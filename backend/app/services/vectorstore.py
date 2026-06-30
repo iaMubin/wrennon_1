@@ -12,11 +12,16 @@ from __future__ import annotations
 
 import chromadb
 import cohere
-from chromadb.utils.embedding_functions import CohereEmbeddingFunction
 
 from app.config import settings
+from app.services.cohere_embeddings import CohereEmbedder, CohereQueryEmbedder
 
-_cohere_ef = CohereEmbeddingFunction(
+_doc_embedder = CohereEmbedder(
+    api_key=settings.cohere_api_key,
+    model_name="embed-english-v3.0",
+)
+
+_query_embedder = CohereQueryEmbedder(
     api_key=settings.cohere_api_key,
     model_name="embed-english-v3.0",
 )
@@ -24,7 +29,7 @@ _cohere_ef = CohereEmbeddingFunction(
 _chroma_client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
 _collection = _chroma_client.get_or_create_collection(
     settings.chroma_collection_name,
-    embedding_function=_cohere_ef,
+    embedding_function=_doc_embedder,
 )
 _cohere_client = cohere.Client(settings.cohere_api_key)
 
@@ -37,10 +42,12 @@ def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
         {"text": str, "relevance_score": float}
         Empty list if the collection has no documents yet.
     """
-    # ChromaDB uses the CohereEmbeddingFunction we registered on the
-    # collection, so we just pass the query text — no manual encoding.
+    # Use search_query input_type for queries (Cohere v3 models
+    # produce better results when document vs query is distinguished)
+    query_embedding = _query_embedder.embed_query(query)
+
     results = _collection.query(
-        query_texts=[query],
+        query_embeddings=[query_embedding],
         n_results=max(top_k * 3, 5),  # over-fetch so reranking has real choices
     )
 

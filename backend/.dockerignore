@@ -1,0 +1,9 @@
+# Don't copy these into the Docker image
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+data/chroma_store/
+data/*.db
+.git/

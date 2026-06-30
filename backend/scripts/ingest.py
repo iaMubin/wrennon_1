@@ -25,11 +25,11 @@ from pathlib import Path
 
 import chromadb
 import fitz
-from chromadb.utils.embedding_functions import CohereEmbeddingFunction
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.config import settings  # noqa: E402
+from app.services.cohere_embeddings import CohereEmbedder  # noqa: E402
 
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
@@ -67,7 +67,7 @@ def main() -> None:
     chunks = load_documents(docs_dir)
     print(f"Loaded {len(chunks)} chunks from {docs_dir}")
 
-    cohere_ef = CohereEmbeddingFunction(
+    cohere_ef = CohereEmbedder(
         api_key=settings.cohere_api_key,
         model_name="embed-english-v3.0",
     )
@@ -82,8 +82,8 @@ def main() -> None:
         embedding_function=cohere_ef,
     )
 
-    # ChromaDB + CohereEmbeddingFunction handles embedding automatically
-    # when we pass documents without explicit embeddings.
+    # ChromaDB calls cohere_ef automatically when we pass documents
+    # without explicit embeddings.
     collection.add(
         ids=[f"chunk-{i}" for i in range(len(chunks))],
         documents=chunks,
