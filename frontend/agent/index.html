@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wrennon Agent Console</title>
+<link rel="stylesheet" href="agent.css">
+</head>
+<body>
+
+  <!-- Login screen -->
+  <div id="login-screen">
+    <form id="login-form">
+      <h1>Agent Console</h1>
+      <label for="username">Username</label>
+      <input id="username" type="text" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <button type="submit">Log in</button>
+      <p id="login-error" class="error hidden">Incorrect username or password.</p>
+    </form>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="hidden">
+    <aside id="sidebar">
+      <div id="sidebar-header">
+        <span id="brand">Wrennon</span>
+        <span id="connection-dot" class="dot dot--offline" title="Connection status"></span>
+      </div>
+
+      <nav id="section-tabs">
+        <button class="tab tab--active" data-section="attention">
+          Needs attention <span id="attention-count" class="count">0</span>
+        </button>
+        <button class="tab" data-section="all">All conversations</button>
+      </nav>
+
+      <div id="conversation-list"></div>
+    </aside>
+
+    <main id="conversation-view">
+      <div id="empty-state">
+        <p>Select a conversation to view it here.</p>
+      </div>
+
+      <div id="active-conversation" class="hidden">
+        <header id="conversation-header">
+          <div>
+            <span id="conversation-email"></span>
+            <span id="conversation-session"></span>
+          </div>
+          <button id="resolve-btn">Mark resolved</button>
+        </header>
+
+        <div id="agent-messages"></div>
+
+        <div id="agent-input-row">
+          <input id="agent-message-input" type="text" placeholder="Type a reply" autocomplete="off">
+          <button id="agent-send-btn">Send</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="agent.js?v=4"></script>
+</body>
+</html>

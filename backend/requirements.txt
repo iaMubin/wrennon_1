@@ -1,0 +1,38 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# Orchestration
+langgraph==0.2.62
+langchain-core==0.3.28
+
+# LLM
+groq==0.15.0
+
+# Embeddings + vector store
+chromadb==0.5.23
+posthog==3.7.4
+sentence-transformers==3.3.1
+
+# Reranking
+cohere==5.13.4
+
+# PDF ingestion (policy docs)
+pymupdf==1.25.1
+langchain-text-splitters==0.3.4
+
+python-dotenv==1.0.1
+
+# Database (SQLite via SQLAlchemy ORM — easy migration path to Postgres later)
+sqlalchemy==2.0.36
+alembic==1.14.0
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.20
+
+# WebSocket (uvicorn[standard] already includes the websockets package,
+# this is just here as an explicit reminder of the dependency)
+websockets==14.1
