@@ -17,7 +17,6 @@ class Settings(BaseSettings):
 
     chroma_persist_dir: str = "./data/chroma_store"
     chroma_collection_name: str = "policy_docs"
-    embedding_model: str = "BAAI/bge-large-en-v1.5"
 
     app_env: str = "development"
     cors_allowed_origins: str = "http://localhost:5500"

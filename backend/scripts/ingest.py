@@ -12,6 +12,10 @@ fused into policy content) that tanked Cohere relevance scores.
 
 Re-running clears and rebuilds the collection rather than appending,
 so stale chunks never linger.
+
+Embeddings are computed via Cohere's API (embed-english-v3.0) instead
+of a local sentence-transformers model — keeps RAM under 512 MB for
+Render's free tier.
 """
 
 from __future__ import annotations
@@ -21,8 +25,8 @@ from pathlib import Path
 
 import chromadb
 import fitz
+from chromadb.utils.embedding_functions import CohereEmbeddingFunction
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from sentence_transformers import SentenceTransformer
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.config import settings  # noqa: E402
@@ -63,20 +67,26 @@ def main() -> None:
     chunks = load_documents(docs_dir)
     print(f"Loaded {len(chunks)} chunks from {docs_dir}")
 
+    cohere_ef = CohereEmbeddingFunction(
+        api_key=settings.cohere_api_key,
+        model_name="embed-english-v3.0",
+    )
+
     client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
     try:
         client.delete_collection(settings.chroma_collection_name)
     except Exception:
         pass  # collection didn't exist yet — nothing to clear, fine on first run
-    collection = client.create_collection(settings.chroma_collection_name)
+    collection = client.create_collection(
+        settings.chroma_collection_name,
+        embedding_function=cohere_ef,
+    )
 
-    embedder = SentenceTransformer(settings.embedding_model)
-    embeddings = embedder.encode(chunks).tolist()
-
+    # ChromaDB + CohereEmbeddingFunction handles embedding automatically
+    # when we pass documents without explicit embeddings.
     collection.add(
         ids=[f"chunk-{i}" for i in range(len(chunks))],
         documents=chunks,
-        embeddings=embeddings,
     )
 
     print(f"Ingested {len(chunks)} chunks into collection '{settings.chroma_collection_name}'")

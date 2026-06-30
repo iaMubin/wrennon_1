@@ -1,19 +1,31 @@
 """
-Vector store access: ChromaDB for retrieval, Cohere for reranking the
-candidates before they're handed to the LLM.
+Vector store access: ChromaDB for retrieval, Cohere for both
+embeddings and reranking.
+
+Embeddings are generated via Cohere's API (embed-english-v3.0) instead
+of a local sentence-transformers model. This keeps RAM usage under the
+512 MB limit on Render's free tier — sentence-transformers + PyTorch
+alone would consume ~500 MB before any application code even loads.
 """
 
 from __future__ import annotations
 
 import chromadb
 import cohere
-from sentence_transformers import SentenceTransformer
+from chromadb.utils.embedding_functions import CohereEmbeddingFunction
 
 from app.config import settings
 
+_cohere_ef = CohereEmbeddingFunction(
+    api_key=settings.cohere_api_key,
+    model_name="embed-english-v3.0",
+)
+
 _chroma_client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
-_collection = _chroma_client.get_or_create_collection(settings.chroma_collection_name)
-_embedder = SentenceTransformer(settings.embedding_model)
+_collection = _chroma_client.get_or_create_collection(
+    settings.chroma_collection_name,
+    embedding_function=_cohere_ef,
+)
 _cohere_client = cohere.Client(settings.cohere_api_key)
 
 
@@ -25,10 +37,10 @@ def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
         {"text": str, "relevance_score": float}
         Empty list if the collection has no documents yet.
     """
-    query_embedding = _embedder.encode(query).tolist()
-
+    # ChromaDB uses the CohereEmbeddingFunction we registered on the
+    # collection, so we just pass the query text — no manual encoding.
     results = _collection.query(
-        query_embeddings=[query_embedding],
+        query_texts=[query],
         n_results=max(top_k * 3, 5),  # over-fetch so reranking has real choices
     )
 
