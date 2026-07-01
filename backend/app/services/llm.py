@@ -96,12 +96,13 @@ def classify_intent(messages: list) -> str:
     for context. Returns one of: 'greeting', 'order', 'handoff', or 'rag'."""
     prompt = (
         "Analyze the conversation and classify the LAST user message's intent. "
-        "Return EXACTLY ONE word from this list: [greeting, order, handoff, rag].\n"
+        "Return EXACTLY ONE word from this list: [greeting, order, handoff, resolved, rag].\n"
         "Rules:\n"
         "1. handoff: The user wants to speak with a human, agent, representative, or demands human support.\n"
         "2. order: The user is asking about an order status, provides an order number, or follows up on a previous order inquiry.\n"
         "3. greeting: The user is just saying hello, without any other request.\n"
-        "4. rag: Everything else, including questions about store policies, returns, or general info."
+        "4. resolved: The user is expressing that their problem is solved, thanking you and leaving, or saying goodbye because the chat is over.\n"
+        "5. rag: Everything else, including questions about store policies, returns, or general info."
     )
     
     # Build conversation history for the LLM
@@ -116,7 +117,7 @@ def classify_intent(messages: list) -> str:
     result = _safe_llm_call(messages=llm_messages, temperature=0.0, max_tokens=100)
     intent = result.lower() if result else "rag"
     logger.info(f"Classified intent as: {intent}")
-    if intent not in ["greeting", "order", "handoff", "rag"]:
+    if intent not in ["greeting", "order", "handoff", "resolved", "rag"]:
         return "rag"
     return intent
 

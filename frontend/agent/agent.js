@@ -226,6 +226,9 @@ resolveBtn.addEventListener("click", async () => {
   if (!activeSessionId) return;
   const result = await authedFetch(`/agent/conversations/${activeSessionId}/resolve`, "POST");
   if (result) {
+    resolveBtn.textContent = "Resolved";
+    resolveBtn.disabled = true;
+    resolveBtn.classList.remove("btn-primary");
     loadConversations();
   }
 });

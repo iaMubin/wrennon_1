@@ -16,6 +16,7 @@ from app.graph.nodes.handoff_node import handoff_node
 from app.graph.nodes.order_node import order_node
 from app.graph.nodes.rag_node import rag_node
 from app.graph.nodes.reply_node import reply_node
+from app.graph.nodes.resolved_node import resolved_node
 from app.graph.state import ConversationState
 from app.services.llm import classify_intent
 
@@ -46,6 +47,7 @@ def build_graph():
     graph.add_node("rag", rag_node)
     graph.add_node("order", order_node)
     graph.add_node("handoff", handoff_node)
+    graph.add_node("resolved", resolved_node)
     graph.add_node("reply", reply_node)
 
     graph.set_conditional_entry_point(
@@ -55,6 +57,7 @@ def build_graph():
             "rag": "rag",
             "order": "order",
             "handoff": "handoff",
+            "resolved": "resolved",
         },
     )
 
@@ -62,6 +65,7 @@ def build_graph():
     graph.add_edge("rag", "reply")
     graph.add_edge("order", "reply")
     graph.add_edge("handoff", "reply")
+    graph.add_edge("resolved", END)
     graph.add_edge("reply", END)
 
     # --- L3/L4 extension point ---

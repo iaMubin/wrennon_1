@@ -173,6 +173,16 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     "ticket_id": updated_state["handoff_ticket_id"],
                     "summary": summary,
                 })
+            elif updated_state.get("conversation_mode") == "resolved":
+                conversation.resolved = True
+                conversation.resolved_at = datetime.datetime.utcnow()
+                conversation.handoff_active = False
+                db.commit()
+                
+                await manager.broadcast_to_agents({
+                    "type": "reopen",  # Re-use reopen event to force UI refresh
+                    "session_id": session_id,
+                })
 
             await websocket.send_json({"reply": reply_text})
 
