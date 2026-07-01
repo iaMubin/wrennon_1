@@ -141,6 +141,12 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
             if updated_state.get("handoff_ticket_id"):
                 conversation.handoff_active = True
                 conversation.handoff_ticket_id = updated_state["handoff_ticket_id"]
+                
+                if conversation.resolved:
+                    conversation.resolved = False
+                    conversation.resolved_at = None
+                    conversation.reopen_count += 1
+                    
                 db.commit()
 
                 # Save the AI-generated summary as a system message
