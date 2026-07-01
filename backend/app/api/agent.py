@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_agent
 from app.auth.security import create_access_token, verify_password
 from app.config import settings
-from app.db.models import Conversation, Message
+from app.db.models import Agent, Conversation, Message
 from app.db.session import get_db
 from app.realtime.connection_manager import manager
 
@@ -24,21 +24,18 @@ router = APIRouter()
 
 
 @router.post("/agent/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends()) -> dict:
-    correct_username = form_data.username == settings.agent_username
-    correct_password = (
-        settings.agent_password_hash
-        and verify_password(form_data.password, settings.agent_password_hash)
-    )
-    if not (correct_username and correct_password):
-        # Deliberately the same error for "wrong username" and "wrong
-        # password" — a different message for each would let an
-        # attacker confirm whether a given username exists at all.
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+) -> dict:
+    agent = db.query(Agent).filter(Agent.username == form_data.username).first()
+    
+    if not agent or not verify_password(form_data.password, agent.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
         )
-    token = create_access_token(subject=form_data.username)
+    token = create_access_token(subject=agent.username)
     return {"access_token": token, "token_type": "bearer"}
 
 
@@ -47,13 +44,23 @@ def needs_attention(
     db: Session = Depends(get_db),
     agent: str = Depends(get_current_agent),
 ) -> list[dict]:
-    """Section 1 of the agent widget: conversations where the AI has
-    handed off and an agent hasn't marked it resolved yet. Per Mubin's
-    decision, a conversation stays here even after an agent has
-    replied — only an explicit resolve action removes it."""
     conversations = (
         db.query(Conversation)
         .filter_by(handoff_active=True, resolved=False)
+        .order_by(Conversation.updated_at.desc())
+        .all()
+    )
+    return [_conversation_summary(c) for c in conversations]
+
+
+@router.get("/agent/conversations/active")
+def active_chats(
+    db: Session = Depends(get_db),
+    agent: str = Depends(get_current_agent),
+) -> list[dict]:
+    conversations = (
+        db.query(Conversation)
+        .filter_by(handoff_active=False, resolved=False)
         .order_by(Conversation.updated_at.desc())
         .all()
     )
@@ -65,8 +72,12 @@ def all_conversations(
     db: Session = Depends(get_db),
     agent: str = Depends(get_current_agent),
 ) -> list[dict]:
-    """Section 2: every conversation, regardless of handoff state."""
-    conversations = db.query(Conversation).order_by(Conversation.updated_at.desc()).all()
+    conversations = (
+        db.query(Conversation)
+        .order_by(Conversation.updated_at.desc())
+        .limit(50)
+        .all()
+    )
     return [_conversation_summary(c) for c in conversations]
 
 
@@ -105,12 +116,21 @@ def resolve_conversation(
 
 def _conversation_summary(c: Conversation) -> dict:
     last_message = c.messages[-1].content if c.messages else None
+    
+    stage = "AI"
+    if c.resolved:
+        stage = "Resolved"
+    elif c.handoff_active:
+        stage = "Human Agent"
+
     return {
         "session_id": c.session_id,
+        "short_id": getattr(c, "short_id", "CUST-XXXX"),
         "customer_email": c.customer_email,
         "handoff_active": c.handoff_active,
         "resolved": c.resolved,
-        "reopen_count": c.reopen_count,
+        "reopen_count": getattr(c, "reopen_count", 0),
+        "stage": stage,
         "last_message": last_message,
         "updated_at": c.updated_at.isoformat(),
     }

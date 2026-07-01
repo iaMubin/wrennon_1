@@ -29,12 +29,17 @@ def _new_uuid() -> str:
     return str(uuid.uuid4())
 
 
+def _generate_short_id() -> str:
+    return f"CUST-{uuid.uuid4().hex[:6].upper()}"
+
+
 class Conversation(Base):
     __tablename__ = "conversations"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     session_id: Mapped[str] = mapped_column(String, unique=True, index=True)
     customer_email: Mapped[str | None] = mapped_column(String, nullable=True)
+    short_id: Mapped[str] = mapped_column(String, default=_generate_short_id)
 
     # --- Handoff / resolution tracking ---
     # handoff_active: True the moment the AI escalates. Stays True until
@@ -79,3 +84,15 @@ class Message(Base):
     )
 
     conversation: Mapped["Conversation"] = relationship(back_populates="messages")
+
+
+class Agent(Base):
+    __tablename__ = "agents"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
+    username: Mapped[str] = mapped_column(String, unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String)
+
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=datetime.datetime.utcnow
+    )

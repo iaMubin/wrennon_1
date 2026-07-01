@@ -1,7 +1,4 @@
 // ── Backend URL detection ──────────────────────────────────────────
-// Same pattern as widget.js — auto-detects local vs production.
-// After deploying to Render, replace the placeholder below with
-// your actual Render service hostname.
 const _RENDER_HOST = "wrennon-backend.onrender.com";  // ← UPDATE THIS after Render deploy
 const _IS_LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1";
 const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/api`;
@@ -10,8 +7,8 @@ const WS_URL  = `${_IS_LOCAL ? "ws"   : "wss"}://${_IS_LOCAL ? "localhost:8000" 
 let accessToken = null;
 let socket = null;
 let activeSessionId = null;
-let activeSection = "attention"; // "attention" | "all"
-const drafts = {}; // Store drafts per session_id
+let activeSection = "attention"; // "attention" | "active" | "all"
+const drafts = {};
 
 // --- Elements ---
 const loginScreen = document.getElementById("login-screen");
@@ -22,6 +19,7 @@ const connectionDot = document.getElementById("connection-dot");
 const sectionTabs = document.querySelectorAll(".tab");
 const conversationList = document.getElementById("conversation-list");
 const attentionCount = document.getElementById("attention-count");
+const activeCount = document.getElementById("active-count");
 const emptyState = document.getElementById("empty-state");
 const activeConversationEl = document.getElementById("active-conversation");
 const conversationEmail = document.getElementById("conversation-email");
@@ -32,17 +30,12 @@ const agentSendBtn = document.getElementById("agent-send-btn");
 const resolveBtn = document.getElementById("resolve-btn");
 
 // --- Login ---
-
 loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   loginError.classList.add("hidden");
 
   const username = document.getElementById("username").value;
   const password = document.getElementById("password").value;
-
-  // OAuth2PasswordRequestForm (FastAPI's standard login dependency)
-  // expects form-encoded data, not JSON — hence URLSearchParams here
-  // instead of JSON.stringify.
   const body = new URLSearchParams({ username, password });
 
   try {
@@ -70,8 +63,7 @@ loginForm.addEventListener("submit", async (e) => {
   }
 });
 
-// --- WebSocket (live updates from the backend) ---
-
+// --- WebSocket ---
 function connectSocket() {
   socket = new WebSocket(`${WS_URL}?token=${accessToken}`);
 
@@ -83,37 +75,28 @@ function connectSocket() {
   socket.onclose = () => {
     connectionDot.classList.remove("dot--online");
     connectionDot.classList.add("dot--offline");
+    setTimeout(connectSocket, 3000); // Reconnect
   };
 
   socket.onmessage = (event) => {
     let data;
-    try {
-      data = JSON.parse(event.data);
-    } catch (err) {
-      console.error("Failed to parse WebSocket message:", err);
-      return;
-    }
+    try { data = JSON.parse(event.data); } catch (err) { return; }
 
-    if (data.type === "handoff") {
+    if (data.type === "handoff" || data.type === "reopen") {
       loadConversations();
       if (data.session_id === activeSessionId && data.summary) {
         appendMessage("system", `📋 Summary: ${data.summary}`);
       }
-    } else if (data.type === "reopen") {
-      // A previously resolved conversation was reopened by the customer
-      loadConversations();
     } else if (data.type === "new_message") {
       if (data.session_id === activeSessionId) {
         appendMessage(data.sender, data.content);
-      } else {
-        loadConversations();
       }
+      loadConversations();
     }
   };
 }
 
-// --- Section tabs ---
-
+// --- Section Tabs ---
 sectionTabs.forEach((tab) => {
   tab.addEventListener("click", () => {
     sectionTabs.forEach((t) => t.classList.remove("tab--active"));
@@ -124,21 +107,23 @@ sectionTabs.forEach((tab) => {
 });
 
 // --- Loading conversation lists ---
-
 async function loadConversations() {
-  const endpoint = activeSection === "attention"
-    ? "/agent/conversations/needs-attention"
-    : "/agent/conversations";
-
+  const endpoints = {
+    "attention": "/agent/conversations/needs-attention",
+    "active": "/agent/conversations/active",
+    "all": "/agent/conversations"
+  };
+  
+  const endpoint = endpoints[activeSection] || endpoints["attention"];
   const conversations = await authedFetch(endpoint);
   if (!conversations) return;
 
-  // The "needs attention" count badge always reflects that section's
-  // count specifically, regardless of which tab is currently open.
-  const attentionList = activeSection === "attention"
-    ? conversations
-    : await authedFetch("/agent/conversations/needs-attention");
-  attentionCount.textContent = attentionList ? attentionList.length : 0;
+  // Always update the badges
+  const attnList = activeSection === "attention" ? conversations : await authedFetch(endpoints["attention"]);
+  if (attnList) attentionCount.textContent = attnList.length;
+  
+  const actList = activeSection === "active" ? conversations : await authedFetch(endpoints["active"]);
+  if (actList) activeCount.textContent = actList.length;
 
   renderConversationList(conversations);
 }
@@ -147,43 +132,49 @@ function renderConversationList(conversations) {
   conversationList.innerHTML = "";
 
   for (const conv of conversations) {
-    const item = document.createElement("button");
+    const item = document.createElement("div");
     item.className = "conv-item";
     if (conv.handoff_active && !conv.resolved) item.classList.add("conv-item--urgent");
-    if (conv.reopen_count > 0) item.classList.add("conv-item--reopened");
     if (conv.session_id === activeSessionId) item.classList.add("conv-item--selected");
+
+    let badgeClass = "badge--ai";
+    if (conv.stage === "Human Agent") badgeClass = "badge--human";
+    if (conv.stage === "Resolved") badgeClass = "badge--resolved";
 
     const reopenBadge = conv.reopen_count > 0
       ? `<span class="conv-item__reopen-badge">↩ Reopened${conv.reopen_count > 1 ? ` ×${conv.reopen_count}` : ""}</span>`
       : "";
 
     item.innerHTML = `
-      <div class="conv-item__top">
-        <span class="conv-item__email">${escapeHtml(conv.customer_email || "Unknown customer")}${reopenBadge}</span>
-        <span class="conv-item__time">${formatTime(conv.updated_at)}</span>
+      <div class="conv-item-header">
+        <span class="conv-item-email">${escapeHtml(conv.customer_email || "Unknown Customer")}</span>
+        <span class="conv-item-time">${formatTime(conv.updated_at)}</span>
       </div>
-      <div class="conv-item__preview">${escapeHtml(conv.last_message || "No messages yet")}</div>
+      <div class="conv-item-preview">${escapeHtml(conv.last_message || "No messages yet")}</div>
+      <div class="badge-row">
+        <span class="badge ${badgeClass}">${conv.stage}</span>
+        ${reopenBadge}
+      </div>
     `;
 
-    item.addEventListener("click", () => openConversation(conv.session_id, conv.customer_email));
+    item.addEventListener("click", () => openConversation(conv.session_id, conv.customer_email, conv.short_id));
     conversationList.appendChild(item);
   }
 }
 
 // --- Opening and viewing a conversation ---
-
-async function openConversation(sessionId, customerEmail) {
+async function openConversation(sessionId, customerEmail, shortId) {
   if (activeSessionId && activeSessionId !== sessionId) {
-    drafts[activeSessionId] = agentInput.value; // Save previous draft
+    drafts[activeSessionId] = agentInput.value;
   }
   activeSessionId = sessionId;
   emptyState.classList.add("hidden");
   activeConversationEl.classList.remove("hidden");
   
-  agentInput.value = drafts[sessionId] || ""; // Restore draft or clear
+  agentInput.value = drafts[sessionId] || "";
 
-  conversationEmail.textContent = customerEmail || "Unknown customer";
-  conversationSession.textContent = sessionId;
+  conversationEmail.textContent = customerEmail || "Unknown Customer";
+  conversationSession.textContent = shortId || sessionId;
 
   agentMessages.innerHTML = "";
   const messages = await authedFetch(`/agent/conversations/${sessionId}/messages`);
@@ -192,22 +183,19 @@ async function openConversation(sessionId, customerEmail) {
       appendMessage(msg.sender, msg.content);
     }
   }
-
-  // Re-render the list so the newly-selected item gets highlighted.
+  
   loadConversations();
 }
 
 function appendMessage(sender, content) {
   const div = document.createElement("div");
-  div.className = `amsg amsg--${sender}`;
-  const label = { human: "Customer", ai: "AI", agent: "You", system: "Summary" }[sender] || sender;
-  div.innerHTML = `<span class="amsg__label">${label}</span>${escapeHtml(content)}`;
+  div.className = `msg msg--${sender}`;
+  div.innerHTML = `${escapeHtml(content)}`;
   agentMessages.appendChild(div);
   agentMessages.scrollTop = agentMessages.scrollHeight;
 }
 
 // --- Sending a reply ---
-
 agentSendBtn.addEventListener("click", sendAgentReply);
 agentInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendAgentReply();
@@ -220,11 +208,10 @@ function sendAgentReply() {
   socket.send(JSON.stringify({ session_id: activeSessionId, message: text }));
   appendMessage("agent", text);
   agentInput.value = "";
-  drafts[activeSessionId] = ""; // Clear draft after sending
+  drafts[activeSessionId] = ""; 
 }
 
 // --- Resolving a conversation ---
-
 resolveBtn.addEventListener("click", async () => {
   if (!activeSessionId) return;
   const result = await authedFetch(`/agent/conversations/${activeSessionId}/resolve`, "POST");
@@ -234,17 +221,13 @@ resolveBtn.addEventListener("click", async () => {
 });
 
 // --- Helpers ---
-
 async function authedFetch(path, method = "GET") {
   try {
     const response = await fetch(`${API_BASE}${path}`, {
       method,
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    if (!response.ok) {
-      console.error(`Request to ${path} failed: ${response.status}`);
-      return null;
-    }
+    if (!response.ok) return null;
     return await response.json();
   } catch (err) {
     console.error(err);

@@ -34,7 +34,10 @@
         <button class="tab tab--active" data-section="attention">
           Needs attention <span id="attention-count" class="count">0</span>
         </button>
-        <button class="tab" data-section="all">All conversations</button>
+        <button class="tab" data-section="active">
+          Active Chats <span id="active-count" class="count">0</span>
+        </button>
+        <button class="tab" data-section="all">All history</button>
       </nav>
 
       <div id="conversation-list"></div>
@@ -47,9 +50,9 @@
 
       <div id="active-conversation" class="hidden">
         <header id="conversation-header">
-          <div>
-            <span id="conversation-email"></span>
-            <span id="conversation-session"></span>
+          <div class="conv-header-info">
+            <h2 id="conversation-email">Unknown Customer</h2>
+            <span id="conversation-session" class="short-id">CUST-XXXX</span>
           </div>
           <button id="resolve-btn">Mark resolved</button>
         </header>
