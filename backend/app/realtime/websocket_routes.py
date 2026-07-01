@@ -73,6 +73,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                 "type": "reopen",
                 "session_id": session_id,
                 "reopen_count": conversation.reopen_count,
+                "is_resolved": conversation.resolved,
             })
 
         while True:
@@ -88,6 +89,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                 "session_id": session_id,
                 "sender": "human",
                 "content": customer_text,
+                "is_resolved": conversation.resolved,
             })
 
             # Refresh conversation state from DB (in case agent resolved while we were waiting)
@@ -104,6 +106,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     "type": "reopen",
                     "session_id": session_id,
                     "reopen_count": conversation.reopen_count,
+                    "is_resolved": conversation.resolved,
                 })
 
             if conversation.handoff_active and not conversation.resolved:
@@ -149,6 +152,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                 "session_id": session_id,
                 "sender": "ai",
                 "content": reply_text,
+                "is_resolved": conversation.resolved,
             })
 
             if updated_state.get("handoff_ticket_id"):
@@ -172,6 +176,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     "session_id": session_id,
                     "ticket_id": updated_state["handoff_ticket_id"],
                     "summary": summary,
+                    "is_resolved": conversation.resolved,
                 })
             elif updated_state.get("conversation_mode") == "resolved":
                 conversation.resolved = True
@@ -182,6 +187,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                 await manager.broadcast_to_agents({
                     "type": "reopen",  # Re-use reopen event to force UI refresh
                     "session_id": session_id,
+                    "is_resolved": conversation.resolved,
                 })
 
             await websocket.send_json({"reply": reply_text})
@@ -226,6 +232,7 @@ async def agent_websocket(websocket: WebSocket, token: str):
                     "type": "handoff",
                     "session_id": session_id,
                     "ticket_id": "manual_intervention",
+                    "is_resolved": conversation.resolved,
                 })
 
             # Customer receives same shape as AI reply — seamless handoff.

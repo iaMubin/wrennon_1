@@ -84,12 +84,32 @@ function connectSocket() {
 
     if (data.type === "handoff" || data.type === "reopen") {
       loadConversations();
-      if (data.session_id === activeSessionId && data.summary) {
-        appendMessage("system", `📋 Summary: ${data.summary}`);
+      if (data.session_id === activeSessionId) {
+        if (data.summary) {
+          appendMessage("system", `📋 Summary: ${data.summary}`);
+        }
+        if (data.is_resolved) {
+          resolveBtn.textContent = "Resolved";
+          resolveBtn.disabled = true;
+          resolveBtn.classList.remove("btn-primary");
+        } else {
+          resolveBtn.textContent = "Mark resolved";
+          resolveBtn.disabled = false;
+          resolveBtn.classList.add("btn-primary");
+        }
       }
     } else if (data.type === "new_message") {
       if (data.session_id === activeSessionId) {
         appendMessage(data.sender, data.content);
+        if (data.is_resolved) {
+          resolveBtn.textContent = "Resolved";
+          resolveBtn.disabled = true;
+          resolveBtn.classList.remove("btn-primary");
+        } else {
+          resolveBtn.textContent = "Mark resolved";
+          resolveBtn.disabled = false;
+          resolveBtn.classList.add("btn-primary");
+        }
       }
       loadConversations();
     }
