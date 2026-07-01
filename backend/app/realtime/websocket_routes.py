@@ -93,6 +93,19 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
             # Refresh conversation state from DB (in case agent resolved while we were waiting)
             db.refresh(conversation)
 
+            # If the customer sends a message after resolution, it automatically reopens
+            if conversation.resolved:
+                conversation.resolved = False
+                conversation.resolved_at = None
+                conversation.reopen_count += 1
+                db.commit()
+                # Notify agents
+                await manager.broadcast_to_agents({
+                    "type": "reopen",
+                    "session_id": session_id,
+                    "reopen_count": conversation.reopen_count,
+                })
+
             if conversation.handoff_active and not conversation.resolved:
                 # A human agent already owns this conversation — the AI stays silent.
                 continue

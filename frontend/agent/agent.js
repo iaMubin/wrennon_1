@@ -157,13 +157,13 @@ function renderConversationList(conversations) {
       </div>
     `;
 
-    item.addEventListener("click", () => openConversation(conv.session_id, conv.customer_email, conv.short_id));
+    item.addEventListener("click", () => openConversation(conv.session_id, conv.customer_email, conv.short_id, conv.resolved));
     conversationList.appendChild(item);
   }
 }
 
 // --- Opening and viewing a conversation ---
-async function openConversation(sessionId, customerEmail, shortId) {
+async function openConversation(sessionId, customerEmail, shortId, isResolved) {
   if (activeSessionId && activeSessionId !== sessionId) {
     drafts[activeSessionId] = agentInput.value;
   }
@@ -175,6 +175,16 @@ async function openConversation(sessionId, customerEmail, shortId) {
 
   conversationEmail.textContent = customerEmail || "Unknown Customer";
   conversationSession.textContent = shortId || sessionId;
+  
+  if (isResolved) {
+    resolveBtn.textContent = "Resolved";
+    resolveBtn.disabled = true;
+    resolveBtn.classList.remove("btn-primary");
+  } else {
+    resolveBtn.textContent = "Mark resolved";
+    resolveBtn.disabled = false;
+    resolveBtn.classList.add("btn-primary");
+  }
 
   agentMessages.innerHTML = "";
   const messages = await authedFetch(`/agent/conversations/${sessionId}/messages`);

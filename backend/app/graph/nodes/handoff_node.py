@@ -36,7 +36,6 @@ def handoff_node(state: ConversationState) -> ConversationState:
 
     state["handoff_ticket_id"] = ticket["ticket_id"]
     state["handoff_summary"] = conversation_summary
-    state["handoff_requested"] = False
     state["conversation_mode"] = "pending_human"
 
     return state

@@ -106,7 +106,10 @@ def classify_intent(messages: list) -> str:
     
     # Build conversation history for the LLM
     llm_messages = [{"role": "system", "content": prompt}]
-    for msg in messages:
+    
+    # Only use the last 5 messages so the LLM doesn't get confused by old resolved intents
+    recent_messages = messages[-5:] if len(messages) > 5 else messages
+    for msg in recent_messages:
         role = "user" if msg.type == "human" else "assistant"
         llm_messages.append({"role": role, "content": msg.content})
     
@@ -127,6 +130,7 @@ def generate_final_reply(state: dict) -> str:
         "CRITICAL INSTRUCTIONS: Keep your response concise, professional, and natural. "
         "Do NOT use unnecessary pleasantries, greetings (e.g. 'Hello!', 'I'm happy to help!'), or filler words. "
         "Do NOT repeat information the customer already knows. "
+        "Do NOT offer to transfer to a human unless explicitly instructed in the Context. "
         "Just answer the question or state what action is being taken directly."
     )
     
@@ -154,8 +158,8 @@ def generate_final_reply(state: dict) -> str:
     # Build conversation history for the LLM
     llm_messages = [{"role": "system", "content": system_instruction}]
     
-    # Add conversation history (last 10 messages for context window efficiency)
-    recent_messages = state["messages"][-10:]
+    # Add conversation history (last 5 messages for context window efficiency and precision)
+    recent_messages = state["messages"][-5:]
     for msg in recent_messages[:-1]:  # All except the last (current) message
         role = "user" if msg.type == "human" else "assistant"
         llm_messages.append({"role": role, "content": msg.content})

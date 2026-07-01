@@ -60,7 +60,7 @@ def active_chats(
 ) -> list[dict]:
     conversations = (
         db.query(Conversation)
-        .filter_by(handoff_active=False, resolved=False)
+        .filter_by(resolved=False)
         .order_by(Conversation.updated_at.desc())
         .all()
     )
