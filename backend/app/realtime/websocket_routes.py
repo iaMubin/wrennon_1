@@ -1,23 +1,16 @@
 """
-WebSocket endpoints. This replaces the old POST /api/chat as the
-primary way messages flow — a persistent connection instead of one
-request per message, which is what makes the agent's reply reach the
-customer's widget without the customer refreshing anything.
-
-Two endpoints:
+WebSocket endpoints. Two endpoints:
 - /ws/customer/{session_id} — one customer's conversation
 - /ws/agent — an agent dashboard, sees every conversation
-
-The REST endpoint in api/chat.py still exists, but now only for
-fetching conversation history on initial page load (a WebSocket isn't
-a great fit for "give me everything that already happened" — that's
-a one-time fetch, which REST already does well).
 """
 
 from __future__ import annotations
 
+import datetime
+import re
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from sqlalchemy.orm import Session
 
 from app.auth.security import decode_access_token
@@ -33,16 +26,26 @@ _graph = build_graph()
 
 
 def _get_or_create_conversation(db: Session, session_id: str, customer_email: str | None) -> Conversation:
+    """Look up an existing conversation or create a new one.
+    If the conversation was resolved within 72 hours, reactivate it."""
     conversation = db.query(Conversation).filter_by(session_id=session_id).first()
     if conversation is None:
         conversation = Conversation(session_id=session_id, customer_email=customer_email)
         db.add(conversation)
         db.commit()
         db.refresh(conversation)
+        return conversation
+
+    # Reactivate a resolved conversation (within 72-hour window)
+    if conversation.resolved:
+        conversation.resolved = False
+        conversation.resolved_at = None
+        conversation.reopen_count += 1
+        db.commit()
+        logger.info(f"Conversation {session_id} reopened (count: {conversation.reopen_count})")
+
     return conversation
 
-
-import datetime
 
 def _save_message(db: Session, conversation_id: str, sender: str, content: str) -> Message:
     message = Message(conversation_id=conversation_id, sender=sender, content=content)
@@ -64,6 +67,14 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
     try:
         conversation = _get_or_create_conversation(db, session_id, customer_email=None)
 
+        # Notify agents if this is a reopened conversation
+        if conversation.reopen_count > 0 and not conversation.handoff_active:
+            await manager.broadcast_to_agents({
+                "type": "reopen",
+                "session_id": session_id,
+                "reopen_count": conversation.reopen_count,
+            })
+
         while True:
             data = await websocket.receive_json()
             customer_text = data["message"]
@@ -79,37 +90,37 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                 "content": customer_text,
             })
 
+            # Refresh conversation state from DB (in case agent resolved while we were waiting)
+            db.refresh(conversation)
+
             if conversation.handoff_active and not conversation.resolved:
-                # A human agent already owns this conversation — the AI
-                # stays silent. The agent's reply (sent from the agent
-                # websocket below) is what reaches the customer here,
-                # not anything the graph would generate. This is the
-                # core of the "customer can't tell it's a human"
-                # design: the customer's send/receive flow never
-                # changes shape, only who is actually typing changes.
+                # A human agent already owns this conversation — the AI stays silent.
                 continue
 
             state = initial_state(customer_email=conversation.customer_email)
+
+            # Pass existing ticket_id so handoff_node can reopen it instead of creating new
+            if conversation.handoff_ticket_id:
+                state["existing_ticket_id"] = conversation.handoff_ticket_id
 
             # Load conversation history so the AI has full context
             prev_messages = (
                 db.query(Message)
                 .filter_by(conversation_id=conversation.id)
-                .order_by(Message.id.asc())
+                .order_by(Message.created_at.asc())
                 .all()
             )
             for msg in prev_messages:
                 if msg.sender == "human":
                     state["messages"].append(HumanMessage(content=msg.content))
-                else:
-                    from langchain_core.messages import AIMessage
+                elif msg.sender in ("ai", "agent"):
                     state["messages"].append(AIMessage(content=msg.content))
+                # Skip "system" messages — they're internal summaries
 
             # Add the current message
             state["messages"].append(HumanMessage(content=customer_text))
 
             # Extract order ID from the current message before invoking graph
-            import re
             order_match = re.search(r"#?(\d{4,})", customer_text)
             if order_match:
                 state["order_id"] = order_match.group(1)
@@ -118,7 +129,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
             reply_text = updated_state["messages"][-1].content
 
             _save_message(db, conversation.id, sender="ai", content=reply_text)
-            
+
             # Broadcast AI messages to agent dashboard as well
             await manager.broadcast_to_agents({
                 "type": "new_message",
@@ -155,15 +166,10 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
 
 @router.websocket("/ws/agent")
 async def agent_websocket(websocket: WebSocket, token: str):
-    # Auth check happens BEFORE accepting the connection. A WebSocket
-    # can't use the normal Depends(get_current_agent) pattern used by
-    # REST routes, so the token is verified manually here — same
-    # decode_access_token function, just called directly instead of
-    # through FastAPI's dependency injection.
     username = decode_access_token(token)
     if username is None:
         logger.warning("Agent connection rejected: unauthorized")
-        await websocket.close(code=4401)  # 4401: custom close code for "unauthorized"
+        await websocket.close(code=4401)
         return
 
     logger.info(f"Agent connected: {username}")
@@ -173,7 +179,6 @@ async def agent_websocket(websocket: WebSocket, token: str):
         db = SessionLocal()
         while True:
             data = await websocket.receive_json()
-            # Agent sent a reply to a specific conversation.
             session_id = data["session_id"]
             reply_text = data["message"]
             logger.info(f"Agent {username} replied to conversation {session_id}")
@@ -183,7 +188,7 @@ async def agent_websocket(websocket: WebSocket, token: str):
                 continue
 
             _save_message(db, conversation.id, sender="agent", content=reply_text)
-            
+
             # If agent manually intervenes, lock out the AI.
             if not conversation.handoff_active:
                 conversation.handoff_active = True
@@ -194,11 +199,7 @@ async def agent_websocket(websocket: WebSocket, token: str):
                     "ticket_id": "manual_intervention",
                 })
 
-            # This is the key line for the "seamless" design: the
-            # customer receives this exactly the same shape
-            # ({"reply": ...}) as an AI-generated reply. Nothing in the
-            # customer widget's code path needs to know or care that a
-            # human typed this instead of the graph.
+            # Customer receives same shape as AI reply — seamless handoff.
             await manager.send_to_customer(session_id, {"reply": reply_text})
 
     except WebSocketDisconnect:

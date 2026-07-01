@@ -88,3 +88,30 @@ def create_support_ticket(
         "status": "open",
         "created_at": datetime.datetime.utcnow().isoformat(),
     }
+
+
+def reopen_support_ticket(
+    ticket_id: str,
+    conversation_summary: str,
+) -> dict:
+    """Reopen a previously resolved ticket.
+
+    Real integration target: Gorgias or Zendesk API
+    PUT /api/tickets/{ticket_id}/reopen
+
+    Returns:
+        dict shaped like:
+        {
+            "ticket_id": str,
+            "status": "reopened",
+            "reopened_at": str,   # ISO timestamp
+        }
+    """
+    # --- MOCK BODY ---
+    import datetime
+
+    return {
+        "ticket_id": ticket_id,  # Same ticket ID — not a new one
+        "status": "reopened",
+        "reopened_at": datetime.datetime.utcnow().isoformat(),
+    }

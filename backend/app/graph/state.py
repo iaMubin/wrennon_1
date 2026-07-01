@@ -33,6 +33,7 @@ class ConversationState(TypedDict):
     handoff_requested: bool
     handoff_ticket_id: Optional[str]
     handoff_summary: Optional[str]
+    existing_ticket_id: Optional[str]  # Set when reopening a resolved conversation
     conversation_mode: Literal["bot", "pending_human", "human"]
     # Defaults to "bot". Flips to "pending_human" the moment a handoff is
     # triggered, and to "human" once the ticket is confirmed created.
@@ -62,6 +63,7 @@ def initial_state(customer_email: Optional[str] = None) -> ConversationState:
         handoff_requested=False,
         handoff_ticket_id=None,
         handoff_summary=None,
+        existing_ticket_id=None,
         conversation_mode="bot",
         otp_verified=None,
         subscription_action=None,

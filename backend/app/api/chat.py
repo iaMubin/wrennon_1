@@ -7,6 +7,8 @@ WebSocket connection takes over for everything that happens next.
 
 from __future__ import annotations
 
+import datetime
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -14,6 +16,30 @@ from app.db.models import Conversation
 from app.db.session import get_db
 
 router = APIRouter()
+
+REOPEN_WINDOW_HOURS = 72
+
+
+@router.get("/chat/{session_id}/status")
+def session_status(session_id: str, db: Session = Depends(get_db)) -> dict:
+    """Check whether a session is still usable or expired."""
+    conversation = db.query(Conversation).filter_by(session_id=session_id).first()
+    if conversation is None:
+        return {"status": "not_found"}
+
+    if not conversation.resolved:
+        return {"status": "active"}
+
+    # Conversation was resolved — check if within 72-hour window
+    if conversation.resolved_at:
+        elapsed = datetime.datetime.utcnow() - conversation.resolved_at
+        if elapsed.total_seconds() < REOPEN_WINDOW_HOURS * 3600:
+            return {"status": "resolved_recent"}
+        else:
+            return {"status": "expired"}
+
+    # resolved=True but no resolved_at (legacy data) — treat as expired
+    return {"status": "expired"}
 
 
 @router.get("/chat/{session_id}/history")
@@ -33,4 +59,5 @@ def get_history(session_id: str, db: Session = Depends(get_db)) -> list[dict]:
             "content": m.content,
         }
         for m in conversation.messages
+        if m.sender != "system"  # Hide internal summaries from customer
     ]

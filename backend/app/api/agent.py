@@ -7,6 +7,8 @@ these REST routes are for the initial page load only.
 
 from __future__ import annotations
 
+import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -16,6 +18,7 @@ from app.auth.security import create_access_token, verify_password
 from app.config import settings
 from app.db.models import Conversation, Message
 from app.db.session import get_db
+from app.realtime.connection_manager import manager
 
 router = APIRouter()
 
@@ -94,8 +97,10 @@ def resolve_conversation(
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
     conversation.resolved = True
+    conversation.resolved_at = datetime.datetime.utcnow()
+    conversation.handoff_active = False
     db.commit()
-    return {"status": "resolved"}
+    return {"status": "resolved", "session_id": session_id}
 
 
 def _conversation_summary(c: Conversation) -> dict:
@@ -105,6 +110,7 @@ def _conversation_summary(c: Conversation) -> dict:
         "customer_email": c.customer_email,
         "handoff_active": c.handoff_active,
         "resolved": c.resolved,
+        "reopen_count": c.reopen_count,
         "last_message": last_message,
         "updated_at": c.updated_at.isoformat(),
     }

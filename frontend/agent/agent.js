@@ -86,20 +86,23 @@ function connectSocket() {
   };
 
   socket.onmessage = (event) => {
-    const data = JSON.parse(event.data);
+    let data;
+    try {
+      data = JSON.parse(event.data);
+    } catch (err) {
+      console.error("Failed to parse WebSocket message:", err);
+      return;
+    }
 
     if (data.type === "handoff") {
-      // A conversation just escalated — refresh the list so it shows
-      // up in "Needs attention" without the agent having to reload.
       loadConversations();
-      // If this conversation is currently open, show the summary
       if (data.session_id === activeSessionId && data.summary) {
         appendMessage("system", `📋 Summary: ${data.summary}`);
       }
+    } else if (data.type === "reopen") {
+      // A previously resolved conversation was reopened by the customer
+      loadConversations();
     } else if (data.type === "new_message") {
-      // If the agent currently has this exact conversation open,
-      // append the message live. Otherwise just refresh the list so
-      // the preview text and ordering stay current.
       if (data.session_id === activeSessionId) {
         appendMessage(data.sender, data.content);
       } else {
@@ -147,11 +150,16 @@ function renderConversationList(conversations) {
     const item = document.createElement("button");
     item.className = "conv-item";
     if (conv.handoff_active && !conv.resolved) item.classList.add("conv-item--urgent");
+    if (conv.reopen_count > 0) item.classList.add("conv-item--reopened");
     if (conv.session_id === activeSessionId) item.classList.add("conv-item--selected");
+
+    const reopenBadge = conv.reopen_count > 0
+      ? `<span class="conv-item__reopen-badge">↩ Reopened${conv.reopen_count > 1 ? ` ×${conv.reopen_count}` : ""}</span>`
+      : "";
 
     item.innerHTML = `
       <div class="conv-item__top">
-        <span class="conv-item__email">${escapeHtml(conv.customer_email || "Unknown customer")}</span>
+        <span class="conv-item__email">${escapeHtml(conv.customer_email || "Unknown customer")}${reopenBadge}</span>
         <span class="conv-item__time">${formatTime(conv.updated_at)}</span>
       </div>
       <div class="conv-item__preview">${escapeHtml(conv.last_message || "No messages yet")}</div>
