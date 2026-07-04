@@ -86,7 +86,7 @@ def main() -> None:
 
     # Compute embeddings
     print("Computing embeddings via Cohere...")
-    embeddings = cohere_ef(chunks)
+    embeddings = cohere_ef.embed_documents(chunks)
 
     # Upsert in batches
     batch_size = 100

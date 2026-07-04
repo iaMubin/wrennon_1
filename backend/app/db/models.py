@@ -52,6 +52,7 @@ class Conversation(Base):
     resolved_at: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
     reopen_count: Mapped[int] = mapped_column(Integer, default=0)
     handoff_ticket_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=datetime.datetime.utcnow

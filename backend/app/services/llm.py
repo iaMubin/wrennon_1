@@ -91,7 +91,7 @@ def generate_conversation_summary(messages: list) -> str:
     return result or "Customer requested to speak with a human agent."
 
 
-def classify_intent(messages: list) -> str:
+def classify_intent(messages: list, summary: str | None = None) -> str:
     """Classifies the intent of the latest user message using conversation history
     for context. Returns one of: 'greeting', 'order', 'handoff', or 'rag'."""
     prompt = (
@@ -105,10 +105,13 @@ def classify_intent(messages: list) -> str:
         "5. rag: Everything else, including questions about store policies, returns, or general info."
     )
     
+    if summary:
+        prompt += f"\n\nPrevious Conversation Summary:\n{summary}"
+        
     # Build conversation history for the LLM
     llm_messages = [{"role": "system", "content": prompt}]
     
-    # Only use the last 5 messages so the LLM doesn't get confused by old resolved intents
+    # Use the last 5 messages to preserve recent context context
     recent_messages = messages[-5:] if len(messages) > 5 else messages
     for msg in recent_messages:
         role = "user" if msg.type == "human" else "assistant"
@@ -140,13 +143,14 @@ def generate_final_reply(state: dict) -> str:
     if state.get("order_id") and state.get("order_status"):
         status = state["order_status"]
         context_parts.append(
-            f"Order #{state['order_id']} status: {status.get('status', 'unknown')}. "
+            f"The customer is currently asking about Order #{state['order_id']}. "
+            f"Here are the details: Status: {status.get('status', 'unknown')}. "
             f"Carrier: {status.get('carrier', 'N/A')}. "
             f"ETA: {status.get('eta', 'unknown')}. "
             f"Tracking URL: {status.get('tracking_url', 'N/A')}."
         )
     elif state.get("order_id") and not state.get("order_status") and state.get("current_intent") == "order":
-        context_parts.append(f"Order #{state['order_id']} was not found in our system.")
+        context_parts.append(f"The customer is currently asking about Order #{state['order_id']}, but it was not found in our system.")
     elif not state.get("order_id") and state.get("current_intent") == "order":
         # Explicit instruction when the user asks about an order but hasn't provided the ID
         context_parts.append(
@@ -160,13 +164,16 @@ def generate_final_reply(state: dict) -> str:
     if state.get("handoff_requested"):
         context_parts.append("A support ticket has been created and the conversation is being transferred to a human agent. Inform the customer that they are being transferred directly.")
         
+    if state.get("conversation_summary"):
+        context_parts.append(f"Previous Conversation Summary:\n{state['conversation_summary']}")
+
     context_text = "\n\n".join(context_parts) if context_parts else "No specific context available. Answer politely."
     
     # Build conversation history for the LLM
     llm_messages = [{"role": "system", "content": system_instruction}]
     
-    # Add conversation history (last 5 messages for context window efficiency and precision)
-    recent_messages = state["messages"][-5:]
+    # Add conversation history (last 10 messages for a better context window)
+    recent_messages = state["messages"][-10:]
     for msg in recent_messages[:-1]:  # All except the last (current) message
         role = "user" if msg.type == "human" else "assistant"
         llm_messages.append({"role": role, "content": msg.content})
@@ -179,3 +186,24 @@ def generate_final_reply(state: dict) -> str:
     logger.info(f"Generating final reply")
     result = _safe_llm_call(messages=llm_messages, temperature=0.3, max_tokens=400)
     return result or "I apologize, I'm having trouble processing your request. Please try again."
+
+
+def update_conversation_summary(messages: list, current_summary: str | None) -> str:
+    """Condenses the older conversation into a summary to prevent token overflow."""
+    prompt = (
+        "Summarize the provided customer service conversation concisely. "
+        "Keep critical facts like order numbers, tracking info, emails, and the main issue discussed. "
+        "If a previous summary exists, incorporate the new messages into the summary."
+    )
+    
+    llm_messages = [{"role": "system", "content": prompt}]
+    
+    if current_summary:
+        llm_messages.append({"role": "system", "content": f"Existing Summary:\n{current_summary}"})
+        
+    for msg in messages:
+        role = "user" if msg.type == "human" else "assistant"
+        llm_messages.append({"role": role, "content": msg.content})
+        
+    result = _safe_llm_call(messages=llm_messages, temperature=0.2, max_tokens=250)
+    return result or current_summary or ""

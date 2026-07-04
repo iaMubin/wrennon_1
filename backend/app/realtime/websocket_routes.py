@@ -119,6 +119,8 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
             if conversation.handoff_ticket_id:
                 state["existing_ticket_id"] = conversation.handoff_ticket_id
 
+            state["conversation_summary"] = conversation.summary
+
             # Load conversation history so the AI has full context
             prev_messages = (
                 db.query(Message)
@@ -135,6 +137,14 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
 
             # Add the current message
             state["messages"].append(HumanMessage(content=customer_text))
+
+            # Update rolling summary if conversation gets long (e.g., every 6 messages)
+            if len(state["messages"]) > 0 and len(state["messages"]) % 6 == 0:
+                from app.services.llm import update_conversation_summary
+                new_summary = update_conversation_summary(state["messages"][-6:], conversation.summary)
+                conversation.summary = new_summary
+                db.commit()
+                state["conversation_summary"] = new_summary
 
             # Extract order ID from the current message or previous messages
             order_match = re.search(r"#?(\d{4,})", customer_text)

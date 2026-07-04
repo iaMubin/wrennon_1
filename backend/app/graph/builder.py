@@ -27,7 +27,7 @@ def route_intent(state: ConversationState) -> str:
     if state.get("handoff_requested"):
         return "handoff"
 
-    intent = classify_intent(state["messages"])
+    intent = classify_intent(state["messages"], state.get("conversation_summary"))
     state["current_intent"] = intent
     
     if intent == "handoff":

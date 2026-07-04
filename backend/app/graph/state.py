@@ -20,6 +20,7 @@ class ConversationState(TypedDict):
     messages: list[BaseMessage]
     customer_email: Optional[str]
     current_intent: Optional[str]
+    conversation_summary: Optional[str]
 
     # --- L1: RAG ---
     last_retrieved_context: Optional[str]
@@ -58,6 +59,7 @@ def initial_state(customer_email: Optional[str] = None) -> ConversationState:
         messages=[],
         customer_email=customer_email,
         current_intent=None,
+        conversation_summary=None,
         last_retrieved_context=None,
         answer_grounded=None,
         order_id=None,
