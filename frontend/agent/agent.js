@@ -29,6 +29,26 @@ const agentInput = document.getElementById("agent-message-input");
 const agentSendBtn = document.getElementById("agent-send-btn");
 const resolveBtn = document.getElementById("resolve-btn");
 
+// --- Password Toggle ---
+const togglePwdBtn = document.getElementById("toggle-pwd");
+if (togglePwdBtn) {
+  const pwdInput = document.getElementById("password");
+  const eyePaths = togglePwdBtn.querySelectorAll(".eye");
+  const slashLine = togglePwdBtn.querySelector(".eye-slash");
+  
+  togglePwdBtn.addEventListener("click", () => {
+    if (pwdInput.type === "password") {
+      pwdInput.type = "text";
+      eyePaths.forEach(p => p.classList.add("hidden"));
+      slashLine.classList.remove("hidden");
+    } else {
+      pwdInput.type = "password";
+      eyePaths.forEach(p => p.classList.remove("hidden"));
+      slashLine.classList.add("hidden");
+    }
+  });
+}
+
 // --- Login ---
 loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();

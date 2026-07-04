@@ -16,10 +16,25 @@
   <div id="login-screen">
     <form id="login-form">
       <h1>Agent Console</h1>
-      <label for="username">Username</label>
-      <input id="username" type="text" autocomplete="username" required>
-      <label for="password">Password</label>
-      <input id="password" type="password" autocomplete="current-password" required>
+      <div class="input-group">
+        <label for="username">Agent ID</label>
+        <div class="input-wrapper">
+          <input type="text" id="username" name="username" required autocomplete="username">
+        </div>
+      </div>
+      <div class="input-group">
+        <label for="password">Passcode</label>
+        <div class="input-wrapper">
+          <input type="password" id="password" name="password" required autocomplete="current-password">
+          <button type="button" class="pwd-toggle" id="toggle-pwd" aria-label="Toggle password visibility">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+              <path class="eye" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle class="eye" cx="12" cy="12" r="3"></circle>
+              <line class="eye-slash hidden" x1="1" y1="1" x2="23" y2="23"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
       <button type="submit">Log in</button>
       <p id="login-error" class="error hidden">Incorrect username or password.</p>
     </form>

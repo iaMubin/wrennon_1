@@ -3,86 +3,284 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wrennon - Admin Dashboard</title>
+    <title>Admin Dashboard — Wrennon</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; background: #f3f4f6; margin: 0; padding: 20px; }
-        .admin-container {
-            max-width: 800px;
-            margin: 40px auto;
-            padding: 20px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        :root {
+            --ink: #F3F4F6;
+            --ink-soft: #9CA3AF;
+            --paper: rgba(17, 24, 39, 0.7);
+            --paper-dim: #0B0E14;
+            --line: rgba(255, 255, 255, 0.08);
+            --accent: #3B82F6;
+            --accent-glow: rgba(59, 130, 246, 0.5);
+            --radius: 20px;
+            --radius-sm: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--paper-dim);
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.08), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 25%);
+            color: var(--ink);
+            min-height: 100vh;
+            padding: 40px 20px;
+            overflow-x: hidden;
+        }
+
+        @keyframes slideUpFade {
+            0% { opacity: 0; transform: translateY(20px) scale(0.98); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .admin-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(17, 24, 39, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: var(--radius);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+            padding: 40px;
+            animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
         .admin-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 20px;
-            margin-bottom: 20px;
+            border-bottom: 1px solid var(--line);
+            padding-bottom: 24px;
+            margin-bottom: 32px;
         }
-        .form-group {
-            margin-bottom: 15px;
+
+        .admin-header h2 {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, #fff, #9CA3AF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #cbd5e1;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
+
         .btn {
-            background: #2563eb;
+            background: rgba(255,255,255,0.05);
+            color: var(--ink);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 10px 18px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: inherit;
+        }
+
+        .btn:hover {
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3B82F6, #2563EB);
             color: white;
             border: none;
-            padding: 10px 15px;
-            border-radius: 4px;
-            cursor: pointer;
+            box-shadow: 0 4px 14px var(--accent-glow);
         }
+
+        .btn-primary:hover {
+            background: #2563EB;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6);
+        }
+
         .btn-danger {
-            background: #dc2626;
+            background: rgba(239, 68, 68, 0.15);
+            color: #F87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            box-shadow: none;
         }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.25);
+            transform: translateY(-1px);
+        }
+
+        h3 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: var(--ink);
+            font-weight: 700;
+        }
+
+        form {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr auto;
+            gap: 16px;
+            align-items: end;
+            background: rgba(0,0,0,0.2);
+            padding: 24px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--line);
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .form-group label {
+            font-size: 12px;
+            color: var(--ink-soft);
+            margin-bottom: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        .input-wrapper input, .form-group select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--ink);
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: var(--transition);
+            font-family: inherit;
+        }
+
+        .input-wrapper input:focus, .form-group select:focus {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+        
+        .form-group select option {
+            background: var(--paper-dim);
+            color: var(--ink);
+        }
+
+        .pwd-toggle {
+            position: absolute;
+            right: 12px;
+            background: transparent;
+            border: none;
+            color: var(--ink-soft);
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
+        }
+
+        .pwd-toggle:hover {
+            color: var(--ink);
+        }
+        
+        .hidden { display: none !important; }
+
         table {
             width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 16px;
         }
+
         th, td {
             text-align: left;
-            padding: 12px;
-            border-bottom: 1px solid #e2e8f0;
+            padding: 16px;
+            border-bottom: 1px solid var(--line);
         }
+
         th {
-            background-color: #f8fafc;
+            font-size: 12px;
+            color: var(--ink-soft);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
+
+        tbody tr {
+            transition: var(--transition);
+        }
+
+        tbody tr:hover {
+            background: rgba(255,255,255,0.03);
+        }
+
+        .role-badge {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .role-manager {
+            background: rgba(139, 92, 246, 0.15);
+            color: #C4B5FD;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+        }
+
+        .role-agent {
+            background: rgba(59, 130, 246, 0.15);
+            color: #93C5FD;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
         #error-msg {
-            color: #dc2626;
-            margin-top: 10px;
+            color: #EF4444;
+            font-size: 13px;
+            margin-top: 12px;
+            font-weight: 500;
+            grid-column: 1 / -1;
         }
     </style>
 </head>
 <body>
     <div class="admin-container">
         <div class="admin-header">
-            <h2>Admin Dashboard - Agent Management</h2>
+            <h2>Admin Dashboard</h2>
             <button class="btn" onclick="window.location.href='index.html'">Back to Agent Chat</button>
         </div>
 
         <h3>Create New Agent</h3>
         <form id="create-agent-form">
             <div class="form-group">
-                <label>Username</label>
-                <input type="text" id="agent-username" required>
+                <label>Agent ID</label>
+                <div class="input-wrapper">
+                    <input type="text" id="agent-username" required autocomplete="off">
+                </div>
             </div>
             <div class="form-group">
-                <label>Password</label>
-                <input type="password" id="agent-password" required>
+                <label>Passcode</label>
+                <div class="input-wrapper">
+                    <input type="password" id="agent-password" required autocomplete="new-password">
+                    <button type="button" class="pwd-toggle" id="toggle-pwd" aria-label="Toggle password visibility">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                            <path class="eye" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle class="eye" cx="12" cy="12" r="3"></circle>
+                            <line class="eye-slash hidden" x1="1" y1="1" x2="23" y2="23"></line>
+                        </svg>
+                    </button>
+                </div>
             </div>
             <div class="form-group">
                 <label>Role</label>
@@ -91,18 +289,18 @@
                     <option value="manager">Manager</option>
                 </select>
             </div>
-            <button type="submit" class="btn">Create Account</button>
+            <button type="submit" class="btn btn-primary" style="height: 43px; margin-bottom: 2px;">Create Agent</button>
             <div id="error-msg"></div>
         </form>
 
-        <h3 style="margin-top: 40px;">Current Agents</h3>
+        <h3 style="margin-top: 48px;">Team Directory</h3>
         <table>
             <thead>
                 <tr>
-                    <th>Username</th>
-                    <th>Role</th>
-                    <th>Created At</th>
-                    <th>Actions</th>
+                    <th>Agent ID</th>
+                    <th>Access Level</th>
+                    <th>Joined</th>
+                    <th style="text-align: right;">Action</th>
                 </tr>
             </thead>
             <tbody id="agents-list">
@@ -118,15 +316,34 @@
         const token = localStorage.getItem("agent_token");
 
         if (!token) {
-            window.location.href = "login.html";
+            window.location.href = "index.html";
         }
+        
+        // Toggle password logic
+        const togglePwdBtn = document.getElementById("toggle-pwd");
+        const pwdInput = document.getElementById("agent-password");
+        const eyePaths = togglePwdBtn.querySelectorAll(".eye");
+        const slashLine = togglePwdBtn.querySelector(".eye-slash");
+        
+        togglePwdBtn.addEventListener("click", () => {
+            if (pwdInput.type === "password") {
+                pwdInput.type = "text";
+                eyePaths.forEach(p => p.classList.add("hidden"));
+                slashLine.classList.remove("hidden");
+            } else {
+                pwdInput.type = "password";
+                eyePaths.forEach(p => p.classList.remove("hidden"));
+                slashLine.classList.add("hidden");
+            }
+        });
 
         async function fetchAgents() {
             const res = await fetch(`${API_BASE}/admin/agents`, {
                 headers: { "Authorization": `Bearer ${token}` }
             });
-            if (res.status === 403) {
-                alert("You are not a manager. Access denied.");
+            
+            if (res.status === 401 || res.status === 403) {
+                alert("Session expired or access denied.");
                 window.location.href = "index.html";
                 return;
             }
@@ -137,13 +354,15 @@
             tbody.innerHTML = "";
 
             agents.forEach(agent => {
+                const roleClass = agent.role === 'manager' ? 'role-manager' : 'role-agent';
+                const date = new Date(agent.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
                 const tr = document.createElement("tr");
                 tr.innerHTML = `
-                    <td>${agent.username}</td>
-                    <td><strong>${agent.role.toUpperCase()}</strong></td>
-                    <td>${new Date(agent.created_at).toLocaleString()}</td>
-                    <td>
-                        <button class="btn btn-danger" onclick="deleteAgent('${agent.username}')">Delete</button>
+                    <td style="font-weight: 600;">${agent.username}</td>
+                    <td><span class="role-badge ${roleClass}">${agent.role}</span></td>
+                    <td style="color: var(--ink-soft);">${date}</td>
+                    <td style="text-align: right;">
+                        <button class="btn btn-danger" onclick="deleteAgent('${agent.username}')">Remove</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -151,7 +370,7 @@
         }
 
         async function deleteAgent(username) {
-            if (!confirm(`Are you sure you want to delete ${username}?`)) return;
+            if (!confirm(`Are you sure you want to remove agent '${username}'?`)) return;
             const res = await fetch(`${API_BASE}/admin/agents/${username}`, {
                 method: 'DELETE',
                 headers: { "Authorization": `Bearer ${token}` }
@@ -160,14 +379,18 @@
                 fetchAgents();
             } else {
                 const data = await res.json();
-                alert(data.detail);
+                document.getElementById("error-msg").innerText = data.detail;
             }
         }
 
         document.getElementById("create-agent-form").addEventListener("submit", async (e) => {
             e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.innerText = "Creating...";
+            
             const username = document.getElementById("agent-username").value;
-            const password = document.getElementById("agent-password").value;
+            const password = pwdInput.value;
             const role = document.getElementById("agent-role").value;
 
             const res = await fetch(`${API_BASE}/admin/agents`, {
@@ -179,10 +402,19 @@
                 body: JSON.stringify({ username, password, role })
             });
 
+            btn.disabled = false;
+            btn.innerText = "Create Agent";
+
             if (res.ok) {
                 document.getElementById("agent-username").value = "";
-                document.getElementById("agent-password").value = "";
+                pwdInput.value = "";
                 document.getElementById("error-msg").innerText = "";
+                
+                // reset pwd toggle if visible
+                if (pwdInput.type === "text") {
+                    togglePwdBtn.click();
+                }
+                
                 fetchAgents();
             } else {
                 const data = await res.json();
