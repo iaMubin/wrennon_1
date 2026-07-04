@@ -136,10 +136,17 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
             # Add the current message
             state["messages"].append(HumanMessage(content=customer_text))
 
-            # Extract order ID from the current message before invoking graph
+            # Extract order ID from the current message or previous messages
             order_match = re.search(r"#?(\d{4,})", customer_text)
             if order_match:
                 state["order_id"] = order_match.group(1)
+            else:
+                for msg in reversed(state["messages"]):
+                    if msg.type == "human":
+                        match = re.search(r"#?(\d{4,})", msg.content)
+                        if match:
+                            state["order_id"] = match.group(1)
+                            break
 
             updated_state = _graph.invoke(state)
             reply_text = updated_state["messages"][-1].content
