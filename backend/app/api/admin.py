@@ -9,9 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
+from sqlalchemy import func
 from app.auth.dependencies import get_current_manager
 from app.auth.security import hash_password
-from app.db.models import Agent
+from app.db.models import Agent, Conversation
 from app.db.session import get_db
 
 router = APIRouter()
@@ -65,3 +66,21 @@ def delete_agent(
     db.delete(agent)
     db.commit()
     return {"status": "deleted", "username": username}
+
+@router.get("/admin/analytics")
+def get_analytics(
+    db: Session = Depends(get_db),
+    manager: Agent = Depends(get_current_manager),
+) -> dict:
+    results = db.query(
+        Conversation.handled_by, 
+        func.count(Conversation.id)
+    ).filter(Conversation.resolved == True).group_by(Conversation.handled_by).all()
+
+    stats = []
+    for handled_by, count in results:
+        agent_name = handled_by if handled_by else "AI Agent"
+        stats.append({"agent": agent_name, "resolved_count": count})
+        
+    stats.sort(key=lambda x: x["resolved_count"], reverse=True)
+    return {"resolution_stats": stats}

@@ -110,6 +110,7 @@ def resolve_conversation(
     conversation.resolved = True
     conversation.resolved_at = datetime.datetime.utcnow()
     conversation.handoff_active = False
+    conversation.handled_by = agent.username
     db.commit()
     return {"status": "resolved", "session_id": session_id}
 
@@ -131,6 +132,7 @@ def _conversation_summary(c: Conversation) -> dict:
         "resolved": c.resolved,
         "reopen_count": getattr(c, "reopen_count", 0),
         "stage": stage,
+        "handled_by": getattr(c, "handled_by", None),
         "last_message": last_message,
         "updated_at": c.updated_at.isoformat(),
     }

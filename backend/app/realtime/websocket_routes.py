@@ -257,7 +257,11 @@ async def agent_websocket(websocket: WebSocket, token: str):
             # If agent manually intervenes, lock out the AI.
             if not conversation.handoff_active:
                 conversation.handoff_active = True
-                db.commit()
+                
+            conversation.handled_by = username
+            db.commit()
+            
+            if conversation.handoff_active:
                 await manager.broadcast_to_agents({
                     "type": "handoff",
                     "session_id": session_id,

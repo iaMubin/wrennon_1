@@ -262,11 +262,14 @@
         </div>
 
         <h3>Create New Agent</h3>
+        <!-- hidden input to trick browser password managers -->
+        <input style="display:none" type="text" name="fakeusernameremembered"/>
+        <input style="display:none" type="password" name="fakepasswordremembered"/>
         <form id="create-agent-form">
             <div class="form-group">
                 <label>Agent ID</label>
                 <div class="input-wrapper">
-                    <input type="text" id="agent-username" required autocomplete="off">
+                    <input type="text" id="agent-username" required autocomplete="new-password">
                 </div>
             </div>
             <div class="form-group">
@@ -293,7 +296,20 @@
             <div id="error-msg"></div>
         </form>
 
-        <h3 style="margin-top: 48px;">Team Directory</h3>
+        <h3 style="margin-top: 48px;">Performance Analytics</h3>
+        <table style="margin-bottom: 40px;">
+            <thead>
+                <tr>
+                    <th>Agent Name</th>
+                    <th>Conversations Resolved</th>
+                </tr>
+            </thead>
+            <tbody id="analytics-list">
+                <!-- Populated by JS -->
+            </tbody>
+        </table>
+
+        <h3>Team Directory</h3>
         <table>
             <thead>
                 <tr>
@@ -375,6 +391,31 @@
                 tbody.appendChild(tr);
             });
         }
+        
+        async function fetchAnalytics() {
+            const res = await fetch(`${API_BASE}/admin/analytics`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (!res.ok) return;
+            
+            const data = await res.json();
+            const tbody = document.getElementById("analytics-list");
+            tbody.innerHTML = "";
+            
+            data.resolution_stats.forEach(stat => {
+                const tr = document.createElement("tr");
+                const isAI = stat.agent === "AI Agent";
+                const badge = isAI 
+                    ? `<span class="role-badge" style="background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3);">AI Agent</span>`
+                    : `<span style="font-weight: 600;">${stat.agent}</span>`;
+                    
+                tr.innerHTML = `
+                    <td>${badge}</td>
+                    <td style="font-weight: 700; font-size: 16px; color: var(--accent);">${stat.resolved_count}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
 
         async function deleteAgent(username) {
             if (!confirm(`Are you sure you want to remove agent '${username}'?`)) return;
@@ -430,6 +471,7 @@
         });
 
         fetchAgents();
+        fetchAnalytics();
     </script>
 </body>
 </html>

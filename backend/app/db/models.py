@@ -51,6 +51,7 @@ class Conversation(Base):
     resolved: Mapped[bool] = mapped_column(Boolean, default=False)
     resolved_at: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
     reopen_count: Mapped[int] = mapped_column(Integer, default=0)
+    handled_by: Mapped[str | None] = mapped_column(String, nullable=True)
     handoff_ticket_id: Mapped[str | None] = mapped_column(String, nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 

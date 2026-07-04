@@ -188,8 +188,15 @@ function renderConversationList(conversations) {
     if (conv.session_id === activeSessionId) item.classList.add("conv-item--selected");
 
     let badgeClass = "badge--ai";
-    if (conv.stage === "Human Agent") badgeClass = "badge--human";
-    if (conv.stage === "Resolved") badgeClass = "badge--resolved";
+    let stageText = "AI";
+
+    if (conv.resolved) {
+      badgeClass = "badge--resolved";
+      stageText = conv.handled_by ? `Resolved by ${conv.handled_by}` : "Resolved (AI)";
+    } else if (conv.handoff_active) {
+      badgeClass = "badge--human";
+      stageText = conv.handled_by ? `Handled by ${conv.handled_by}` : "Needs Attention";
+    }
 
     const reopenBadge = conv.reopen_count > 0
       ? `<span class="conv-item__reopen-badge">↩ Reopened${conv.reopen_count > 1 ? ` ×${conv.reopen_count}` : ""}</span>`
@@ -202,7 +209,7 @@ function renderConversationList(conversations) {
       </div>
       <div class="conv-item-preview">${escapeHtml(conv.last_message || "No messages yet")}</div>
       <div class="badge-row">
-        <span class="badge ${badgeClass}">${conv.stage}</span>
+        <span class="badge ${badgeClass}">${stageText}</span>
         ${reopenBadge}
       </div>
     `;
