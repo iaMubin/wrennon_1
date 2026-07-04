@@ -145,7 +145,7 @@ def generate_final_reply(state: dict) -> str:
             f"ETA: {status.get('eta', 'unknown')}. "
             f"Tracking URL: {status.get('tracking_url', 'N/A')}."
         )
-    elif state.get("order_id") and not state.get("order_status"):
+    elif state.get("order_id") and not state.get("order_status") and state.get("current_intent") == "order":
         context_parts.append(f"Order #{state['order_id']} was not found in our system.")
     elif not state.get("order_id") and state.get("current_intent") == "order":
         # Explicit instruction when the user asks about an order but hasn't provided the ID
