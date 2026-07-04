@@ -1,0 +1,7 @@
+{
+  "rewrites": [
+    { "source": "/agent/(.*)", "destination": "/frontend/agent/$1" },
+    { "source": "/agent", "destination": "/frontend/agent/index.html" },
+    { "source": "/(.*)", "destination": "/frontend/$1" }
+  ]
+}
