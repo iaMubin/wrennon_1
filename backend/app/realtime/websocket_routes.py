@@ -81,6 +81,19 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
             customer_text = data["message"]
             logger.info(f"Received message from customer {session_id}: {customer_text}")
 
+            # Rate Limiting (max 15 msgs / minute)
+            try:
+                rate_key = f"rate_limit:{session_id}"
+                count = await manager.redis.incr(rate_key)
+                if count == 1:
+                    await manager.redis.expire(rate_key, 60)
+                if count > 15:
+                    logger.warning(f"Rate limit exceeded for {session_id}")
+                    await websocket.send_json({"reply": "You are sending messages too quickly. Please wait a minute."})
+                    continue
+            except Exception as e:
+                logger.error(f"Rate limiting error: {e}")
+
             _save_message(db, conversation.id, sender="human", content=customer_text)
 
             # Broadcast ALL customer messages to the agent dashboard for real-time sync.

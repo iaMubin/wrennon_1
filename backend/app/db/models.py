@@ -93,6 +93,7 @@ class Agent(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     username: Mapped[str] = mapped_column(String, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String)
+    role: Mapped[str] = mapped_column(String, default="agent")
 
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=datetime.datetime.utcnow

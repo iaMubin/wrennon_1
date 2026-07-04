@@ -57,6 +57,34 @@ def get_order_status(order_id: str, customer_email: str) -> Optional[dict]:
             "eta": "2026-06-20",
             "tracking_url": "https://example.com/track/1003",
         },
+        "1004": {
+            "order_id": "1004",
+            "status": "cancelled",
+            "carrier": None,
+            "eta": None,
+            "tracking_url": None,
+        },
+        "1005": {
+            "order_id": "1005",
+            "status": "processing",
+            "carrier": None,
+            "eta": "2026-07-15",
+            "tracking_url": None,
+        },
+        "1006": {
+            "order_id": "1006",
+            "status": "shipped",
+            "carrier": "DHL",
+            "eta": "2026-07-08",
+            "tracking_url": "https://dhl.com/track/1006",
+        },
+        "1007": {
+            "order_id": "1007",
+            "status": "delivered",
+            "carrier": "FedEx",
+            "eta": "2026-06-05",
+            "tracking_url": "https://fedex.com/track/1007",
+        },
     }
     return mock_orders.get(order_id)
 

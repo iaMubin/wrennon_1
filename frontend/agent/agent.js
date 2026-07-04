@@ -52,6 +52,15 @@ loginForm.addEventListener("submit", async (e) => {
 
     const data = await response.json();
     accessToken = data.access_token;
+    localStorage.setItem("agent_token", accessToken); // Save token for admin dashboard
+    
+    if (data.role === "manager") {
+      document.getElementById("admin-dashboard-btn").classList.remove("hidden");
+      document.getElementById("admin-dashboard-btn").addEventListener("click", () => {
+        window.location.href = "admin_dashboard.html";
+      });
+    }
+
     loginScreen.classList.add("hidden");
     dashboard.classList.remove("hidden");
 

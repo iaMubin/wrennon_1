@@ -7,33 +7,71 @@ from __future__ import annotations
 
 import time
 
+import re
 from groq import Groq
+import openai
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings
 from app.logger import logger
 
 _client = Groq(api_key=settings.groq_api_key)
+_openai_client = openai.OpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
 
+def mask_pii(text: str) -> str:
+    """Masks emails and credit card numbers from user input."""
+    # Mask emails
+    text = re.sub(r'[\w\.-]+@[\w\.-]+\.\w+', '[EMAIL HIDDEN]', text)
+    # Mask credit cards (simple 13-16 digits)
+    text = re.sub(r'\b(?:\d[ -]*?){13,16}\b', '[CARD HIDDEN]', text)
+    return text
 
-def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, retries: int = 2) -> str:
-    """Wrapper around Groq API calls with retry logic to handle empty/parse errors."""
-    for attempt in range(retries + 1):
-        try:
-            response = _client.chat.completions.create(
-                model=MODEL,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            result = response.choices[0].message.content
-            if result and result.strip():
-                return result.strip()
-            logger.warning(f"LLM returned empty response (attempt {attempt + 1}/{retries + 1})")
-        except Exception as e:
-            logger.warning(f"LLM call failed (attempt {attempt + 1}/{retries + 1}): {e}")
-        if attempt < retries:
-            time.sleep(0.5)
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True
+)
+def _safe_groq_call(messages: list, temperature: float = 0.2, max_tokens: int = 400) -> str:
+    """Wrapper around Groq API calls with retry logic."""
+    response = _client.chat.completions.create(
+        model=MODEL,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+    result = response.choices[0].message.content
+    if result and result.strip():
+        return result.strip()
+    raise ValueError("Groq returned empty response")
+
+def _safe_openai_call(messages: list, temperature: float = 0.2, max_tokens: int = 400) -> str:
+    """Fallback to OpenAI if Groq fails."""
+    if not _openai_client:
+        return ""
+    logger.info("Falling back to OpenAI API...")
+    try:
+        response = _openai_client.chat.completions.create(
+            model="gpt-5.4-mini",
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        result = response.choices[0].message.content
+        if result and result.strip():
+            return result.strip()
+    except Exception as e:
+        logger.warning(f"OpenAI fallback failed: {e}")
     return ""
+
+def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: int = 400) -> str:
+    """Calls Groq with retries, and falls back to OpenAI if it completely fails."""
+    try:
+        return _safe_groq_call(messages, temperature, max_tokens)
+    except Exception as e:
+        logger.error(f"Groq API completely failed after retries: {e}")
+        if _openai_client:
+            return _safe_openai_call(messages, temperature, max_tokens)
+        return ""
 
 MODEL = "openai/gpt-oss-120b"
 # Groq deprecated meta-llama/llama-4-scout-17b-16e-instruct on June 17,
@@ -115,7 +153,8 @@ def classify_intent(messages: list, summary: str | None = None) -> str:
     recent_messages = messages[-5:] if len(messages) > 5 else messages
     for msg in recent_messages:
         role = "user" if msg.type == "human" else "assistant"
-        llm_messages.append({"role": role, "content": msg.content})
+        content = mask_pii(msg.content) if role == "user" else msg.content
+        llm_messages.append({"role": role, "content": content})
     
     result = _safe_llm_call(messages=llm_messages, temperature=0.0, max_tokens=100)
     intent = result.lower() if result else "rag"
@@ -176,10 +215,11 @@ def generate_final_reply(state: dict) -> str:
     recent_messages = state["messages"][-10:]
     for msg in recent_messages[:-1]:  # All except the last (current) message
         role = "user" if msg.type == "human" else "assistant"
-        llm_messages.append({"role": role, "content": msg.content})
+        content = mask_pii(msg.content) if role == "user" else msg.content
+        llm_messages.append({"role": role, "content": content})
     
     # Add the final user prompt with context
-    last_user_message = state["messages"][-1].content
+    last_user_message = mask_pii(state["messages"][-1].content)
     prompt = f"Context:\n{context_text}\n\nCustomer Message:\n{last_user_message}"
     llm_messages.append({"role": "user", "content": prompt})
     

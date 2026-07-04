@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wrennon - Admin Dashboard</title>
+    <style>
+        body { font-family: sans-serif; background: #f3f4f6; margin: 0; padding: 20px; }
+        .admin-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .btn {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-danger {
+            background: #dc2626;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            background-color: #f8fafc;
+        }
+        #error-msg {
+            color: #dc2626;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="admin-header">
+            <h2>Admin Dashboard - Agent Management</h2>
+            <button class="btn" onclick="window.location.href='index.html'">Back to Agent Chat</button>
+        </div>
+
+        <h3>Create New Agent</h3>
+        <form id="create-agent-form">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="agent-username" required>
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="agent-password" required>
+            </div>
+            <div class="form-group">
+                <label>Role</label>
+                <select id="agent-role">
+                    <option value="agent">Agent</option>
+                    <option value="manager">Manager</option>
+                </select>
+            </div>
+            <button type="submit" class="btn">Create Account</button>
+            <div id="error-msg"></div>
+        </form>
+
+        <h3 style="margin-top: 40px;">Current Agents</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Created At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="agents-list">
+                <!-- Populated by JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost:10000/api";
+        const token = localStorage.getItem("agent_token");
+
+        if (!token) {
+            window.location.href = "login.html";
+        }
+
+        async function fetchAgents() {
+            const res = await fetch(`${API_BASE}/admin/agents`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (res.status === 403) {
+                alert("You are not a manager. Access denied.");
+                window.location.href = "index.html";
+                return;
+            }
+            if (!res.ok) return;
+
+            const agents = await res.json();
+            const tbody = document.getElementById("agents-list");
+            tbody.innerHTML = "";
+
+            agents.forEach(agent => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>${agent.username}</td>
+                    <td><strong>${agent.role.toUpperCase()}</strong></td>
+                    <td>${new Date(agent.created_at).toLocaleString()}</td>
+                    <td>
+                        <button class="btn btn-danger" onclick="deleteAgent('${agent.username}')">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function deleteAgent(username) {
+            if (!confirm(`Are you sure you want to delete ${username}?`)) return;
+            const res = await fetch(`${API_BASE}/admin/agents/${username}`, {
+                method: 'DELETE',
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (res.ok) {
+                fetchAgents();
+            } else {
+                const data = await res.json();
+                alert(data.detail);
+            }
+        }
+
+        document.getElementById("create-agent-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const username = document.getElementById("agent-username").value;
+            const password = document.getElementById("agent-password").value;
+            const role = document.getElementById("agent-role").value;
+
+            const res = await fetch(`${API_BASE}/admin/agents`, {
+                method: 'POST',
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ username, password, role })
+            });
+
+            if (res.ok) {
+                document.getElementById("agent-username").value = "";
+                document.getElementById("agent-password").value = "";
+                document.getElementById("error-msg").innerText = "";
+                fetchAgents();
+            } else {
+                const data = await res.json();
+                document.getElementById("error-msg").innerText = data.detail;
+            }
+        });
+
+        fetchAgents();
+    </script>
+</body>
+</html>

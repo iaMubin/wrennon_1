@@ -36,13 +36,13 @@ def login(
             detail="Incorrect username or password",
         )
     token = create_access_token(subject=agent.username)
-    return {"access_token": token, "token_type": "bearer"}
+    return {"access_token": token, "token_type": "bearer", "role": agent.role}
 
 
 @router.get("/agent/conversations/needs-attention")
 def needs_attention(
     db: Session = Depends(get_db),
-    agent: str = Depends(get_current_agent),
+    agent: Agent = Depends(get_current_agent),
 ) -> list[dict]:
     conversations = (
         db.query(Conversation)
@@ -56,7 +56,7 @@ def needs_attention(
 @router.get("/agent/conversations/active")
 def active_chats(
     db: Session = Depends(get_db),
-    agent: str = Depends(get_current_agent),
+    agent: Agent = Depends(get_current_agent),
 ) -> list[dict]:
     conversations = (
         db.query(Conversation)
@@ -70,7 +70,7 @@ def active_chats(
 @router.get("/agent/conversations")
 def all_conversations(
     db: Session = Depends(get_db),
-    agent: str = Depends(get_current_agent),
+    agent: Agent = Depends(get_current_agent),
 ) -> list[dict]:
     conversations = (
         db.query(Conversation)
@@ -85,7 +85,7 @@ def all_conversations(
 def conversation_messages(
     session_id: str,
     db: Session = Depends(get_db),
-    agent: str = Depends(get_current_agent),
+    agent: Agent = Depends(get_current_agent),
 ) -> list[dict]:
     """Full message history for one conversation — used when an agent
     clicks into a conversation to see what's been said so far."""
@@ -102,7 +102,7 @@ def conversation_messages(
 def resolve_conversation(
     session_id: str,
     db: Session = Depends(get_db),
-    agent: str = Depends(get_current_agent),
+    agent: Agent = Depends(get_current_agent),
 ) -> dict:
     conversation = db.query(Conversation).filter_by(session_id=session_id).first()
     if conversation is None:

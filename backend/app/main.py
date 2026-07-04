@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.api.agent import router as agent_router
+from app.api.admin import router as admin_router
 from app.api.chat import router as chat_router
 from app.config import settings
 from app.db.models import Base, Agent
@@ -42,13 +43,14 @@ Base.metadata.create_all(bind=engine)
 # Auto-create default admin agent if none exist
 with SessionLocal() as db:
     if db.query(Agent).count() == 0:
-        logger.info("No agents found in database. Creating default 'mubin' agent.")
+        logger.info("No agents found in database. Creating default 'mubin' manager.")
         hashed_pw = hash_password("admin123")
-        db.add(Agent(username="mubin", password_hash=hashed_pw))
+        db.add(Agent(username="mubin", password_hash=hashed_pw, role="manager"))
         db.commit()
 
 app.include_router(chat_router, prefix="/api")
 app.include_router(agent_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
 app.include_router(realtime_router)  # no /api prefix — /ws/... paths
 
 
