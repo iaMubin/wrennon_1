@@ -45,7 +45,16 @@ with SessionLocal() as db:
     if db.query(Agent).count() == 0:
         logger.info("No agents found in database. Creating default 'mubin' manager.")
         hashed_pw = hash_password("admin123")
-        db.add(Agent(username="mubin", password_hash=hashed_pw, role="manager"))
+        db.add(Agent(username="mubin", password_hash=hashed_pw, role="manager", employee_id="EMP-1001"))
+        db.commit()
+
+    # Backfill employee_id for any existing agents
+    agents_without_id = db.query(Agent).filter(Agent.employee_id == None).all()
+    for i, a in enumerate(agents_without_id):
+        # Generate a unique ID (we use their ID hash or just EMP- + random string, but simpler: EMP-100X)
+        import random
+        a.employee_id = f"EMP-{random.randint(1000, 9999)}"
+    if agents_without_id:
         db.commit()
 
 app.include_router(chat_router, prefix="/api")

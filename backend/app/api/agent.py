@@ -12,6 +12,7 @@ import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from app.auth.dependencies import get_current_agent
 from app.auth.security import create_access_token, verify_password
@@ -28,7 +29,9 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ) -> dict:
-    agent = db.query(Agent).filter(Agent.username == form_data.username).first()
+    agent = db.query(Agent).filter(
+        or_(Agent.username == form_data.username, Agent.employee_id == form_data.username)
+    ).first()
     
     if not agent or not verify_password(form_data.password, agent.password_hash):
         raise HTTPException(

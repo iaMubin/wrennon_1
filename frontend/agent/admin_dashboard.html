@@ -267,9 +267,15 @@
         <input style="display:none" type="password" name="fakepasswordremembered"/>
         <form id="create-agent-form">
             <div class="form-group">
-                <label>Agent ID</label>
+                <label>Agent Name</label>
                 <div class="input-wrapper">
-                    <input type="text" id="agent-username" required autocomplete="new-password">
+                    <input type="text" id="agent-username" required autocomplete="new-password" placeholder="e.g. john_doe">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Employee ID</label>
+                <div class="input-wrapper">
+                    <input type="text" id="agent-employee-id" required autocomplete="new-password" placeholder="e.g. EMP-1234">
                 </div>
             </div>
             <div class="form-group">
@@ -296,25 +302,14 @@
             <div id="error-msg"></div>
         </form>
 
-        <h3 style="margin-top: 48px;">Performance Analytics</h3>
-        <table style="margin-bottom: 40px;">
-            <thead>
-                <tr>
-                    <th>Agent Name</th>
-                    <th>Conversations Resolved</th>
-                </tr>
-            </thead>
-            <tbody id="analytics-list">
-                <!-- Populated by JS -->
-            </tbody>
-        </table>
-
-        <h3>Team Directory</h3>
+        <h3 style="margin-top: 48px;">Team Directory</h3>
         <table>
             <thead>
                 <tr>
-                    <th>Agent ID</th>
+                    <th>Agent Name</th>
+                    <th>Employee ID</th>
                     <th>Access Level</th>
+                    <th>Chats Resolved</th>
                     <th>Joined</th>
                     <th style="text-align: right;">Action</th>
                 </tr>
@@ -372,17 +367,26 @@
             tbody.innerHTML = "";
 
             agents.forEach(agent => {
-                const roleClass = agent.role === 'manager' ? 'role-manager' : 'role-agent';
-                const date = new Date(agent.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+                const roleClass = agent.role === 'manager' ? 'role-manager' : (agent.role === 'ai' ? 'role-badge' : 'role-agent');
+                let roleStyle = agent.role === 'ai' ? 'background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3);' : '';
+                const date = agent.created_at ? new Date(agent.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
+                
                 const isSelf = agent.username === currentUser;
-                const actionCol = isSelf 
-                    ? `<span style="color: var(--ink-soft); font-size: 12px; font-weight: 600; margin-right: 12px;">(You)</span>` 
-                    : `<button class="btn btn-danger" onclick="deleteAgent('${agent.username}')">Remove</button>`;
+                const isAi = agent.role === 'ai';
+                
+                let actionCol = "";
+                if (isSelf) {
+                    actionCol = `<span style="color: var(--ink-soft); font-size: 12px; font-weight: 600; margin-right: 12px;">(You)</span>`;
+                } else if (!isAi) {
+                    actionCol = `<button class="btn btn-danger" onclick="deleteAgent('${agent.username}')">Remove</button>`;
+                }
 
                 const tr = document.createElement("tr");
                 tr.innerHTML = `
                     <td style="font-weight: 600;">${agent.username}</td>
-                    <td><span class="role-badge ${roleClass}">${agent.role}</span></td>
+                    <td style="color: var(--ink-soft); font-family: monospace;">${agent.employee_id}</td>
+                    <td><span class="role-badge ${roleClass}" style="${roleStyle}">${agent.role}</span></td>
+                    <td style="font-weight: 700; font-size: 15px; color: var(--accent);">${agent.resolved_count}</td>
                     <td style="color: var(--ink-soft);">${date}</td>
                     <td style="text-align: right;">
                         ${actionCol}
@@ -392,30 +396,7 @@
             });
         }
         
-        async function fetchAnalytics() {
-            const res = await fetch(`${API_BASE}/admin/analytics`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            if (!res.ok) return;
-            
-            const data = await res.json();
-            const tbody = document.getElementById("analytics-list");
-            tbody.innerHTML = "";
-            
-            data.resolution_stats.forEach(stat => {
-                const tr = document.createElement("tr");
-                const isAI = stat.agent === "AI Agent";
-                const badge = isAI 
-                    ? `<span class="role-badge" style="background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3);">AI Agent</span>`
-                    : `<span style="font-weight: 600;">${stat.agent}</span>`;
-                    
-                tr.innerHTML = `
-                    <td>${badge}</td>
-                    <td style="font-weight: 700; font-size: 16px; color: var(--accent);">${stat.resolved_count}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
+
 
         async function deleteAgent(username) {
             if (!confirm(`Are you sure you want to remove agent '${username}'?`)) return;
@@ -438,6 +419,7 @@
             btn.innerText = "Creating...";
             
             const username = document.getElementById("agent-username").value;
+            const employee_id = document.getElementById("agent-employee-id").value;
             const password = pwdInput.value;
             const role = document.getElementById("agent-role").value;
 
@@ -447,7 +429,7 @@
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
                 },
-                body: JSON.stringify({ username, password, role })
+                body: JSON.stringify({ username, employee_id, password, role })
             });
 
             btn.disabled = false;
@@ -455,6 +437,7 @@
 
             if (res.ok) {
                 document.getElementById("agent-username").value = "";
+                document.getElementById("agent-employee-id").value = "";
                 pwdInput.value = "";
                 document.getElementById("error-msg").innerText = "";
                 
@@ -470,8 +453,17 @@
             }
         });
 
+        // Force clear autofill fields completely on load
+        setTimeout(() => {
+            document.getElementById("agent-username").value = "";
+            document.getElementById("agent-password").value = "";
+            const fakeUser = document.querySelector('input[name="fakeusernameremembered"]');
+            const fakePass = document.querySelector('input[name="fakepasswordremembered"]');
+            if(fakeUser) fakeUser.value = "";
+            if(fakePass) fakePass.value = "";
+        }, 100);
+
         fetchAgents();
-        fetchAnalytics();
     </script>
 </body>
 </html>

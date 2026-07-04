@@ -19,6 +19,7 @@ router = APIRouter()
 
 class AgentCreate(BaseModel):
     username: str
+    employee_id: str
     password: str
     role: str = "agent"
 
@@ -27,8 +28,39 @@ def list_agents(
     db: Session = Depends(get_db),
     manager: Agent = Depends(get_current_manager),
 ) -> list[dict]:
+    # Get all agents
     agents = db.query(Agent).all()
-    return [{"username": a.username, "role": a.role, "created_at": a.created_at.isoformat()} for a in agents]
+    
+    # Get resolution stats
+    results = db.query(
+        Conversation.handled_by, 
+        func.count(Conversation.id)
+    ).filter(Conversation.resolved == True).group_by(Conversation.handled_by).all()
+    
+    stats_map = {handled_by: count for handled_by, count in results if handled_by}
+    ai_count = next((count for handled_by, count in results if not handled_by), 0)
+
+    # Combine
+    directory = []
+    for a in agents:
+        directory.append({
+            "username": a.username,
+            "employee_id": a.employee_id or "N/A",
+            "role": a.role,
+            "created_at": a.created_at.isoformat(),
+            "resolved_count": stats_map.get(a.username, 0)
+        })
+        
+    # Append AI Agent
+    directory.append({
+        "username": "AI Agent",
+        "employee_id": "AUTO",
+        "role": "ai",
+        "created_at": "",
+        "resolved_count": ai_count
+    })
+    
+    return directory
 
 @router.post("/admin/agents")
 def create_agent(
@@ -41,9 +73,13 @@ def create_agent(
     
     if agent_in.role not in ["agent", "manager"]:
         raise HTTPException(status_code=400, detail="Invalid role. Must be 'agent' or 'manager'")
+        
+    if db.query(Agent).filter_by(employee_id=agent_in.employee_id).first():
+        raise HTTPException(status_code=400, detail="Employee ID already exists")
 
     new_agent = Agent(
         username=agent_in.username,
+        employee_id=agent_in.employee_id,
         password_hash=hash_password(agent_in.password),
         role=agent_in.role
     )
@@ -67,20 +103,4 @@ def delete_agent(
     db.commit()
     return {"status": "deleted", "username": username}
 
-@router.get("/admin/analytics")
-def get_analytics(
-    db: Session = Depends(get_db),
-    manager: Agent = Depends(get_current_manager),
-) -> dict:
-    results = db.query(
-        Conversation.handled_by, 
-        func.count(Conversation.id)
-    ).filter(Conversation.resolved == True).group_by(Conversation.handled_by).all()
 
-    stats = []
-    for handled_by, count in results:
-        agent_name = handled_by if handled_by else "AI Agent"
-        stats.append({"agent": agent_name, "resolved_count": count})
-        
-    stats.sort(key=lambda x: x["resolved_count"], reverse=True)
-    return {"resolution_stats": stats}
