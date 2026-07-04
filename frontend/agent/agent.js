@@ -57,7 +57,7 @@ loginForm.addEventListener("submit", async (e) => {
     if (data.role === "manager") {
       document.getElementById("admin-dashboard-btn").classList.remove("hidden");
       document.getElementById("admin-dashboard-btn").addEventListener("click", () => {
-        window.location.href = "admin_dashboard.html";
+        window.location.href = "/agent/admin_dashboard.html";
       });
     }
 
