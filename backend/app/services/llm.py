@@ -147,6 +147,12 @@ def generate_final_reply(state: dict) -> str:
         )
     elif state.get("order_id") and not state.get("order_status"):
         context_parts.append(f"Order #{state['order_id']} was not found in our system.")
+    elif not state.get("order_id") and state.get("current_intent") == "order":
+        # Explicit instruction when the user asks about an order but hasn't provided the ID
+        context_parts.append(
+            "The customer is asking about an order, but they haven't provided an order number yet. "
+            "Politely ask them to provide their 4+ digit order number."
+        )
     
     if state.get("last_retrieved_context") and state.get("answer_grounded"):
         context_parts.append(f"Policy Context:\n{state['last_retrieved_context']}")

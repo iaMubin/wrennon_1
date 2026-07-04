@@ -27,11 +27,8 @@ def route_intent(state: ConversationState) -> str:
     if state.get("handoff_requested"):
         return "handoff"
 
-    # If order_id was pre-extracted, route directly to order node
-    if state.get("order_id"):
-        return "order"
-
     intent = classify_intent(state["messages"])
+    state["current_intent"] = intent
     
     if intent == "handoff":
         state["handoff_requested"] = True
