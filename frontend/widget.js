@@ -5,6 +5,8 @@ const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "localhost:800
 const WS_URL  = `${_IS_LOCAL ? "ws"   : "wss"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/ws/customer`;
 
 const STORAGE_KEY = "wrennon_session_id";
+const HISTORY_KEY = "wrennon_chat_history";
+const QUEUE_KEY = "wrennon_offline_queue";
 
 const launcher = document.getElementById("launcher");
 const panel = document.getElementById("panel");
@@ -16,6 +18,7 @@ const sendBtn = document.getElementById("send-btn");
 let socket = null;
 let hasLoadedHistory = false;
 let SESSION_ID = null;
+let reconnectInterval = null;
 
 // ── Session Management ─────────────────────────────────────────────
 // Persist session_id in localStorage so the customer can continue
@@ -66,25 +69,74 @@ inputEl.addEventListener("keydown", (e) => {
 
 // ── History & WebSocket ────────────────────────────────────────────
 
-async function loadHistory() {
+// ── History & Offline Storage ──────────────────────────────────────
+
+function getLocalHistory() {
+  const data = localStorage.getItem(HISTORY_KEY);
+  if (!data) return [];
   try {
-    const response = await fetch(`${API_BASE}/chat/${SESSION_ID}/history`);
-    const history = await response.json();
-    if (history.length === 0) {
-      appendMessage("system", "Connected. Try: \"what's your return policy?\" or \"where is order #1001?\"");
-      return;
-    }
-    for (const msg of history) {
-      appendMessage(msg.sender, msg.content);
-    }
-  } catch (err) {
-    appendMessage("system", "Couldn't load conversation history.");
-    console.error(err);
+    const history = JSON.parse(data);
+    // Filter out messages older than 7 days
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return history.filter(msg => msg.timestamp > sevenDaysAgo);
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveToHistory(role, text) {
+  const history = getLocalHistory();
+  history.push({ role, text, timestamp: Date.now() });
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+}
+
+function getOfflineQueue() {
+  const data = localStorage.getItem(QUEUE_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+function addToOfflineQueue(text) {
+  const queue = getOfflineQueue();
+  queue.push(text);
+  localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+}
+
+function clearOfflineQueue() {
+  localStorage.removeItem(QUEUE_KEY);
+}
+
+async function loadHistory() {
+  // Always load from local storage to survive backend restarts
+  const history = getLocalHistory();
+  
+  if (history.length === 0) {
+    appendMessage("system", "Connected. Try: \"what's your return policy?\" or \"where is order #1001?\"", false);
+    return;
+  }
+  
+  for (const msg of history) {
+    appendMessage(msg.role, msg.text, false); // false = don't re-save
   }
 }
 
 function connectSocket() {
   socket = new WebSocket(`${WS_URL}/${SESSION_ID}`);
+
+  socket.onopen = () => {
+    if (reconnectInterval) {
+      clearInterval(reconnectInterval);
+      reconnectInterval = null;
+      appendMessage("system", "Connection restored.", false);
+    }
+    
+    // Send queued offline messages
+    const queue = getOfflineQueue();
+    if (queue.length > 0) {
+      const combinedMessage = queue.join("\n\n");
+      socket.send(JSON.stringify({ message: combinedMessage }));
+      clearOfflineQueue();
+    }
+  };
 
   socket.onmessage = (event) => {
     try {
@@ -96,7 +148,10 @@ function connectSocket() {
   };
 
   socket.onclose = () => {
-    appendMessage("system", "Connection lost. Reload the page to reconnect.");
+    if (!reconnectInterval) {
+      appendMessage("system", "Connection lost. Reconnecting in background...", false);
+      reconnectInterval = setInterval(connectSocket, 5000);
+    }
   };
 
   socket.onerror = (err) => {
@@ -158,23 +213,36 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-function appendMessage(role, text) {
+function appendMessage(role, text, save = true) {
+  // Standardize role names for UI styling
+  const uiRole = role === "human" ? "user" : (role === "ai" ? "bot" : role);
+  
   const div = document.createElement("div");
-  div.className = `msg msg--${role}`;
-  if (role === "bot") {
+  div.className = `msg msg--${uiRole}`;
+  if (uiRole === "bot") {
     div.innerHTML = renderMarkdown(text);
   } else {
     div.textContent = text;
   }
   messagesEl.appendChild(div);
   messagesEl.scrollTop = messagesEl.scrollHeight;
+  
+  if (save && uiRole !== "system") {
+    saveToHistory(role, text);
+  }
 }
 
 function sendMessage() {
   const text = inputEl.value.trim();
-  if (!text || !socket || socket.readyState !== WebSocket.OPEN) return;
+  if (!text) return;
 
   appendMessage("user", text);
   inputEl.value = "";
-  socket.send(JSON.stringify({ message: text }));
+  
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ message: text }));
+  } else {
+    // Backend is down or disconnected
+    addToOfflineQueue(text);
+  }
 }
