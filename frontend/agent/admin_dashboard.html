@@ -337,6 +337,8 @@
             }
         });
 
+        const currentUser = localStorage.getItem("agent_username");
+
         async function fetchAgents() {
             const res = await fetch(`${API_BASE}/admin/agents`, {
                 headers: { "Authorization": `Bearer ${token}` }
@@ -356,13 +358,18 @@
             agents.forEach(agent => {
                 const roleClass = agent.role === 'manager' ? 'role-manager' : 'role-agent';
                 const date = new Date(agent.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+                const isSelf = agent.username === currentUser;
+                const actionCol = isSelf 
+                    ? `<span style="color: var(--ink-soft); font-size: 12px; font-weight: 600; margin-right: 12px;">(You)</span>` 
+                    : `<button class="btn btn-danger" onclick="deleteAgent('${agent.username}')">Remove</button>`;
+
                 const tr = document.createElement("tr");
                 tr.innerHTML = `
                     <td style="font-weight: 600;">${agent.username}</td>
                     <td><span class="role-badge ${roleClass}">${agent.role}</span></td>
                     <td style="color: var(--ink-soft);">${date}</td>
                     <td style="text-align: right;">
-                        <button class="btn btn-danger" onclick="deleteAgent('${agent.username}')">Remove</button>
+                        ${actionCol}
                     </td>
                 `;
                 tbody.appendChild(tr);
