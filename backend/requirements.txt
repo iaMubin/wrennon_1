@@ -11,7 +11,7 @@ langchain-core==0.3.28
 groq==0.15.0
 
 # Embeddings + vector store
-chromadb==0.5.23
+pinecone==9.1.0
 posthog==3.7.4
 
 # Reranking
@@ -23,9 +23,10 @@ langchain-text-splitters==0.3.4
 
 python-dotenv==1.0.1
 
-# Database (SQLite via SQLAlchemy ORM — easy migration path to Postgres later)
+# Database (PostgreSQL via SQLAlchemy ORM)
 sqlalchemy==2.0.36
 alembic==1.14.0
+psycopg2-binary==2.9.12
 
 # Auth
 python-jose[cryptography]==3.3.0
@@ -35,3 +36,5 @@ python-multipart==0.0.20
 # WebSocket (uvicorn[standard] already includes the websockets package,
 # this is just here as an explicit reminder of the dependency)
 websockets==14.1
+redis==8.0.1
+broadcaster==0.3.1

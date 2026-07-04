@@ -15,13 +15,14 @@ class Settings(BaseSettings):
     groq_api_key: str
     cohere_api_key: str
 
-    chroma_persist_dir: str = "./data/chroma_store"
-    chroma_collection_name: str = "policy_docs"
+    pinecone_api_key: str
+    pinecone_host: str
 
     app_env: str = "development"
     cors_allowed_origins: str = "http://localhost:5500"
 
     database_url: str = "sqlite:///./data/wrennon.db"
+    redis_url: str = "redis://localhost:6379"
 
     # JWT settings for agent login. jwt_secret_key MUST be overridden in
     # .env for any real deployment — this default is fine for local dev

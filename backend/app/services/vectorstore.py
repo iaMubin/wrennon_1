@@ -10,7 +10,8 @@ alone would consume ~500 MB before any application code even loads.
 
 from __future__ import annotations
 
-import chromadb
+import uuid
+from pinecone import Pinecone
 import cohere
 
 from app.config import settings
@@ -26,11 +27,9 @@ _query_embedder = CohereQueryEmbedder(
     model_name="embed-english-v3.0",
 )
 
-_chroma_client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
-_collection = _chroma_client.get_or_create_collection(
-    settings.chroma_collection_name,
-    embedding_function=_doc_embedder,
-)
+_pinecone = Pinecone(api_key=settings.pinecone_api_key)
+_index = _pinecone.Index(host=settings.pinecone_host)
+
 _cohere_client = cohere.Client(settings.cohere_api_key)
 
 
@@ -46,12 +45,17 @@ def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
     # produce better results when document vs query is distinguished)
     query_embedding = _query_embedder.embed_query(query)
 
-    results = _collection.query(
-        query_embeddings=[query_embedding],
-        n_results=max(top_k * 3, 5),  # over-fetch so reranking has real choices
+    # Pinecone fetch
+    results = _index.query(
+        vector=query_embedding,
+        top_k=max(top_k * 3, 5),
+        include_metadata=True
     )
 
-    candidates = results.get("documents", [[]])[0]
+    if not results.matches:
+        return []
+
+    candidates = [match.metadata["text"] for match in results.matches if "text" in match.metadata]
     if not candidates:
         return []
 

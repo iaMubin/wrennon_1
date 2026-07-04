@@ -23,7 +23,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import chromadb
+import uuid
+from pinecone import Pinecone
 import fitz
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -72,24 +73,44 @@ def main() -> None:
         model_name="embed-english-v3.0",
     )
 
-    client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
+    pinecone = Pinecone(api_key=settings.pinecone_api_key)
+    index = pinecone.Index(host=settings.pinecone_host)
+    
+    # We delete all existing vectors before re-ingesting to avoid stale chunks.
+    # We do this by deleting the index or just calling delete_all?
+    # Pinecone delete all: index.delete(delete_all=True)
     try:
-        client.delete_collection(settings.chroma_collection_name)
-    except Exception:
-        pass  # collection didn't exist yet — nothing to clear, fine on first run
-    collection = client.create_collection(
-        settings.chroma_collection_name,
-        embedding_function=cohere_ef,
-    )
+        index.delete(delete_all=True)
+    except Exception as e:
+        print(f"Warning on delete all (can be ignored on empty index): {e}")
 
-    # ChromaDB calls cohere_ef automatically when we pass documents
-    # without explicit embeddings.
-    collection.add(
-        ids=[f"chunk-{i}" for i in range(len(chunks))],
-        documents=chunks,
-    )
+    # Compute embeddings
+    print("Computing embeddings via Cohere...")
+    embeddings = cohere_ef(chunks)
 
-    print(f"Ingested {len(chunks)} chunks into collection '{settings.chroma_collection_name}'")
+    # Upsert in batches
+    batch_size = 100
+    for i in range(0, len(chunks), batch_size):
+        batch_chunks = chunks[i:i + batch_size]
+        batch_embeddings = embeddings[i:i + batch_size]
+        
+        vectors = []
+        for j, (chunk, embedding) in enumerate(zip(batch_chunks, batch_embeddings)):
+            # Convert numpy floats to standard python floats if necessary
+            if hasattr(embedding, "tolist"):
+                embedding = embedding.tolist()
+            else:
+                embedding = [float(x) for x in embedding]
+            
+            vectors.append({
+                "id": f"chunk-{i+j}",
+                "values": embedding,
+                "metadata": {"text": chunk}
+            })
+            
+        index.upsert(vectors=vectors)
+
+    print(f"Ingested {len(chunks)} chunks into Pinecone index at {settings.pinecone_host}")
 
 
 if __name__ == "__main__":

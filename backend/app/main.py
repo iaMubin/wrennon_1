@@ -3,6 +3,8 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from contextlib import asynccontextmanager
+
 from app.api.agent import router as agent_router
 from app.api.chat import router as chat_router
 from app.config import settings
@@ -11,9 +13,18 @@ from app.db.session import engine, SessionLocal
 from app.auth.security import hash_password
 from app.logger import logger
 from app.realtime.websocket_routes import router as realtime_router
+from app.realtime.connection_manager import broadcast
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Connecting to Redis Pub/Sub...")
+    await broadcast.connect()
+    yield
+    logger.info("Disconnecting from Redis Pub/Sub...")
+    await broadcast.disconnect()
 
 logger.info("Starting Wrennon Showcase Agent...")
-app = FastAPI(title="Wrennon Showcase Agent", version="0.2.0")
+app = FastAPI(title="Wrennon Showcase Agent", version="0.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
