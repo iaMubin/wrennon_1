@@ -30,7 +30,7 @@ app = FastAPI(title="Wrennon Showcase Agent", version="0.2.0", lifespan=lifespan
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
-    allow_methods=["GET", "POST"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
