@@ -20,6 +20,11 @@ from app.config import settings
 from app.db.models import Agent, Conversation, Message, AuditLog
 from app.db.session import get_db
 from app.realtime.connection_manager import manager
+from app.config import settings
+import redis.asyncio as redis
+
+# Create a Redis client for rate limiting
+redis_client = redis.from_url(settings.redis_url, decode_responses=True)
 
 router = APIRouter()
 
@@ -31,27 +36,38 @@ async def login(
 ) -> dict:
     # Rate Limiting
     rate_key = f"login_attempts:{form_data.username}"
-    attempts = await manager.redis.get(rate_key)
-    if attempts and int(attempts) >= 5:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many failed login attempts. Please try again later.",
-        )
+    try:
+        attempts = await redis_client.get(rate_key)
+        if attempts and int(attempts) >= 5:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many failed login attempts. Please try again later.",
+            )
+    except redis.ConnectionError:
+        # Fallback if Redis is down
+        pass
 
     agent = db.query(Agent).filter(
         or_(Agent.username == form_data.username, Agent.employee_id == form_data.username)
     ).first()
     
     if not agent or not verify_password(form_data.password, agent.password_hash):
-        await manager.redis.incr(rate_key)
-        await manager.redis.expire(rate_key, 60)
+        try:
+            await redis_client.incr(rate_key)
+            await redis_client.expire(rate_key, 60)
+        except redis.ConnectionError:
+            pass
+            
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
         )
         
     # Reset rate limit on success
-    await manager.redis.delete(rate_key)
+    try:
+        await redis_client.delete(rate_key)
+    except redis.ConnectionError:
+        pass
         
     token = create_access_token(subject=agent.username, pwd_hash=agent.password_hash)
     
