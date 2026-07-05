@@ -22,6 +22,10 @@ class ConversationState(TypedDict):
     current_intent: Optional[str]
     conversation_summary: Optional[str]
     
+    # --- Plan and Execute ---
+    planned_tools: list[dict]
+    gathered_context: list[str]
+    
     # --- Conversation State ---
     active_topic: Optional[str]
     last_order_id: Optional[str]
@@ -66,6 +70,8 @@ def initial_state(customer_email: Optional[str] = None) -> ConversationState:
         customer_email=customer_email,
         current_intent=None,
         conversation_summary=None,
+        planned_tools=[],
+        gathered_context=[],
         active_topic=None,
         last_order_id=None,
         turn_count=0,

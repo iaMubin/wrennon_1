@@ -44,18 +44,41 @@ def _safe_groq_call(messages: list, temperature: float = 0.2, max_tokens: int = 
         return result.strip()
     raise ValueError("Groq returned empty response")
 
-def _safe_openai_call(messages: list, temperature: float = 0.2, max_tokens: int = 400) -> str:
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True
+)
+def _safe_groq_json_call(messages: list, temperature: float = 0.2, max_tokens: int = 1000) -> str:
+    """Wrapper around Groq API calls specifically for JSON output."""
+    response = _client.chat.completions.create(
+        model=MODEL,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        response_format={"type": "json_object"}
+    )
+    result = response.choices[0].message.content
+    if result and result.strip():
+        return result.strip()
+    raise ValueError("Groq returned empty JSON response")
+
+def _safe_openai_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, is_json: bool = False) -> str:
     """Fallback to OpenAI if Groq fails."""
     if not _openai_client:
         return ""
     logger.info("Falling back to OpenAI API...")
     try:
-        response = _openai_client.chat.completions.create(
-            model="gpt-5.4-mini",
-            messages=messages,
-            temperature=temperature,
-            max_completion_tokens=max_tokens,
-        )
+        kwargs = {
+            "model": "gpt-5.4-mini",
+            "messages": messages,
+            "temperature": temperature,
+            "max_completion_tokens": max_tokens,
+        }
+        if is_json:
+            kwargs["response_format"] = {"type": "json_object"}
+            
+        response = _openai_client.chat.completions.create(**kwargs)
         result = response.choices[0].message.content
         if result and result.strip():
             return result.strip()
@@ -63,14 +86,16 @@ def _safe_openai_call(messages: list, temperature: float = 0.2, max_tokens: int 
         logger.warning(f"OpenAI fallback failed: {e}")
     return ""
 
-def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: int = 400) -> str:
+def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, is_json: bool = False) -> str:
     """Calls Groq with retries, and falls back to OpenAI if it completely fails."""
     try:
+        if is_json:
+            return _safe_groq_json_call(messages, temperature, max_tokens)
         return _safe_groq_call(messages, temperature, max_tokens)
     except Exception as e:
         logger.error(f"Groq API completely failed after retries: {e}")
         if _openai_client:
-            return _safe_openai_call(messages, temperature, max_tokens)
+            return _safe_openai_call(messages, temperature, max_tokens, is_json)
         return ""
 
 MODEL = "openai/gpt-oss-120b"
