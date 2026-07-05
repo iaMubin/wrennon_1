@@ -39,7 +39,7 @@ with SessionLocal() as db:
     if db.query(Agent).count() == 0:
         logger.info(f"No agents found. Creating initial manager: {settings.agent_username}")
         if not settings.agent_password_hash:
-            logger.error("AGENT_PASSWORD_HASH is empty! Cannot create the initial admin account.")
+            raise RuntimeError("AGENT_PASSWORD_HASH is empty! Cannot create the initial admin account.")
         else:
             db.add(Agent(
                 username=settings.agent_username, 

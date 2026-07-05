@@ -27,8 +27,15 @@ _query_embedder = CohereQueryEmbedder(
     model_name="embed-english-v3.0",
 )
 
-_pinecone = Pinecone(api_key=settings.pinecone_api_key)
-_index = _pinecone.Index(host=settings.pinecone_host)
+_pinecone = None
+_index = None
+
+def _get_index():
+    global _pinecone, _index
+    if _index is None:
+        _pinecone = Pinecone(api_key=settings.pinecone_api_key)
+        _index = _pinecone.Index(host=settings.pinecone_host)
+    return _index
 
 _cohere_client = cohere.Client(settings.cohere_api_key)
 
@@ -46,7 +53,8 @@ def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
     query_embedding = _query_embedder.embed_query(query)
 
     # Pinecone fetch
-    results = _index.query(
+    index = _get_index()
+    results = index.query(
         vector=query_embedding,
         top_k=max(top_k * 3, 5),
         include_metadata=True

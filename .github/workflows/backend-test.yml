@@ -37,5 +37,7 @@ jobs:
         JWT_SECRET_KEY: "test-secret"
         AGENT_PASSWORD_HASH: "test-hash"
         AGENT_USERNAME: "test_admin"
+        PYTHONPATH: "."
       run: |
+        alembic upgrade head
         pytest tests/

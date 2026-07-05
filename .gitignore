@@ -29,4 +29,3 @@ frontend/.vercel/
 # Cruft files
 temp_env/
 temp_reqs.txt
-*.txt

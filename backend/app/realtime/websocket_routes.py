@@ -23,6 +23,7 @@ from app.graph.state import initial_state
 from app.logger import logger
 from app.realtime.connection_manager import manager
 from app.config import settings
+from app.services.llm import mask_pii
 
 router = APIRouter()
 _graph = build_graph()
@@ -79,7 +80,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
             if not customer_text:
                 continue
                 
-            logger.info(f"Received message from customer {session_id}: {customer_text}")
+            logger.info(f"Received message from customer {session_id}: {mask_pii(customer_text)}")
 
             # Rate Limiting (max 15 msgs / minute)
             try:

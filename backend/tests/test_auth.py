@@ -41,7 +41,7 @@ def test_health_check():
 def test_login_success(setup_test_agent):
     response = client.post(
         "/api/agent/login",
-        json={"username": "test_admin", "password": "SecureAdmin!123"}
+        data={"username": "test_admin", "password": "SecureAdmin!123"}
     )
     assert response.status_code == 200
     data = response.json()
@@ -51,6 +51,6 @@ def test_login_success(setup_test_agent):
 def test_login_invalid_password(setup_test_agent):
     response = client.post(
         "/api/agent/login",
-        json={"username": "test_admin", "password": "WrongPassword123!"}
+        data={"username": "test_admin", "password": "WrongPassword123!"}
     )
     assert response.status_code == 401
