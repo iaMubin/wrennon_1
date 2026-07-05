@@ -1,5 +1,5 @@
 """
-Vector store access: ChromaDB for retrieval, Cohere for both
+Vector store access: Pinecone for retrieval, Cohere for both
 embeddings and reranking.
 
 Embeddings are generated via Cohere's API (embed-english-v3.0) instead
@@ -34,7 +34,7 @@ _cohere_client = cohere.Client(settings.cohere_api_key)
 
 
 def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
-    """Retrieve candidate chunks from ChromaDB, then rerank with Cohere.
+    """Retrieve candidate chunks from Pinecone, then rerank with Cohere.
 
     Returns:
         list of dicts, ordered by relevance, each shaped like:

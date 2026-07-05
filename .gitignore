@@ -25,3 +25,8 @@ frontend/.vercel/
 
 # Docker (optional local builds)
 *.log
+
+# Cruft files
+temp_env/
+temp_reqs.txt
+*.txt

@@ -37,10 +37,18 @@ app.add_middleware(
 # Auto-create default admin agent if none exist
 with SessionLocal() as db:
     if db.query(Agent).count() == 0:
-        logger.info("No agents found in database. Creating default 'mubin' manager.")
-        hashed_pw = hash_password("admin123")
-        db.add(Agent(username="mubin", full_name="Admin Mubin", password_hash=hashed_pw, role="manager", employee_id="EMP-1001"))
-        db.commit()
+        logger.info(f"No agents found. Creating initial manager: {settings.agent_username}")
+        if not settings.agent_password_hash:
+            logger.error("AGENT_PASSWORD_HASH is empty! Cannot create the initial admin account.")
+        else:
+            db.add(Agent(
+                username=settings.agent_username, 
+                full_name=settings.agent_username.capitalize(), 
+                password_hash=settings.agent_password_hash, 
+                role="manager", 
+                employee_id="EMP-1001"
+            ))
+            db.commit()
 
     # Backfill full_name for existing agents
     agents_without_name = db.query(Agent).filter(Agent.full_name == None).all()

@@ -19,3 +19,11 @@ services:
         sync: false
       - key: APP_ENV
         value: production
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: PINECONE_HOST
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
