@@ -277,14 +277,14 @@
                 <div class="input-wrapper">
                     <input type="text" id="agent-username" required readonly onfocus="this.removeAttribute('readonly');" autocomplete="new-password" placeholder="e.g. john_doe">
                 </div>
-                <div id="uname-error" style="color: var(--danger); font-size: 12px; margin-top: 4px;"></div>
+                <div id="uname-error" style="color: var(--danger); font-size: 11px; margin-top: 4px;"></div>
             </div>
             <div class="form-group">
                 <label>Employee ID</label>
                 <div class="input-wrapper">
                     <input type="text" id="agent-employee-id" required readonly onfocus="this.removeAttribute('readonly');" autocomplete="new-password" placeholder="e.g. EMP-1234">
                 </div>
-                <div id="emp-error" style="color: var(--danger); font-size: 12px; margin-top: 4px;"></div>
+                <div id="emp-error" style="color: var(--danger); font-size: 11px; margin-top: 4px;"></div>
             </div>
             <div class="form-group">
                 <label>Password</label>
@@ -298,7 +298,7 @@
                         </svg>
                     </button>
                 </div>
-                <div id="pwd-error" style="color: var(--danger); font-size: 12px; margin-top: 4px;"></div>
+                <div id="pwd-error" style="color: var(--danger); font-size: 11px; margin-top: 4px;"></div>
             </div>
             <div class="form-group">
                 <label>Role</label>
@@ -380,7 +380,7 @@
                     </button>
                     <button class="btn btn-primary" id="reset-pwd-btn" onclick="resetAgentPassword()" style="padding: 0 16px; min-width: auto; height: 40px;">Reset</button>
                 </div>
-                <div id="reset-error-msg" style="color: var(--danger); font-size: 12px; margin-top: 8px;"></div>
+                <div id="reset-error-msg" style="color: var(--danger); font-size: 11px; margin-top: 8px;"></div>
             </div>
 
             <div id="modal-actions" style="display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid var(--line);">
@@ -438,7 +438,7 @@
         const unameError = document.getElementById("uname-error");
         const empError = document.getElementById("emp-error");
         const pwdError = document.getElementById("pwd-error");
-        const fullPwdInstruction = "Password must be at least 8 characters long, contain 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character.";
+        const fullPwdInstruction = "Requires 8+ chars, uppercase, lowercase, number, & special char.";
 
         function validateForm() {
             let unameErrText = "";
