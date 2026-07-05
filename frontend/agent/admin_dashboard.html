@@ -375,8 +375,9 @@
                             <line class="eye-slash hidden" x1="1" y1="1" x2="23" y2="23"></line>
                         </svg>
                     </button>
-                    <button class="btn btn-primary" onclick="resetAgentPassword()" style="padding: 0 16px; min-width: auto; height: 40px;">Reset</button>
+                    <button class="btn btn-primary" id="reset-pwd-btn" onclick="resetAgentPassword()" style="padding: 0 16px; min-width: auto; height: 40px;">Reset</button>
                 </div>
+                <div id="reset-error-msg" style="color: var(--danger); font-size: 12px; margin-top: 8px;"></div>
             </div>
 
             <div id="modal-actions" style="display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid var(--line);">
@@ -421,15 +422,60 @@
         const resetSlashLine = toggleResetPwdBtn.querySelector(".eye-slash");
         
         toggleResetPwdBtn.addEventListener("click", () => {
-            if (resetPwdInput.type === "password") {
-                resetPwdInput.type = "text";
-                resetEyePaths.forEach(p => p.classList.add("hidden"));
-                resetSlashLine.classList.remove("hidden");
-            } else {
-                resetPwdInput.type = "password";
-                resetEyePaths.forEach(p => p.classList.remove("hidden"));
-                resetSlashLine.classList.add("hidden");
+            const isPwd = resetPwdInput.type === "password";
+            resetPwdInput.type = isPwd ? "text" : "password";
+            toggleResetPwdBtn.querySelectorAll('.eye').forEach(el => el.classList.toggle('hidden', isPwd));
+            toggleResetPwdBtn.querySelector('.eye-slash').classList.toggle('hidden', !isPwd);
+        });
+
+        const usernameInput = document.getElementById("agent-username");
+        const empIdInput = document.getElementById("agent-employee-id");
+        const createBtn = document.querySelector('#create-agent-form button[type="submit"]');
+        const errorMsg = document.getElementById("error-msg");
+
+        function validateForm() {
+            let error = "";
+            const pwd = pwdInput.value;
+            const uname = usernameInput.value.trim();
+            const empId = empIdInput.value.trim();
+            
+            if (uname && currentAgentsData && currentAgentsData.some(a => a.username.toLowerCase() === uname.toLowerCase())) {
+                error = "Username already exists.";
+            } else if (empId && currentAgentsData && currentAgentsData.some(a => a.employee_id && a.employee_id.toLowerCase() === empId.toLowerCase())) {
+                error = "Employee ID already exists.";
+            } else if (pwd) {
+                if (pwd.length < 8) error = "Password must be at least 8 characters long.";
+                else if (!/[A-Z]/.test(pwd)) error = "Password must contain at least one uppercase letter.";
+                else if (!/[a-z]/.test(pwd)) error = "Password must contain at least one lowercase letter.";
+                else if (!/[0-9]/.test(pwd)) error = "Password must contain at least one number.";
+                else if (!/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) error = "Password must contain at least one special character.";
             }
+            
+            errorMsg.innerText = error;
+            if (error) errorMsg.style.color = "var(--danger)";
+            createBtn.disabled = error.length > 0;
+            return error.length === 0;
+        }
+
+        usernameInput.addEventListener('input', validateForm);
+        empIdInput.addEventListener('input', validateForm);
+        pwdInput.addEventListener('input', validateForm);
+
+        const resetBtn = document.getElementById("reset-pwd-btn");
+        const resetErrorMsg = document.getElementById("reset-error-msg");
+        
+        resetPwdInput.addEventListener('input', () => {
+            const pwd = resetPwdInput.value;
+            let error = "";
+            if (pwd) {
+                if (pwd.length < 8) error = "Password must be at least 8 characters long.";
+                else if (!/[A-Z]/.test(pwd)) error = "Password must contain at least one uppercase letter.";
+                else if (!/[a-z]/.test(pwd)) error = "Password must contain at least one lowercase letter.";
+                else if (!/[0-9]/.test(pwd)) error = "Password must contain at least one number.";
+                else if (!/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) error = "Password must contain at least one special character.";
+            }
+            resetErrorMsg.innerText = error;
+            resetBtn.disabled = error.length > 0;
         });
 
         const currentUser = localStorage.getItem("agent_username");
@@ -563,6 +609,8 @@
 
         document.getElementById("create-agent-form").addEventListener("submit", async (e) => {
             e.preventDefault();
+            if (!validateForm()) return;
+
             const btn = e.target.querySelector('button[type="submit"]');
             btn.disabled = true;
             btn.innerText = "Creating...";
