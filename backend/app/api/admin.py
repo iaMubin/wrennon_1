@@ -19,6 +19,7 @@ router = APIRouter()
 
 class AgentCreate(BaseModel):
     username: str
+    full_name: str
     employee_id: str
     password: str
     role: str = "agent"
@@ -44,6 +45,7 @@ def list_agents(
     directory = []
     for a in agents:
         directory.append({
+            "full_name": a.full_name or a.username.capitalize(),
             "username": a.username,
             "employee_id": a.employee_id or "N/A",
             "role": a.role,
@@ -53,6 +55,7 @@ def list_agents(
         
     # Append AI Agent
     directory.append({
+        "full_name": "Artificial Intelligence",
         "username": "AI Agent",
         "employee_id": "AUTO",
         "role": "ai",
@@ -79,6 +82,7 @@ def create_agent(
 
     new_agent = Agent(
         username=agent_in.username,
+        full_name=agent_in.full_name,
         employee_id=agent_in.employee_id,
         password_hash=hash_password(agent_in.password),
         role=agent_in.role

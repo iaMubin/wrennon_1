@@ -93,6 +93,7 @@ class Agent(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     employee_id: Mapped[str | None] = mapped_column(String, unique=True, index=True, nullable=True)
+    full_name: Mapped[str | None] = mapped_column(String, nullable=True)
     username: Mapped[str] = mapped_column(String, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String)
     role: Mapped[str] = mapped_column(String, default="agent")

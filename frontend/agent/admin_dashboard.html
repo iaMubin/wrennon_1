@@ -262,31 +262,36 @@
         </div>
 
         <h3>Create New Agent</h3>
-        <!-- hidden input to trick browser password managers -->
+        <!-- hidden inputs to trick browser password managers -->
         <input style="display:none" type="text" name="fakeusernameremembered"/>
         <input style="display:none" type="password" name="fakepasswordremembered"/>
         <form id="create-agent-form">
             <div class="form-group">
-                <label>Agent Name</label>
+                <label>Full Name</label>
                 <div class="input-wrapper">
-                    <input type="text" id="agent-username" required autocomplete="new-password" placeholder="e.g. john_doe">
+                    <input type="text" id="agent-fullname" required autocomplete="new-password" placeholder="e.g. John Doe">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Agent Username</label>
+                <div class="input-wrapper">
+                    <input type="text" id="agent-username" required readonly onfocus="this.removeAttribute('readonly');" autocomplete="new-password" placeholder="e.g. john_doe">
                 </div>
             </div>
             <div class="form-group">
                 <label>Employee ID</label>
                 <div class="input-wrapper">
-                    <input type="text" id="agent-employee-id" required autocomplete="new-password" placeholder="e.g. EMP-1234">
+                    <input type="text" id="agent-employee-id" required readonly onfocus="this.removeAttribute('readonly');" autocomplete="new-password" placeholder="e.g. EMP-1234">
                 </div>
             </div>
             <div class="form-group">
-                <label>Passcode</label>
+                <label>Password</label>
                 <div class="input-wrapper">
-                    <input type="password" id="agent-password" required autocomplete="new-password">
-                    <button type="button" class="pwd-toggle" id="toggle-pwd" aria-label="Toggle password visibility">
-                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-                            <path class="eye" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle class="eye" cx="12" cy="12" r="3"></circle>
-                            <line class="eye-slash hidden" x1="1" y1="1" x2="23" y2="23"></line>
+                    <input type="password" id="agent-password" required readonly onfocus="this.removeAttribute('readonly');" autocomplete="new-password">
+                    <button type="button" class="btn-icon" id="toggle-pwd-btn" onclick="togglePasswordVisibility()" aria-label="Toggle password visibility">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         </svg>
                     </button>
                 </div>
@@ -302,11 +307,12 @@
             <div id="error-msg"></div>
         </form>
 
-        <h3 style="margin-top: 48px;">Team Directory</h3>
+        <h3>Team Directory</h3>
+        <p style="color: var(--ink-soft); font-size: 14px; margin-bottom: 20px;">Click on any agent to view their details.</p>
         <table>
             <thead>
                 <tr>
-                    <th>Agent Name</th>
+                    <th>Full Name</th>
                     <th>Employee ID</th>
                     <th>Access Level</th>
                     <th>Chats Resolved</th>
@@ -320,6 +326,35 @@
         </table>
     </div>
 
+    <!-- Agent Details Modal -->
+    <div id="agent-modal" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 100;">
+        <div style="background: var(--surface); padding: 32px; border-radius: 16px; border: 1px solid var(--border); width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.2);">
+            <h3 style="margin-bottom: 24px;">Agent Details</h3>
+            <div style="margin-bottom: 16px;">
+                <label style="color: var(--ink-soft); font-size: 12px; font-weight: 600; text-transform: uppercase;">Full Name</label>
+                <div id="modal-fullname" style="font-size: 16px; font-weight: 500; margin-top: 4px;"></div>
+            </div>
+            <div style="margin-bottom: 16px;">
+                <label style="color: var(--ink-soft); font-size: 12px; font-weight: 600; text-transform: uppercase;">Username</label>
+                <div id="modal-username" style="font-size: 16px; font-weight: 500; margin-top: 4px;"></div>
+            </div>
+            <div style="margin-bottom: 16px;">
+                <label style="color: var(--ink-soft); font-size: 12px; font-weight: 600; text-transform: uppercase;">Employee ID</label>
+                <div id="modal-employee-id" style="font-size: 16px; font-weight: 500; margin-top: 4px; font-family: monospace;"></div>
+            </div>
+            <div style="margin-bottom: 24px;">
+                <label style="color: var(--ink-soft); font-size: 12px; font-weight: 600; text-transform: uppercase;">Role</label>
+                <div id="modal-role" style="font-size: 16px; font-weight: 500; margin-top: 4px;"></div>
+            </div>
+            <div style="margin-bottom: 24px; padding: 12px; background: rgba(239, 68, 68, 0.1); border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.2);">
+                <span style="color: #F87171; font-size: 12px; display: block;">🔒 Passwords are hashed in the database and cannot be viewed.</span>
+            </div>
+            <div style="text-align: right;">
+                <button class="btn btn-secondary" onclick="document.getElementById('agent-modal').style.display='none'">Close</button>
+            </div>
+        </div>
+    </div>
+    
     <script>
         const _RENDER_HOST = "wrennon-backend.onrender.com";
         const _IS_LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1";
@@ -350,6 +385,18 @@
 
         const currentUser = localStorage.getItem("agent_username");
 
+        let currentAgentsData = [];
+        
+        function showAgentDetails(index) {
+            const agent = currentAgentsData[index];
+            if(!agent) return;
+            document.getElementById("modal-fullname").innerText = agent.full_name;
+            document.getElementById("modal-username").innerText = agent.username;
+            document.getElementById("modal-employee-id").innerText = agent.employee_id;
+            document.getElementById("modal-role").innerText = agent.role;
+            document.getElementById('agent-modal').style.display = 'flex';
+        }
+
         async function fetchAgents() {
             const res = await fetch(`${API_BASE}/admin/agents`, {
                 headers: { "Authorization": `Bearer ${token}` }
@@ -363,10 +410,11 @@
             if (!res.ok) return;
 
             const agents = await res.json();
+            currentAgentsData = agents;
             const tbody = document.getElementById("agents-list");
             tbody.innerHTML = "";
 
-            agents.forEach(agent => {
+            agents.forEach((agent, index) => {
                 const roleClass = agent.role === 'manager' ? 'role-manager' : (agent.role === 'ai' ? 'role-badge' : 'role-agent');
                 let roleStyle = agent.role === 'ai' ? 'background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3);' : '';
                 const date = agent.created_at ? new Date(agent.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
@@ -378,12 +426,14 @@
                 if (isSelf) {
                     actionCol = `<span style="color: var(--ink-soft); font-size: 12px; font-weight: 600; margin-right: 12px;">(You)</span>`;
                 } else if (!isAi) {
-                    actionCol = `<button class="btn btn-danger" onclick="deleteAgent('${agent.username}')">Remove</button>`;
+                    actionCol = `<button class="btn btn-danger" onclick="event.stopPropagation(); deleteAgent('${agent.username}')">Remove</button>`;
                 }
 
                 const tr = document.createElement("tr");
+                tr.style.cursor = "pointer";
+                tr.onclick = () => showAgentDetails(index);
                 tr.innerHTML = `
-                    <td style="font-weight: 600;">${agent.username}</td>
+                    <td style="font-weight: 600;">${agent.full_name}</td>
                     <td style="color: var(--ink-soft); font-family: monospace;">${agent.employee_id}</td>
                     <td><span class="role-badge ${roleClass}" style="${roleStyle}">${agent.role}</span></td>
                     <td style="font-weight: 700; font-size: 15px; color: var(--accent);">${agent.resolved_count}</td>
@@ -419,6 +469,7 @@
             btn.innerText = "Creating...";
             
             const username = document.getElementById("agent-username").value;
+            const full_name = document.getElementById("agent-fullname").value;
             const employee_id = document.getElementById("agent-employee-id").value;
             const password = pwdInput.value;
             const role = document.getElementById("agent-role").value;
@@ -429,7 +480,7 @@
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
                 },
-                body: JSON.stringify({ username, employee_id, password, role })
+                body: JSON.stringify({ username, full_name, employee_id, password, role })
             });
 
             btn.disabled = false;
@@ -437,6 +488,7 @@
 
             if (res.ok) {
                 document.getElementById("agent-username").value = "";
+                document.getElementById("agent-fullname").value = "";
                 document.getElementById("agent-employee-id").value = "";
                 pwdInput.value = "";
                 document.getElementById("error-msg").innerText = "";
@@ -455,12 +507,14 @@
 
         // Force clear autofill fields completely on load
         setTimeout(() => {
-            document.getElementById("agent-username").value = "";
-            document.getElementById("agent-password").value = "";
-            const fakeUser = document.querySelector('input[name="fakeusernameremembered"]');
-            const fakePass = document.querySelector('input[name="fakepasswordremembered"]');
-            if(fakeUser) fakeUser.value = "";
-            if(fakePass) fakePass.value = "";
+            const inputs = ['agent-username', 'agent-fullname', 'agent-employee-id', 'agent-password'];
+            inputs.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) {
+                    el.value = "";
+                    el.setAttribute('readonly', 'readonly');
+                }
+            });
         }, 100);
 
         fetchAgents();

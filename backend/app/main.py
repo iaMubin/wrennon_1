@@ -45,7 +45,14 @@ with SessionLocal() as db:
     if db.query(Agent).count() == 0:
         logger.info("No agents found in database. Creating default 'mubin' manager.")
         hashed_pw = hash_password("admin123")
-        db.add(Agent(username="mubin", password_hash=hashed_pw, role="manager", employee_id="EMP-1001"))
+        db.add(Agent(username="mubin", full_name="Admin Mubin", password_hash=hashed_pw, role="manager", employee_id="EMP-1001"))
+        db.commit()
+
+    # Backfill full_name for existing agents
+    agents_without_name = db.query(Agent).filter(Agent.full_name == None).all()
+    for a in agents_without_name:
+        a.full_name = a.username.capitalize()
+    if agents_without_name:
         db.commit()
 
     # Backfill employee_id for any existing agents
