@@ -40,14 +40,6 @@ def _get_or_create_conversation(db: Session, session_id: str, customer_email: st
         db.refresh(conversation)
         return conversation
 
-    # Reactivate a resolved conversation (within 72-hour window)
-    if conversation.resolved:
-        conversation.resolved = False
-        conversation.resolved_at = None
-        conversation.reopen_count += 1
-        db.commit()
-        logger.info(f"Conversation {session_id} reopened (count: {conversation.reopen_count})")
-
     return conversation
 
 
