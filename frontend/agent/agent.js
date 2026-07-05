@@ -212,10 +212,10 @@ function renderConversationList(conversations) {
 
     if (conv.resolved) {
       badgeClass = "badge--resolved";
-      stageText = conv.handled_by ? `Resolved by ${conv.handled_by}` : "Resolved (AI)";
+      stageText = conv.handled_by ? conv.handled_by : "AI";
     } else if (conv.handoff_active) {
       badgeClass = "badge--human";
-      stageText = conv.handled_by ? `Handled by ${conv.handled_by}` : "Needs Attention";
+      stageText = conv.handled_by ? conv.handled_by : "Needs Attention";
     }
 
     const reopenBadge = conv.reopen_count > 0
