@@ -54,7 +54,7 @@ def _safe_openai_call(messages: list, temperature: float = 0.2, max_tokens: int 
             model="gpt-5.4-mini",
             messages=messages,
             temperature=temperature,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_tokens,
         )
         result = response.choices[0].message.content
         if result and result.strip():
