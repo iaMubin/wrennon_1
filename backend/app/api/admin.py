@@ -36,10 +36,16 @@ def list_agents(
     agents = db.query(Agent).all()
     
     # Get resolution stats
+    from sqlalchemy import or_
     results = db.query(
         Conversation.handled_by, 
         func.count(Conversation.id)
-    ).filter(Conversation.resolved == True).group_by(Conversation.handled_by).all()
+    ).filter(
+        or_(
+            Conversation.resolved == True,
+            Conversation.handled_by.isnot(None)
+        )
+    ).group_by(Conversation.handled_by).all()
     
     stats_map = {handled_by: count for handled_by, count in results if handled_by}
     ai_count = next((count for handled_by, count in results if not handled_by), 0)
