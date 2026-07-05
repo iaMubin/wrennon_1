@@ -106,6 +106,31 @@ def generate_answer(question: str, context: str) -> str:
     )
     return result or "I'm sorry, I couldn't process that. Could you try rephrasing?"
 
+def monitor_response(customer_query: str, ai_response: str) -> bool:
+    """
+    Evaluates the AI response before sending it to the user.
+    Returns True if the response is safe/good, False if it requires escalation.
+    """
+    prompt = (
+        "You are a strict QA monitor for a customer support AI. "
+        "Your job is to read the customer's query and the AI's response, and determine if the response is SAFE to send.\n\n"
+        "Conditions for a UNSAFE/BAD response (return 'ESCALATE'):\n"
+        "1. The AI is rude, sarcastic, or dismissive.\n"
+        "2. The AI promises something outside normal policy (e.g., guarantees a full refund unconditionally).\n"
+        "3. The user is highly frustrated or angry, and the AI is just repeating itself unhelpfully.\n"
+        "4. The AI says it cannot help and does not offer escalation.\n\n"
+        "If the response is fine, return 'SAFE'.\n"
+        "Respond with ONLY the word 'SAFE' or 'ESCALATE'."
+    )
+    
+    messages = [
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": f"Customer: {customer_query}\n\nAI: {ai_response}"}
+    ]
+    
+    result = _safe_llm_call(messages, temperature=0.0, max_tokens=10).strip().upper()
+    return "SAFE" in result
+
 
 def generate_conversation_summary(messages: list) -> str:
     """Generate a short summary of the conversation for the human agent."""

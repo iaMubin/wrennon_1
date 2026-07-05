@@ -17,6 +17,7 @@ from app.graph.nodes.order_node import order_node
 from app.graph.nodes.rag_node import rag_node
 from app.graph.nodes.reply_node import reply_node
 from app.graph.nodes.resolved_node import resolved_node
+from app.graph.nodes.monitor_node import monitor_node
 from app.graph.state import ConversationState
 from app.services.llm import classify_intent
 
@@ -52,6 +53,7 @@ def build_graph():
     graph.add_node("handoff", handoff_node)
     graph.add_node("resolved", resolved_node)
     graph.add_node("reply", reply_node)
+    graph.add_node("monitor", monitor_node)
 
     graph.set_conditional_entry_point(
         route_intent,
@@ -73,7 +75,20 @@ def build_graph():
     
     graph.add_edge("handoff", "reply")
     graph.add_edge("resolved", END)
-    graph.add_edge("reply", END)
+    
+    # After generating a reply, it must be monitored
+    graph.add_edge("reply", "monitor")
+    
+    def check_monitor(state: ConversationState) -> str:
+        # If monitor flagged it and requested handoff, but we aren't already handing off
+        # wait, if monitor sets handoff_requested = True, we route to handoff.
+        # But if handoff_requested was ALREADY true before reply generated it, 
+        # monitor node doesn't need to trigger handoff again. It just ends.
+        if state.get("handoff_requested") and state["conversation_mode"] != "pending_human":
+            return "handoff"
+        return END
+        
+    graph.add_conditional_edges("monitor", check_monitor, {"handoff": "handoff", END: END})
 
     # --- L3/L4 extension point ---
     # When those levels are built, add their nodes above and extend the
