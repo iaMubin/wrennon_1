@@ -178,18 +178,22 @@ async function loadConversations() {
   };
   
   const endpoint = endpoints[activeSection] || endpoints["attention"];
-  const conversations = await authedFetch(endpoint);
+  
+  // Use Promise.all to fetch concurrently and save time
+  const [conversations, attnList, actList] = await Promise.all([
+    authedFetch(endpoint),
+    activeSection === "attention" ? null : authedFetch(endpoints["attention"]),
+    activeSection === "active" ? null : authedFetch(endpoints["active"])
+  ]);
+
   if (!conversations) {
     logout();
     return;
   }
 
-  // Always update the badges
-  const attnList = activeSection === "attention" ? conversations : await authedFetch(endpoints["attention"]);
-  if (attnList) attentionCount.textContent = attnList.length;
-  
-  const actList = activeSection === "active" ? conversations : await authedFetch(endpoints["active"]);
-  if (actList) activeCount.textContent = actList.length;
+  // Update badges
+  attentionCount.textContent = activeSection === "attention" ? conversations.length : (attnList ? attnList.length : 0);
+  activeCount.textContent = activeSection === "active" ? conversations.length : (actList ? actList.length : 0);
 
   renderConversationList(conversations);
 }
