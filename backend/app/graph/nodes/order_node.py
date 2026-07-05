@@ -6,6 +6,7 @@ into a customer-facing reply.
 
 from __future__ import annotations
 
+import re
 from langchain_core.messages import AIMessage
 
 from app.graph.state import ConversationState
@@ -18,8 +19,20 @@ ORDER_NOT_FOUND_MESSAGE = (
 
 
 def order_node(state: ConversationState) -> ConversationState:
-    order_id = state.get("order_id")
     customer_email = state.get("customer_email") or "unknown@customer"
+    
+    # Try to extract a new order ID from the latest message
+    order_id = None
+    if state["messages"]:
+        last_msg = state["messages"][-1].content
+        match = re.search(r"#?(\d{4,})", last_msg)
+        if match:
+            order_id = match.group(1)
+            state["last_order_id"] = order_id  # Update tracking state
+
+    # Fallback to the persistent active context
+    if not order_id:
+        order_id = state.get("last_order_id")
 
     if not order_id:
         return state

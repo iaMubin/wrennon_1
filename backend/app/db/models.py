@@ -62,6 +62,11 @@ class Conversation(Base):
         DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow
     )
 
+    # --- Conversation State ---
+    active_topic: Mapped[str | None] = mapped_column(String, nullable=True)
+    last_order_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    turn_count: Mapped[int] = mapped_column(Integer, default=0)
+
     messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation", order_by="Message.created_at"
     )

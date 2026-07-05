@@ -21,6 +21,12 @@ class ConversationState(TypedDict):
     customer_email: Optional[str]
     current_intent: Optional[str]
     conversation_summary: Optional[str]
+    
+    # --- Conversation State ---
+    active_topic: Optional[str]
+    last_order_id: Optional[str]
+    turn_count: int
+    fallback_count: int
 
     # --- L1: RAG ---
     last_retrieved_context: Optional[str]
@@ -60,6 +66,10 @@ def initial_state(customer_email: Optional[str] = None) -> ConversationState:
         customer_email=customer_email,
         current_intent=None,
         conversation_summary=None,
+        active_topic=None,
+        last_order_id=None,
+        turn_count=0,
+        fallback_count=0,
         last_retrieved_context=None,
         answer_grounded=None,
         order_id=None,

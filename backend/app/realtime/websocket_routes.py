@@ -137,6 +137,9 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     state["existing_ticket_id"] = conversation.handoff_ticket_id
 
                 state["conversation_summary"] = conversation.summary
+                state["active_topic"] = conversation.active_topic
+                state["last_order_id"] = conversation.last_order_id
+                state["turn_count"] = conversation.turn_count
 
                 # Load conversation history so the AI has full context
                 prev_messages = (
@@ -163,21 +166,14 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     db.commit()
                     state["conversation_summary"] = new_summary
 
-                # Extract order ID from the current message or previous messages
-                order_match = re.search(r"#?(\d{4,})", customer_text)
-                if order_match:
-                    state["order_id"] = order_match.group(1)
-                else:
-                    for msg in reversed(state["messages"]):
-                        if msg.type == "human":
-                            match = re.search(r"#?(\d{4,})", msg.content)
-                            if match:
-                                state["order_id"] = match.group(1)
-                                break
-
                 # Run graph in a separate thread to avoid blocking the main async event loop
                 updated_state = await asyncio.to_thread(_graph.invoke, state)
                 reply_text = updated_state["messages"][-1].content
+                
+                # Persist state updates
+                conversation.active_topic = updated_state.get("active_topic")
+                conversation.last_order_id = updated_state.get("last_order_id")
+                conversation.turn_count = updated_state.get("turn_count", conversation.turn_count) + 1
 
                 _save_message(db, conversation.id, sender="ai", content=reply_text)
 

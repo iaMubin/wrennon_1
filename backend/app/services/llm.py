@@ -229,10 +229,13 @@ def generate_final_reply(state: dict) -> str:
 
 
 def update_conversation_summary(messages: list, current_summary: str | None) -> str:
-    """Condenses the older conversation into a summary to prevent token overflow."""
+    """Condenses the older conversation into a structured summary to prevent token overflow."""
     prompt = (
-        "Summarize the provided customer service conversation concisely. "
-        "Keep critical facts like order numbers, tracking info, emails, and the main issue discussed. "
+        "Summarize the provided customer service conversation into a structured Context Card. "
+        "Your output MUST follow this exact format:\n\n"
+        "Topic: [The main issue being discussed]\n"
+        "Key Details: [Bullet points of important facts like dates, emails, order statuses]\n"
+        "Customer Sentiment: [Positive/Neutral/Frustrated]\n\n"
         "If a previous summary exists, incorporate the new messages into the summary."
     )
     

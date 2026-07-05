@@ -22,13 +22,27 @@ from app.services.llm import classify_intent
 
 
 def route_intent(state: ConversationState) -> str:
-    """Decide which node should handle this turn using an LLM classifier.
-    """
+    """Decide which node should handle this turn using an LLM classifier."""
+    
+    # 1. Check for struggle / silent escalation
+    if state.get("turn_count", 0) >= 10 or state.get("fallback_count", 0) >= 2:
+        state["handoff_requested"] = True
+        return "handoff"
+        
     if state.get("handoff_requested"):
         return "handoff"
 
+    # 2. Classify intent
     intent = classify_intent(state["messages"], state.get("conversation_summary"))
     state["current_intent"] = intent
+    
+    # 3. State/Topic Updates
+    if intent in ("greeting", "resolved"):
+        # Reset topic on clear topic shifts
+        state["active_topic"] = None
+        state["last_order_id"] = None
+    else:
+        state["active_topic"] = intent
     
     if intent == "handoff":
         state["handoff_requested"] = True
