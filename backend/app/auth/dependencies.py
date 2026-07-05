@@ -23,16 +23,24 @@ _oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/agent/login")
 
 
 def get_current_agent(token: str = Depends(_oauth2_scheme), db: Session = Depends(get_db)) -> Agent:
-    username = decode_access_token(token)
-    if username is None:
+    token_data = decode_access_token(token)
+    if token_data is None or not token_data.get("sub"):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    username = token_data["sub"]
     agent = db.query(Agent).filter_by(username=username).first()
     if agent is None:
         raise HTTPException(status_code=401, detail="Agent not found")
+        
+    # Check for token revocation via password change
+    expected_frag = agent.password_hash[-10:] if agent.password_hash else ""
+    if token_data.get("pwd_frag") != expected_frag:
+        raise HTTPException(status_code=401, detail="Token revoked (password was changed)")
+        
     return agent
 
 

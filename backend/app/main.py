@@ -34,12 +34,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Creates tables on startup if they don't exist yet. Fine for SQLite at
-# this stage — once Alembic migrations are in regular use, this line
-# should be removed so schema changes go through migrations instead of
-# this auto-create silently papering over a missing migration.
-Base.metadata.create_all(bind=engine)
-
 # Auto-create default admin agent if none exist
 with SessionLocal() as db:
     if db.query(Agent).count() == 0:

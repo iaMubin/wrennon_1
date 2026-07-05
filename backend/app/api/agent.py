@@ -25,20 +25,35 @@ router = APIRouter()
 
 
 @router.post("/agent/login")
-def login(
+async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ) -> dict:
+    # Rate Limiting
+    rate_key = f"login_attempts:{form_data.username}"
+    attempts = await manager.redis.get(rate_key)
+    if attempts and int(attempts) >= 5:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed login attempts. Please try again later.",
+        )
+
     agent = db.query(Agent).filter(
         or_(Agent.username == form_data.username, Agent.employee_id == form_data.username)
     ).first()
     
     if not agent or not verify_password(form_data.password, agent.password_hash):
+        await manager.redis.incr(rate_key)
+        await manager.redis.expire(rate_key, 60)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
         )
-    token = create_access_token(subject=agent.username)
+        
+    # Reset rate limit on success
+    await manager.redis.delete(rate_key)
+        
+    token = create_access_token(subject=agent.username, pwd_hash=agent.password_hash)
     
     # Audit log
     audit = AuditLog(

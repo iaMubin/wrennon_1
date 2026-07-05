@@ -14,7 +14,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from sqlalchemy.orm import Session
 
 from app.auth.security import decode_access_token
-from app.db.models import Conversation, Message
+from app.db.models import Conversation, Message, Agent
 from app.db.session import SessionLocal
 from app.graph.builder import build_graph
 from app.graph.state import initial_state
@@ -239,17 +239,30 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
 
 @router.websocket("/ws/agent")
 async def agent_websocket(websocket: WebSocket, token: str):
-    username = decode_access_token(token)
-    if username is None:
+    token_data = decode_access_token(token)
+    if token_data is None or not token_data.get("sub"):
         logger.warning("Agent connection rejected: unauthorized")
         await websocket.close(code=4401)
         return
 
-    logger.info(f"Agent connected: {username}")
-    await manager.connect_agent(websocket)
+    username = token_data["sub"]
 
     try:
         db = SessionLocal()
+        agent = db.query(Agent).filter_by(username=username).first()
+        if not agent:
+            logger.warning("Agent connection rejected: agent not found")
+            await websocket.close(code=4401)
+            return
+            
+        expected_frag = agent.password_hash[-10:] if agent.password_hash else ""
+        if token_data.get("pwd_frag") != expected_frag:
+            logger.warning("Agent connection rejected: token revoked")
+            await websocket.close(code=4401)
+            return
+
+        logger.info(f"Agent connected: {username}")
+        await manager.connect_agent(websocket)
         while True:
             data = await websocket.receive_json()
             session_id = data["session_id"]

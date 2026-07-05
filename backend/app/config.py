@@ -7,6 +7,7 @@ this moves from local dev to a real deployment.
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 
 
 class Settings(BaseSettings):
@@ -43,6 +44,16 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_allowed_origins.split(",")]
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> "Settings":
+        if self.app_env != "development":
+            if self.jwt_secret_key == "dev-only-change-this-in-production":
+                raise ValueError(
+                    "JWT_SECRET_KEY must be overridden in non-development environments! "
+                    "Current value is the insecure default."
+                )
+        return self
 
 
 settings = Settings()

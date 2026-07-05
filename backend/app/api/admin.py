@@ -15,6 +15,20 @@ from app.auth.security import hash_password
 from app.db.models import Agent, Conversation, AuditLog
 from app.db.session import get_db
 
+import re
+
+def validate_password(password: str) -> None:
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+    if not re.search(r"[A-Z]", password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
+    if not re.search(r"[a-z]", password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter")
+    if not re.search(r"[0-9]", password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one number")
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one special character")
+
 router = APIRouter()
 
 class AgentCreate(BaseModel):
@@ -85,6 +99,8 @@ def create_agent(
 ) -> dict:
     if db.query(Agent).filter_by(username=agent_in.username).first():
         raise HTTPException(status_code=400, detail="Username already exists")
+        
+    validate_password(agent_in.password)
     
     if agent_in.role not in ["agent", "manager"]:
         raise HTTPException(status_code=400, detail="Invalid role. Must be 'agent' or 'manager'")
@@ -148,6 +164,8 @@ def reset_password(
     agent = db.query(Agent).filter_by(username=username).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
+        
+    validate_password(payload.new_password)
         
     agent.password_hash = hash_password(payload.new_password)
     
