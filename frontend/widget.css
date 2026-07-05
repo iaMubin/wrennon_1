@@ -64,14 +64,16 @@ body {
   flex-direction: column;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.05);
-  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275), visibility 0.35s;
   transform-origin: bottom right;
   opacity: 1;
+  visibility: visible;
   transform: scale(1) translateY(0);
 }
 #panel.hidden {
   opacity: 0;
-  transform: scale(0.95) translateY(10px);
+  visibility: hidden;
+  transform: scale(0.85) translateY(20px);
   pointer-events: none;
 }
 

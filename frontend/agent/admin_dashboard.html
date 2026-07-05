@@ -344,7 +344,7 @@
     </div>
 
     <!-- Agent Details Modal -->
-    <div id="agent-modal" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(11, 14, 20, 0.9); align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
+    <div id="agent-modal" class="modal" onclick="if(event.target === this) this.style.display='none'" style="display: none; position: fixed; inset: 0; background: rgba(11, 14, 20, 0.4); align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
         <div style="background: var(--paper); padding: 32px; border-radius: 16px; border: 1px solid var(--line); width: 400px; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
             <h3 style="margin-bottom: 24px;">Agent Details</h3>
             <div style="margin-bottom: 16px;">
