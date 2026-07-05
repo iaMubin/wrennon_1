@@ -352,6 +352,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const savedRole = localStorage.getItem("agent_role");
   
   if (savedToken) {
+    // Migration: if token exists but role is missing, force a re-login to save role
+    if (!savedRole) {
+      logout();
+      return;
+    }
+
     accessToken = savedToken;
     loginScreen.classList.add("hidden");
     dashboard.classList.remove("hidden");
