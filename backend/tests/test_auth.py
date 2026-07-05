@@ -1,6 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from unittest.mock import AsyncMock, patch
+
 from app.main import app
 from app.db.session import SessionLocal
 from app.db.models import Agent
@@ -32,6 +34,14 @@ def setup_test_agent():
     db.delete(new_agent)
     db.commit()
     db.close()
+
+@pytest.fixture(autouse=True)
+def mock_redis():
+    with patch("app.api.agent.get_redis") as mock_get_redis:
+        mock_r = AsyncMock()
+        mock_r.get.return_value = None
+        mock_get_redis.return_value = mock_r
+        yield mock_r
 
 def test_health_check():
     response = client.get("/health")

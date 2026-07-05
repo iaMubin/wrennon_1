@@ -40,7 +40,8 @@
         }
 
         .admin-container {
-            max-width: 900px;
+            width: 96%;
+            max-width: 1600px;
             margin: 0 auto;
             background: rgba(17, 24, 39, 0.6);
             backdrop-filter: blur(20px);
@@ -330,7 +331,11 @@
             </tbody>
         </table>
 
-        <h3 style="margin-top: 48px;">System Audit Logs</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 48px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 12px;">
+            <h3 style="margin: 0;">System Audit Logs</h3>
+            <button class="btn" id="toggle-logs-btn" onclick="toggleLogs()" style="padding: 6px 14px; font-size: 16px; transform: rotate(180deg); transition: transform 0.3s ease;">^</button>
+        </div>
+        <div id="logs-container" style="display: none; overflow-x: auto;">
         <table style="margin-bottom: 40px; opacity: 0.9;">
             <thead>
                 <tr>
@@ -345,6 +350,7 @@
                 <!-- Populated by JS -->
             </tbody>
         </table>
+        </div>
     </div>
 
     <!-- Agent Details Modal -->
@@ -395,11 +401,6 @@
         const _RENDER_HOST = "wrennon-backend.onrender.com";
         const _IS_LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.protocol === "file:";
         const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/api`;
-        const token = localStorage.getItem("agent_token");
-
-        if (!token) {
-            window.location.href = "index.html";
-        }
         
         // Toggle password logic
         const togglePwdBtn = document.getElementById("toggle-pwd");
@@ -421,16 +422,36 @@
         
         // Toggle password logic (Reset Password Modal)
         const toggleResetPwdBtn = document.getElementById("toggle-reset-pwd");
-        const resetPwdInput = document.getElementById("reset-new-password");
-        const resetEyePaths = toggleResetPwdBtn.querySelectorAll(".eye");
-        const resetSlashLine = toggleResetPwdBtn.querySelector(".eye-slash");
+        if (toggleResetPwdBtn) {
+            const pwdInput = document.getElementById("reset-new-password");
+            const eyePaths = toggleResetPwdBtn.querySelectorAll(".eye");
+            const slashLine = toggleResetPwdBtn.querySelector(".eye-slash");
+            
+            toggleResetPwdBtn.addEventListener("click", () => {
+                if (pwdInput.type === "password") {
+                    pwdInput.type = "text";
+                    eyePaths.forEach(p => p.classList.add("hidden"));
+                    slashLine.classList.remove("hidden");
+                } else {
+                    pwdInput.type = "password";
+                    eyePaths.forEach(p => p.classList.remove("hidden"));
+                    slashLine.classList.add("hidden");
+                }
+            });
+        }
         
-        toggleResetPwdBtn.addEventListener("click", () => {
-            const isPwd = resetPwdInput.type === "password";
-            resetPwdInput.type = isPwd ? "text" : "password";
-            toggleResetPwdBtn.querySelectorAll('.eye').forEach(el => el.classList.toggle('hidden', isPwd));
-            toggleResetPwdBtn.querySelector('.eye-slash').classList.toggle('hidden', !isPwd);
-        });
+        // Toggle Logs
+        function toggleLogs() {
+            const logsContainer = document.getElementById("logs-container");
+            const toggleBtn = document.getElementById("toggle-logs-btn");
+            if (logsContainer.style.display === "none") {
+                logsContainer.style.display = "block";
+                toggleBtn.style.transform = "rotate(0deg)";
+            } else {
+                logsContainer.style.display = "none";
+                toggleBtn.style.transform = "rotate(180deg)";
+            }
+        }
 
         const usernameInput = document.getElementById("agent-username");
         const empIdInput = document.getElementById("agent-employee-id");
@@ -534,9 +555,9 @@
             const res = await fetch(`${API_BASE}/admin/agents/${selectedAgentUsername}/reset-password`, {
                 method: 'PUT',
                 headers: { 
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}` 
+                    "Content-Type": "application/json"
                 },
+                credentials: "include",
                 body: JSON.stringify({ new_password: newPassword })
             });
             if (res.ok) {
@@ -552,7 +573,7 @@
         async function fetchAgents() {
             try {
                 const res = await fetch(`${API_BASE}/admin/agents`, {
-                    headers: { "Authorization": `Bearer ${token}` }
+                    credentials: "include"
                 });
                 
                 if (res.status === 401 || res.status === 403) {
@@ -610,7 +631,7 @@
             if (!confirm(`Are you sure you want to remove agent '${username}'?`)) return;
             const res = await fetch(`${API_BASE}/admin/agents/${username}`, {
                 method: 'DELETE',
-                headers: { "Authorization": `Bearer ${token}` }
+                credentials: "include"
             });
             if (res.ok) {
                 document.getElementById('agent-modal').style.display = 'none';
@@ -638,9 +659,9 @@
             const res = await fetch(`${API_BASE}/admin/agents`, {
                 method: 'POST',
                 headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
+                    "Content-Type": "application/json"
                 },
+                credentials: "include",
                 body: JSON.stringify({ username, full_name, employee_id, password, role })
             });
 
@@ -670,7 +691,7 @@
         async function fetchLogs() {
             try {
                 const res = await fetch(`${API_BASE}/admin/logs`, {
-                    headers: { "Authorization": `Bearer ${token}` }
+                    credentials: "include"
                 });
                 if (!res.ok) return;
                 

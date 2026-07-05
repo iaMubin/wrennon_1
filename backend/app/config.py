@@ -11,6 +11,11 @@ from pydantic import model_validator
 
 
 class Settings(BaseSettings):
+    # LangSmith Tracing
+    langchain_tracing_v2: bool = False
+    langchain_api_key: str | None = None
+    langchain_project: str | None = None
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     # LLM

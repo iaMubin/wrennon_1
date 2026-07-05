@@ -37,8 +37,13 @@ def _get_index():
         _index = _pinecone.Index(host=settings.pinecone_host)
     return _index
 
-_cohere_client = cohere.Client(settings.cohere_api_key)
+_cohere_client = None
 
+def _get_cohere():
+    global _cohere_client
+    if _cohere_client is None:
+        _cohere_client = cohere.Client(settings.cohere_api_key)
+    return _cohere_client
 
 def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
     """Retrieve candidate chunks from Pinecone, then rerank with Cohere.
@@ -67,7 +72,8 @@ def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
     if not candidates:
         return []
 
-    reranked = _cohere_client.rerank(
+    cohere_client = _get_cohere()
+    reranked = cohere_client.rerank(
         query=query,
         documents=candidates,
         top_n=top_k,

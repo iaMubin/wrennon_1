@@ -18,11 +18,35 @@ from app.logger import logger
 _client = Groq(api_key=settings.groq_api_key)
 _openai_client = openai.OpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
 
+_analyzer = None
+_anonymizer = None
+
+def _get_presidio():
+    global _analyzer, _anonymizer
+    if _analyzer is None:
+        try:
+            from presidio_analyzer import AnalyzerEngine
+            from presidio_anonymizer import AnonymizerEngine
+            _analyzer = AnalyzerEngine()
+            _anonymizer = AnonymizerEngine()
+        except ImportError:
+            pass
+    return _analyzer, _anonymizer
+
 def mask_pii(text: str) -> str:
-    """Masks emails and credit card numbers from user input."""
-    # Mask emails
+    """Masks PII from user input using Microsoft Presidio (or regex fallback)."""
+    analyzer, anonymizer = _get_presidio()
+    
+    if analyzer and anonymizer:
+        try:
+            results = analyzer.analyze(text=text, entities=["EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "PERSON", "LOCATION"], language='en')
+            anonymized = anonymizer.anonymize(text=text, analyzer_results=results)
+            return anonymized.text
+        except Exception as e:
+            logger.warning(f"Presidio anonymization failed: {e}")
+            
+    # Fallback to Regex
     text = re.sub(r'[\w\.-]+@[\w\.-]+\.\w+', '[EMAIL HIDDEN]', text)
-    # Mask credit cards (simple 13-16 digits)
     text = re.sub(r'\b(?:\d[ -]*?){13,16}\b', '[CARD HIDDEN]', text)
     return text
 

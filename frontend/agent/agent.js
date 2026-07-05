@@ -4,7 +4,7 @@ const _IS_LOCAL = location.hostname === "localhost" || location.hostname === "12
 const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/api`;
 const WS_URL  = `${_IS_LOCAL ? "ws"   : "wss"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/ws/agent`;
 
-let accessToken = null;
+
 let socket = null;
 let activeSessionId = null;
 let activeSection = "attention"; // "attention" | "active" | "all"
@@ -62,6 +62,7 @@ loginForm.addEventListener("submit", async (e) => {
     const response = await fetch(`${API_BASE}/agent/login`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      credentials: "include",
       body,
     });
 
@@ -71,8 +72,7 @@ loginForm.addEventListener("submit", async (e) => {
     }
 
     const data = await response.json();
-    accessToken = data.access_token;
-    localStorage.setItem("agent_token", accessToken); // Save token for admin dashboard
+    // Token is automatically set as httpOnly cookie by the backend
     localStorage.setItem("agent_username", username); // Save username to identify self
     localStorage.setItem("agent_role", data.role); // Save role to show admin btn
     
@@ -100,7 +100,7 @@ let reconnectTimeout = null;
 
 function connectSocket() {
   if (reconnectTimeout) clearTimeout(reconnectTimeout);
-  socket = new WebSocket(`${WS_URL}?token=${accessToken}`);
+  socket = new WebSocket(WS_URL);
 
   socket.onopen = () => {
     reconnectAttempts = 0;
@@ -315,7 +315,7 @@ async function authedFetch(path, method = "GET") {
   try {
     const response = await fetch(`${API_BASE}${path}`, {
       method,
-      headers: { Authorization: `Bearer ${accessToken}` },
+      credentials: "include"
     });
     if (!response.ok) return null;
     return await response.json();

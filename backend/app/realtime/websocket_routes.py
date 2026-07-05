@@ -11,7 +11,7 @@ import re
 import asyncio
 import redis.asyncio as redis
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Cookie
 from langchain_core.messages import AIMessage, HumanMessage
 from sqlalchemy.orm import Session
 
@@ -24,6 +24,7 @@ from app.logger import logger
 from app.realtime.connection_manager import manager
 from app.config import settings
 from app.services.llm import mask_pii
+from app.services.cache import get_cache, set_cache
 
 router = APIRouter()
 _graph = build_graph()
@@ -167,13 +168,30 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     state["conversation_summary"] = new_summary
 
                 # Run graph in a separate thread to avoid blocking the main async event loop
-                updated_state = await asyncio.to_thread(_graph.invoke, state)
-                reply_text = updated_state["messages"][-1].content
+                # Semantic Cache logic: Only check cache for early generic questions
+                reply_text = None
+                updated_state = None
+                if len(state["messages"]) == 1: # Only human's very first message
+                    cached_reply = await get_cache(customer_text)
+                    if cached_reply:
+                        reply_text = cached_reply
+                        logger.info(f"Semantic Cache HIT for '{customer_text}'")
                 
-                # Persist state updates
-                conversation.active_topic = updated_state.get("active_topic")
-                conversation.last_order_id = updated_state.get("last_order_id")
-                conversation.turn_count = updated_state.get("turn_count", conversation.turn_count) + 1
+                if not reply_text:
+                    updated_state = await asyncio.to_thread(_graph.invoke, state)
+                    reply_text = updated_state["messages"][-1].content
+                    
+                    # Store RAG/Generic questions in cache if no tools were used except knowledge base
+                    if updated_state.get("planned_tools"):
+                        tool_names = [t.get("name") for t in updated_state["planned_tools"]]
+                        if tool_names == ["search_knowledge_base"]:
+                            await set_cache(customer_text, reply_text, ttl=3600)
+                
+                # Persist state updates if graph ran
+                if updated_state:
+                    conversation.active_topic = updated_state.get("active_topic")
+                    conversation.last_order_id = updated_state.get("last_order_id")
+                    conversation.turn_count = updated_state.get("turn_count", conversation.turn_count) + 1
 
                 _save_message(db, conversation.id, sender="ai", content=reply_text)
 
@@ -186,7 +204,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     "is_resolved": conversation.resolved,
                 })
 
-                if updated_state.get("handoff_ticket_id"):
+                if updated_state and updated_state.get("handoff_ticket_id"):
                     conversation.handoff_active = True
                     conversation.handoff_ticket_id = updated_state["handoff_ticket_id"]
                     
@@ -198,6 +216,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     db.commit()
 
                     # Save the AI-generated summary as a system message
+                    _save_message(db, conversation.id, sender="system", content=f"[System] AI generated summary for agent handoff: {updated_state.get('conversation_summary', '')}")
                     summary = updated_state.get("handoff_summary", "")
                     if summary:
                         _save_message(db, conversation.id, sender="system", content=f"📋 Summary: {summary}")
@@ -240,7 +259,13 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
 
 
 @router.websocket("/ws/agent")
-async def agent_websocket(websocket: WebSocket, token: str):
+async def agent_websocket(websocket: WebSocket, access_token: str | None = Cookie(None)):
+    if not access_token:
+        logger.warning("Agent connection rejected: missing cookie")
+        await websocket.close(code=4401)
+        return
+        
+    token = access_token.replace("Bearer ", "")
     token_data = decode_access_token(token)
     if token_data is None or not token_data.get("sub"):
         logger.warning("Agent connection rejected: unauthorized")

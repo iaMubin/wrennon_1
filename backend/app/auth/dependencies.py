@@ -9,7 +9,7 @@ any of the route's logic (or any database query) runs.
 
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -22,7 +22,18 @@ from app.db.models import Agent
 _oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/agent/login")
 
 
-def get_current_agent(token: str = Depends(_oauth2_scheme), db: Session = Depends(get_db)) -> Agent:
+def get_current_agent(request: Request, db: Session = Depends(get_db)) -> Agent:
+    # First try Authorization header, then fallback to cookie
+    token = request.headers.get("Authorization")
+    if token and token.startswith("Bearer "):
+        token = token.replace("Bearer ", "")
+    else:
+        token = request.cookies.get("access_token")
+        if token and token.startswith("Bearer "):
+            token = token.replace("Bearer ", "")
+            
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     token_data = decode_access_token(token)
     if token_data is None or not token_data.get("sub"):
         raise HTTPException(

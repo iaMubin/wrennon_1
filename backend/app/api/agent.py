@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -24,20 +24,28 @@ from app.config import settings
 import redis.asyncio as redis
 
 # Create a Redis client for rate limiting
-redis_client = redis.from_url(settings.redis_url, decode_responses=True)
+_redis_client = None
+
+def get_redis():
+    global _redis_client
+    if _redis_client is None:
+        _redis_client = redis.from_url(settings.redis_url, decode_responses=True)
+    return _redis_client
 
 router = APIRouter()
 
 
 @router.post("/agent/login")
 async def login(
+    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ) -> dict:
     # Rate Limiting
     rate_key = f"login_attempts:{form_data.username}"
     try:
-        attempts = await redis_client.get(rate_key)
+        r = get_redis()
+        attempts = await r.get(rate_key)
         if attempts and int(attempts) >= 5:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -53,8 +61,9 @@ async def login(
     
     if not agent or not verify_password(form_data.password, agent.password_hash):
         try:
-            await redis_client.incr(rate_key)
-            await redis_client.expire(rate_key, 60)
+            r = get_redis()
+            await r.incr(rate_key)
+            await r.expire(rate_key, 60)
         except redis.ConnectionError:
             pass
             
@@ -65,7 +74,8 @@ async def login(
         
     # Reset rate limit on success
     try:
-        await redis_client.delete(rate_key)
+        r = get_redis()
+        await r.delete(rate_key)
     except redis.ConnectionError:
         pass
         
@@ -78,6 +88,16 @@ async def login(
     )
     db.add(audit)
     db.commit()
+    
+    # Set httpOnly cookie
+    response.set_cookie(
+        key="access_token",
+        value=f"Bearer {token}",
+        httponly=True,
+        secure=True,     # Must be True for production (HTTPS)
+        samesite="lax",
+        max_age=60 * 60 * 24 * 7 # 7 days
+    )
     
     return {"access_token": token, "token_type": "bearer", "role": agent.role}
 

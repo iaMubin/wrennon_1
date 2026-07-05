@@ -166,6 +166,7 @@ function connectSocket() {
 
   socket.onmessage = (event) => {
     try {
+      hideTypingIndicator();
       const data = JSON.parse(event.data);
       appendMessage("bot", data.reply);
     } catch (err) {
@@ -258,12 +259,30 @@ function appendMessage(role, text, save = true) {
   }
 }
 
+function showTypingIndicator() {
+  hideTypingIndicator(); // Ensure no duplicates
+  const div = document.createElement("div");
+  div.id = "typing-indicator";
+  div.className = "msg msg--bot typing-indicator";
+  div.innerHTML = `<span class="dot"></span><span class="dot"></span><span class="dot"></span>`;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function hideTypingIndicator() {
+  const indicator = document.getElementById("typing-indicator");
+  if (indicator) {
+    indicator.remove();
+  }
+}
+
 function sendMessage() {
   const text = inputEl.value.trim();
   if (!text) return;
 
   appendMessage("user", text);
   inputEl.value = "";
+  showTypingIndicator();
   
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({ message: text }));
