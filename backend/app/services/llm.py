@@ -192,15 +192,32 @@ def classify_intent(messages: list, summary: str | None = None) -> str:
 def generate_final_reply(state: dict) -> str:
     """Generates the final reply to the user based on the context accumulated in the state."""
     
-    system_instruction = (
-        "You are a customer support agent for an online store. "
+    intent = state.get("current_intent")
+    
+    base_instructions = (
+        "You are a helpful customer support agent for an online store. "
         "Formulate a reply to the customer based on the provided context and conversation history. "
-        "CRITICAL INSTRUCTIONS: Keep your response concise, professional, and natural. "
-        "Do NOT use unnecessary pleasantries, greetings (e.g. 'Hello!', 'I'm happy to help!'), or filler words. "
-        "Do NOT repeat information the customer already knows. "
-        "Do NOT offer to transfer to a human unless explicitly instructed in the Context. "
-        "Just answer the question or state what action is being taken directly."
+        "Keep your response concise, professional, and natural."
     )
+    
+    if intent == "greeting":
+        system_instruction = (
+            f"{base_instructions}\n"
+            "CRITICAL INSTRUCTION: The user is greeting you. You MUST reply with a polite greeting and ask how you can help. "
+            "Do NOT ask about previous context (like order numbers) unless the user specifically brings it up in this message."
+        )
+    elif intent == "order":
+        system_instruction = (
+            f"{base_instructions}\n"
+            "CRITICAL INSTRUCTION: Focus entirely on providing the order status or asking for missing details (Order ID or Email). "
+            "Do NOT use unnecessary pleasantries. Be direct and helpful."
+        )
+    else:
+        system_instruction = (
+            f"{base_instructions}\n"
+            "CRITICAL INSTRUCTION: Just answer the question or state what action is being taken directly. "
+            "Do NOT use unnecessary pleasantries or filler words. Do NOT offer to transfer to a human unless explicitly instructed in the Context."
+        )
     
     context_parts = []
     
