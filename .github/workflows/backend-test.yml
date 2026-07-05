@@ -1,0 +1,41 @@
+name: Backend Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run Pytest
+      env:
+        # Dummy values so Settings doesn't crash during initialization
+        GROQ_API_KEY: "dummy"
+        COHERE_API_KEY: "dummy"
+        PINECONE_API_KEY: "dummy"
+        PINECONE_HOST: "dummy"
+        DATABASE_URL: "sqlite:///./test.db"
+        JWT_SECRET_KEY: "test-secret"
+        AGENT_PASSWORD_HASH: "test-hash"
+        AGENT_USERNAME: "test_admin"
+      run: |
+        pytest tests/
