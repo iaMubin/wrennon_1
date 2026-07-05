@@ -74,6 +74,7 @@ loginForm.addEventListener("submit", async (e) => {
     accessToken = data.access_token;
     localStorage.setItem("agent_token", accessToken); // Save token for admin dashboard
     localStorage.setItem("agent_username", username); // Save username to identify self
+    localStorage.setItem("agent_role", data.role); // Save role to show admin btn
     
     if (data.role === "manager") {
       document.getElementById("admin-dashboard-btn").classList.remove("hidden");
@@ -178,7 +179,10 @@ async function loadConversations() {
   
   const endpoint = endpoints[activeSection] || endpoints["attention"];
   const conversations = await authedFetch(endpoint);
-  if (!conversations) return;
+  if (!conversations) {
+    logout();
+    return;
+  }
 
   // Always update the badges
   const attnList = activeSection === "attention" ? conversations : await authedFetch(endpoints["attention"]);
@@ -327,3 +331,39 @@ function formatTime(isoString) {
   const date = new Date(isoString);
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
+
+function logout() {
+  localStorage.removeItem("agent_token");
+  localStorage.removeItem("agent_username");
+  localStorage.removeItem("agent_role");
+  accessToken = null;
+  dashboard.classList.add("hidden");
+  loginScreen.classList.remove("hidden");
+  if (socket) socket.close();
+}
+
+// --- Auto Login ---
+document.addEventListener("DOMContentLoaded", () => {
+  const savedToken = localStorage.getItem("agent_token");
+  const savedRole = localStorage.getItem("agent_role");
+  
+  if (savedToken) {
+    accessToken = savedToken;
+    loginScreen.classList.add("hidden");
+    dashboard.classList.remove("hidden");
+    
+    if (savedRole === "manager") {
+      const adminBtn = document.getElementById("admin-dashboard-btn");
+      if (adminBtn) {
+        adminBtn.classList.remove("hidden");
+        // Ensure we only add the listener once (it's safe here since we just loaded)
+        adminBtn.addEventListener("click", () => {
+          window.location.href = "/agent/admin_dashboard.html";
+        });
+      }
+    }
+    
+    connectSocket();
+    loadConversations();
+  }
+});
