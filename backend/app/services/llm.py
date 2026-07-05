@@ -136,7 +136,7 @@ def classify_intent(messages: list, summary: str | None = None) -> str:
         "Analyze the conversation and classify the LAST user message's intent. "
         "Return EXACTLY ONE word from this list: [greeting, order, handoff, resolved, rag].\n"
         "Rules:\n"
-        "1. handoff: The user wants to speak with a human, agent, representative, or demands human support.\n"
+        "1. handoff: The user wants to speak with a human, agent, representative, OR the user is expressing frustration/anger, OR the user is asking you to perform an action/use a tool that you do not support (e.g., 'cancel my account', 'change my address').\n"
         "2. order: The user is asking about an order status, provides an order number, or follows up on a previous order inquiry.\n"
         "3. greeting: The user is just saying hello, without any other request.\n"
         "4. resolved: The user is expressing that their problem is solved, thanking you and leaving, or saying goodbye because the chat is over.\n"
@@ -201,7 +201,11 @@ def generate_final_reply(state: dict) -> str:
         context_parts.append(f"Policy Context:\n{state['last_retrieved_context']}")
     
     if state.get("handoff_requested"):
-        context_parts.append("A support ticket has been created and the conversation is being transferred to a human agent. Inform the customer that they are being transferred directly.")
+        context_parts.append(
+            "IMPORTANT: A human agent has been notified behind the scenes. "
+            "Reply to the customer naturally (e.g. apologize that you cannot fully resolve it, "
+            "and mention you will have someone look into it). DO NOT say 'ticket created' or explicitly announce a transfer."
+        )
         
     if state.get("conversation_summary"):
         context_parts.append(f"Previous Conversation Summary:\n{state['conversation_summary']}")

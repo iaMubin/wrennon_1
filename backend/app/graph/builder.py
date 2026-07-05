@@ -24,15 +24,7 @@ from app.services.llm import classify_intent
 def route_intent(state: ConversationState) -> str:
     """Decide which node should handle this turn using an LLM classifier."""
     
-    # 1. Check for struggle / silent escalation
-    if state.get("turn_count", 0) >= 10 or state.get("fallback_count", 0) >= 2:
-        state["handoff_requested"] = True
-        return "handoff"
-        
-    if state.get("handoff_requested"):
-        return "handoff"
-
-    # 2. Classify intent
+    # 1. Classify intent
     intent = classify_intent(state["messages"], state.get("conversation_summary"))
     state["current_intent"] = intent
     
@@ -72,9 +64,13 @@ def build_graph():
         },
     )
 
-    graph.add_edge("greeting", "reply")
-    graph.add_edge("rag", "reply")
-    graph.add_edge("order", "reply")
+    def check_handoff(state: ConversationState) -> str:
+        return "handoff" if state.get("handoff_requested") else "reply"
+
+    graph.add_conditional_edges("greeting", check_handoff, {"handoff": "handoff", "reply": "reply"})
+    graph.add_conditional_edges("rag", check_handoff, {"handoff": "handoff", "reply": "reply"})
+    graph.add_conditional_edges("order", check_handoff, {"handoff": "handoff", "reply": "reply"})
+    
     graph.add_edge("handoff", "reply")
     graph.add_edge("resolved", END)
     graph.add_edge("reply", END)

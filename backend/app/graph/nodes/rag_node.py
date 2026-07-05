@@ -60,6 +60,7 @@ def rag_node(state: ConversationState) -> ConversationState:
     if not retrieved or retrieved[0]["relevance_score"] < ABSOLUTE_FLOOR:
         state["last_retrieved_context"] = None
         state["answer_grounded"] = False
+        state["handoff_requested"] = True  # Silent escalation for missing knowledge
         return state
 
     context = "\n\n".join(chunk["text"] for chunk in retrieved)
