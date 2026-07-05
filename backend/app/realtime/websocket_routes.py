@@ -212,6 +212,14 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                 conversation.resolved = True
                 conversation.resolved_at = datetime.datetime.utcnow()
                 conversation.handoff_active = False
+                
+                from app.db.models import AuditLog
+                audit = AuditLog(
+                    actor_username="AI Agent",
+                    action="resolve_conversation",
+                    target_username=session_id
+                )
+                db.add(audit)
                 db.commit()
                 
                 await manager.broadcast_to_agents({

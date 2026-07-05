@@ -123,6 +123,13 @@ def resolve_conversation(
     conversation.resolved_at = datetime.datetime.utcnow()
     conversation.handoff_active = False
     conversation.handled_by = agent.username
+    
+    audit = AuditLog(
+        actor_username=agent.username,
+        action="resolve_conversation",
+        target_username=session_id
+    )
+    db.add(audit)
     db.commit()
     return {"status": "resolved", "session_id": session_id}
 

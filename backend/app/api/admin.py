@@ -35,20 +35,23 @@ def list_agents(
     # Get all agents
     agents = db.query(Agent).all()
     
-    # Get resolution stats
-    from sqlalchemy import or_
+    # Quick backfill for legacy resolved conversations that have no audit log
+    legacy_conversations = db.query(Conversation).filter(Conversation.resolved == True).all()
+    for c in legacy_conversations:
+        actor = c.handled_by if c.handled_by else "AI Agent"
+        existing = db.query(AuditLog).filter_by(action="resolve_conversation", target_username=c.session_id).first()
+        if not existing:
+            db.add(AuditLog(actor_username=actor, action="resolve_conversation", target_username=c.session_id))
+    db.commit()
+
+    # Get resolution stats from AuditLogs
     results = db.query(
-        Conversation.handled_by, 
-        func.count(Conversation.id)
-    ).filter(
-        or_(
-            Conversation.resolved == True,
-            Conversation.handled_by.isnot(None)
-        )
-    ).group_by(Conversation.handled_by).all()
+        AuditLog.actor_username, 
+        func.count(AuditLog.id)
+    ).filter(AuditLog.action == "resolve_conversation").group_by(AuditLog.actor_username).all()
     
-    stats_map = {handled_by: count for handled_by, count in results if handled_by}
-    ai_count = next((count for handled_by, count in results if not handled_by), 0)
+    stats_map = {actor: count for actor, count in results}
+    ai_count = stats_map.get("AI Agent", 0)
 
     # Combine
     directory = []
