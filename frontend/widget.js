@@ -119,14 +119,22 @@ async function loadHistory() {
   }
 }
 
+let widgetReconnectAttempts = 0;
+let widgetReconnectTimeout = null;
+
 function connectSocket() {
+  if (widgetReconnectTimeout) clearTimeout(widgetReconnectTimeout);
   socket = new WebSocket(`${WS_URL}/${SESSION_ID}`);
 
   socket.onopen = () => {
-    if (reconnectInterval) {
-      clearInterval(reconnectInterval);
-      reconnectInterval = null;
-      appendMessage("system", "Connection restored.", false);
+    widgetReconnectAttempts = 0;
+    if (widgetReconnectTimeout) {
+      clearTimeout(widgetReconnectTimeout);
+      widgetReconnectTimeout = null;
+    }
+    // Only show restored message if we were previously disconnected and trying to reconnect
+    if (messagesEl.lastElementChild && messagesEl.lastElementChild.textContent.includes("Reconnecting")) {
+        appendMessage("system", "Connection restored.", false);
     }
     
     // Send queued offline messages
@@ -148,10 +156,10 @@ function connectSocket() {
   };
 
   socket.onclose = () => {
-    if (!reconnectInterval) {
-      appendMessage("system", "Connection lost. Reconnecting in background...", false);
-      reconnectInterval = setInterval(connectSocket, 5000);
-    }
+    widgetReconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, widgetReconnectAttempts), 30000); // max 30s
+    appendMessage("system", `Connection lost. Reconnecting in ${delay/1000}s...`, false);
+    widgetReconnectTimeout = setTimeout(connectSocket, delay);
   };
 
   socket.onerror = (err) => {

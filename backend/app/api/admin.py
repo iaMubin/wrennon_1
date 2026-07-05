@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from app.auth.dependencies import get_current_manager
 from app.auth.security import hash_password
-from app.db.models import Agent, Conversation
+from app.db.models import Agent, Conversation, AuditLog
 from app.db.session import get_db
 
 router = APIRouter()
@@ -23,6 +23,9 @@ class AgentCreate(BaseModel):
     employee_id: str
     password: str
     role: str = "agent"
+
+class PasswordReset(BaseModel):
+    new_password: str
 
 @router.get("/admin/agents")
 def list_agents(
@@ -88,6 +91,16 @@ def create_agent(
         role=agent_in.role
     )
     db.add(new_agent)
+    
+    # Audit log
+    audit = AuditLog(
+        actor_username=manager.username,
+        action="create_agent",
+        target_username=agent_in.username,
+        details=f"Role: {agent_in.role}"
+    )
+    db.add(audit)
+    
     db.commit()
     return {"status": "success", "username": agent_in.username, "role": agent_in.role}
 
@@ -104,7 +117,58 @@ def delete_agent(
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
         
     db.delete(agent)
+    
+    # Audit log
+    audit = AuditLog(
+        actor_username=manager.username,
+        action="delete_agent",
+        target_username=username,
+    )
+    db.add(audit)
+    
     db.commit()
     return {"status": "deleted", "username": username}
+
+@router.put("/admin/agents/{username}/reset-password")
+def reset_password(
+    username: str,
+    payload: PasswordReset,
+    db: Session = Depends(get_db),
+    manager: Agent = Depends(get_current_manager),
+) -> dict:
+    agent = db.query(Agent).filter_by(username=username).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+        
+    agent.password_hash = hash_password(payload.new_password)
+    
+    # Audit log
+    audit = AuditLog(
+        actor_username=manager.username,
+        action="reset_password",
+        target_username=username,
+    )
+    db.add(audit)
+    
+    db.commit()
+    return {"status": "success", "username": username}
+
+@router.get("/admin/logs")
+def get_audit_logs(
+    db: Session = Depends(get_db),
+    manager: Agent = Depends(get_current_manager),
+) -> list[dict]:
+    logs = db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(100).all()
+    return [
+        {
+            "id": log.id,
+            "actor": log.actor_username,
+            "action": log.action,
+            "target": log.target_username,
+            "details": log.details,
+            "created_at": log.created_at.isoformat()
+        }
+        for log in logs
+    ]
 
 

@@ -324,6 +324,22 @@
                 <!-- Populated by JS -->
             </tbody>
         </table>
+
+        <h3 style="margin-top: 48px;">System Audit Logs</h3>
+        <table style="margin-bottom: 40px; opacity: 0.9;">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Actor</th>
+                    <th>Action</th>
+                    <th>Target</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody id="logs-list">
+                <!-- Populated by JS -->
+            </tbody>
+        </table>
     </div>
 
     <!-- Agent Details Modal -->
@@ -346,6 +362,15 @@
                 <label style="color: var(--ink-soft); font-size: 12px; font-weight: 600; text-transform: uppercase;">Role</label>
                 <div id="modal-role" style="font-size: 16px; font-weight: 500; margin-top: 4px;"></div>
             </div>
+            
+            <div id="password-reset-section" style="margin-bottom: 24px; padding-top: 24px; border-top: 1px solid var(--border);">
+                <label style="color: var(--ink-soft); font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px; display: block;">Reset Password</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="password" id="reset-new-password" placeholder="New Password" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--ink);">
+                    <button class="btn btn-primary" onclick="resetAgentPassword()" style="padding: 0 16px; min-width: auto; height: 40px;">Reset</button>
+                </div>
+            </div>
+
             <div style="margin-bottom: 24px; padding: 12px; background: rgba(239, 68, 68, 0.1); border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.2);">
                 <span style="color: #F87171; font-size: 12px; display: block;">🔒 Passwords are hashed in the database and cannot be viewed.</span>
             </div>
@@ -386,15 +411,52 @@
         const currentUser = localStorage.getItem("agent_username");
 
         let currentAgentsData = [];
+        let selectedAgentUsername = null;
         
         function showAgentDetails(index) {
             const agent = currentAgentsData[index];
             if(!agent) return;
+            selectedAgentUsername = agent.username;
             document.getElementById("modal-fullname").innerText = agent.full_name;
             document.getElementById("modal-username").innerText = agent.username;
             document.getElementById("modal-employee-id").innerText = agent.employee_id;
             document.getElementById("modal-role").innerText = agent.role;
+            
+            if (agent.role === 'ai') {
+                document.getElementById('password-reset-section').style.display = 'none';
+            } else {
+                document.getElementById('password-reset-section').style.display = 'block';
+            }
+            document.getElementById("reset-new-password").value = "";
+            
             document.getElementById('agent-modal').style.display = 'flex';
+        }
+
+        async function resetAgentPassword() {
+            if (!selectedAgentUsername) return;
+            const newPassword = document.getElementById("reset-new-password").value;
+            if (!newPassword) {
+                alert("Please enter a new password");
+                return;
+            }
+            if (!confirm(`Are you sure you want to reset password for ${selectedAgentUsername}?`)) return;
+            
+            const res = await fetch(`${API_BASE}/admin/agents/${selectedAgentUsername}/reset-password`, {
+                method: 'PUT',
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}` 
+                },
+                body: JSON.stringify({ new_password: newPassword })
+            });
+            if (res.ok) {
+                alert("Password reset successfully!");
+                document.getElementById("reset-new-password").value = "";
+                fetchLogs(); // refresh logs
+            } else {
+                const data = await res.json();
+                alert(`Error: ${data.detail}`);
+            }
         }
 
         async function fetchAgents() {
@@ -499,11 +561,36 @@
                 }
                 
                 fetchAgents();
+                fetchLogs();
             } else {
                 const data = await res.json();
                 document.getElementById("error-msg").innerText = data.detail;
             }
         });
+        
+        async function fetchLogs() {
+            const res = await fetch(`${API_BASE}/admin/logs`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (!res.ok) return;
+            
+            const logs = await res.json();
+            const tbody = document.getElementById("logs-list");
+            tbody.innerHTML = "";
+            
+            logs.forEach(log => {
+                const date = new Date(log.created_at).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td style="color: var(--ink-soft); font-size: 13px;">${date}</td>
+                    <td style="font-weight: 600;">${log.actor}</td>
+                    <td style="color: var(--accent); font-family: monospace;">${log.action}</td>
+                    <td>${log.target || "-"}</td>
+                    <td style="color: var(--ink-soft); font-size: 13px;">${log.details || "-"}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
 
         // Force clear autofill fields completely on load
         setTimeout(() => {
@@ -518,6 +605,7 @@
         }, 100);
 
         fetchAgents();
+        fetchLogs();
     </script>
 </body>
 </html>

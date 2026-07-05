@@ -94,18 +94,30 @@ loginForm.addEventListener("submit", async (e) => {
 });
 
 // --- WebSocket ---
+let reconnectAttempts = 0;
+let reconnectTimeout = null;
+
 function connectSocket() {
+  if (reconnectTimeout) clearTimeout(reconnectTimeout);
   socket = new WebSocket(`${WS_URL}?token=${accessToken}`);
 
   socket.onopen = () => {
+    reconnectAttempts = 0;
     connectionDot.classList.remove("dot--offline");
     connectionDot.classList.add("dot--online");
+    connectionDot.title = "Connected";
   };
 
   socket.onclose = () => {
     connectionDot.classList.remove("dot--online");
     connectionDot.classList.add("dot--offline");
-    setTimeout(connectSocket, 3000); // Reconnect
+    
+    // Exponential backoff
+    reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // max 30s
+    connectionDot.title = `Disconnected. Reconnecting in ${delay/1000}s...`;
+    
+    reconnectTimeout = setTimeout(connectSocket, delay);
   };
 
   socket.onmessage = (event) => {

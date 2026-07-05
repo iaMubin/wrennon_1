@@ -17,7 +17,7 @@ from sqlalchemy import or_
 from app.auth.dependencies import get_current_agent
 from app.auth.security import create_access_token, verify_password
 from app.config import settings
-from app.db.models import Agent, Conversation, Message
+from app.db.models import Agent, Conversation, Message, AuditLog
 from app.db.session import get_db
 from app.realtime.connection_manager import manager
 
@@ -39,6 +39,15 @@ def login(
             detail="Incorrect username or password",
         )
     token = create_access_token(subject=agent.username)
+    
+    # Audit log
+    audit = AuditLog(
+        actor_username=agent.username,
+        action="login"
+    )
+    db.add(audit)
+    db.commit()
+    
     return {"access_token": token, "token_type": "bearer", "role": agent.role}
 
 

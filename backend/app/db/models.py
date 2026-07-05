@@ -101,3 +101,17 @@ class Agent(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=datetime.datetime.utcnow
     )
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
+    actor_username: Mapped[str] = mapped_column(String, index=True)
+    action: Mapped[str] = mapped_column(String)  # e.g., "login", "create_agent", "delete_agent", "reset_password"
+    target_username: Mapped[str | None] = mapped_column(String, nullable=True)
+    details: Mapped[str | None] = mapped_column(Text, nullable=True)
+    
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=datetime.datetime.utcnow, index=True
+    )
