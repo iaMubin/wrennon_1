@@ -277,12 +277,14 @@
                 <div class="input-wrapper">
                     <input type="text" id="agent-username" required readonly onfocus="this.removeAttribute('readonly');" autocomplete="new-password" placeholder="e.g. john_doe">
                 </div>
+                <div id="uname-error" style="color: var(--danger); font-size: 12px; margin-top: 4px;"></div>
             </div>
             <div class="form-group">
                 <label>Employee ID</label>
                 <div class="input-wrapper">
                     <input type="text" id="agent-employee-id" required readonly onfocus="this.removeAttribute('readonly');" autocomplete="new-password" placeholder="e.g. EMP-1234">
                 </div>
+                <div id="emp-error" style="color: var(--danger); font-size: 12px; margin-top: 4px;"></div>
             </div>
             <div class="form-group">
                 <label>Password</label>
@@ -296,6 +298,7 @@
                         </svg>
                     </button>
                 </div>
+                <div id="pwd-error" style="color: var(--danger); font-size: 12px; margin-top: 4px;"></div>
             </div>
             <div class="form-group">
                 <label>Role</label>
@@ -431,30 +434,42 @@
         const usernameInput = document.getElementById("agent-username");
         const empIdInput = document.getElementById("agent-employee-id");
         const createBtn = document.querySelector('#create-agent-form button[type="submit"]');
-        const errorMsg = document.getElementById("error-msg");
+        const errorMsg = document.getElementById("error-msg"); // Kept for server errors
+        const unameError = document.getElementById("uname-error");
+        const empError = document.getElementById("emp-error");
+        const pwdError = document.getElementById("pwd-error");
+        const fullPwdInstruction = "Password must be at least 8 characters long, contain 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character.";
 
         function validateForm() {
-            let error = "";
+            let unameErrText = "";
+            let empErrText = "";
+            let pwdErrText = "";
+            
             const pwd = pwdInput.value;
             const uname = usernameInput.value.trim();
             const empId = empIdInput.value.trim();
             
             if (uname && currentAgentsData && currentAgentsData.some(a => a.username.toLowerCase() === uname.toLowerCase())) {
-                error = "Username already exists.";
-            } else if (empId && currentAgentsData && currentAgentsData.some(a => a.employee_id && a.employee_id.toLowerCase() === empId.toLowerCase())) {
-                error = "Employee ID already exists.";
-            } else if (pwd) {
-                if (pwd.length < 8) error = "Password must be at least 8 characters long.";
-                else if (!/[A-Z]/.test(pwd)) error = "Password must contain at least one uppercase letter.";
-                else if (!/[a-z]/.test(pwd)) error = "Password must contain at least one lowercase letter.";
-                else if (!/[0-9]/.test(pwd)) error = "Password must contain at least one number.";
-                else if (!/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) error = "Password must contain at least one special character.";
+                unameErrText = "Username already exists.";
+            } 
+            if (empId && currentAgentsData && currentAgentsData.some(a => a.employee_id && a.employee_id.toLowerCase() === empId.toLowerCase())) {
+                empErrText = "Employee ID already exists.";
+            } 
+            if (pwd) {
+                if (pwd.length < 8 || !/[A-Z]/.test(pwd) || !/[a-z]/.test(pwd) || !/[0-9]/.test(pwd) || !/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) {
+                    pwdErrText = fullPwdInstruction;
+                }
             }
             
-            errorMsg.innerText = error;
-            if (error) errorMsg.style.color = "var(--danger)";
-            createBtn.disabled = error.length > 0;
-            return error.length === 0;
+            unameError.innerText = unameErrText;
+            empError.innerText = empErrText;
+            pwdError.innerText = pwdErrText;
+            
+            errorMsg.innerText = ""; // Clear generic error
+            
+            const hasError = unameErrText || empErrText || pwdErrText;
+            createBtn.disabled = !!hasError;
+            return !hasError;
         }
 
         usernameInput.addEventListener('input', validateForm);
@@ -468,11 +483,9 @@
             const pwd = resetPwdInput.value;
             let error = "";
             if (pwd) {
-                if (pwd.length < 8) error = "Password must be at least 8 characters long.";
-                else if (!/[A-Z]/.test(pwd)) error = "Password must contain at least one uppercase letter.";
-                else if (!/[a-z]/.test(pwd)) error = "Password must contain at least one lowercase letter.";
-                else if (!/[0-9]/.test(pwd)) error = "Password must contain at least one number.";
-                else if (!/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) error = "Password must contain at least one special character.";
+                if (pwd.length < 8 || !/[A-Z]/.test(pwd) || !/[a-z]/.test(pwd) || !/[0-9]/.test(pwd) || !/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) {
+                    error = fullPwdInstruction;
+                }
             }
             resetErrorMsg.innerText = error;
             resetBtn.disabled = error.length > 0;
