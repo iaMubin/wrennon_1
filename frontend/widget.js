@@ -50,17 +50,35 @@ async function resolveSessionId() {
 
 // ── UI Event Handlers ──────────────────────────────────────────────
 
-launcher.addEventListener("click", async () => {
-  panel.classList.remove("hidden");
-  if (!hasLoadedHistory) {
-    await resolveSessionId();
-    await loadHistory();
-    connectSocket();
-    hasLoadedHistory = true;
+launcher.addEventListener("click", async (e) => {
+  e.stopPropagation();
+  if (panel.classList.contains("hidden")) {
+    panel.classList.remove("hidden");
+    if (!hasLoadedHistory) {
+      await resolveSessionId();
+      await loadHistory();
+      connectSocket();
+      hasLoadedHistory = true;
+    }
+  } else {
+    panel.classList.add("hidden");
   }
 });
 
-closeBtn.addEventListener("click", () => panel.classList.add("hidden"));
+closeBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  panel.classList.add("hidden");
+});
+
+document.addEventListener("click", (e) => {
+  if (!panel.classList.contains("hidden") && !panel.contains(e.target) && !launcher.contains(e.target)) {
+    panel.classList.add("hidden");
+  }
+});
+
+panel.addEventListener("click", (e) => {
+  e.stopPropagation();
+});
 
 sendBtn.addEventListener("click", sendMessage);
 inputEl.addEventListener("keydown", (e) => {

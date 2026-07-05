@@ -53,7 +53,7 @@ body {
 
 #panel {
   position: absolute;
-  bottom: 70px;
+  bottom: 80px;
   right: 0;
   width: 380px;
   height: 520px;
@@ -64,8 +64,16 @@ body {
   flex-direction: column;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: bottom right;
+  opacity: 1;
+  transform: scale(1) translateY(0);
 }
-#panel.hidden { display: none; }
+#panel.hidden {
+  opacity: 0;
+  transform: scale(0.95) translateY(10px);
+  pointer-events: none;
+}
 
 #panel-header {
   padding: 16px 18px;

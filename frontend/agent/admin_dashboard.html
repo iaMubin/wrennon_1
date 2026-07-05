@@ -269,7 +269,7 @@
             <div class="form-group">
                 <label>Full Name</label>
                 <div class="input-wrapper">
-                    <input type="text" id="agent-fullname" required autocomplete="new-password" placeholder="e.g. John Doe">
+                    <input type="text" id="agent-fullname" required readonly onfocus="this.removeAttribute('readonly');" autocomplete="new-password" placeholder="e.g. John Doe">
                 </div>
             </div>
             <div class="form-group">
@@ -313,7 +313,7 @@
         <table>
             <thead>
                 <tr>
-                    <th>Full Name</th>
+                    <th>Username</th>
                     <th>Employee ID</th>
                     <th>Access Level</th>
                     <th>Chats Resolved</th>
@@ -344,8 +344,8 @@
     </div>
 
     <!-- Agent Details Modal -->
-    <div id="agent-modal" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 100;">
-        <div style="background: var(--surface); padding: 32px; border-radius: 16px; border: 1px solid var(--border); width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.2);">
+    <div id="agent-modal" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(11, 14, 20, 0.9); align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
+        <div style="background: var(--paper); padding: 32px; border-radius: 16px; border: 1px solid var(--line); width: 400px; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
             <h3 style="margin-bottom: 24px;">Agent Details</h3>
             <div style="margin-bottom: 16px;">
                 <label style="color: var(--ink-soft); font-size: 12px; font-weight: 600; text-transform: uppercase;">Full Name</label>
@@ -364,19 +364,24 @@
                 <div id="modal-role" style="font-size: 16px; font-weight: 500; margin-top: 4px;"></div>
             </div>
             
-            <div id="password-reset-section" style="margin-bottom: 24px; padding-top: 24px; border-top: 1px solid var(--border);">
+            <div id="password-reset-section" style="margin-bottom: 24px; padding-top: 24px; border-top: 1px solid var(--line);">
                 <label style="color: var(--ink-soft); font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px; display: block;">Reset Password</label>
-                <div style="display: flex; gap: 8px;">
-                    <input type="password" id="reset-new-password" placeholder="New Password" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--ink);">
+                <div style="display: flex; gap: 8px; position: relative;">
+                    <input type="password" id="reset-new-password" placeholder="New Password" style="flex: 1; padding: 10px 40px 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); color: var(--ink); outline: none;">
+                    <button type="button" class="pwd-toggle" id="toggle-reset-pwd" aria-label="Toggle password visibility" style="right: 80px;">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                            <path class="eye" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle class="eye" cx="12" cy="12" r="3"></circle>
+                            <line class="eye-slash hidden" x1="1" y1="1" x2="23" y2="23"></line>
+                        </svg>
+                    </button>
                     <button class="btn btn-primary" onclick="resetAgentPassword()" style="padding: 0 16px; min-width: auto; height: 40px;">Reset</button>
                 </div>
             </div>
 
-            <div style="margin-bottom: 24px; padding: 12px; background: rgba(239, 68, 68, 0.1); border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.2);">
-                <span style="color: #F87171; font-size: 12px; display: block;">🔒 Passwords are hashed in the database and cannot be viewed.</span>
-            </div>
-            <div style="text-align: right;">
-                <button class="btn btn-secondary" onclick="document.getElementById('agent-modal').style.display='none'">Close</button>
+            <div id="modal-actions" style="display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid var(--line);">
+                <button class="btn btn-danger" id="modal-remove-btn" onclick="deleteAgent(selectedAgentUsername)">Remove Agent</button>
+                <button class="btn" onclick="document.getElementById('agent-modal').style.display='none'">Close</button>
             </div>
         </div>
     </div>
@@ -408,6 +413,24 @@
                 slashLine.classList.add("hidden");
             }
         });
+        
+        // Toggle password logic (Reset Password Modal)
+        const toggleResetPwdBtn = document.getElementById("toggle-reset-pwd");
+        const resetPwdInput = document.getElementById("reset-new-password");
+        const resetEyePaths = toggleResetPwdBtn.querySelectorAll(".eye");
+        const resetSlashLine = toggleResetPwdBtn.querySelector(".eye-slash");
+        
+        toggleResetPwdBtn.addEventListener("click", () => {
+            if (resetPwdInput.type === "password") {
+                resetPwdInput.type = "text";
+                resetEyePaths.forEach(p => p.classList.add("hidden"));
+                resetSlashLine.classList.remove("hidden");
+            } else {
+                resetPwdInput.type = "password";
+                resetEyePaths.forEach(p => p.classList.remove("hidden"));
+                resetSlashLine.classList.add("hidden");
+            }
+        });
 
         const currentUser = localStorage.getItem("agent_username");
 
@@ -425,8 +448,14 @@
             
             if (agent.role === 'ai') {
                 document.getElementById('password-reset-section').style.display = 'none';
+                document.getElementById('modal-remove-btn').style.display = 'none';
             } else {
                 document.getElementById('password-reset-section').style.display = 'block';
+                if (agent.username === currentUser) {
+                    document.getElementById('modal-remove-btn').style.display = 'none';
+                } else {
+                    document.getElementById('modal-remove-btn').style.display = 'block';
+                }
             }
             document.getElementById("reset-new-password").value = "";
             
@@ -486,18 +515,18 @@
                     const isSelf = agent.username === currentUser;
                     const isAi = agent.role === 'ai';
                     
-                    let actionCol = "";
+                    let actionCol = `<button class="btn" style="font-size: 12px; padding: 6px 12px;" onclick="event.stopPropagation(); showAgentDetails(${index})">Manage</button>`;
                     if (isSelf) {
                         actionCol = `<span style="color: var(--ink-soft); font-size: 12px; font-weight: 600; margin-right: 12px;">(You)</span>`;
-                    } else if (!isAi) {
-                        actionCol = `<button class="btn btn-danger" onclick="event.stopPropagation(); deleteAgent('${agent.username}')">Remove</button>`;
+                    } else if (isAi) {
+                        actionCol = "";
                     }
 
                     const tr = document.createElement("tr");
                     tr.style.cursor = "pointer";
                     tr.onclick = () => showAgentDetails(index);
                     tr.innerHTML = `
-                        <td style="font-weight: 600;">${agent.full_name}</td>
+                        <td style="font-weight: 600;">${agent.username}</td>
                         <td style="color: var(--ink-soft); font-family: monospace;">${agent.employee_id}</td>
                         <td><span class="role-badge ${roleClass}" style="${roleStyle}">${agent.role}</span></td>
                         <td style="font-weight: 700; font-size: 15px; color: var(--accent);">${agent.resolved_count}</td>
@@ -524,6 +553,7 @@
                 headers: { "Authorization": `Bearer ${token}` }
             });
             if (res.ok) {
+                document.getElementById('agent-modal').style.display = 'none';
                 fetchAgents();
             } else {
                 const data = await res.json();

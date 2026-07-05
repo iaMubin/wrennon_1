@@ -58,7 +58,7 @@ def list_agents(
         
     # Append AI Agent
     directory.append({
-        "full_name": "Artificial Intelligence",
+        "full_name": "AI Agent",
         "username": "AI Agent",
         "employee_id": "AUTO",
         "role": "ai",
