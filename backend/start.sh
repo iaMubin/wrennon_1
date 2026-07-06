@@ -1,11 +1,21 @@
 #!/bin/bash
+set -x
 
 echo "==> Running policy doc ingestion..."
-python scripts/ingest.py || echo "WARNING: Ingestion failed or skipped (this is OK if policy_docs/ is empty)"
+if python scripts/ingest.py; then
+    echo "Ingestion completed successfully."
+else
+    echo "WARNING: Ingestion failed or skipped (this is OK if policy_docs/ is empty)"
+fi
+
 echo "==> Running database migrations..."
 alembic upgrade head
+migration_status=$?
+if [ $migration_status -ne 0 ]; then
+    echo "ERROR: Database migration failed with status $migration_status"
+    exit 1
+fi
 
-# Set default concurrency if not provided
 export WEB_CONCURRENCY=${WEB_CONCURRENCY:-2}
 
 echo "==> Starting Wrennon backend on port ${PORT:-8000} with ${WEB_CONCURRENCY} workers..."

@@ -2,6 +2,8 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+ENV PYTHONUNBUFFERED=1
+
 # Install dependencies first (cached layer — only re-runs when
 # requirements.txt changes, not on every code change)
 COPY requirements.txt .
