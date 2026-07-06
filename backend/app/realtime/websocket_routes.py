@@ -85,10 +85,9 @@ def _sync_phase1(session_id: str, customer_text: str) -> dict | None:
             db.commit()
             reopened = True
 
-        if conversation.handoff_active and not conversation.resolved:
-            return {"handoff_active": True}
-
-        prev_messages = (
+        messages_data = []
+        if not (conversation.handoff_active and not conversation.resolved):
+            prev_messages = (
             db.query(Message)
             .filter_by(conversation_id=conversation.id)
             .order_by(Message.created_at.asc())
@@ -280,10 +279,6 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             if not phase1_data:
                 continue
                 
-            if phase1_data.get("handoff_active"):
-                # A human agent already owns this conversation — the AI stays silent.
-                continue
-
             # Broadcast ALL customer messages to the agent dashboard for real-time sync in background.
             _t0 = time.time()
             asyncio.create_task(manager.broadcast_to_agents({
@@ -294,6 +289,10 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
                 "is_resolved": phase1_data["resolved"],
             }))
             logger.info(f"[TIMING] broadcast_to_agents (human msg) dispatched in {time.time() - _t0:.3f}s")
+
+            if phase1_data.get("handoff_active"):
+                # A human agent already owns this conversation — the AI stays silent.
+                continue
 
             if phase1_data["reopened"]:
                 _t0 = time.time()
