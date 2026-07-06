@@ -9,27 +9,30 @@ async def manager_node(state: ConversationState) -> ConversationState:
     logger.info("Manager Node: Planning execution...")
     
     system_prompt = (
-        "You are an expert Manager LLM orchestrating a customer support chatbot. "
-        "Your job is to analyze the conversation history and the latest user message to determine what tools need to be executed.\n\n"
+        "You are an Expert System Assistant orchestrating a premium customer support chatbot. "
+        "Your job is to analyze the conversation history and the latest user message to determine if any tools are needed, if a human agent is required, or if the conversation has naturally concluded.\n\n"
         "Available Tools:\n"
-        "1. get_order_status: Fetches tracking information. Requires 'order_id'.\n"
-        "2. If the user provides an order ID you can use get_order_status immediately.\n"
-        "3. search_knowledge_base: Fetches policy info (returns, shipping, etc.). Requires 'query'.\n\n"
+        "1. get_order_status: Fetches tracking information. Requires 'order_id'. Use this immediately if the user provides an order ID.\n"
+        "2. search_knowledge_base: Fetches policy info (returns, shipping, etc.). Requires 'query'.\n\n"
         "Rules:\n"
-        "1. If the user is just saying hello, saying thank you, or having small talk, you do not need any tools.\n"
-        "2. If the user asks for something outside our capabilities (e.g., 'cancel my order', 'refund me', 'change my address') OR is highly frustrated, set 'handoff_required' to true.\n"
-        "3. You MUST output your decision as a JSON object with this exact structure:\n"
+        "1. If the user is just saying hello, thank you, or engaging in small talk, you DO NOT need any tools.\n"
+        "2. If the user asks for something outside our capabilities (e.g., 'cancel my order', 'change address', 'refund me') OR is highly frustrated/angry, set 'handoff_required' to true.\n"
+        "3. If the user indicates their problem is completely solved, says goodbye, or explicitly says they have no more questions (e.g. 'I am good', 'thanks bye', 'all good'), set 'resolved_required' to true to close the chat.\n"
+        "4. You MUST output your decision as a JSON object with this exact structure:\n"
         "{\n"
         "  \"tools_to_run\": [{\"name\": \"tool_name\", \"args\": {\"arg_name\": \"value\"}}],\n"
-        "  \"handoff_required\": boolean\n"
+        "  \"handoff_required\": boolean,\n"
+        "  \"resolved_required\": boolean\n"
         "}\n\n"
         "EXAMPLES:\n"
         "Example 1: User says 'Where is order 1002?'\n"
-        "Output: {\"tools_to_run\": [{\"name\": \"get_order_status\", \"args\": {\"order_id\": \"1002\"}}], \"handoff_required\": false}\n\n"
-        "Example 3: User says 'What is your return policy?'\n"
-        "Output: {\"tools_to_run\": [{\"name\": \"search_knowledge_base\", \"args\": {\"query\": \"return policy\"}}], \"handoff_required\": false}\n\n"
-        "Example 4: User says 'Cancel my account'\n"
-        "Output: {\"tools_to_run\": [], \"handoff_required\": true}\n"
+        "Output: {\"tools_to_run\": [{\"name\": \"get_order_status\", \"args\": {\"order_id\": \"1002\"}}], \"handoff_required\": false, \"resolved_required\": false}\n\n"
+        "Example 2: User says 'What is your return policy?'\n"
+        "Output: {\"tools_to_run\": [{\"name\": \"search_knowledge_base\", \"args\": {\"query\": \"return policy\"}}], \"handoff_required\": false, \"resolved_required\": false}\n\n"
+        "Example 3: User says 'Cancel my account'\n"
+        "Output: {\"tools_to_run\": [], \"handoff_required\": true, \"resolved_required\": false}\n\n"
+        "Example 4: User says 'Thanks that helped a lot, bye'\n"
+        "Output: {\"tools_to_run\": [], \"handoff_required\": false, \"resolved_required\": true}\n"
     )
 
     llm_messages = [{"role": "system", "content": system_prompt}]
@@ -46,9 +49,14 @@ async def manager_node(state: ConversationState) -> ConversationState:
         decision = json.loads(result_str)
         
         state["planned_tools"] = decision.get("tools_to_run", [])
+        
         if decision.get("handoff_required"):
             logger.warning("Manager LLM requested handoff.")
             state["handoff_requested"] = True
+        elif decision.get("resolved_required"):
+            logger.info("Manager LLM requested resolution.")
+            state["conversation_mode"] = "resolved"
+            
         logger.info(f"[TIMING] Manager Node took {time.time() - start_time:.3f}s")
         return state
         

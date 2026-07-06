@@ -123,7 +123,7 @@ async def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: i
             return await _safe_openai_call(messages, temperature, max_tokens, is_json)
         return ""
 
-MODEL = "llama-3.3-70b-versatile"
+MODEL = "openai/gpt-oss-120b"
 # Groq deprecated meta-llama/llama-4-scout-17b-16e-instruct on June 17,
 # 2026 (free/developer tier) and recommends this model as the direct
 # replacement. If Groq changes their lineup again, check
@@ -164,20 +164,24 @@ async def generate_conversation_summary(messages: list) -> str:
     logger.info("Generating conversation summary for handoff")
     
     prompt = (
-        "You are an internal tool for support agents. "
-        "Summarize this customer conversation in 2-3 short bullet points. "
-        "Focus on: what the customer wants, any order/account details mentioned, "
-        "and the customer's sentiment (frustrated, calm, etc). "
-        "Keep it very brief — the agent will read the full chat if needed."
+        "You are an expert assistant. Summarize the following customer support conversation "
+        "briefly and concisely. Use a short bulleted list. "
+        "Do not include any intro like 'Here is the summary' or headers. Start directly with the bullets.\n\n"
+        "Focus ONLY on:\n"
+        "- What the customer's main issue/request is.\n"
+        "- What has been done so far.\n"
+        "- What the human agent needs to do next."
     )
     
+    # Build conversation history for the LLM
     llm_messages = [{"role": "system", "content": prompt}]
+    
     for msg in messages:
         role = "user" if msg.type == "human" else "assistant"
-        llm_messages.append({"role": role, "content": msg.content})
-    llm_messages.append({"role": "user", "content": "Now summarize this conversation for the human agent."})
+        content = mask_pii(msg.content) if role == "user" else msg.content
+        llm_messages.append({"role": role, "content": content})
     
-    result = await _safe_llm_call(messages=llm_messages, temperature=0.2, max_tokens=200)
+    result = await _safe_llm_call(messages=llm_messages, temperature=0.1, max_tokens=250)
     return result or "Customer requested to speak with a human agent."
 
 

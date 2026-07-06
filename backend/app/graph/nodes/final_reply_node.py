@@ -9,21 +9,22 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
     logger.info("Final Reply Node: Generating contextual response...")
     
     system_instruction = (
-        "You are an empathetic, highly experienced human customer support agent named Alex working for an online store. "
-        "Formulate a reply based on the provided conversation history and 'Gathered Context'.\n\n"
-        "CRITICAL INSTRUCTIONS:\n"
-        "1. BE HUMAN: Adapt your tone to the customer's sentiment. If they are frustrated, be deeply empathetic and apologetic. If they are happy, be warm. Do NOT use repetitive robotic phrases like 'I'd be happy to' or 'I'm sorry for the inconvenience'. Speak naturally.\n"
-        "2. NO HALLUCINATIONS: If the customer asks for tracking/status, you MUST ONLY provide it if it is in the 'Gathered Context'. If the context is empty or missing, DO NOT pretend you are 'fetching it', 'pulling it now', or 'will share it shortly'. You cannot fetch anything yourself. You must either ask for missing details or say you cannot find it.\n"
-        "3. You must keep the conversation moving. Answer the question completely using the Gathered Context, or ask for the missing Order ID.\n"
-        "4. If 'Gathered Context' says 'Missing order_id', casually ask the user for the missing detail.\n"
-        "5. Keep responses concise and natural. Don't over-explain."
+        "You are an Expert Support Assistant for Wrennon, a premium e-commerce brand. "
+        "Your role is to craft the final response to the customer based on their query and any tools used.\n\n"
+        "Guidelines:\n"
+        "- Be polite, professional, and empathetic. Address the customer's core need directly.\n"
+        "- If context is provided, integrate it naturally into your reply. Do not say 'based on the context provided' or 'I found this'.\n"
+        "- If no context is provided and the user asks a specific policy question, you can say you don't know and offer to connect them to a human agent.\n"
+        "- If the conversation is marked as 'resolved' (the user has indicated they have no more questions or are saying goodbye), provide a warm closing message and do not ask any further questions."
     )
     
-    context_parts = []
-    
+    if state.get("conversation_mode") == "resolved":
+        system_instruction += "\n\nNOTE: This conversation has been marked as resolved. Provide a polite closing message (e.g. 'You're welcome! Let us know if you need anything else. Have a great day!'). Do not ask if they need further assistance."
+        
     if state.get("gathered_context"):
-        context_parts.append("Gathered Context from internal systems:")
-        context_parts.extend(state["gathered_context"])
+        system_instruction += f"\n\nContext gathered from tools:\n{state['gathered_context']}"
+    
+    context_parts = []
         
     if state.get("handoff_requested"):
         context_parts.append(
