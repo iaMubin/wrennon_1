@@ -94,8 +94,8 @@ async def login(
         key="access_token",
         value=f"Bearer {token}",
         httponly=True,
-        secure=True,     # Must be True for production (HTTPS)
-        samesite="lax",
+        secure=True,     # Must be True for samesite="none" (HTTPS)
+        samesite="none", # Allow cross-origin requests
         max_age=60 * 60 * 24 * 7 # 7 days
     )
     

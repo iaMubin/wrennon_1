@@ -27,9 +27,14 @@ async def lifespan(app: FastAPI):
 logger.info("Starting Wrennon Showcase Agent...")
 app = FastAPI(title="Wrennon Showcase Agent", version="0.2.0", lifespan=lifespan)
 
+_origins = settings.cors_origins_list
+_allow_all = _origins == ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
+    allow_origins=_origins if not _allow_all else [],
+    allow_origin_regex=".*" if _allow_all else None,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
