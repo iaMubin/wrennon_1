@@ -51,8 +51,8 @@ async def login(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Too many failed login attempts. Please try again later.",
             )
-    except redis.ConnectionError:
-        # Fallback if Redis is down
+    except Exception as e:
+        # Fallback if Redis is down or times out
         pass
 
     agent = db.query(Agent).filter(
@@ -64,7 +64,7 @@ async def login(
             r = get_redis()
             await r.incr(rate_key)
             await r.expire(rate_key, 60)
-        except redis.ConnectionError:
+        except Exception:
             pass
             
         raise HTTPException(
@@ -76,7 +76,7 @@ async def login(
     try:
         r = get_redis()
         await r.delete(rate_key)
-    except redis.ConnectionError:
+    except Exception:
         pass
         
     token = create_access_token(subject=agent.username, pwd_hash=agent.password_hash)
