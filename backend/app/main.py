@@ -16,6 +16,14 @@ from app.logger import logger
 from app.realtime.websocket_routes import router as realtime_router
 from app.realtime.connection_manager import broadcast
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
+# Initialize rate limiter based on remote IP
+limiter = Limiter(key_func=get_remote_address)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Connecting to Redis Pub/Sub...")
@@ -26,15 +34,18 @@ async def lifespan(app: FastAPI):
 
 logger.info("Starting Wrennon Showcase Agent...")
 app = FastAPI(title="Wrennon Showcase Agent", version="0.2.0", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 _origins = settings.cors_origins_list
 _allow_all = _origins == ["*"]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_origins if not _allow_all else [],
-    allow_origin_regex=".*" if _allow_all else None,
-    allow_credentials=True,
+    allow_origins=_origins if not _allow_all else ["*"],
+    allow_origin_regex=None,
+    allow_credentials=not _allow_all,
     allow_methods=["*"],
     allow_headers=["*"],
 )

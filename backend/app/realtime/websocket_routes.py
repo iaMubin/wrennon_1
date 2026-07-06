@@ -83,6 +83,10 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
             if not customer_text:
                 continue
                 
+            if len(customer_text) > 2000:
+                logger.warning(f"Message from {session_id} exceeded max length. Truncating.")
+                customer_text = customer_text[:2000]
+                
             msg_start_time = time.time()
             logger.info(f"Received message from customer {session_id}: {mask_pii(customer_text)}")
 

@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.db.models import Conversation
 from app.db.session import get_db
+from app.main import limiter
 
 router = APIRouter()
 
@@ -21,7 +22,8 @@ REOPEN_WINDOW_HOURS = 72
 
 
 @router.get("/chat/{session_id}/status")
-def session_status(session_id: str, db: Session = Depends(get_db)) -> dict:
+@limiter.limit("100/minute")
+def session_status(request: Request, session_id: str, db: Session = Depends(get_db)) -> dict:
     """Check whether a session is still usable or expired."""
     conversation = db.query(Conversation).filter_by(session_id=session_id).first()
     if conversation is None:
@@ -43,7 +45,8 @@ def session_status(session_id: str, db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/chat/{session_id}/history")
-def get_history(session_id: str, db: Session = Depends(get_db)) -> list[dict]:
+@limiter.limit("100/minute")
+def get_history(request: Request, session_id: str, db: Session = Depends(get_db)) -> list[dict]:
     conversation = db.query(Conversation).filter_by(session_id=session_id).first()
     if conversation is None:
         return []

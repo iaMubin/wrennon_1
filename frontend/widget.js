@@ -44,8 +44,10 @@ async function resolveSessionId() {
   }
 
   // No valid stored session — create a new one
-  SESSION_ID = `session-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-  localStorage.setItem(STORAGE_KEY, SESSION_ID);
+  if (!SESSION_ID) {
+    SESSION_ID = crypto.randomUUID();
+    localStorage.setItem(STORAGE_KEY, SESSION_ID);
+  }
 }
 
 // ── UI Event Handlers ──────────────────────────────────────────────
