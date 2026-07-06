@@ -82,8 +82,9 @@ def _sync_phase1(session_id: str, customer_text: str) -> dict | None:
             conversation.resolved = False
             conversation.resolved_at = None
             conversation.reopen_count += 1
-            db.commit()
             reopened = True
+            
+        db.commit()
 
         messages_data = []
         if not (conversation.handoff_active and not conversation.resolved):
@@ -177,6 +178,7 @@ def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None) -
                 "is_resolved": conversation.resolved
             })
 
+        db.commit()
         return {
             "resolved": conversation.resolved,
             "events": events
