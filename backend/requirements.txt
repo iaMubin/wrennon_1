@@ -45,5 +45,3 @@ openai==2.41.0
 pytest==8.3.4
 httpx==0.28.1
 langsmith
-presidio-analyzer
-presidio-anonymizer

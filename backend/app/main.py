@@ -79,5 +79,4 @@ app.include_router(realtime_router)  # no /api prefix — /ws/... paths
 
 @app.get("/health")
 def health() -> dict:
-    logger.info("Health check endpoint called")
     return {"status": "ok"}

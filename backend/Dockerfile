@@ -13,8 +13,6 @@ COPY . .
 # Install curl for HEALTHCHECK
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Download spacy model for Presidio
-RUN python -m spacy download en_core_web_lg
 
 # Create a non-root user and give ownership of the /app directory
 RUN useradd -m appuser && chown -R appuser:appuser /app
