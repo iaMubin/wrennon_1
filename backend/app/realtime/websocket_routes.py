@@ -88,19 +88,19 @@ def _sync_phase1(session_id: str, customer_text: str) -> dict | None:
         messages_data = []
         if not (conversation.handoff_active and not conversation.resolved):
             prev_messages = (
-            db.query(Message)
-            .filter_by(conversation_id=conversation.id)
-            .order_by(Message.created_at.asc())
-            .all()
-        )
-        messages_data = [
-            {"sender": m.sender, "content": m.content}
-            for m in prev_messages
-            if m.sender != "system"
-        ]
+                db.query(Message)
+                .filter_by(conversation_id=conversation.id)
+                .order_by(Message.created_at.asc())
+                .all()
+            )
+            messages_data = [
+                {"sender": m.sender, "content": m.content}
+                for m in prev_messages
+                if m.sender != "system"
+            ]
 
         return {
-            "handoff_active": False,
+            "handoff_active": conversation.handoff_active,
             "reopened": reopened,
             "resolved": conversation.resolved,
             "reopen_count": conversation.reopen_count,
