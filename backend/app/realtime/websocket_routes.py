@@ -111,16 +111,16 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     
                 _save_message(db, conversation.id, sender="human", content=customer_text)
 
-                # Broadcast ALL customer messages to the agent dashboard for real-time sync.
+                # Broadcast ALL customer messages to the agent dashboard for real-time sync in background.
                 _t0 = time.time()
-                await manager.broadcast_to_agents({
+                asyncio.create_task(manager.broadcast_to_agents({
                     "type": "new_message",
                     "session_id": session_id,
                     "sender": "human",
                     "content": customer_text,
                     "is_resolved": conversation.resolved,
-                })
-                logger.info(f"[TIMING] broadcast_to_agents (human msg) took {time.time() - _t0:.3f}s")
+                }))
+                logger.info(f"[TIMING] broadcast_to_agents (human msg) dispatched in {time.time() - _t0:.3f}s")
 
                 # If the customer sends a message after resolution, it automatically reopens
                 if conversation.resolved:
@@ -128,15 +128,15 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     conversation.resolved_at = None
                     conversation.reopen_count += 1
                     db.commit()
-                    # Notify agents
+                    # Notify agents in background
                     _t0 = time.time()
-                    await manager.broadcast_to_agents({
+                    asyncio.create_task(manager.broadcast_to_agents({
                         "type": "reopen",
                         "session_id": session_id,
                         "reopen_count": conversation.reopen_count,
                         "is_resolved": conversation.resolved,
-                    })
-                    logger.info(f"[TIMING] broadcast_to_agents (reopen) took {time.time() - _t0:.3f}s")
+                    }))
+                    logger.info(f"[TIMING] broadcast_to_agents (reopen) dispatched in {time.time() - _t0:.3f}s")
 
                 if conversation.handoff_active and not conversation.resolved:
                     # A human agent already owns this conversation — the AI stays silent.
@@ -226,16 +226,16 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
 
                 _save_message(db, conversation.id, sender="ai", content=reply_text)
 
-                # Broadcast AI messages to agent dashboard as well
+                # Broadcast AI messages to agent dashboard as well in background
                 _t0 = time.time()
-                await manager.broadcast_to_agents({
+                asyncio.create_task(manager.broadcast_to_agents({
                     "type": "new_message",
                     "session_id": session_id,
                     "sender": "ai",
                     "content": reply_text,
                     "is_resolved": conversation.resolved,
-                })
-                logger.info(f"[TIMING] broadcast_to_agents (ai msg) took {time.time() - _t0:.3f}s")
+                }))
+                logger.info(f"[TIMING] broadcast_to_agents (ai msg) dispatched in {time.time() - _t0:.3f}s")
 
                 if updated_state and updated_state.get("handoff_ticket_id"):
                     conversation.handoff_active = True
@@ -255,14 +255,14 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                         _save_message(db, conversation.id, sender="system", content=f"📋 Summary: {summary}")
 
                     _t0 = time.time()
-                    await manager.broadcast_to_agents({
+                    asyncio.create_task(manager.broadcast_to_agents({
                         "type": "handoff",
                         "session_id": session_id,
                         "ticket_id": updated_state["handoff_ticket_id"],
                         "summary": summary,
                         "is_resolved": conversation.resolved,
-                    })
-                    logger.info(f"[TIMING] broadcast_to_agents (handoff) took {time.time() - _t0:.3f}s")
+                    }))
+                    logger.info(f"[TIMING] broadcast_to_agents (handoff) dispatched in {time.time() - _t0:.3f}s")
                 elif updated_state.get("conversation_mode") == "resolved":
                     conversation.resolved = True
                     conversation.resolved_at = datetime.datetime.utcnow()
@@ -278,12 +278,12 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     db.commit()
                     
                     _t0 = time.time()
-                    await manager.broadcast_to_agents({
+                    asyncio.create_task(manager.broadcast_to_agents({
                         "type": "reopen",  # Re-use reopen event to force UI refresh
                         "session_id": session_id,
                         "is_resolved": conversation.resolved,
-                    })
-                    logger.info(f"[TIMING] broadcast_to_agents (resolve reopen) took {time.time() - _t0:.3f}s")
+                    }))
+                    logger.info(f"[TIMING] broadcast_to_agents (resolve reopen) dispatched in {time.time() - _t0:.3f}s")
 
                 phase3_duration = time.time() - phase3_start
                 logger.info(f"[TIMING] Phase 3 (DB Post-processing) took {phase3_duration:.3f}s")
