@@ -2,8 +2,10 @@ import json
 from app.graph.state import ConversationState
 from app.services.llm import _safe_llm_call, mask_pii
 from app.logger import logger
+import time
 
 async def manager_node(state: ConversationState) -> ConversationState:
+    start_time = time.time()
     logger.info("Manager Node: Planning execution...")
     
     system_prompt = (
@@ -47,9 +49,11 @@ async def manager_node(state: ConversationState) -> ConversationState:
         if decision.get("handoff_required"):
             logger.warning("Manager LLM requested handoff.")
             state["handoff_requested"] = True
-            
-    except Exception as e:
-        logger.error(f"Failed to parse Manager LLM JSON: {e}")
-        state["planned_tools"] = []
+        logger.info(f"[TIMING] Manager Node took {time.time() - start_time:.3f}s")
+        return state
         
-    return state
+    except Exception as e:
+        logger.error(f"Error parsing manager decision: {e}")
+        state["conversation_mode"] = "handoff"
+        logger.info(f"[TIMING] Manager Node (Error) took {time.time() - start_time:.3f}s")
+        return state

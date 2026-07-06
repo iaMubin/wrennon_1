@@ -1,8 +1,10 @@
 from app.graph.state import ConversationState
 from app.services.tools import TOOL_EXECUTORS
 from app.logger import logger
+import time
 
 async def tool_executor_node(state: ConversationState) -> ConversationState:
+    start_time = time.time()
     logger.info("Worker Node: Executing planned tools...")
     planned_tools = state.get("planned_tools", [])
     gathered_context = []
@@ -23,4 +25,5 @@ async def tool_executor_node(state: ConversationState) -> ConversationState:
             logger.warning(f"Unknown tool requested: {tool_name}")
             
     state["gathered_context"] = gathered_context
+    logger.info(f"[TIMING] Tool Executor Node took {time.time() - start_time:.3f}s")
     return state

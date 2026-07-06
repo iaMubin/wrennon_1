@@ -2,8 +2,10 @@ from langchain_core.messages import AIMessage
 from app.graph.state import ConversationState
 from app.services.llm import _safe_llm_call, mask_pii
 from app.logger import logger
+import time
 
 async def final_reply_node(state: ConversationState) -> ConversationState:
+    start_time = time.time()
     logger.info("Final Reply Node: Generating contextual response...")
     
     system_instruction = (
@@ -55,4 +57,5 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
         reply = "I'm sorry, I couldn't process that right now. Could you please try again?"
         
     state["messages"].append(AIMessage(content=reply))
+    logger.info(f"[TIMING] Final Reply Node took {time.time() - start_time:.3f}s")
     return state

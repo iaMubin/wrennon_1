@@ -49,12 +49,15 @@ def mask_pii(text: str) -> str:
 )
 async def _safe_groq_call(messages: list, temperature: float = 0.2, max_tokens: int = 400) -> str:
     """Wrapper around Groq API calls with retry logic."""
+    import time
+    start_time = time.time()
     response = await _client.chat.completions.create(
         model=MODEL,
         messages=messages,
         temperature=temperature,
         max_tokens=max_tokens,
     )
+    logger.info(f"[TIMING] Groq Chat Completion took {time.time() - start_time:.3f}s")
     result = response.choices[0].message.content
     if result and result.strip():
         return result.strip()
@@ -67,6 +70,8 @@ async def _safe_groq_call(messages: list, temperature: float = 0.2, max_tokens: 
 )
 async def _safe_groq_json_call(messages: list, temperature: float = 0.2, max_tokens: int = 1000) -> str:
     """Wrapper around Groq API calls specifically for JSON output."""
+    import time
+    start_time = time.time()
     response = await _client.chat.completions.create(
         model=MODEL,
         messages=messages,
@@ -74,6 +79,7 @@ async def _safe_groq_json_call(messages: list, temperature: float = 0.2, max_tok
         max_tokens=max_tokens,
         response_format={"type": "json_object"}
     )
+    logger.info(f"[TIMING] Groq JSON Completion took {time.time() - start_time:.3f}s")
     result = response.choices[0].message.content
     if result and result.strip():
         return result.strip()
@@ -94,7 +100,10 @@ async def _safe_openai_call(messages: list, temperature: float = 0.2, max_tokens
         if is_json:
             kwargs["response_format"] = {"type": "json_object"}
             
+        import time
+        start_time = time.time()
         response = await _openai_client.chat.completions.create(**kwargs)
+        logger.info(f"[TIMING] OpenAI Completion took {time.time() - start_time:.3f}s")
         result = response.choices[0].message.content
         if result and result.strip():
             return result.strip()

@@ -13,6 +13,8 @@ from __future__ import annotations
 import uuid
 from pinecone import Pinecone
 import cohere
+import time
+from app.logger import logger
 
 from app.config import settings
 from app.services.cohere_embeddings import CohereEmbedder, CohereQueryEmbedder
@@ -57,7 +59,9 @@ async def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
     """
     # Use search_query input_type for queries (Cohere v3 models
     # produce better results when document vs query is distinguished)
+    start_time = time.time()
     query_embedding = await asyncio.to_thread(_query_embedder.embed_query, query)
+    logger.info(f"[TIMING] Cohere Embed Query took {time.time() - start_time:.3f}s")
 
     # Pinecone fetch
     index = _get_index()
@@ -69,7 +73,9 @@ async def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
             include_metadata=True
         )
         
+    pinecone_start = time.time()
     results = await asyncio.to_thread(_pinecone_query)
+    logger.info(f"[TIMING] Pinecone Fetch took {time.time() - pinecone_start:.3f}s")
 
     if not results.matches:
         return []
@@ -79,12 +85,14 @@ async def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
         return []
 
     cohere_client = _get_cohere()
+    rerank_start = time.time()
     reranked = await cohere_client.rerank(
         query=query,
         documents=candidates,
         top_n=top_k,
         model="rerank-english-v3.0",
     )
+    logger.info(f"[TIMING] Cohere Rerank took {time.time() - rerank_start:.3f}s")
 
     return [
         {"text": candidates[result.index], "relevance_score": result.relevance_score}

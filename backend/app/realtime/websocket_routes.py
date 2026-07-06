@@ -59,6 +59,7 @@ def _save_message(db: Session, conversation_id: str, sender: str, content: str) 
 
 @router.websocket("/ws/customer/{session_id}")
 async def customer_websocket(websocket: WebSocket, session_id: str):
+    import time
     logger.info(f"Customer connected: {session_id}")
     await manager.connect_customer(session_id, websocket)
 
@@ -82,6 +83,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
             if not customer_text:
                 continue
                 
+            msg_start_time = time.time()
             logger.info(f"Received message from customer {session_id}: {mask_pii(customer_text)}")
 
             # Rate Limiting (max 15 msgs / minute)
@@ -98,7 +100,8 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
             except Exception as e:
                 logger.error(f"Rate limiting error: {e}")
 
-            # Open a fresh DB connection only for the duration of this message
+            # Phase 1: Pre-processing & DB Save
+            phase1_start = time.time()
             with SessionLocal() as db:
                 conversation = db.query(Conversation).filter_by(session_id=session_id).first()
                 if not conversation:
@@ -180,6 +183,12 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                         logger.info(f"Semantic Cache HIT for '{customer_text}'")
             
             # --- END DB SESSION 1 ---
+            phase1_duration = time.time() - phase1_start
+            logger.info(f"[TIMING] Phase 1 (DB Pre-processing) took {phase1_duration:.3f}s")
+
+            # Phase 2: AI Processing (LangGraph)
+            phase2_start = time.time()
+            
             # Run graph WITHOUT holding a database connection!
             if not reply_text:
                 updated_state = await _graph.ainvoke(state)
@@ -191,6 +200,11 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     if tool_names == ["search_knowledge_base"]:
                         await set_cache(customer_text, reply_text, ttl=3600)
             
+            phase2_duration = time.time() - phase2_start
+            logger.info(f"[TIMING] Phase 2 (AI Graph Execution) took {phase2_duration:.3f}s")
+
+            # Phase 3: Post-processing & DB Save
+            phase3_start = time.time()
             # --- START DB SESSION 2 ---
             # Reopen connection to persist results
             with SessionLocal() as db:
@@ -259,7 +273,13 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                         "is_resolved": conversation.resolved,
                     })
 
+                phase3_duration = time.time() - phase3_start
+                logger.info(f"[TIMING] Phase 3 (DB Post-processing) took {phase3_duration:.3f}s")
+
                 await websocket.send_json({"reply": reply_text})
+                
+                total_time = time.time() - msg_start_time
+                logger.info(f"[TIMING] Total Message Turnaround Time: {total_time:.3f}s")
 
     except WebSocketDisconnect:
         logger.info(f"Customer disconnected: {session_id}")
