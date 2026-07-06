@@ -26,9 +26,10 @@ from app.config import settings
 from app.services.llm import mask_pii
 from app.services.cache import get_cache, set_cache
 
+from app.api.agent import get_redis
+
 router = APIRouter()
 _graph = build_graph()
-redis_client = redis.from_url(settings.redis_url, decode_responses=True)
 
 
 def _get_or_create_conversation(db: Session, session_id: str, customer_email: str | None) -> Conversation:
@@ -85,10 +86,11 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
 
             # Rate Limiting (max 15 msgs / minute)
             try:
+                r = get_redis()
                 rate_key = f"rate_limit:{session_id}"
-                count = await redis_client.incr(rate_key)
+                count = await r.incr(rate_key)
                 if count == 1:
-                    await redis_client.expire(rate_key, 60)
+                    await r.expire(rate_key, 60)
                 if count > 15:
                     logger.warning(f"Rate limit exceeded for {session_id}")
                     await websocket.send_json({"reply": "You are sending messages too quickly. Please wait a minute."})

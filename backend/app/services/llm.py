@@ -29,8 +29,8 @@ def _get_presidio():
             from presidio_anonymizer import AnonymizerEngine
             _analyzer = AnalyzerEngine()
             _anonymizer = AnonymizerEngine()
-        except ImportError:
-            pass
+        except Exception as e:
+            logger.warning(f"Presidio init failed, falling back to regex: {e}")
     return _analyzer, _anonymizer
 
 def mask_pii(text: str) -> str:
