@@ -22,16 +22,8 @@ _analyzer = None
 _anonymizer = None
 
 def _get_presidio():
-    global _analyzer, _anonymizer
-    if _analyzer is None:
-        try:
-            from presidio_analyzer import AnalyzerEngine
-            from presidio_anonymizer import AnonymizerEngine
-            _analyzer = AnalyzerEngine()
-            _anonymizer = AnonymizerEngine()
-        except Exception as e:
-            logger.warning(f"Presidio init failed, falling back to regex: {e}")
-    return _analyzer, _anonymizer
+    # Disabled for Render production due to 512MB memory limit causing thrashing with SpaCy
+    return None, None
 
 def mask_pii(text: str) -> str:
     """Masks PII from user input using Microsoft Presidio (or regex fallback)."""
