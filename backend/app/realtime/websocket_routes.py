@@ -178,16 +178,25 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     if cached_reply:
                         reply_text = cached_reply
                         logger.info(f"Semantic Cache HIT for '{customer_text}'")
+            
+            # --- END DB SESSION 1 ---
+            # Run graph WITHOUT holding a database connection!
+            if not reply_text:
+                updated_state = await _graph.ainvoke(state)
+                reply_text = updated_state["messages"][-1].content
                 
-                if not reply_text:
-                    updated_state = await _graph.ainvoke(state)
-                    reply_text = updated_state["messages"][-1].content
-                    
-                    # Store RAG/Generic questions in cache if no tools were used except knowledge base
-                    if updated_state.get("planned_tools"):
-                        tool_names = [t.get("name") for t in updated_state["planned_tools"]]
-                        if tool_names == ["search_knowledge_base"]:
-                            await set_cache(customer_text, reply_text, ttl=3600)
+                # Store RAG/Generic questions in cache if no tools were used except knowledge base
+                if updated_state.get("planned_tools"):
+                    tool_names = [t.get("name") for t in updated_state["planned_tools"]]
+                    if tool_names == ["search_knowledge_base"]:
+                        await set_cache(customer_text, reply_text, ttl=3600)
+            
+            # --- START DB SESSION 2 ---
+            # Reopen connection to persist results
+            with SessionLocal() as db:
+                conversation = db.query(Conversation).filter_by(session_id=session_id).first()
+                if not conversation:
+                    continue
                 
                 # Persist state updates if graph ran
                 if updated_state:
