@@ -129,7 +129,7 @@ function connectSocket() {
       loadConversations();
       if (data.session_id === activeSessionId) {
         if (data.summary) {
-          appendMessage("system", `📋 Summary: ${data.summary}`);
+          appendMessage("system", `📋 Summary: ${data.summary}`, new Date().toISOString());
         }
         if (data.is_resolved) {
           resolveBtn.textContent = "Resolved";
@@ -143,7 +143,7 @@ function connectSocket() {
       }
     } else if (data.type === "new_message") {
       if (data.session_id === activeSessionId) {
-        appendMessage(data.sender, data.content);
+        appendMessage(data.sender, data.content, new Date().toISOString());
         if (data.is_resolved) {
           resolveBtn.textContent = "Resolved";
           resolveBtn.disabled = true;
@@ -263,21 +263,50 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved) {
     resolveBtn.classList.add("btn-primary");
   }
 
-  agentMessages.innerHTML = "";
+  agentMessages.innerHTML = "<div class='loading-spinner'></div>";
   const messages = await authedFetch(`/agent/conversations/${sessionId}/messages`);
+  agentMessages.innerHTML = "";
   if (messages) {
+    let lastDateStr = null;
     for (const msg of messages) {
-      appendMessage(msg.sender, msg.content);
+      const dateObj = new Date(msg.created_at);
+      const dateStr = dateObj.toLocaleDateString();
+      if (dateStr !== lastDateStr) {
+        const dateDiv = document.createElement("div");
+        dateDiv.className = "date-separator";
+        
+        const todayStr = new Date().toLocaleDateString();
+        const yesterdayDate = new Date();
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        const yesterdayStr = yesterdayDate.toLocaleDateString();
+        
+        if (dateStr === todayStr) dateDiv.textContent = "Today";
+        else if (dateStr === yesterdayStr) dateDiv.textContent = "Yesterday";
+        else dateDiv.textContent = dateObj.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        
+        agentMessages.appendChild(dateDiv);
+        lastDateStr = dateStr;
+      }
+      appendMessage(msg.sender, msg.content, msg.created_at);
     }
   }
   
   loadConversations();
 }
 
-function appendMessage(sender, content) {
+function appendMessage(sender, content, isoString = new Date().toISOString()) {
   const div = document.createElement("div");
   div.className = `msg msg--${sender}`;
-  div.innerHTML = `${escapeHtml(content)}`;
+  
+  let timeHtml = "";
+  if (isoString) {
+      const timeStr = formatTime(isoString);
+      // Double ticks for outbound messages (ai or agent)
+      const ticks = (sender === "ai" || sender === "agent") ? `<span class="msg-ticks">✓✓</span>` : "";
+      timeHtml = `<div class="msg-meta"><span>${timeStr}</span>${ticks}</div>`;
+  }
+  
+  div.innerHTML = `${escapeHtml(content)}${timeHtml}`;
   agentMessages.appendChild(div);
   agentMessages.scrollTop = agentMessages.scrollHeight;
 }
@@ -293,7 +322,7 @@ function sendAgentReply() {
   if (!text || !activeSessionId || !socket || socket.readyState !== WebSocket.OPEN) return;
 
   socket.send(JSON.stringify({ session_id: activeSessionId, message: text }));
-  appendMessage("agent", text);
+  appendMessage("agent", text, new Date().toISOString());
   agentInput.value = "";
   drafts[activeSessionId] = ""; 
 }
@@ -340,6 +369,10 @@ function logout() {
   localStorage.removeItem("agent_token");
   localStorage.removeItem("agent_username");
   localStorage.removeItem("agent_role");
+  
+  const antiFlash = document.getElementById('anti-flash-style');
+  if(antiFlash) antiFlash.remove();
+  
   accessToken = null;
   dashboard.classList.add("hidden");
   loginScreen.classList.remove("hidden");

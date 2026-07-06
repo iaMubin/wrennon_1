@@ -332,8 +332,18 @@
         </table>
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 48px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 12px;">
-            <h3 style="margin: 0;">System Audit Logs</h3>
-            <button class="btn" id="toggle-logs-btn" onclick="toggleLogs()" style="padding: 6px 14px; font-size: 16px; transform: rotate(180deg); transition: transform 0.3s ease;">^</button>
+            <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent);">
+                    <path d="M12 20h9"></path>
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                </svg>
+                System Audit Logs
+            </h3>
+            <button class="btn" id="toggle-logs-btn" onclick="toggleLogs()" style="padding: 8px; display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--line);">
+                <svg id="toggle-logs-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(180deg); transition: transform 0.3s ease;">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </button>
         </div>
         <div id="logs-container" style="display: none; overflow-x: auto;">
         <table style="margin-bottom: 40px; opacity: 0.9;">
@@ -443,13 +453,13 @@
         // Toggle Logs
         function toggleLogs() {
             const logsContainer = document.getElementById("logs-container");
-            const toggleBtn = document.getElementById("toggle-logs-btn");
+            const toggleIcon = document.getElementById("toggle-logs-icon");
             if (logsContainer.style.display === "none") {
                 logsContainer.style.display = "block";
-                toggleBtn.style.transform = "rotate(0deg)";
+                toggleIcon.style.transform = "rotate(180deg)";
             } else {
                 logsContainer.style.display = "none";
-                toggleBtn.style.transform = "rotate(180deg)";
+                toggleIcon.style.transform = "rotate(0deg)";
             }
         }
 
