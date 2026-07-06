@@ -78,6 +78,12 @@ with SessionLocal() as db:
                 employee_id="EMP-1001"
             ))
             db.commit()
+    else:
+        admin_agent = db.query(Agent).filter_by(username=settings.agent_username).first()
+        if admin_agent and settings.agent_password_hash and admin_agent.password_hash != settings.agent_password_hash:
+            logger.info(f"Updating password hash for admin agent: {settings.agent_username}")
+            admin_agent.password_hash = settings.agent_password_hash
+            db.commit()
 
     # Backfill full_name for existing agents
     agents_without_name = db.query(Agent).filter(Agent.full_name == None).all()
