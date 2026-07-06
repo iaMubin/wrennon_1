@@ -8,22 +8,49 @@ WebSocket connection takes over for everything that happens next.
 from __future__ import annotations
 
 import datetime
+import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.models import Conversation
 from app.db.session import get_db
 from app.limiter import limiter
+from app.auth.security import create_session_token, decode_session_token
 
 router = APIRouter()
 
 REOPEN_WINDOW_HOURS = 72
 
 
+def verify_session_token(session_id: str, authorization: str | None = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing or invalid token")
+    
+    token = authorization.split(" ")[1]
+    decoded_session = decode_session_token(token)
+    
+    if not decoded_session or decoded_session != session_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token for this session")
+
+
+@router.post("/chat/init")
+@limiter.limit("100/minute")
+def init_session(request: Request):
+    """Start a new session and get a signed token."""
+    new_session_id = str(uuid.uuid4())
+    token = create_session_token(new_session_id)
+    return {"session_id": new_session_id, "token": token}
+
+
 @router.get("/chat/{session_id}/status")
 @limiter.limit("100/minute")
-def session_status(request: Request, session_id: str, db: Session = Depends(get_db)) -> dict:
+def session_status(
+    request: Request, 
+    session_id: str, 
+    db: Session = Depends(get_db),
+    _=Depends(verify_session_token)
+) -> dict:
     """Check whether a session is still usable or expired."""
     conversation = db.query(Conversation).filter_by(session_id=session_id).first()
     if conversation is None:
@@ -46,7 +73,12 @@ def session_status(request: Request, session_id: str, db: Session = Depends(get_
 
 @router.get("/chat/{session_id}/history")
 @limiter.limit("100/minute")
-def get_history(request: Request, session_id: str, db: Session = Depends(get_db)) -> list[dict]:
+def get_history(
+    request: Request, 
+    session_id: str, 
+    db: Session = Depends(get_db),
+    _=Depends(verify_session_token)
+) -> list[dict]:
     conversation = db.query(Conversation).filter_by(session_id=session_id).first()
     if conversation is None:
         return []

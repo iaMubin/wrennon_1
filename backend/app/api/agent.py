@@ -26,10 +26,21 @@ import redis.asyncio as redis
 # Create a Redis client for rate limiting
 _redis_client = None
 
+class DummyRedis:
+    async def get(self, key): return None
+    async def setex(self, key, time, value): pass
+    async def set(self, key, value, ex=None, nx=None): pass
+    async def incr(self, key): return 1
+    async def expire(self, key, time): pass
+    async def delete(self, key): pass
+
 def get_redis():
     global _redis_client
     if _redis_client is None:
-        _redis_client = redis.from_url(settings.redis_url, decode_responses=True, socket_connect_timeout=1.0, socket_timeout=1.0)
+        if settings.redis_url.startswith("memory://"):
+            _redis_client = DummyRedis()
+        else:
+            _redis_client = redis.from_url(settings.redis_url, decode_responses=True, socket_connect_timeout=1.0, socket_timeout=1.0)
     return _redis_client
 
 router = APIRouter()

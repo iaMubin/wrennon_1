@@ -64,3 +64,34 @@ def test_login_invalid_password(setup_test_agent):
         data={"username": "test_admin", "password": "WrongPassword123!"}
     )
     assert response.status_code == 401
+
+def test_session_token_creation_and_decoding():
+    from app.auth.security import create_session_token, decode_session_token
+    session_id = "test-session-123"
+    token = create_session_token(session_id)
+    
+    assert token is not None
+    assert type(token) == str
+
+    decoded_session_id = decode_session_token(token)
+    assert decoded_session_id == session_id
+
+def test_expired_session_token_fails():
+    import datetime
+    from jose import jwt
+    from app.config import settings
+    from app.auth.security import decode_session_token
+
+    # Create a manually expired token
+    expire = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)
+    to_encode = {"session_id": "expired-session", "exp": expire}
+    encoded_jwt = jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+    result = decode_session_token(encoded_jwt)
+    assert result is None
+
+def test_invalid_session_token_fails():
+    from app.auth.security import decode_session_token
+    
+    result = decode_session_token("invalid.token.here")
+    assert result is None

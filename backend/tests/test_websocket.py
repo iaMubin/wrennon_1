@@ -8,18 +8,65 @@ from app.db.session import SessionLocal
 client = TestClient(app)
 
 def test_websocket_connection_and_length_limit():
-    session_id = "test-session-ws-1"
+    # 1. Get token
+    init_resp = client.post("/api/chat/init")
+    assert init_resp.status_code == 200
+    session_id = init_resp.json()["session_id"]
+    token = init_resp.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
     
-    # Can't easily test full redis-backed websocket loop in isolated test without mocking Redis,
-    # but we can verify the HTTP endpoint for status works and respects the limit.
-    
-    response = client.get(f"/api/chat/{session_id}/status")
-    # Should return status='not_found' since it doesn't exist
+    # 2. Test status endpoint with token
+    response = client.get(f"/api/chat/{session_id}/status", headers=headers)
+    # Should return status='not_found' since it doesn't exist in DB yet (init just generates token)
     assert response.status_code == 200
     assert response.json() == {"status": "not_found"}
     
     # Test rate limiter on status endpoint
     for _ in range(101):
-        resp = client.get(f"/api/chat/{session_id}/status")
+        resp = client.get(f"/api/chat/{session_id}/status", headers=headers)
         
     assert resp.status_code == 429 # Too Many Requests
+
+def test_chat_auth_rejection():
+    # Test that missing token rejects
+    resp = client.get("/api/chat/fake-session/status")
+    assert resp.status_code == 401
+    
+    # Test that cross-session token rejects
+    init_resp = client.post("/api/chat/init")
+    token = init_resp.json()["token"]
+    resp = client.get("/api/chat/other-session/status", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+
+def test_websocket_connection_success():
+    init_resp = client.post("/api/chat/init")
+    session_id = init_resp.json()["session_id"]
+    token = init_resp.json()["token"]
+    
+    with client.websocket_connect(f"/ws/customer/{session_id}?token={token}") as websocket:
+        # Test basic connection. It shouldn't be immediately closed.
+        # Send a message and wait for an ack or something, but we don't need to wait for full LLM.
+        # The main thing is that we successfully connect.
+        websocket.send_text("Hello")
+        # We might receive some message back from the LLM, or we can just exit the context cleanly.
+        pass
+
+def test_websocket_connection_missing_token_rejected():
+    from starlette.websockets import WebSocketDisconnect
+    init_resp = client.post("/api/chat/init")
+    session_id = init_resp.json()["session_id"]
+    
+    with pytest.raises(WebSocketDisconnect) as excinfo:
+        with client.websocket_connect(f"/ws/customer/{session_id}") as websocket:
+            websocket.send_text("Hello")
+    assert excinfo.value.code == 4401
+
+def test_websocket_connection_invalid_token_rejected():
+    from starlette.websockets import WebSocketDisconnect
+    init_resp = client.post("/api/chat/init")
+    session_id = init_resp.json()["session_id"]
+    
+    with pytest.raises(WebSocketDisconnect) as excinfo:
+        with client.websocket_connect(f"/ws/customer/{session_id}?token=invalid.token.here") as websocket:
+            websocket.send_text("Hello")
+    assert excinfo.value.code == 4401

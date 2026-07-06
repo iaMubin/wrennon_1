@@ -88,3 +88,17 @@ def decode_access_token(token: str) -> dict | None:
         return {"sub": payload.get("sub"), "pwd_frag": payload.get("pwd_frag")}
     except JWTError:
         return None
+
+
+def create_session_token(session_id: str) -> str:
+    expire = datetime.datetime.utcnow() + datetime.timedelta(hours=72)
+    payload = {"session_id": session_id, "exp": expire}
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
+def decode_session_token(token: str) -> str | None:
+    try:
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        return payload.get("session_id")
+    except JWTError:
+        return None

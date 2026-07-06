@@ -26,21 +26,36 @@ def _get_presidio():
     return None, None
 
 def mask_pii(text: str) -> str:
-    """Masks PII from user input using Microsoft Presidio (or regex fallback)."""
-    analyzer, anonymizer = _get_presidio()
+    """Masks PII from user input using robust regex rules."""
     
-    if analyzer and anonymizer:
-        try:
-            results = analyzer.analyze(text=text, entities=["EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "PERSON", "LOCATION"], language='en')
-            anonymized = anonymizer.anonymize(text=text, analyzer_results=results)
-            return anonymized.text
-        except Exception as e:
-            logger.warning(f"Presidio anonymization failed: {e}")
-            
-    # Fallback to Regex (Note: Only covers Email, Credit Card, and Phone due to Render memory limit preventing SpaCy/Presidio usage)
+    # 1. Emails
     text = re.sub(r'[\w\.-]+@[\w\.-]+\.\w+', '[EMAIL HIDDEN]', text)
+    
+    # 2. Credit Cards (13-16 digits, with optional dashes/spaces)
     text = re.sub(r'\b(?:\d[ -]*?){13,16}\b', '[CARD HIDDEN]', text)
+    
+    # 3. Phone Numbers (US/International standard formats)
     text = re.sub(r'\b(?:\+\d{1,3}[- ]?)?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}\b', '[PHONE HIDDEN]', text)
+    
+    # 4. Social Security Numbers (SSN)
+    text = re.sub(r'\b\d{3}[-]?\d{2}[-]?\d{4}\b', '[SSN HIDDEN]', text)
+    
+    # 5. IP Addresses (IPv4)
+    text = re.sub(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', '[IP HIDDEN]', text)
+    
+    # 6. Passwords (contextual)
+    text = re.sub(r'(?i)(password\s+is|pwd\s+is|password:|pwd:)\s+([^\s]+)', r'\1 [PASSWORD HIDDEN]', text)
+    
+    # 7. Street Addresses (e.g., 123 Main St, 456 Elm Avenue)
+    # Matches: 1-5 digits, 1-3 capitalized words, and a street suffix.
+    address_pattern = r'\b\d{1,5}\s+(?:[A-Z][a-z0-9]*\s+){1,3}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct|Way|Circle|Cir)\b(?:.*?,\s*[A-Z]{2}\s+\d{5})?'
+    text = re.sub(address_pattern, '[ADDRESS HIDDEN]', text, flags=re.IGNORECASE)
+    
+    # 8. Contextual Names
+    # Matches: "My name is John Doe", "I am John", "Shipping to John", "Deliver to John Smith"
+    name_trigger_pattern = r'(?i)\b(my\s+name\s+is|i\s+am|i\'m|this\s+is|shipping\s+to|deliver\s+to|account\s+under|name:)\s+(?:[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b'
+    text = re.sub(name_trigger_pattern, r'\1 [NAME HIDDEN]', text)
+    
     return text
 
 @retry(

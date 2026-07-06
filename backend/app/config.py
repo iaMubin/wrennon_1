@@ -52,12 +52,20 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
-        if self.app_env != "development":
+        if self.app_env not in ("development", "staging", "production"):
+            raise ValueError("app_env must be one of: development, staging, production")
+
+        if self.app_env == "production":
             if self.jwt_secret_key == "dev-only-change-this-in-production":
-                raise ValueError(
-                    "JWT_SECRET_KEY must be overridden in non-development environments! "
-                    "Current value is the insecure default."
-                )
+                raise ValueError("JWT_SECRET_KEY must be overridden in non-development environments! Current value is the insecure default.")
+            if self.database_url.startswith("sqlite:///"):
+                raise ValueError("DATABASE_URL cannot use sqlite in production.")
+            if self.redis_url.startswith("memory://"):
+                raise ValueError("REDIS_URL cannot use memory backend in production.")
+            if "*" in self.cors_allowed_origins:
+                raise ValueError("CORS_ALLOWED_ORIGINS cannot contain '*' wildcard in production.")
+            if not self.agent_password_hash:
+                raise ValueError("AGENT_PASSWORD_HASH must be set in production.")
         return self
 
 

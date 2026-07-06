@@ -5,6 +5,7 @@ const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "localhost:800
 const WS_URL  = `${_IS_LOCAL ? "ws"   : "wss"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/ws/customer`;
 
 const STORAGE_KEY = "wrennon_session_id";
+const TOKEN_KEY = "wrennon_session_token";
 const HISTORY_KEY = "wrennon_chat_history";
 const QUEUE_KEY = "wrennon_offline_queue";
 
@@ -18,6 +19,7 @@ const sendBtn = document.getElementById("send-btn");
 let socket = null;
 let hasLoadedHistory = false;
 let SESSION_ID = null;
+let SESSION_TOKEN = null;
 let reconnectInterval = null;
 
 // ── Session Management ─────────────────────────────────────────────
@@ -26,27 +28,38 @@ let reconnectInterval = null;
 
 async function resolveSessionId() {
   const stored = localStorage.getItem(STORAGE_KEY);
+  const storedToken = localStorage.getItem(TOKEN_KEY);
 
-  if (stored) {
-    // Check if the stored session is still usable
+  if (stored && storedToken) {
     try {
-      const response = await fetch(`${API_BASE}/chat/${stored}/status`);
-      const data = await response.json();
-
-      if (data.status === "active" || data.status === "resolved_recent") {
-        // Session still valid — reuse it
-        SESSION_ID = stored;
-        return;
+      const response = await fetch(`${API_BASE}/chat/${stored}/status`, {
+        headers: { "Authorization": `Bearer ${storedToken}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === "active" || data.status === "resolved_recent") {
+          SESSION_ID = stored;
+          SESSION_TOKEN = storedToken;
+          return;
+        }
       }
     } catch (err) {
       console.error("Failed to check session status:", err);
     }
   }
 
-  // No valid stored session — create a new one
-  if (!SESSION_ID) {
-    SESSION_ID = crypto.randomUUID();
-    localStorage.setItem(STORAGE_KEY, SESSION_ID);
+  // No valid stored session — create a new one via backend
+  try {
+    const response = await fetch(`${API_BASE}/chat/init`, { method: "POST" });
+    if (response.ok) {
+      const data = await response.json();
+      SESSION_ID = data.session_id;
+      SESSION_TOKEN = data.token;
+      localStorage.setItem(STORAGE_KEY, SESSION_ID);
+      localStorage.setItem(TOKEN_KEY, SESSION_TOKEN);
+    }
+  } catch (err) {
+    console.error("Failed to init session:", err);
   }
 }
 
@@ -165,7 +178,7 @@ let widgetReconnectTimeout = null;
 
 function connectSocket() {
   if (widgetReconnectTimeout) clearTimeout(widgetReconnectTimeout);
-  socket = new WebSocket(`${WS_URL}/${SESSION_ID}`);
+  socket = new WebSocket(`${WS_URL}/${SESSION_ID}?token=${SESSION_TOKEN}`);
 
   socket.onopen = () => {
     widgetReconnectAttempts = 0;
