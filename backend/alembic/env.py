@@ -18,7 +18,13 @@ config = context.config
 # Use the same DATABASE_URL the running app uses (from .env via
 # app.config.settings) instead of a separate, easy-to-forget value
 # hardcoded in alembic.ini.
-config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
+# But allow test fixtures to override it by checking if TEST_DATABASE_URL is set.
+import os
+test_db_url = os.environ.get("TEST_DATABASE_URL")
+if test_db_url:
+    config.set_main_option("sqlalchemy.url", test_db_url)
+else:
+    config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

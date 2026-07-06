@@ -10,6 +10,7 @@ def engine():
     # Use an in-memory SQLite database or file-based for testing schema
     db_path = "sqlite:///./test_schema.db"
     os.environ["DATABASE_URL"] = db_path
+    os.environ["TEST_DATABASE_URL"] = db_path
     
     if os.path.exists("./test_schema.db"):
         os.remove("./test_schema.db")

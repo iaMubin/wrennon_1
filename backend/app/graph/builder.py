@@ -1,5 +1,6 @@
 from __future__ import annotations
 from langgraph.graph import END, StateGraph
+from app.logger import logger
 
 from app.graph.nodes.handoff_node import handoff_node
 from app.graph.nodes.manager_node import manager_node
