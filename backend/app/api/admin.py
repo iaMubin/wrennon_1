@@ -48,15 +48,6 @@ def list_agents(
 ) -> list[dict]:
     # Get all agents
     agents = db.query(Agent).all()
-    
-    # Quick backfill for legacy resolved conversations that have no audit log
-    legacy_conversations = db.query(Conversation).filter(Conversation.resolved == True).all()
-    for c in legacy_conversations:
-        actor = c.handled_by if c.handled_by else "AI Agent"
-        existing = db.query(AuditLog).filter_by(action="resolve_conversation", target_username=c.session_id).first()
-        if not existing:
-            db.add(AuditLog(actor_username=actor, action="resolve_conversation", target_username=c.session_id))
-    db.commit()
 
     # Get resolution stats from AuditLogs
     results = db.query(

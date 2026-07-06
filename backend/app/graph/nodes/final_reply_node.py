@@ -3,7 +3,7 @@ from app.graph.state import ConversationState
 from app.services.llm import _safe_llm_call, mask_pii
 from app.logger import logger
 
-def final_reply_node(state: ConversationState) -> ConversationState:
+async def final_reply_node(state: ConversationState) -> ConversationState:
     logger.info("Final Reply Node: Generating contextual response...")
     
     system_instruction = (
@@ -50,7 +50,7 @@ def final_reply_node(state: ConversationState) -> ConversationState:
     final_prompt = f"System Context/Data:\n{context_text}\n\nUser Message: {last_user_msg}"
     llm_messages.append({"role": "user", "content": final_prompt})
     
-    reply = _safe_llm_call(llm_messages, temperature=0.3, max_tokens=400)
+    reply = await _safe_llm_call(llm_messages, temperature=0.3, max_tokens=400)
     if not reply:
         reply = "I'm sorry, I couldn't process that right now. Could you please try again?"
         

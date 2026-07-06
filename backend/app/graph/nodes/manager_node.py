@@ -3,7 +3,7 @@ from app.graph.state import ConversationState
 from app.services.llm import _safe_llm_call, mask_pii
 from app.logger import logger
 
-def manager_node(state: ConversationState) -> ConversationState:
+async def manager_node(state: ConversationState) -> ConversationState:
     logger.info("Manager Node: Planning execution...")
     
     system_prompt = (
@@ -40,7 +40,7 @@ def manager_node(state: ConversationState) -> ConversationState:
         llm_messages.append({"role": role, "content": content})
 
     try:
-        result_str = _safe_llm_call(llm_messages, temperature=0.0, max_tokens=300, is_json=True)
+        result_str = await _safe_llm_call(llm_messages, temperature=0.0, max_tokens=300, is_json=True)
         decision = json.loads(result_str)
         
         state["planned_tools"] = decision.get("tools_to_run", [])

@@ -164,7 +164,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                 # Update rolling summary if conversation gets long (e.g., every 6 messages)
                 if len(state["messages"]) > 0 and len(state["messages"]) % 6 == 0:
                     from app.services.llm import update_conversation_summary
-                    new_summary = await asyncio.to_thread(update_conversation_summary, state["messages"][-6:], conversation.summary)
+                    new_summary = await update_conversation_summary(state["messages"][-6:], conversation.summary)
                     conversation.summary = new_summary
                     db.commit()
                     state["conversation_summary"] = new_summary
@@ -180,7 +180,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                         logger.info(f"Semantic Cache HIT for '{customer_text}'")
                 
                 if not reply_text:
-                    updated_state = await asyncio.to_thread(_graph.invoke, state)
+                    updated_state = await _graph.ainvoke(state)
                     reply_text = updated_state["messages"][-1].content
                     
                     # Store RAG/Generic questions in cache if no tools were used except knowledge base

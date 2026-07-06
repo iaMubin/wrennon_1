@@ -2,7 +2,7 @@ from app.graph.state import ConversationState
 from app.services.tools import TOOL_EXECUTORS
 from app.logger import logger
 
-def tool_executor_node(state: ConversationState) -> ConversationState:
+async def tool_executor_node(state: ConversationState) -> ConversationState:
     logger.info("Worker Node: Executing planned tools...")
     planned_tools = state.get("planned_tools", [])
     gathered_context = []
@@ -14,7 +14,7 @@ def tool_executor_node(state: ConversationState) -> ConversationState:
         if tool_name in TOOL_EXECUTORS:
             logger.info(f"Executing tool: {tool_name} with args {tool_args}")
             try:
-                result = TOOL_EXECUTORS[tool_name](tool_args)
+                result = await TOOL_EXECUTORS[tool_name](tool_args)
                 gathered_context.append(f"Result from {tool_name}:\n{result}")
             except Exception as e:
                 logger.error(f"Error executing {tool_name}: {e}")

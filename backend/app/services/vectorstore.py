@@ -42,10 +42,12 @@ _cohere_client = None
 def _get_cohere():
     global _cohere_client
     if _cohere_client is None:
-        _cohere_client = cohere.Client(settings.cohere_api_key)
+        _cohere_client = cohere.AsyncClient(settings.cohere_api_key)
     return _cohere_client
 
-def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
+import asyncio
+
+async def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
     """Retrieve candidate chunks from Pinecone, then rerank with Cohere.
 
     Returns:
@@ -55,15 +57,19 @@ def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
     """
     # Use search_query input_type for queries (Cohere v3 models
     # produce better results when document vs query is distinguished)
-    query_embedding = _query_embedder.embed_query(query)
+    query_embedding = await asyncio.to_thread(_query_embedder.embed_query, query)
 
     # Pinecone fetch
     index = _get_index()
-    results = index.query(
-        vector=query_embedding,
-        top_k=max(top_k * 3, 5),
-        include_metadata=True
-    )
+    
+    def _pinecone_query():
+        return index.query(
+            vector=query_embedding,
+            top_k=max(top_k * 3, 5),
+            include_metadata=True
+        )
+        
+    results = await asyncio.to_thread(_pinecone_query)
 
     if not results.matches:
         return []
@@ -73,7 +79,7 @@ def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
         return []
 
     cohere_client = _get_cohere()
-    reranked = cohere_client.rerank(
+    reranked = await cohere_client.rerank(
         query=query,
         documents=candidates,
         top_n=top_k,

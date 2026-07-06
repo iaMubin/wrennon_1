@@ -8,15 +8,15 @@ from __future__ import annotations
 import time
 
 import re
-from groq import Groq
+from groq import AsyncGroq
 import openai
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, AsyncRetrying
 
 from app.config import settings
 from app.logger import logger
 
-_client = Groq(api_key=settings.groq_api_key)
-_openai_client = openai.OpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
+_client = AsyncGroq(api_key=settings.groq_api_key)
+_openai_client = openai.AsyncOpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
 
 _analyzer = None
 _anonymizer = None
@@ -47,9 +47,9 @@ def mask_pii(text: str) -> str:
     wait=wait_exponential(multiplier=1, min=2, max=10),
     reraise=True
 )
-def _safe_groq_call(messages: list, temperature: float = 0.2, max_tokens: int = 400) -> str:
+async def _safe_groq_call(messages: list, temperature: float = 0.2, max_tokens: int = 400) -> str:
     """Wrapper around Groq API calls with retry logic."""
-    response = _client.chat.completions.create(
+    response = await _client.chat.completions.create(
         model=MODEL,
         messages=messages,
         temperature=temperature,
@@ -65,9 +65,9 @@ def _safe_groq_call(messages: list, temperature: float = 0.2, max_tokens: int = 
     wait=wait_exponential(multiplier=1, min=2, max=10),
     reraise=True
 )
-def _safe_groq_json_call(messages: list, temperature: float = 0.2, max_tokens: int = 1000) -> str:
+async def _safe_groq_json_call(messages: list, temperature: float = 0.2, max_tokens: int = 1000) -> str:
     """Wrapper around Groq API calls specifically for JSON output."""
-    response = _client.chat.completions.create(
+    response = await _client.chat.completions.create(
         model=MODEL,
         messages=messages,
         temperature=temperature,
@@ -79,7 +79,7 @@ def _safe_groq_json_call(messages: list, temperature: float = 0.2, max_tokens: i
         return result.strip()
     raise ValueError("Groq returned empty JSON response")
 
-def _safe_openai_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, is_json: bool = False) -> str:
+async def _safe_openai_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, is_json: bool = False) -> str:
     """Fallback to OpenAI if Groq fails."""
     if not _openai_client:
         return ""
@@ -94,7 +94,7 @@ def _safe_openai_call(messages: list, temperature: float = 0.2, max_tokens: int 
         if is_json:
             kwargs["response_format"] = {"type": "json_object"}
             
-        response = _openai_client.chat.completions.create(**kwargs)
+        response = await _openai_client.chat.completions.create(**kwargs)
         result = response.choices[0].message.content
         if result and result.strip():
             return result.strip()
@@ -102,16 +102,16 @@ def _safe_openai_call(messages: list, temperature: float = 0.2, max_tokens: int 
         logger.warning(f"OpenAI fallback failed: {e}")
     return ""
 
-def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, is_json: bool = False) -> str:
+async def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, is_json: bool = False) -> str:
     """Calls Groq with retries, and falls back to OpenAI if it completely fails."""
     try:
         if is_json:
-            return _safe_groq_json_call(messages, temperature, max_tokens)
-        return _safe_groq_call(messages, temperature, max_tokens)
+            return await _safe_groq_json_call(messages, temperature, max_tokens)
+        return await _safe_groq_call(messages, temperature, max_tokens)
     except Exception as e:
         logger.error(f"Groq API completely failed after retries: {e}")
         if _openai_client:
-            return _safe_openai_call(messages, temperature, max_tokens, is_json)
+            return await _safe_openai_call(messages, temperature, max_tokens, is_json)
         return ""
 
 MODEL = "llama3-70b-8192"
@@ -135,9 +135,9 @@ SYSTEM_PROMPT = (
 )
 
 
-def generate_answer(question: str, context: str) -> str:
+async def generate_answer(question: str, context: str) -> str:
     logger.info(f"Generating RAG answer for question: {question}")
-    result = _safe_llm_call(
+    result = await _safe_llm_call(
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"},
@@ -147,7 +147,7 @@ def generate_answer(question: str, context: str) -> str:
     )
     return result or "I'm sorry, I couldn't process that. Could you try rephrasing?"
 
-def monitor_response(customer_query: str, ai_response: str) -> bool:
+async def monitor_response(customer_query: str, ai_response: str) -> bool:
     """
     Evaluates the AI response before sending it to the user.
     Returns True if the response is safe/good, False if it requires escalation.
@@ -169,11 +169,11 @@ def monitor_response(customer_query: str, ai_response: str) -> bool:
         {"role": "user", "content": f"Customer: {customer_query}\n\nAI: {ai_response}"}
     ]
     
-    result = _safe_llm_call(messages, temperature=0.0, max_tokens=10).strip().upper()
-    return "SAFE" in result
+    result = await _safe_llm_call(messages, temperature=0.0, max_tokens=10)
+    return "SAFE" in (result or "").strip().upper()
 
 
-def generate_conversation_summary(messages: list) -> str:
+async def generate_conversation_summary(messages: list) -> str:
     """Generate a short summary of the conversation for the human agent."""
     logger.info("Generating conversation summary for handoff")
     
@@ -191,11 +191,11 @@ def generate_conversation_summary(messages: list) -> str:
         llm_messages.append({"role": role, "content": msg.content})
     llm_messages.append({"role": "user", "content": "Now summarize this conversation for the human agent."})
     
-    result = _safe_llm_call(messages=llm_messages, temperature=0.2, max_tokens=200)
+    result = await _safe_llm_call(messages=llm_messages, temperature=0.2, max_tokens=200)
     return result or "Customer requested to speak with a human agent."
 
 
-def classify_intent(messages: list, summary: str | None = None) -> str:
+async def classify_intent(messages: list, summary: str | None = None) -> str:
     """Classifies the intent of the latest user message using conversation history
     for context. Returns one of: 'greeting', 'order', 'handoff', or 'rag'."""
     prompt = (
@@ -222,7 +222,7 @@ def classify_intent(messages: list, summary: str | None = None) -> str:
         content = mask_pii(msg.content) if role == "user" else msg.content
         llm_messages.append({"role": role, "content": content})
     
-    result = _safe_llm_call(messages=llm_messages, temperature=0.0, max_tokens=100)
+    result = await _safe_llm_call(messages=llm_messages, temperature=0.0, max_tokens=100)
     intent = result.lower() if result else "rag"
     logger.info(f"Classified intent as: {intent}")
     if intent not in ["greeting", "order", "handoff", "resolved", "rag"]:
@@ -230,7 +230,7 @@ def classify_intent(messages: list, summary: str | None = None) -> str:
     return intent
 
 
-def generate_final_reply(state: dict) -> str:
+async def generate_final_reply(state: dict) -> str:
     """Generates the final reply to the user based on the context accumulated in the state."""
     
     intent = state.get("current_intent")
@@ -311,11 +311,11 @@ def generate_final_reply(state: dict) -> str:
     llm_messages.append({"role": "user", "content": prompt})
     
     logger.info(f"Generating final reply")
-    result = _safe_llm_call(messages=llm_messages, temperature=0.3, max_tokens=400)
+    result = await _safe_llm_call(messages=llm_messages, temperature=0.3, max_tokens=400)
     return result or "I apologize, I'm having trouble processing your request. Please try again."
 
 
-def update_conversation_summary(messages: list, current_summary: str | None) -> str:
+async def update_conversation_summary(messages: list, current_summary: str | None) -> str:
     """Condenses the older conversation into a structured summary to prevent token overflow."""
     prompt = (
         "Summarize the provided customer service conversation into a structured Context Card. "
@@ -335,5 +335,5 @@ def update_conversation_summary(messages: list, current_summary: str | None) -> 
         role = "user" if msg.type == "human" else "assistant"
         llm_messages.append({"role": role, "content": msg.content})
         
-    result = _safe_llm_call(messages=llm_messages, temperature=0.2, max_tokens=250)
+    result = await _safe_llm_call(messages=llm_messages, temperature=0.2, max_tokens=250)
     return result or current_summary or ""

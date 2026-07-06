@@ -14,9 +14,9 @@ from app.services.llm import generate_conversation_summary
 from app.services.mock_apis import create_support_ticket, reopen_support_ticket
 
 
-def handoff_node(state: ConversationState) -> ConversationState:
+async def handoff_node(state: ConversationState) -> ConversationState:
     # Generate an LLM-based summary for the human agent
-    conversation_summary = generate_conversation_summary(state["messages"])
+    conversation_summary = await generate_conversation_summary(state["messages"])
 
     existing_ticket_id = state.get("existing_ticket_id")
 

@@ -11,7 +11,7 @@ import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_
 
 from app.auth.dependencies import get_current_agent
@@ -110,6 +110,7 @@ def needs_attention(
     conversations = (
         db.query(Conversation)
         .filter_by(handoff_active=True, resolved=False)
+        .options(selectinload(Conversation.messages))
         .order_by(Conversation.updated_at.desc())
         .all()
     )
@@ -124,6 +125,7 @@ def active_chats(
     conversations = (
         db.query(Conversation)
         .filter_by(resolved=False)
+        .options(selectinload(Conversation.messages))
         .order_by(Conversation.updated_at.desc())
         .all()
     )
@@ -137,6 +139,7 @@ def all_conversations(
 ) -> list[dict]:
     conversations = (
         db.query(Conversation)
+        .options(selectinload(Conversation.messages))
         .order_by(Conversation.updated_at.desc())
         .limit(50)
         .all()
