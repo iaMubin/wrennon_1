@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Conversation
 from app.db.session import get_db
-from app.main import limiter
+from app.limiter import limiter
 
 router = APIRouter()
 

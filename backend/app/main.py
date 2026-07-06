@@ -16,16 +16,14 @@ from app.logger import logger
 from app.realtime.websocket_routes import router as realtime_router
 from app.realtime.connection_manager import broadcast
 
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 
-# Initialize rate limiter based on remote IP
-limiter = Limiter(key_func=get_remote_address)
+from app.limiter import limiter
 
 # Initialize Sentry
 if os.environ.get("SENTRY_DSN"):
