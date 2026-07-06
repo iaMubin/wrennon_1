@@ -12,6 +12,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the backend code
 COPY . .
 
+# NOTE: If Render's build context is set to the root directory, 
+# this will copy the whole repo. If it's set to 'backend', we can't access 'frontend'.
+
 # Install curl for HEALTHCHECK
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 

@@ -112,10 +112,12 @@ app.include_router(realtime_router)  # no /api prefix — /ws/... paths
 def health() -> dict:
     return {"status": "ok"}
 
-# Mount the frontend agent directory to /agent to serve the dashboard and avoid CORS issues
-# The frontend directory is one level up from backend
-frontend_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "frontend", "agent")
+# Mount the frontend directory to serve the dashboard and the widget
+# The frontend agent files have been copied to backend/app/static/agent 
+# so they are guaranteed to be in the Docker image.
+frontend_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "agent")
+
 if os.path.exists(frontend_path):
     app.mount("/agent", StaticFiles(directory=frontend_path, html=True), name="agent")
 else:
-    logger.warning(f"Frontend directory not found at {frontend_path}")
+    logger.warning(f"Frontend agent directory not found at {frontend_path}")

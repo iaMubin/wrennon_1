@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wrennon Agent Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/agent/agent.css">
+<script>
+  if (localStorage.getItem("agent_username")) {
+    document.write('<style id="anti-flash-style">#login-screen { display: none !important; }</style>');
+  }
+</script>
+</head>
+<body>
+
+
+  <!-- Login screen -->
+  <div id="login-screen">
+    <form id="login-form">
+      <h1>Agent Console</h1>
+      <div class="input-group">
+        <label for="username">Username or Employee ID</label>
+        <div class="input-wrapper">
+          <input type="text" id="username" name="username" required autocomplete="username">
+        </div>
+      </div>
+      <div class="input-group">
+        <label for="password">Passcode</label>
+        <div class="input-wrapper">
+          <input type="password" id="password" name="password" required autocomplete="current-password">
+          <button type="button" class="pwd-toggle" id="toggle-pwd" aria-label="Toggle password visibility">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+              <path class="eye" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle class="eye" cx="12" cy="12" r="3"></circle>
+              <line class="eye-slash hidden" x1="1" y1="1" x2="23" y2="23"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <button type="submit">Log in</button>
+      <p id="login-error" class="error hidden">Incorrect username or password.</p>
+    </form>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="hidden">
+    <aside id="sidebar">
+      <div id="sidebar-header">
+        <div>
+          <span id="brand">Wrennon</span>
+          <span id="connection-dot" class="dot dot--offline" title="Connection status"></span>
+        </div>
+        <button id="admin-dashboard-btn" class="hidden" style="font-size: 12px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; background: white; cursor: pointer; color: #334155;">Admin</button>
+      </div>
+
+      <nav id="section-tabs">
+        <button class="tab tab--active" data-section="attention">
+          Needs attention <span id="attention-count" class="count">0</span>
+        </button>
+        <button class="tab" data-section="active">
+          Active Chats <span id="active-count" class="count">0</span>
+        </button>
+        <button class="tab" data-section="all">All history</button>
+      </nav>
+
+      <div id="conversation-list"></div>
+    </aside>
+
+    <main id="conversation-view">
+      <div id="empty-state">
+        <p>Select a conversation to view it here.</p>
+      </div>
+
+      <div id="active-conversation" class="hidden">
+        <header id="conversation-header">
+          <div class="conv-header-info">
+            <h2 id="conversation-email">Unknown Customer</h2>
+            <span id="conversation-session" class="short-id">CUST-XXXX</span>
+          </div>
+          <button id="resolve-btn">Mark resolved</button>
+        </header>
+
+        <div id="agent-messages"></div>
+
+        <div id="agent-input-row">
+          <input id="agent-message-input" type="text" placeholder="Type a reply" autocomplete="off">
+          <button id="agent-send-btn">Send</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/agent/agent.js?v=5"></script>
+</body>
+</html>
+
