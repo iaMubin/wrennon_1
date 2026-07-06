@@ -90,7 +90,9 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
             try:
                 r = get_redis()
                 rate_key = f"rate_limit:{session_id}"
+                _t0 = time.time()
                 count = await r.incr(rate_key)
+                logger.info(f"[TIMING] redis_incr took {time.time() - _t0:.3f}s")
                 if count == 1:
                     await r.expire(rate_key, 60)
                 if count > 15:
@@ -110,6 +112,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                 _save_message(db, conversation.id, sender="human", content=customer_text)
 
                 # Broadcast ALL customer messages to the agent dashboard for real-time sync.
+                _t0 = time.time()
                 await manager.broadcast_to_agents({
                     "type": "new_message",
                     "session_id": session_id,
@@ -117,6 +120,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     "content": customer_text,
                     "is_resolved": conversation.resolved,
                 })
+                logger.info(f"[TIMING] broadcast_to_agents (human msg) took {time.time() - _t0:.3f}s")
 
                 # If the customer sends a message after resolution, it automatically reopens
                 if conversation.resolved:
@@ -125,12 +129,14 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     conversation.reopen_count += 1
                     db.commit()
                     # Notify agents
+                    _t0 = time.time()
                     await manager.broadcast_to_agents({
                         "type": "reopen",
                         "session_id": session_id,
                         "reopen_count": conversation.reopen_count,
                         "is_resolved": conversation.resolved,
                     })
+                    logger.info(f"[TIMING] broadcast_to_agents (reopen) took {time.time() - _t0:.3f}s")
 
                 if conversation.handoff_active and not conversation.resolved:
                     # A human agent already owns this conversation — the AI stays silent.
@@ -221,6 +227,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                 _save_message(db, conversation.id, sender="ai", content=reply_text)
 
                 # Broadcast AI messages to agent dashboard as well
+                _t0 = time.time()
                 await manager.broadcast_to_agents({
                     "type": "new_message",
                     "session_id": session_id,
@@ -228,6 +235,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     "content": reply_text,
                     "is_resolved": conversation.resolved,
                 })
+                logger.info(f"[TIMING] broadcast_to_agents (ai msg) took {time.time() - _t0:.3f}s")
 
                 if updated_state and updated_state.get("handoff_ticket_id"):
                     conversation.handoff_active = True
@@ -246,6 +254,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     if summary:
                         _save_message(db, conversation.id, sender="system", content=f"📋 Summary: {summary}")
 
+                    _t0 = time.time()
                     await manager.broadcast_to_agents({
                         "type": "handoff",
                         "session_id": session_id,
@@ -253,6 +262,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                         "summary": summary,
                         "is_resolved": conversation.resolved,
                     })
+                    logger.info(f"[TIMING] broadcast_to_agents (handoff) took {time.time() - _t0:.3f}s")
                 elif updated_state.get("conversation_mode") == "resolved":
                     conversation.resolved = True
                     conversation.resolved_at = datetime.datetime.utcnow()
@@ -267,11 +277,13 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                     db.add(audit)
                     db.commit()
                     
+                    _t0 = time.time()
                     await manager.broadcast_to_agents({
                         "type": "reopen",  # Re-use reopen event to force UI refresh
                         "session_id": session_id,
                         "is_resolved": conversation.resolved,
                     })
+                    logger.info(f"[TIMING] broadcast_to_agents (resolve reopen) took {time.time() - _t0:.3f}s")
 
                 phase3_duration = time.time() - phase3_start
                 logger.info(f"[TIMING] Phase 3 (DB Post-processing) took {phase3_duration:.3f}s")
