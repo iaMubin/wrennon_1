@@ -306,14 +306,15 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
 
 
 @router.websocket("/ws/agent")
-async def agent_websocket(websocket: WebSocket, access_token: str | None = Cookie(None)):
-    if not access_token:
-        logger.warning("Agent connection rejected: missing cookie")
+async def agent_websocket(websocket: WebSocket, access_token: str | None = Cookie(None), token: str | None = None):
+    raw_token = token or access_token
+    if not raw_token:
+        logger.warning("Agent connection rejected: missing token")
         await websocket.close(code=4401)
         return
         
-    token = access_token.replace("Bearer ", "")
-    token_data = decode_access_token(token)
+    raw_token = raw_token.replace("Bearer ", "")
+    token_data = decode_access_token(raw_token)
     if token_data is None or not token_data.get("sub"):
         logger.warning("Agent connection rejected: unauthorized")
         await websocket.close(code=4401)

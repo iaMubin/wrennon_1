@@ -82,7 +82,8 @@ loginForm.addEventListener("submit", async (e) => {
     }
 
     const data = await response.json();
-    // Token is automatically set as httpOnly cookie by the backend
+    // Token is stored in localStorage to avoid cross-origin cookie blocking
+    localStorage.setItem("agent_token", data.access_token);
     localStorage.setItem("agent_username", username); // Save username to identify self
     localStorage.setItem("agent_role", data.role); // Save role to show admin btn
     
@@ -110,7 +111,8 @@ let reconnectTimeout = null;
 
 function connectSocket() {
   if (reconnectTimeout) clearTimeout(reconnectTimeout);
-  socket = new WebSocket(WS_URL);
+  const token = localStorage.getItem("agent_token");
+  socket = new WebSocket(`${WS_URL}?token=${token}`);
 
   socket.onopen = () => {
     reconnectAttempts = 0;
@@ -352,9 +354,12 @@ resolveBtn.addEventListener("click", async () => {
 // --- Helpers ---
 async function authedFetch(path, method = "GET") {
   try {
+    const token = localStorage.getItem("agent_token");
     const response = await fetch(`${API_BASE}${path}`, {
       method,
-      credentials: "include"
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
     });
     if (!response.ok) return null;
     return await response.json();
