@@ -145,6 +145,38 @@ body {
 .msg--bot li { margin-bottom: 3px; }
 .msg--bot strong { font-weight: 600; }
 
+.msg-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 6px;
+}
+.msg-ticks {
+  color: #60A5FA;
+  font-weight: bold;
+  letter-spacing: -2px;
+  margin-left: 2px;
+}
+.msg--user .msg-ticks {
+  color: #fff;
+  opacity: 0.9;
+}
+.date-separator {
+  align-self: center;
+  background: rgba(255,255,255,0.05);
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 12px;
+  margin: 16px 0 8px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 #input-row {
   display: flex;
   gap: 10px;

@@ -132,8 +132,29 @@ async function loadHistory() {
     return;
   }
   
+  let lastDateStr = null;
   for (const msg of history) {
-    appendMessage(msg.role, msg.text, false); // false = don't re-save
+    const dateObj = new Date(msg.timestamp);
+    const dateStr = dateObj.toLocaleDateString();
+    
+    if (dateStr !== lastDateStr && msg.role !== "system") {
+      const dateDiv = document.createElement("div");
+      dateDiv.className = "date-separator";
+      
+      const todayStr = new Date().toLocaleDateString();
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      const yesterdayStr = yesterdayDate.toLocaleDateString();
+      
+      if (dateStr === todayStr) dateDiv.textContent = "Today";
+      else if (dateStr === yesterdayStr) dateDiv.textContent = "Yesterday";
+      else dateDiv.textContent = dateObj.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+      
+      messagesEl.appendChild(dateDiv);
+      lastDateStr = dateStr;
+    }
+    
+    appendMessage(msg.role, msg.text, false, msg.timestamp); // false = don't re-save
   }
 }
 
@@ -240,16 +261,30 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-function appendMessage(role, text, save = true) {
+function formatTime(timestamp) {
+  const d = new Date(timestamp);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function appendMessage(role, text, save = true, timestamp = Date.now()) {
   // Standardize role names for UI styling
   const uiRole = role === "human" ? "user" : (role === "ai" ? "bot" : role);
   
   const div = document.createElement("div");
   div.className = `msg msg--${uiRole}`;
+  
+  let timeHtml = "";
+  if (uiRole !== "system") {
+      const timeStr = formatTime(timestamp);
+      // Double ticks for outbound messages from the customer
+      const ticks = (uiRole === "user") ? `<span class="msg-ticks">✓✓</span>` : "";
+      timeHtml = `<div class="msg-meta"><span>${timeStr}</span>${ticks}</div>`;
+  }
+  
   if (uiRole === "bot") {
-    div.innerHTML = renderMarkdown(text);
+    div.innerHTML = renderMarkdown(text) + timeHtml;
   } else {
-    div.textContent = text;
+    div.innerHTML = escapeHtml(text) + timeHtml;
   }
   messagesEl.appendChild(div);
   messagesEl.scrollTop = messagesEl.scrollHeight;
