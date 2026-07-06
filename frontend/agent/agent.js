@@ -347,33 +347,32 @@ function logout() {
 }
 
 // --- Auto Login ---
-document.addEventListener("DOMContentLoaded", () => {
-  const savedToken = localStorage.getItem("agent_token");
+document.addEventListener("DOMContentLoaded", async () => {
+  const savedUsername = localStorage.getItem("agent_username");
   const savedRole = localStorage.getItem("agent_role");
   
-  if (savedToken) {
-    // Migration: if token exists but role is missing, force a re-login to save role
-    if (!savedRole) {
-      logout();
-      return;
-    }
-
-    accessToken = savedToken;
-    loginScreen.classList.add("hidden");
-    dashboard.classList.remove("hidden");
+  if (savedUsername) {
+    // We make a test request to see if we're authenticated, since the token is an HTTP-only cookie.
+    const checkAuth = await authedFetch("/agent/conversations/needs-attention");
     
-    if (savedRole === "manager") {
-      const adminBtn = document.getElementById("admin-dashboard-btn");
-      if (adminBtn) {
-        adminBtn.classList.remove("hidden");
-        // Ensure we only add the listener once (it's safe here since we just loaded)
-        adminBtn.addEventListener("click", () => {
-          window.location.href = "/agent/admin_dashboard.html";
-        });
+    if (checkAuth) {
+      loginScreen.classList.add("hidden");
+      dashboard.classList.remove("hidden");
+      
+      if (savedRole === "manager") {
+        const adminBtn = document.getElementById("admin-dashboard-btn");
+        if (adminBtn) {
+          adminBtn.classList.remove("hidden");
+          adminBtn.addEventListener("click", () => {
+            window.location.href = "/agent/admin_dashboard.html";
+          });
+        }
       }
+      
+      connectSocket();
+      loadConversations();
+    } else {
+      logout();
     }
-    
-    connectSocket();
-    loadConversations();
   }
 });

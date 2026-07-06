@@ -38,6 +38,7 @@ def get_order_status(order_id: str, customer_email: str) -> Optional[dict]:
     mock_orders = {
         "1001": {
             "order_id": "1001",
+            "email": "customer1@example.com",
             "status": "shipped",
             "carrier": "Pathao Courier",
             "eta": "2026-06-27",
@@ -45,6 +46,7 @@ def get_order_status(order_id: str, customer_email: str) -> Optional[dict]:
         },
         "1002": {
             "order_id": "1002",
+            "email": "test@example.com",
             "status": "processing",
             "carrier": None,
             "eta": "2026-06-30",
@@ -52,6 +54,7 @@ def get_order_status(order_id: str, customer_email: str) -> Optional[dict]:
         },
         "1003": {
             "order_id": "1003",
+            "email": "customer3@example.com",
             "status": "delivered",
             "carrier": "Sundarban Courier",
             "eta": "2026-06-20",
@@ -59,6 +62,7 @@ def get_order_status(order_id: str, customer_email: str) -> Optional[dict]:
         },
         "1004": {
             "order_id": "1004",
+            "email": "test@example.com",
             "status": "cancelled",
             "carrier": None,
             "eta": None,
@@ -66,6 +70,7 @@ def get_order_status(order_id: str, customer_email: str) -> Optional[dict]:
         },
         "1005": {
             "order_id": "1005",
+            "email": "test@example.com",
             "status": "processing",
             "carrier": None,
             "eta": "2026-07-15",
@@ -73,6 +78,7 @@ def get_order_status(order_id: str, customer_email: str) -> Optional[dict]:
         },
         "1006": {
             "order_id": "1006",
+            "email": "customer6@example.com",
             "status": "shipped",
             "carrier": "DHL",
             "eta": "2026-07-08",
@@ -80,13 +86,21 @@ def get_order_status(order_id: str, customer_email: str) -> Optional[dict]:
         },
         "1007": {
             "order_id": "1007",
+            "email": "customer7@example.com",
             "status": "delivered",
             "carrier": "FedEx",
             "eta": "2026-06-05",
             "tracking_url": "https://fedex.com/track/1007",
         },
     }
-    return mock_orders.get(order_id)
+    
+    order = mock_orders.get(order_id)
+    if order and order.get("email") == customer_email:
+        # Don't return the email to the LLM to avoid confusion, just standard output
+        result = order.copy()
+        del result["email"]
+        return result
+    return None
 
 
 def create_support_ticket(

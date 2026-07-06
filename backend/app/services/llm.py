@@ -122,7 +122,7 @@ def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: int = 4
             return _safe_openai_call(messages, temperature, max_tokens, is_json)
         return ""
 
-MODEL = "openai/gpt-oss-120b"
+MODEL = "llama3-70b-8192"
 # Groq deprecated meta-llama/llama-4-scout-17b-16e-instruct on June 17,
 # 2026 (free/developer tier) and recommends this model as the direct
 # replacement. If Groq changes their lineup again, check
