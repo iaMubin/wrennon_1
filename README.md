@@ -58,3 +58,5 @@ and only care about the shape of what comes back.
   LLM classifier — predictable for scripted demo runs.
 - No observability/tracing layer yet — add before this handles real
   customer traffic.
+- **LLM Usage**: The current LangGraph architecture makes 2 LLM calls per turn (one in `manager_node` to plan, one in `final_reply_node` to generate text). This is by design to separate planning from execution, but requires optimizing prompt sizes for cost.
+- **Concurrency**: The deployment dynamically sets `WEB_CONCURRENCY` based on available CPU cores. For production on Render, memory is often the bottleneck before CPU (especially with Pinecone + FastAPI overhead). Monitor RAM usage before scaling horizontal instances.

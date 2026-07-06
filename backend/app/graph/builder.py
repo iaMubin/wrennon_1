@@ -18,6 +18,11 @@ def build_graph():
     graph.set_entry_point("manager")
 
     def route_after_manager(state: ConversationState) -> str:
+        if state.get("turn_count", 0) >= 5 and state["conversation_mode"] != "pending_human":
+            logger.info("Forcing handoff due to turn_count limit.")
+            state["handoff_requested"] = True
+            return "handoff"
+            
         if state.get("handoff_requested") and state["conversation_mode"] != "pending_human":
             # Just route to handoff. The handoff node will create the ticket and change the mode,
             # then it will go to final_reply_node to generate the natural response.

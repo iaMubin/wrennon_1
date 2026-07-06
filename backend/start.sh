@@ -5,5 +5,8 @@ python scripts/ingest.py || echo "WARNING: Ingestion failed or skipped (this is 
 echo "==> Running database migrations..."
 alembic upgrade head
 
-echo "==> Starting Wrennon backend on port ${PORT:-8000}..."
-exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Set default concurrency if not provided
+export WEB_CONCURRENCY=${WEB_CONCURRENCY:-2}
+
+echo "==> Starting Wrennon backend on port ${PORT:-8000} with ${WEB_CONCURRENCY} workers..."
+exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY}

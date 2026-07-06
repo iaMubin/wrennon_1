@@ -37,9 +37,10 @@ def mask_pii(text: str) -> str:
         except Exception as e:
             logger.warning(f"Presidio anonymization failed: {e}")
             
-    # Fallback to Regex
+    # Fallback to Regex (Note: Only covers Email, Credit Card, and Phone due to Render memory limit preventing SpaCy/Presidio usage)
     text = re.sub(r'[\w\.-]+@[\w\.-]+\.\w+', '[EMAIL HIDDEN]', text)
     text = re.sub(r'\b(?:\d[ -]*?){13,16}\b', '[CARD HIDDEN]', text)
+    text = re.sub(r'\b(?:\+\d{1,3}[- ]?)?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}\b', '[PHONE HIDDEN]', text)
     return text
 
 @retry(

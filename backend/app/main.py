@@ -21,8 +21,21 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+
 # Initialize rate limiter based on remote IP
 limiter = Limiter(key_func=get_remote_address)
+
+# Initialize Sentry
+if os.environ.get("SENTRY_DSN"):
+    sentry_sdk.init(
+        dsn=os.environ.get("SENTRY_DSN"),
+        enable_tracing=True,
+        traces_sample_rate=1.0,
+        profiles_sample_rate=1.0,
+        integrations=[FastApiIntegration()],
+    )
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
