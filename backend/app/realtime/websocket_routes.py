@@ -82,6 +82,7 @@ def _sync_phase1(session_id: str, customer_text: str) -> dict | None:
             conversation.resolved = False
             conversation.resolved_at = None
             conversation.reopen_count += 1
+            conversation.turn_count = 0
             reopened = True
             
         db.commit()
