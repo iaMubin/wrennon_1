@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     pinecone_host: str
 
     app_env: str = "development"
-    cors_allowed_origins: str = "http://localhost:5500"
+    cors_allowed_origins: str = "*"
 
     database_url: str = "sqlite:///./data/wrennon.db"
     redis_url: str = "redis://localhost:6379"
