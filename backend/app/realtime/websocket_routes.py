@@ -288,7 +288,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str):
                 phase3_duration = time.time() - phase3_start
                 logger.info(f"[TIMING] Phase 3 (DB Post-processing) took {phase3_duration:.3f}s")
 
-                await websocket.send_json({"reply": reply_text})
+                await websocket.send_json({"reply": reply_text, "sender": "bot"})
                 
                 total_time = time.time() - msg_start_time
                 logger.info(f"[TIMING] Total Message Turnaround Time: {total_time:.3f}s")
@@ -368,7 +368,20 @@ async def agent_websocket(websocket: WebSocket, access_token: str | None = Cooki
                     })
 
                 # Customer receives same shape as AI reply — seamless handoff.
-                await manager.send_to_customer(session_id, {"reply": reply_text})
+                await manager.send_to_customer(session_id, {
+                    "reply": reply_text, 
+                    "sender": "agent", 
+                    "name": agent.full_name
+                })
+                
+                # Also broadcast to all agents so they stay in sync
+                await manager.broadcast_to_agents({
+                    "type": "new_message",
+                    "session_id": session_id,
+                    "sender": "agent",
+                    "content": reply_text,
+                    "is_resolved": conversation.resolved,
+                })
 
     except WebSocketDisconnect:
         manager.disconnect_agent(websocket)

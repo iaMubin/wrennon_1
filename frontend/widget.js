@@ -189,7 +189,9 @@ function connectSocket() {
     try {
       hideTypingIndicator();
       const data = JSON.parse(event.data);
-      appendMessage("bot", data.reply);
+      const sender = data.sender || "bot";
+      const name = data.name || "AI Assistant";
+      appendMessage(sender, data.reply, true, Date.now(), name);
     } catch (err) {
       console.error("Failed to parse WebSocket message:", err);
     }
@@ -266,12 +268,27 @@ function formatTime(timestamp) {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function appendMessage(role, text, save = true, timestamp = Date.now()) {
+function appendMessage(role, text, save = true, timestamp = Date.now(), name = null) {
   // Standardize role names for UI styling
   const uiRole = role === "human" ? "user" : (role === "ai" ? "bot" : role);
   
+  const wrapper = document.createElement("div");
+  wrapper.className = `msg-wrapper msg-wrapper--${uiRole}`;
+  
+  // Add Avatar for incoming messages
+  if (uiRole === "bot" || uiRole === "agent") {
+    const avatarImg = uiRole === "bot" ? "🤖" : "👨‍💻";
+    wrapper.innerHTML += `<div class="msg-avatar ${uiRole === 'agent' ? 'msg-avatar--agent' : ''}">${avatarImg}</div>`;
+  }
+  
   const div = document.createElement("div");
   div.className = `msg msg--${uiRole}`;
+  
+  let nameHtml = "";
+  if (uiRole === "bot" || uiRole === "agent") {
+      const displayName = uiRole === "bot" ? "AI Assistant" : (name || "Support Agent");
+      nameHtml = `<div class="msg-name">${displayName}</div>`;
+  }
   
   let timeHtml = "";
   if (uiRole !== "system") {
@@ -281,12 +298,14 @@ function appendMessage(role, text, save = true, timestamp = Date.now()) {
       timeHtml = `<div class="msg-meta"><span>${timeStr}</span>${ticks}</div>`;
   }
   
-  if (uiRole === "bot") {
-    div.innerHTML = renderMarkdown(text) + timeHtml;
+  if (uiRole === "bot" || uiRole === "agent") {
+    div.innerHTML = nameHtml + renderMarkdown(text) + timeHtml;
   } else {
     div.innerHTML = escapeHtml(text) + timeHtml;
   }
-  messagesEl.appendChild(div);
+  
+  wrapper.appendChild(div);
+  messagesEl.appendChild(wrapper);
   messagesEl.scrollTop = messagesEl.scrollHeight;
   
   if (save && uiRole !== "system") {
@@ -296,18 +315,23 @@ function appendMessage(role, text, save = true, timestamp = Date.now()) {
 
 function showTypingIndicator() {
   hideTypingIndicator(); // Ensure no duplicates
-  const div = document.createElement("div");
-  div.id = "typing-indicator";
-  div.className = "msg msg--bot typing-indicator";
-  div.innerHTML = `<span class="dot"></span><span class="dot"></span><span class="dot"></span>`;
-  messagesEl.appendChild(div);
+  const wrapper = document.createElement("div");
+  wrapper.id = "typing-wrapper";
+  wrapper.className = "msg-wrapper msg-wrapper--bot typing-wrapper";
+  wrapper.innerHTML = `
+    <div class="msg-avatar">🤖</div>
+    <div class="msg msg--bot typing-indicator">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    </div>
+  `;
+  messagesEl.appendChild(wrapper);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
 function hideTypingIndicator() {
-  const indicator = document.getElementById("typing-indicator");
-  if (indicator) {
-    indicator.remove();
+  const wrapper = document.getElementById("typing-wrapper");
+  if (wrapper) {
+    wrapper.remove();
   }
 }
 
