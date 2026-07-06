@@ -342,6 +342,11 @@ async def agent_websocket(websocket: WebSocket, access_token: str | None = Cooki
         while True:
             data = await websocket.receive_json()
             session_id = data.get("session_id")
+            if data.get("type") in ["typing", "stopped_typing"]:
+                if session_id:
+                    await manager.send_to_customer(session_id, {"type": data["type"]})
+                continue
+                
             reply_text = data.get("message")
             
             if not session_id or not reply_text:
