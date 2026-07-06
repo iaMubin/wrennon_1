@@ -4,11 +4,10 @@ from app.services.vectorstore import retrieve_and_rerank
 
 def execute_get_order_status(args: Dict[str, Any]) -> str:
     order_id = args.get("order_id")
-    email = args.get("email")
-    if not order_id or not email:
-        return "Missing order_id or email. Please ask the user to provide both."
+    if not order_id:
+        return "Missing order_id. Please ask the user to provide it."
     
-    result = get_order_status(order_id=order_id, customer_email=email)
+    result = get_order_status(order_id=order_id)
     if not result:
         return f"Order {order_id} not found."
     return f"Order Status for {order_id}: {result}"

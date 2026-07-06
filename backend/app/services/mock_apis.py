@@ -16,23 +16,17 @@ from __future__ import annotations
 from typing import Optional
 
 
-def get_order_status(order_id: str, customer_email: str) -> Optional[dict]:
+def get_order_status(order_id: str) -> Optional[dict]:
     """Look up the current status of an order.
-
-    Real integration target: Shopify REST Admin API
+    Simulates:
     GET /admin/api/2024-01/orders/{order_id}.json
-    (filtered/validated against customer_email before returning)
-
+    
+    Args:
+        order_id: The e-commerce order ID (e.g. 1001)
+        
     Returns:
-        dict shaped like:
-        {
-            "order_id": str,
-            "status": "processing" | "shipped" | "delivered" | "cancelled",
-            "carrier": str,
-            "eta": str,          # ISO date
-            "tracking_url": str,
-        }
-        or None if no matching order is found for that email.
+        A dictionary containing order status, items, shipping,
+        or None if no matching order is found.
     """
     # --- MOCK BODY ---
     mock_orders = {
@@ -95,10 +89,10 @@ def get_order_status(order_id: str, customer_email: str) -> Optional[dict]:
     }
     
     order = mock_orders.get(order_id)
-    if order and order.get("email") == customer_email:
-        # Don't return the email to the LLM to avoid confusion, just standard output
+    if order:
         result = order.copy()
-        del result["email"]
+        if "email" in result:
+            del result["email"]
         return result
     return None
 

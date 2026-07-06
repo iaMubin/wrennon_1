@@ -250,7 +250,7 @@ def generate_final_reply(state: dict) -> str:
     elif intent == "order":
         system_instruction = (
             f"{base_instructions}\n"
-            "CRITICAL INSTRUCTION: Focus entirely on providing the order status or asking for missing details (Order ID or Email). "
+            "CRITICAL INSTRUCTION: Focus entirely on providing the order status or asking for missing details (Order ID). "
             "Do NOT use unnecessary pleasantries. Be direct and helpful."
         )
     else:
