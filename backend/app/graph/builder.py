@@ -19,7 +19,7 @@ def build_graph():
     graph.set_entry_point("manager")
 
     def route_after_manager(state: ConversationState) -> str:
-        if state.get("turn_count", 0) >= 5 and state["conversation_mode"] != "pending_human":
+        if state.get("turn_count", 0) >= 15 and state["conversation_mode"] != "pending_human":
             logger.info("Forcing handoff due to turn_count limit.")
             state["handoff_requested"] = True
             return "handoff"
