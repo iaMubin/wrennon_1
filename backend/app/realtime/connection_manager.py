@@ -62,8 +62,15 @@ class ConnectionManager:
             task.cancel()
 
     async def send_to_customer(self, session_id: str, payload: dict) -> None:
-        # Publish to the specific customer channel via Redis
-        await broadcast.publish(f"customer_{session_id}", json.dumps(payload))
+        # Directly send to local connection if available (bypasses Redis for reliability in single-instance deployments)
+        if session_id in self._customer_connections:
+            try:
+                await self._customer_connections[session_id].send_json(payload)
+            except Exception as e:
+                logger.error(f"Error sending directly to customer {session_id}: {e}")
+        else:
+            # Fallback to Redis if multi-instance
+            await broadcast.publish(f"customer_{session_id}", json.dumps(payload))
 
     # --- Agent side ---
 

@@ -26,6 +26,18 @@ const conversationEmail = document.getElementById("conversation-email");
 const conversationSession = document.getElementById("conversation-session");
 const agentMessages = document.getElementById("agent-messages");
 const agentInput = document.getElementById("agent-message-input");
+
+let typingTimeout;
+agentInput.addEventListener("input", (e) => {
+  if (!activeSessionId || !socket || socket.readyState !== WebSocket.OPEN) return;
+  socket.send(JSON.stringify({ type: "typing", session_id: activeSessionId }));
+  
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => {
+    socket.send(JSON.stringify({ type: "stopped_typing", session_id: activeSessionId }));
+  }, 1000);
+});
+
 const agentSendBtn = document.getElementById("agent-send-btn");
 const resolveBtn = document.getElementById("resolve-btn");
 
@@ -322,7 +334,7 @@ function sendAgentReply() {
   if (!text || !activeSessionId || !socket || socket.readyState !== WebSocket.OPEN) return;
 
   socket.send(JSON.stringify({ session_id: activeSessionId, message: text }));
-  appendMessage("agent", text, new Date().toISOString());
+  // Message will be appended when it is broadcasted back via the websocket
   agentInput.value = "";
   drafts[activeSessionId] = ""; 
 }

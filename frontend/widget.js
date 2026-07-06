@@ -187,8 +187,17 @@ function connectSocket() {
 
   socket.onmessage = (event) => {
     try {
-      hideTypingIndicator();
       const data = JSON.parse(event.data);
+      
+      if (data.type === "typing") {
+        showTypingIndicator();
+        return;
+      } else if (data.type === "stopped_typing") {
+        hideTypingIndicator();
+        return;
+      }
+      
+      hideTypingIndicator();
       const sender = data.sender || "bot";
       const name = data.name || "AI Assistant";
       appendMessage(sender, data.reply, true, Date.now(), name);
@@ -277,7 +286,11 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   
   // Add Avatar for incoming messages
   if (uiRole === "bot" || uiRole === "agent") {
-    const avatarImg = uiRole === "bot" ? "🤖" : "👨‍💻";
+    // Premium SVG Avatars for better human feel
+    const botSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"></path><path d="M5.5 10A2.5 2.5 0 0 1 8 7.5h8A2.5 2.5 0 0 1 18.5 10v6A2.5 2.5 0 0 1 16 18.5H8A2.5 2.5 0 0 1 5.5 16v-6z"></path><path d="M10 12v2"></path><path d="M14 12v2"></path><path d="M4 12v2"></path><path d="M20 12v2"></path></svg>`;
+    const agentSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+    
+    const avatarImg = uiRole === "bot" ? botSvg : agentSvg;
     wrapper.innerHTML += `<div class="msg-avatar ${uiRole === 'agent' ? 'msg-avatar--agent' : ''}">${avatarImg}</div>`;
   }
   
@@ -317,10 +330,12 @@ function showTypingIndicator() {
   hideTypingIndicator(); // Ensure no duplicates
   const wrapper = document.createElement("div");
   wrapper.id = "typing-wrapper";
-  wrapper.className = "msg-wrapper msg-wrapper--bot typing-wrapper";
+  wrapper.className = "msg-wrapper msg-wrapper--agent typing-wrapper";
   wrapper.innerHTML = `
-    <div class="msg-avatar">🤖</div>
-    <div class="msg msg--bot typing-indicator">
+    <div class="msg-avatar msg-avatar--agent">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    </div>
+    <div class="msg msg--agent typing-indicator">
       <span class="dot"></span><span class="dot"></span><span class="dot"></span>
     </div>
   `;
@@ -341,7 +356,6 @@ function sendMessage() {
 
   appendMessage("user", text);
   inputEl.value = "";
-  showTypingIndicator();
   
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({ message: text }));
