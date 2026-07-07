@@ -128,6 +128,19 @@ def needs_attention(
     return [_conversation_summary(c) for c in conversations]
 
 
+@router.get("/agent/conversations/my-cases")
+def get_my_cases(
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent),
+):
+    convs = db.query(Conversation).filter(
+        Conversation.handled_by == agent.username,
+        Conversation.resolved == False
+    ).order_by(Conversation.updated_at.desc()).all()
+    
+    return [{"session_id": c.session_id, "created_at": c.created_at.isoformat(), "updated_at": c.updated_at.isoformat(), "handoff_active": c.handoff_active, "resolved": c.resolved, "handled_by": c.handled_by, "reopen_count": c.reopen_count} for c in convs]
+
+
 @router.get("/agent/conversations/active")
 def active_chats(
     db: Session = Depends(get_db),

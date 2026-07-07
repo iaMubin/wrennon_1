@@ -166,6 +166,7 @@ def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None) -
             conversation.resolved = True
             conversation.resolved_at = datetime.datetime.utcnow()
             conversation.handoff_active = False
+            conversation.handled_by = None
             
             audit = AuditLog(
                 actor_username="AI Agent",

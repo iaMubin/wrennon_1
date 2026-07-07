@@ -58,12 +58,18 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
           </button>
           <button id="admin-dashboard-btn" class="hidden" style="font-size: 12px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; background: white; cursor: pointer; color: #334155;">Admin</button>
+          <button id="logout-btn" class="theme-toggle-btn" aria-label="Logout" title="Logout">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </button>
         </div>
       </div>
 
       <nav id="section-tabs">
-        <button class="tab tab--active" data-section="attention">
-          Needs attention <span id="attention-count" class="count">0</span>
+        <button class="tab tab--active" data-section="my_cases">
+          My Cases <span id="my-cases-count" class="count">0</span>
+        </button>
+        <button class="tab" data-section="attention">
+          Needs Attention <span id="attention-count" class="count">0</span>
         </button>
         <button class="tab" data-section="active">
           Active Chats <span id="active-count" class="count">0</span>

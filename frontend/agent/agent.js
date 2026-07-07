@@ -7,14 +7,15 @@ const WS_URL  = `${_IS_LOCAL ? "ws"   : "wss"}://${_IS_LOCAL ? "localhost:8000" 
 
 let socket = null;
 let activeSessionId = null;
-let activeSection = "attention"; // "attention" | "active" | "all"
+let activeSection = "my_cases"; // "attention" | "active" | "all"
 const drafts = {};
 
 // --- Elements ---
 const loginScreen = document.getElementById("login-screen");
+const dashboard = document.getElementById("dashboard");
 const loginForm = document.getElementById("login-form");
 const loginError = document.getElementById("login-error");
-const dashboard = document.getElementById("dashboard");
+const logoutBtn = document.getElementById("logout-btn");
 const connectionDot = document.getElementById("connection-dot");
 const sectionTabs = document.querySelectorAll(".tab");
 const conversationList = document.getElementById("conversation-list");
@@ -49,12 +50,19 @@ if (themeBtn) {
     updateThemeIcon(isLight, "theme-btn");
   });
   
-  if (localStorage.getItem("wrennon_theme") === "light") {
+  const savedTheme = localStorage.getItem("wrennon_theme");
+  const systemLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+  
+  if (savedTheme === "light" || (!savedTheme && systemLight)) {
     document.body.classList.add("light-mode");
     updateThemeIcon(true, "theme-btn");
   } else {
     updateThemeIcon(false, "theme-btn");
   }
+}
+
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", logout);
 }
 
 let typingTimeout;
@@ -222,16 +230,18 @@ sectionTabs.forEach((tab) => {
 // --- Loading conversation lists ---
 async function loadConversations() {
   const endpoints = {
+    "my_cases": "/agent/conversations/my-cases",
     "attention": "/agent/conversations/needs-attention",
     "active": "/agent/conversations/active",
     "all": "/agent/conversations"
   };
   
-  const endpoint = endpoints[activeSection] || endpoints["attention"];
+  const endpoint = endpoints[activeSection] || endpoints["my_cases"];
   
   // Use Promise.all to fetch concurrently and save time
-  const [conversations, attnList, actList] = await Promise.all([
+  const [conversations, myCasesList, attnList, actList] = await Promise.all([
     authedFetch(endpoint),
+    activeSection === "my_cases" ? null : authedFetch(endpoints["my_cases"]),
     activeSection === "attention" ? null : authedFetch(endpoints["attention"]),
     activeSection === "active" ? null : authedFetch(endpoints["active"])
   ]);
@@ -242,6 +252,10 @@ async function loadConversations() {
   }
 
   // Update badges
+  const myCasesCountEl = document.getElementById("my-cases-count");
+  if (myCasesCountEl) {
+      myCasesCountEl.textContent = activeSection === "my_cases" ? conversations.length : (myCasesList ? myCasesList.length : 0);
+  }
   attentionCount.textContent = activeSection === "attention" ? conversations.length : (attnList ? attnList.length : 0);
   activeCount.textContent = activeSection === "active" ? conversations.length : (actList ? actList.length : 0);
 

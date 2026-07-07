@@ -245,12 +245,12 @@ body {
 
 /* --- Light Mode Overrides --- */
 #wrennon-widget.light-mode {
-  --ink: #09090b;
+  --ink: #18181b;
   --ink-soft: #71717A;
-  --paper: rgba(255, 255, 255, 0.9);
-  --paper-dim: #F4F4F5;
-  --line: rgba(0, 0, 0, 0.08);
-  --shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05) inset;
+  --paper: #FFFFFF;
+  --paper-dim: #F9FAFB;
+  --line: rgba(0, 0, 0, 0.06);
+  --shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.03) inset;
   background-image: none;
   background-color: var(--paper-dim);
 }
@@ -264,18 +264,21 @@ body {
 }
 
 #wrennon-widget.light-mode #message-input {
-  background: rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
 }
 
 #wrennon-widget.light-mode .msg--bot {
-  background: rgba(219, 234, 254, 0.6);
-  border-color: rgba(59, 130, 246, 0.3);
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
 }
 
 #wrennon-widget.light-mode .msg--agent {
-  background: rgba(209, 250, 229, 0.6);
-  border-color: rgba(16, 185, 129, 0.3);
+  background: #F0FDF4;
+  border-color: rgba(34, 197, 94, 0.2);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
 }
 
 #wrennon-widget.light-mode .msg-name {
@@ -287,18 +290,22 @@ body {
 }
 
 #wrennon-widget.light-mode .msg-avatar {
-  background: linear-gradient(135deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.01));
-  border-color: rgba(0, 0, 0, 0.1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  background: #FFFFFF;
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 #wrennon-widget.light-mode .msg--human {
-  background: rgba(0, 0, 0, 0.03);
+  background: #FFFFFF;
   border-color: rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
 }
 
 #wrennon-widget.light-mode .msg-ticks {
-  color: #2563EB;
+  color: #93C5FD;
+}
+#wrennon-widget.light-mode .msg--user .msg-ticks {
+  color: #FFFFFF;
 }
 
 #wrennon-widget.light-mode .date-separator {
