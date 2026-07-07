@@ -207,6 +207,8 @@ body {
 /* Sidebar */
 #sidebar {
   width: 420px;
+  min-width: 300px;
+  max-width: 600px;
   background: var(--paper);
   backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
@@ -411,8 +413,22 @@ body {
 }
 
 /* Main Chat View */
+#resizer {
+  width: 6px;
+  background-color: transparent;
+  cursor: col-resize;
+  z-index: 10;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+#resizer:hover, #resizer:active {
+  background-color: var(--accent);
+  opacity: 0.5;
+}
+
 #conversation-view {
   flex: 1;
+  min-width: 400px;
   display: flex;
   flex-direction: column;
   background: transparent;

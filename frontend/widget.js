@@ -187,9 +187,47 @@ if (photoBtn && photoUpload) {
 
 const voiceBtn = document.getElementById("voice-btn");
 const voiceUpload = document.getElementById("voice-upload");
-if (voiceBtn && voiceUpload) {
-  voiceBtn.addEventListener("click", () => voiceUpload.click());
-  voiceUpload.addEventListener("change", (e) => handleFileUpload(e.target.files[0], inputEl, voiceUpload, true, sendMessage));
+// --- Voice Recording Logic ---
+let mediaRecorder;
+let audioChunks = [];
+let isRecording = false;
+
+if (voiceBtn) {
+  voiceBtn.addEventListener("click", async () => {
+    if (!isRecording) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        
+        mediaRecorder.addEventListener("dataavailable", event => {
+          audioChunks.push(event.data);
+        });
+        
+        mediaRecorder.addEventListener("stop", () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          const file = new File([audioBlob], "voice_message.webm", { type: 'audio/webm' });
+          handleFileUpload(file, inputEl, null, true, sendMessage);
+          
+          // Stop all tracks to release microphone
+          stream.getTracks().forEach(track => track.stop());
+        });
+        
+        mediaRecorder.start();
+        isRecording = true;
+        voiceBtn.style.color = "#EF4444"; // Red to indicate recording
+        voiceBtn.style.animation = "pulse-glow 1s infinite";
+      } catch (err) {
+        console.error("Error accessing microphone:", err);
+        alert("Could not access microphone.");
+      }
+    } else {
+      mediaRecorder.stop();
+      isRecording = false;
+      voiceBtn.style.color = "#9CA3AF";
+      voiceBtn.style.animation = "none";
+    }
+  });
 }
 
 // ── History & WebSocket ────────────────────────────────────────────

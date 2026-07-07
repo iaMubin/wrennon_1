@@ -219,8 +219,8 @@ body {
   backdrop-filter: blur(8px);
 }
 
-#input-row { display: flex; gap: 14px; padding: 24px 28px; border-top: 1px solid var(--line); background: rgba(11, 14, 20, 0.95); align-items: center; }
-#message-input { flex: 1; border: 1px solid rgba(255,255,255,0.12); border-radius: 32px; padding: 16px 22px; font-size: 15px; font-family: inherit; background: rgba(255,255,255,0.04); color: var(--ink); outline: none; transition: var(--transition); }
+#input-row { display: flex; gap: 8px; padding: 16px 20px; border-top: 1px solid var(--line); background: rgba(11, 14, 20, 0.95); align-items: center; }
+#message-input { flex: 1; min-width: 0; border: 1px solid rgba(255,255,255,0.12); border-radius: 32px; padding: 16px 20px; font-size: 15px; font-family: inherit; background: rgba(255,255,255,0.04); color: var(--ink); outline: none; transition: var(--transition); }
 #message-input:focus { background: rgba(255,255,255,0.08); border-color: var(--accent); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2); }
 #message-input::placeholder { color: var(--ink-soft); font-weight: 500; }
 
@@ -230,9 +230,11 @@ body {
 #send-btn svg { width: 22px; height: 22px; transform: translateX(-1px); }
 
 @media (prefers-reduced-motion: reduce) { #launcher, #panel { transition: none; animation: none; } }
-@media (max-width: 480px) { 
-  #panel { width: calc(100vw - 32px); height: calc(100vh - 120px); right: -16px; bottom: 84px;} 
-  #wrennon-widget { right: 16px; bottom: 16px; }
+@media (max-width: 600px) { 
+  #wrennon-widget { right: 0; bottom: 0; width: 100%; }
+  #launcher { position: fixed; right: 16px; bottom: 16px; z-index: 1000; }
+  #panel { width: 100vw; height: 100dvh; right: 0; bottom: 0; border-radius: 0; display: flex; flex-direction: column; }
+  #messages { flex: 1; }
 }
 
 .typing-wrapper { animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
@@ -251,6 +253,9 @@ body {
   --paper-dim: #F9FAFB;
   --line: rgba(0, 0, 0, 0.06);
   --shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.03) inset;
+}
+
+#wrennon-widget.light-mode #panel {
   background-image: none;
   background-color: var(--paper-dim);
 }

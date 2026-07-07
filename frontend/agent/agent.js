@@ -450,9 +450,47 @@ if (agentPhotoBtn && agentPhotoUpload) {
 
 const agentVoiceBtn = document.getElementById("agent-voice-btn");
 const agentVoiceUpload = document.getElementById("agent-voice-upload");
-if (agentVoiceBtn && agentVoiceUpload) {
-  agentVoiceBtn.addEventListener("click", () => agentVoiceUpload.click());
-  agentVoiceUpload.addEventListener("change", (e) => handleAgentFileUpload(e.target.files[0], agentInput, agentVoiceUpload, true, sendAgentReply));
+// --- Agent Voice Recording Logic ---
+let agentMediaRecorder;
+let agentAudioChunks = [];
+let agentIsRecording = false;
+
+if (agentVoiceBtn) {
+  agentVoiceBtn.addEventListener("click", async () => {
+    if (!agentIsRecording) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        agentMediaRecorder = new MediaRecorder(stream);
+        agentAudioChunks = [];
+        
+        agentMediaRecorder.addEventListener("dataavailable", event => {
+          agentAudioChunks.push(event.data);
+        });
+        
+        agentMediaRecorder.addEventListener("stop", () => {
+          const audioBlob = new Blob(agentAudioChunks, { type: 'audio/webm' });
+          const file = new File([audioBlob], "voice_message.webm", { type: 'audio/webm' });
+          handleAgentFileUpload(file, agentInput, null, true, sendAgentReply);
+          
+          // Stop all tracks
+          stream.getTracks().forEach(track => track.stop());
+        });
+        
+        agentMediaRecorder.start();
+        agentIsRecording = true;
+        agentVoiceBtn.style.color = "#EF4444";
+        agentVoiceBtn.style.animation = "pulse-glow 1s infinite";
+      } catch (err) {
+        console.error("Error accessing microphone:", err);
+        alert("Could not access microphone.");
+      }
+    } else {
+      agentMediaRecorder.stop();
+      agentIsRecording = false;
+      agentVoiceBtn.style.color = "#9CA3AF";
+      agentVoiceBtn.style.animation = "none";
+    }
+  });
 }
 
 function sendAgentReply() {
@@ -607,3 +645,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 });
+
+// --- Resizable Sidebar Logic ---
+const resizer = document.getElementById("resizer");
+const sidebar = document.getElementById("sidebar");
+let isResizing = false;
+
+if (resizer && sidebar) {
+  resizer.addEventListener("mousedown", (e) => {
+    isResizing = true;
+    document.body.style.cursor = "col-resize";
+    e.preventDefault(); // Prevent text selection
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isResizing) return;
+    const newWidth = e.clientX - sidebar.getBoundingClientRect().left;
+    if (newWidth >= 300 && newWidth <= 600) {
+      sidebar.style.width = `${newWidth}px`;
+    }
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (isResizing) {
+      isResizing = false;
+      document.body.style.cursor = "default";
+    }
+  });
+}
