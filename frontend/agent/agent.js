@@ -1,6 +1,8 @@
 // ── Backend URL detection ──────────────────────────────────────────
-const API_BASE = (location.protocol === "file:" ? "http://localhost:8000" : location.origin) + "/api";
-const WS_URL = (location.protocol === "https:" ? "wss://" : "ws://") + (location.protocol === "file:" ? "localhost:8000" : location.host) + "/ws/agent";
+const _RENDER_HOST = "wrennon-backend.onrender.com";
+const _IS_LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.protocol === "file:";
+const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/api`;
+const WS_URL  = `${_IS_LOCAL ? "ws"   : "wss"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/ws/agent`;
 
 
 let socket = null;
