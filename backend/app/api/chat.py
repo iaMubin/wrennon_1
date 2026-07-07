@@ -5,8 +5,6 @@ already happened (if this session_id has been seen before) before the
 WebSocket connection takes over for everything that happens next.
 """
 
-from __future__ import annotations
-
 import datetime
 import uuid
 
