@@ -22,6 +22,20 @@ let SESSION_ID = null;
 let SESSION_TOKEN = null;
 let reconnectInterval = null;
 
+// ── Theme Management ───────────────────────────────────────────────
+const themeBtn = document.getElementById("theme-btn");
+if (themeBtn) {
+  themeBtn.addEventListener("click", () => {
+    document.body.classList.toggle("light-mode");
+    const isLight = document.body.classList.contains("light-mode");
+    localStorage.setItem("wrennon_theme", isLight ? "light" : "dark");
+  });
+  
+  if (localStorage.getItem("wrennon_theme") === "light") {
+    document.body.classList.add("light-mode");
+  }
+}
+
 // ── Session Management ─────────────────────────────────────────────
 // Persist session_id in localStorage so the customer can continue
 // their conversation after page refresh (within the 72-hour window).
@@ -99,6 +113,46 @@ sendBtn.addEventListener("click", sendMessage);
 inputEl.addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendMessage();
 });
+
+const uploadBtn = document.getElementById("upload-btn");
+const fileUpload = document.getElementById("file-upload");
+if (uploadBtn && fileUpload) {
+  uploadBtn.addEventListener("click", () => fileUpload.click());
+  fileUpload.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const originalPlaceholder = inputEl.placeholder;
+    inputEl.placeholder = "Uploading...";
+    inputEl.disabled = true;
+    
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    try {
+      const response = await fetch(`${API_BASE}/chat/upload`, {
+        method: "POST",
+        body: formData
+      });
+      const data = await response.json();
+      if (data.url) {
+        let md = `[Document](${data.url})`;
+        if (file.type.startsWith("image/")) md = `![Image](${data.url})`;
+        else if (file.type.startsWith("audio/")) md = `[Audio](${data.url})`;
+        else if (file.type.startsWith("video/")) md = `[Video](${data.url})`;
+        
+        inputEl.value = (inputEl.value + " " + md).trim();
+      }
+    } catch (err) {
+      console.error("Upload failed", err);
+    } finally {
+      inputEl.placeholder = originalPlaceholder;
+      inputEl.disabled = false;
+      inputEl.focus();
+      fileUpload.value = "";
+    }
+  });
+}
 
 // ── History & WebSocket ────────────────────────────────────────────
 
@@ -342,7 +396,7 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
 }
 
 function showTypingIndicator() {
-  hideTypingIndicator(); // Ensure no duplicates
+  if (document.getElementById("typing-wrapper")) return;
   const wrapper = document.createElement("div");
   wrapper.id = "typing-wrapper";
   wrapper.className = "msg-wrapper msg-wrapper--agent typing-wrapper";

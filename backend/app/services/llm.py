@@ -8,6 +8,8 @@ from __future__ import annotations
 import time
 
 import re
+import base64
+import httpx
 from groq import AsyncGroq
 import openai
 from tenacity import retry, stop_after_attempt, wait_exponential, AsyncRetrying
@@ -63,12 +65,12 @@ def mask_pii(text: str) -> str:
     wait=wait_exponential(multiplier=1, min=2, max=10),
     reraise=True
 )
-async def _safe_groq_call(messages: list, temperature: float = 0.2, max_tokens: int = 400) -> str:
+async def _safe_groq_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, model_override: str = None) -> str:
     """Wrapper around Groq API calls with retry logic."""
     import time
     start_time = time.time()
     response = await _client.chat.completions.create(
-        model=MODEL,
+        model=model_override or MODEL,
         messages=messages,
         temperature=temperature,
         max_tokens=max_tokens,
@@ -127,17 +129,57 @@ async def _safe_openai_call(messages: list, temperature: float = 0.2, max_tokens
         logger.warning(f"OpenAI fallback failed: {e}")
     return ""
 
-async def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, is_json: bool = False) -> str:
+async def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, is_json: bool = False, model_override: str = None) -> str:
     """Calls Groq with retries, and falls back to OpenAI if it completely fails."""
     try:
         if is_json:
             return await _safe_groq_json_call(messages, temperature, max_tokens)
-        return await _safe_groq_call(messages, temperature, max_tokens)
+        return await _safe_groq_call(messages, temperature, max_tokens, model_override)
     except Exception as e:
         logger.error(f"Groq API completely failed after retries: {e}")
         if _openai_client:
             return await _safe_openai_call(messages, temperature, max_tokens, is_json)
         return ""
+
+async def transcribe_audio_if_present(text: str) -> str:
+    """Checks for [Audio](url) or [Video](url), transcribes it, and appends to text."""
+    matches = re.findall(r'\[(?:Audio|Video)\]\((https?://[^\)]+)\)', text)
+    if not matches:
+        return text
+    
+    url = matches[0]
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                filename = url.split("/")[-1]
+                if "." not in filename: filename += ".mp3"
+                transcription = await _client.audio.transcriptions.create(
+                    file=(filename, resp.content),
+                    model="whisper-large-v3"
+                )
+                return text + f"\n\n(Transcript: {transcription.text})"
+    except Exception as e:
+        logger.error(f"Failed to transcribe audio: {e}")
+        return text + "\n\n(Transcript: [Failed to process audio])"
+    return text
+
+def parse_image_urls(text: str) -> list[str]:
+    """Finds all ![Image](url) and returns the URLs"""
+    return re.findall(r'!\[.*?\]\((https?://[^\)]+)\)', text)
+
+async def _url_to_base64(url: str) -> str:
+    """Downloads an image URL and converts to base64."""
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                b64 = base64.b64encode(resp.content).decode("utf-8")
+                mime_type = resp.headers.get("content-type", "image/jpeg")
+                return f"data:{mime_type};base64,{b64}"
+    except Exception as e:
+        logger.error(f"Failed to fetch image: {e}")
+    return None
 
 MODEL = "openai/gpt-oss-120b"
 # Groq deprecated meta-llama/llama-4-scout-17b-16e-instruct on June 17,
@@ -181,12 +223,16 @@ async def generate_conversation_summary(messages: list) -> str:
     
     prompt = (
         "You are an expert assistant. Summarize the following customer support conversation "
-        "briefly and concisely. Use a short bulleted list. "
+        "briefly and concisely. You MUST use a short bulleted list.\n"
         "Do not include any intro like 'Here is the summary' or headers. Start directly with the bullets.\n\n"
         "Focus ONLY on:\n"
         "- What the customer's main issue/request is.\n"
         "- What has been done so far.\n"
-        "- What the human agent needs to do next."
+        "- What the human agent needs to do next (Provide specific suggestions for the agent).\n\n"
+        "Format your response exactly like this:\n"
+        "- **Issue**: [brief issue]\n"
+        "- **Actions Taken**: [brief actions]\n"
+        "- **Suggestions**: [actionable suggestions]"
     )
     
     # Build conversation history for the LLM
@@ -212,7 +258,8 @@ async def generate_final_reply(state: dict) -> str:
     base_instructions = (
         "You are a helpful customer support agent for an online store. "
         "Formulate a reply to the customer based on the provided context and conversation history. "
-        "Keep your response concise, professional, and natural."
+        "Keep your response concise, professional, and natural. "
+        "CRITICAL INSTRUCTION: Your response must be complete and under 150 words. Do not cut off mid-sentence."
     )
     
     if intent == "greeting":
@@ -282,10 +329,23 @@ async def generate_final_reply(state: dict) -> str:
     # Add the final user prompt with context
     last_user_message = mask_pii(state["messages"][-1].content)
     prompt = f"Context:\n{context_text}\n\nCustomer Message:\n{last_user_message}"
-    llm_messages.append({"role": "user", "content": prompt})
+    
+    image_urls = parse_image_urls(state["messages"][-1].content)
+    model_override = None
+    
+    if image_urls:
+        content = [{"type": "text", "text": prompt}]
+        for url in image_urls:
+            b64 = await _url_to_base64(url)
+            if b64:
+                content.append({"type": "image_url", "image_url": {"url": b64}})
+        llm_messages.append({"role": "user", "content": content})
+        model_override = "qwen/qwen3.6-27b"
+    else:
+        llm_messages.append({"role": "user", "content": prompt})
     
     logger.info(f"Generating final reply")
-    result = await _safe_llm_call(messages=llm_messages, temperature=0.3, max_tokens=400)
+    result = await _safe_llm_call(messages=llm_messages, temperature=0.3, max_tokens=600, model_override=model_override)
     return result or "I apologize, I'm having trouble processing your request. Please try again."
 
 

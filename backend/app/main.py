@@ -121,3 +121,7 @@ if os.path.exists(frontend_path):
     app.mount("/agent", StaticFiles(directory=frontend_path, html=True), name="agent")
 else:
     logger.warning(f"Frontend agent directory not found at {frontend_path}")
+
+upload_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
+os.makedirs(upload_path, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=upload_path), name="uploads")

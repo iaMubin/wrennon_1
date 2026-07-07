@@ -25,15 +25,35 @@ const conversationSession = document.getElementById("conversation-session");
 const agentMessages = document.getElementById("agent-messages");
 const agentInput = document.getElementById("agent-message-input");
 
+// ── Theme Management ───────────────────────────────────────────────
+const themeBtn = document.getElementById("theme-btn");
+if (themeBtn) {
+  themeBtn.addEventListener("click", () => {
+    document.body.classList.toggle("light-mode");
+    const isLight = document.body.classList.contains("light-mode");
+    localStorage.setItem("wrennon_theme", isLight ? "light" : "dark");
+  });
+  
+  if (localStorage.getItem("wrennon_theme") === "light") {
+    document.body.classList.add("light-mode");
+  }
+}
+
 let typingTimeout;
+let isTyping = false;
 agentInput.addEventListener("input", (e) => {
   if (!activeSessionId || !socket || socket.readyState !== WebSocket.OPEN) return;
-  socket.send(JSON.stringify({ type: "typing", session_id: activeSessionId }));
+  
+  if (!isTyping) {
+    socket.send(JSON.stringify({ type: "typing", session_id: activeSessionId }));
+    isTyping = true;
+  }
   
   clearTimeout(typingTimeout);
   typingTimeout = setTimeout(() => {
     socket.send(JSON.stringify({ type: "stopped_typing", session_id: activeSessionId }));
-  }, 1000);
+    isTyping = false;
+  }, 1500);
 });
 
 const agentSendBtn = document.getElementById("agent-send-btn");
@@ -226,8 +246,13 @@ function renderConversationList(conversations) {
       badgeClass = "badge--resolved";
       stageText = conv.handled_by ? conv.handled_by : "AI";
     } else if (conv.handoff_active) {
-      badgeClass = "badge--human";
-      stageText = conv.handled_by ? conv.handled_by : "Needs Attention";
+      if (conv.handled_by) {
+        badgeClass = "badge--agent";
+        stageText = conv.handled_by;
+      } else {
+        badgeClass = "badge--human";
+        stageText = "Needs Attention";
+      }
     }
 
     const reopenBadge = conv.reopen_count > 0
@@ -318,7 +343,11 @@ function appendMessage(sender, content, isoString = new Date().toISOString()) {
       timeHtml = `<div class="msg-meta"><span>${timeStr}</span>${ticks}</div>`;
   }
   
-  div.innerHTML = `${escapeHtml(content)}${timeHtml}`;
+  if (sender === "ai" || sender === "agent" || sender === "system") {
+    div.innerHTML = renderMarkdown(content) + timeHtml;
+  } else {
+    div.innerHTML = escapeHtml(content) + timeHtml;
+  }
   agentMessages.appendChild(div);
   agentMessages.scrollTop = agentMessages.scrollHeight;
 }
@@ -328,6 +357,47 @@ agentSendBtn.addEventListener("click", sendAgentReply);
 agentInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendAgentReply();
 });
+
+const agentUploadBtn = document.getElementById("agent-upload-btn");
+const agentFileUpload = document.getElementById("agent-file-upload");
+if (agentUploadBtn && agentFileUpload) {
+  agentUploadBtn.addEventListener("click", () => agentFileUpload.click());
+  agentFileUpload.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const originalPlaceholder = agentInput.placeholder;
+    agentInput.placeholder = "Uploading...";
+    agentInput.disabled = true;
+    
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    try {
+      const response = await fetch(`${API_BASE}/chat/upload`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("agent_token")}` },
+        body: formData
+      });
+      const data = await response.json();
+      if (data.url) {
+        let md = `[Document](${data.url})`;
+        if (file.type.startsWith("image/")) md = `![Image](${data.url})`;
+        else if (file.type.startsWith("audio/")) md = `[Audio](${data.url})`;
+        else if (file.type.startsWith("video/")) md = `[Video](${data.url})`;
+        
+        agentInput.value = (agentInput.value + " " + md).trim();
+      }
+    } catch (err) {
+      console.error("Upload failed", err);
+    } finally {
+      agentInput.placeholder = originalPlaceholder;
+      agentInput.disabled = false;
+      agentInput.focus();
+      agentFileUpload.value = "";
+    }
+  });
+}
 
 function sendAgentReply() {
   const text = agentInput.value.trim();
@@ -367,6 +437,52 @@ async function authedFetch(path, method = "GET") {
     console.error(err);
     return null;
   }
+}
+
+function renderMarkdown(text) {
+  const lines = text.split("\n");
+  let html = "";
+  let inList = false;
+  let listTag = "ul";
+
+  const closeList = () => {
+    if (inList) {
+      html += `</${listTag}>`;
+      inList = false;
+    }
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      closeList();
+      continue;
+    }
+
+    const numbered = line.match(/^(\d+)[.)]\s+(.*)/);
+    const bulleted = line.match(/^[-*]\s+(.*)/);
+
+    if (numbered || bulleted) {
+      const tag = numbered ? "ol" : "ul";
+      if (!inList || listTag !== tag) {
+        closeList();
+        html += `<${tag}>`;
+        inList = true;
+        listTag = tag;
+      }
+      const content = numbered ? numbered[2] : bulleted[1];
+      html += `<li>${inlineMarkdown(content)}</li>`;
+    } else {
+      closeList();
+      html += `<p>${inlineMarkdown(line)}</p>`;
+    }
+  }
+  closeList();
+  return html;
+}
+
+function inlineMarkdown(text) {
+  return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 }
 
 function escapeHtml(text) {

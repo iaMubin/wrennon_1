@@ -79,10 +79,7 @@ class Message(Base):
     conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id"), index=True)
 
     # "human" = customer typed this. "ai" = bot generated this.
-    # "agent" = a human support agent typed this. Kept distinct in storage
-    # even though the customer-facing widget deliberately does not show
-    # this distinction (per Mubin's design decision — the customer
-    # should never be able to tell whether AI or a human is replying).
+    # "agent" = a human support agent typed this. Kept distinct in storage.
     sender: Mapped[str] = mapped_column(String)
     content: Mapped[str] = mapped_column(Text)
 

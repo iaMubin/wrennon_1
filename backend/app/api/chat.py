@@ -10,8 +10,10 @@ from __future__ import annotations
 import datetime
 import uuid
 
-from fastapi import APIRouter, Depends, Request, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Request, Header, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
+import shutil
+import os
 
 from app.db.models import Conversation
 from app.db.session import get_db
@@ -96,3 +98,25 @@ def get_history(
         for m in conversation.messages
         if m.sender != "system"  # Hide internal summaries from customer
     ]
+
+
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+@router.post("/chat/upload")
+@limiter.limit("20/minute")
+async def upload_file(
+    request: Request,
+    file: UploadFile = File(...)
+):
+    """Upload a file for the chat (audio, image, document)."""
+    file_id = str(uuid.uuid4())
+    ext = os.path.splitext(file.filename)[1]
+    safe_filename = f"{file_id}{ext}"
+    
+    file_path = os.path.join(UPLOAD_DIR, safe_filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    file_url = f"{request.base_url}uploads/{safe_filename}"
+    return {"url": file_url, "filename": safe_filename, "type": file.content_type}

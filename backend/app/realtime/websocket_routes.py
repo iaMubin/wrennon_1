@@ -24,7 +24,7 @@ from app.graph.state import initial_state
 from app.logger import logger
 from app.realtime.connection_manager import manager
 from app.config import settings
-from app.services.llm import mask_pii, update_conversation_summary
+from app.services.llm import mask_pii, update_conversation_summary, transcribe_audio_if_present
 from app.services.cache import get_cache, set_cache
 from app.api.agent import get_redis
 
@@ -142,6 +142,7 @@ def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None) -
         if updated_state and updated_state.get("handoff_ticket_id"):
             conversation.handoff_active = True
             conversation.handoff_ticket_id = updated_state["handoff_ticket_id"]
+            conversation.handled_by = None
             
             if conversation.resolved:
                 conversation.resolved = False
@@ -256,6 +257,9 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             if len(customer_text) > 2000:
                 logger.warning(f"Message from {session_id} exceeded max length. Truncating.")
                 customer_text = customer_text[:2000]
+                
+            # Check for audio and transcribe it
+            customer_text = await transcribe_audio_if_present(customer_text)
                 
             msg_start_time = time.time()
             logger.info(f"Received message from customer {session_id}: {mask_pii(customer_text)}")

@@ -386,6 +386,12 @@ body {
   border-color: rgba(239, 68, 68, 0.3);
 }
 
+.badge--agent {
+  background: rgba(234, 179, 8, 0.15);
+  color: #EAB308;
+  border-color: rgba(234, 179, 8, 0.3);
+}
+
 .badge--resolved {
   background: rgba(16, 185, 129, 0.15);
   color: #34D399;
@@ -668,4 +674,96 @@ body {
 }
 #agent-send-btn:active {
   transform: translateY(0) scale(0.95);
+}
+
+/* --- Light Mode Overrides --- */
+body.light-mode {
+  --ink: #111827;
+  --ink-soft: #4B5563;
+  --paper: rgba(255, 255, 255, 0.95);
+  --paper-dim: #F3F4F6;
+  --line: rgba(0, 0, 0, 0.1);
+  background-image: none;
+  background-color: var(--paper-dim);
+}
+
+body.light-mode #login-form {
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+}
+body.light-mode #login-form h1 {
+  background: none;
+  color: #111827;
+}
+body.light-mode .input-wrapper input {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+body.light-mode .input-wrapper input:focus {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+body.light-mode #sidebar {
+  background: rgba(255, 255, 255, 0.95);
+}
+body.light-mode #conversation-header {
+  background: rgba(255, 255, 255, 0.9);
+}
+body.light-mode #agent-input-row {
+  background: rgba(255, 255, 255, 0.9);
+}
+body.light-mode #agent-message-input {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+body.light-mode .msg--human {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+body.light-mode .msg--ai {
+  background: rgba(219, 234, 254, 0.6);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+body.light-mode .msg--system {
+  background: rgba(254, 243, 199, 0.6);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #D97706;
+}
+
+body.light-mode .conv-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+body.light-mode .conv-item--selected {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+body.light-mode .tab:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+body.light-mode #resolve-btn {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+body.light-mode #resolve-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* Theme Toggle Button */
+.theme-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+}
+.theme-toggle-btn:hover {
+  color: var(--ink);
+  background: rgba(128, 128, 128, 0.1);
 }
