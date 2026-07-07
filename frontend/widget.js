@@ -345,7 +345,7 @@ function renderMarkdown(text) {
     }
 
     const numbered = line.match(/^(\d+)[.)]\s+(.*)/);
-    const bulleted = line.match(/^[-*]\s+(.*)/);
+    const bulleted = line.match(/^[-*•]\s+(.*)/);
 
     if (numbered || bulleted) {
       const tag = numbered ? "ol" : "ul";

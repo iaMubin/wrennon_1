@@ -197,8 +197,10 @@ SYSTEM_PROMPT = (
     "explain the relevant process steps).\n\n"
     "Say plainly that you don't have that information ONLY if the "
     "context is genuinely unrelated to what the customer is asking — "
-    "not just because it doesn't cover every detail. Keep answers "
-    "concise and concrete."
+    "not just because it doesn't cover every detail.\n\n"
+    "CRITICAL: Keep your answers extremely concise and conversational. "
+    "Do NOT write long paragraphs or copy-paste large blocks of text. "
+    "Limit your answer to 2 or 3 short sentences max. Do NOT cut off mid-sentence."
 )
 
 
@@ -210,7 +212,7 @@ async def generate_answer(question: str, context: str) -> str:
             {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"},
         ],
         temperature=0.2,
-        max_tokens=400,
+        max_tokens=1024,
     )
     return result or "I'm sorry, I couldn't process that. Could you try rephrasing?"
 
