@@ -9,6 +9,7 @@ import time
 
 import re
 import base64
+import os
 import httpx
 from groq import AsyncGroq
 import openai
@@ -141,6 +142,8 @@ async def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: i
             return await _safe_openai_call(messages, temperature, max_tokens, is_json)
         return ""
 
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads")
+
 async def transcribe_audio_if_present(text: str) -> str:
     """Checks for [Audio](url) or [Video](url), transcribes it, and appends to text."""
     matches = re.findall(r'\[(?:Audio|Video)\]\((https?://[^\)]+)\)', text)
@@ -149,16 +152,25 @@ async def transcribe_audio_if_present(text: str) -> str:
     
     url = matches[0]
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url)
-            if resp.status_code == 200:
-                filename = url.split("/")[-1]
-                if "." not in filename: filename += ".mp3"
-                transcription = await _client.audio.transcriptions.create(
-                    file=(filename, resp.content),
-                    model="whisper-large-v3"
-                )
-                return text + f"\n\n(Transcript: {transcription.text})"
+        # Prevent SSRF: only allow processing files from our own /uploads/ path
+        if "/uploads/" not in url:
+            return text + "\n\n(Transcript: [Cannot process external audio])"
+            
+        filename = os.path.basename(url.split("/uploads/")[-1])
+        file_path = os.path.join(UPLOAD_DIR, filename)
+        
+        if not os.path.exists(file_path):
+            return text + "\n\n(Transcript: [Audio file not found])"
+            
+        with open(file_path, "rb") as f:
+            content = f.read()
+            
+        if "." not in filename: filename += ".mp3"
+        transcription = await _client.audio.transcriptions.create(
+            file=(filename, content),
+            model="whisper-large-v3"
+        )
+        return text + f"\n\n(Transcript: {transcription.text})"
     except Exception as e:
         logger.error(f"Failed to transcribe audio: {e}")
         return text + "\n\n(Transcript: [Failed to process audio])"
@@ -169,14 +181,30 @@ def parse_image_urls(text: str) -> list[str]:
     return re.findall(r'!\[.*?\]\((https?://[^\)]+)\)', text)
 
 async def _url_to_base64(url: str) -> str:
-    """Downloads an image URL and converts to base64."""
+    """Reads an image from local uploads directory and converts to base64."""
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url)
-            if resp.status_code == 200:
-                b64 = base64.b64encode(resp.content).decode("utf-8")
-                mime_type = resp.headers.get("content-type", "image/jpeg")
-                return f"data:{mime_type};base64,{b64}"
+        if "/uploads/" not in url:
+            return None
+            
+        filename = os.path.basename(url.split("/uploads/")[-1])
+        file_path = os.path.join(UPLOAD_DIR, filename)
+        
+        if not os.path.exists(file_path):
+            return None
+            
+        with open(file_path, "rb") as f:
+            content = f.read()
+            
+        b64 = base64.b64encode(content).decode("utf-8")
+        
+        # Simple mime type guessing based on extension
+        ext = os.path.splitext(filename)[1].lower()
+        mime_type = "image/jpeg"
+        if ext == ".png": mime_type = "image/png"
+        elif ext == ".gif": mime_type = "image/gif"
+        elif ext == ".webp": mime_type = "image/webp"
+        
+        return f"data:{mime_type};base64,{b64}"
     except Exception as e:
         logger.error(f"Failed to fetch image: {e}")
     return None

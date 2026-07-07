@@ -407,7 +407,7 @@ async function handleAgentFileUpload(file, inputElement, uploadInputElement, aut
   formData.append("file", file);
   
   try {
-    const response = await fetch(`${API_BASE}/chat/upload`, {
+    const response = await fetch(`${API_BASE}/chat/upload/${activeSessionId}`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${localStorage.getItem("agent_token")}` },
       body: formData

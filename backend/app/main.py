@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from contextlib import asynccontextmanager
@@ -124,4 +125,17 @@ else:
 
 upload_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
 os.makedirs(upload_path, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=upload_path), name="uploads")
+
+@app.get("/uploads/{filename}")
+async def get_upload_file(filename: str):
+    ext = os.path.splitext(filename)[1].lower()
+    if ext in [".html", ".js", ".svg", ".php", ".sh", ".exe", ".bat"]:
+        raise HTTPException(status_code=403, detail="Forbidden file type")
+        
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join(upload_path, safe_filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    return FileResponse(file_path)

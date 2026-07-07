@@ -142,8 +142,11 @@ async function handleFileUpload(file, inputElement, uploadInputElement, autoSend
   formData.append("file", file);
   
   try {
-    const response = await fetch(`${API_BASE}/chat/upload`, {
+    const response = await fetch(`${API_BASE}/chat/upload/${SESSION_ID}`, {
       method: "POST",
+      headers: {
+        "Authorization": `Bearer ${SESSION_TOKEN}`
+      },
       body: formData
     });
     const data = await response.json();
