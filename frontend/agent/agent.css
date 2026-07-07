@@ -6,16 +6,17 @@
 }
 
 :root {
-  --ink: #F3F4F6;
-  --ink-soft: #9CA3AF;
-  --paper: rgba(17, 24, 39, 0.7);
-  --paper-dim: #0B0E14;
+  --ink: #FFFFFF;
+  --ink-soft: #A1A1AA;
+  --paper: rgba(9, 9, 11, 0.7);
+  --paper-dim: #09090b;
   --line: rgba(255, 255, 255, 0.08);
-  --accent: #3B82F6;
-  --accent-glow: rgba(59, 130, 246, 0.5);
-  --radius: 20px;
-  --radius-sm: 12px;
-  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --accent: #3b82f6;
+  --accent-glow: rgba(59, 130, 246, 0.6);
+  --radius: 28px;
+  --radius-sm: 18px;
+  --transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  --shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
 }
 
 body {
@@ -83,12 +84,12 @@ body {
 }
 
 #login-form {
-  background: rgba(17, 24, 39, 0.6);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--paper);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
   padding: 48px;
   border-radius: var(--radius);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  box-shadow: var(--shadow);
   width: 420px;
   display: flex;
   flex-direction: column;
@@ -205,14 +206,15 @@ body {
 
 /* Sidebar */
 #sidebar {
-  width: 380px;
+  width: 420px;
   background: var(--paper);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  z-index: 10;
+  z-index: 2;
+  box-shadow: var(--shadow);
 }
 
 #sidebar-header {
@@ -678,18 +680,19 @@ body {
 
 /* --- Light Mode Overrides --- */
 body.light-mode {
-  --ink: #111827;
-  --ink-soft: #4B5563;
-  --paper: rgba(255, 255, 255, 0.95);
-  --paper-dim: #F3F4F6;
-  --line: rgba(0, 0, 0, 0.1);
+  --ink: #09090b;
+  --ink-soft: #71717A;
+  --paper: rgba(255, 255, 255, 0.9);
+  --paper-dim: #F4F4F5;
+  --line: rgba(0, 0, 0, 0.08);
+  --shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05) inset;
   background-image: none;
   background-color: var(--paper-dim);
 }
 
 body.light-mode #login-form {
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+  background: var(--paper);
+  box-shadow: var(--shadow);
 }
 body.light-mode #login-form h1 {
   background: none;
