@@ -581,7 +581,13 @@ function renderMarkdown(text) {
 }
 
 function inlineMarkdown(text) {
-  return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  let escaped = escapeHtml(text);
+  escaped = escaped.replace(/\[Audio\]\((https?:\/\/[^\)]+)\)/g, '<audio controls src="$1" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 20px;"></audio>');
+  escaped = escaped.replace(/\[Video\]\((https?:\/\/[^\)]+)\)/g, '<video controls src="$1" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;"></video>');
+  escaped = escaped.replace(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g, '<img src="$1" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;" />');
+  escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline;">$1</a>');
+  escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  return escaped;
 }
 
 function escapeHtml(text) {
@@ -661,7 +667,7 @@ if (resizer && sidebar) {
   document.addEventListener("mousemove", (e) => {
     if (!isResizing) return;
     const newWidth = e.clientX - sidebar.getBoundingClientRect().left;
-    if (newWidth >= 300 && newWidth <= 600) {
+    if (newWidth >= 450 && newWidth <= 1000) {
       sidebar.style.width = `${newWidth}px`;
     }
   });

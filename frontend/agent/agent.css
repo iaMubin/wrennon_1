@@ -206,9 +206,9 @@ body {
 
 /* Sidebar */
 #sidebar {
-  width: 420px;
-  min-width: 300px;
-  max-width: 600px;
+  width: 450px;
+  min-width: 450px;
+  max-width: 1000px;
   background: var(--paper);
   backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
