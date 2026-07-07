@@ -23,16 +23,33 @@ let SESSION_TOKEN = null;
 let reconnectInterval = null;
 
 // ── Theme Management ───────────────────────────────────────────────
+function updateThemeIcon(isLight, btnId) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  if (isLight) {
+    // Sun icon
+    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
+  } else {
+    // Moon icon
+    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
+  }
+}
+
 const themeBtn = document.getElementById("theme-btn");
-if (themeBtn) {
+const widgetContainer = document.getElementById("wrennon-widget");
+if (themeBtn && widgetContainer) {
   themeBtn.addEventListener("click", () => {
-    document.body.classList.toggle("light-mode");
-    const isLight = document.body.classList.contains("light-mode");
+    widgetContainer.classList.toggle("light-mode");
+    const isLight = widgetContainer.classList.contains("light-mode");
     localStorage.setItem("wrennon_theme", isLight ? "light" : "dark");
+    updateThemeIcon(isLight, "theme-btn");
   });
   
   if (localStorage.getItem("wrennon_theme") === "light") {
-    document.body.classList.add("light-mode");
+    widgetContainer.classList.add("light-mode");
+    updateThemeIcon(true, "theme-btn");
+  } else {
+    updateThemeIcon(false, "theme-btn");
   }
 }
 
@@ -114,44 +131,62 @@ inputEl.addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendMessage();
 });
 
+async function handleFileUpload(file, inputElement, uploadInputElement, autoSend = false, sendFunction = null) {
+  if (!file) return;
+  
+  const originalPlaceholder = inputElement.placeholder;
+  inputElement.placeholder = "Uploading...";
+  inputElement.disabled = true;
+  
+  const formData = new FormData();
+  formData.append("file", file);
+  
+  try {
+    const response = await fetch(`${API_BASE}/chat/upload`, {
+      method: "POST",
+      body: formData
+    });
+    const data = await response.json();
+    if (data.url) {
+      let md = `[Document](${data.url})`;
+      if (file.type.startsWith("image/")) md = `![Image](${data.url})`;
+      else if (file.type.startsWith("audio/")) md = `[Audio](${data.url})`;
+      else if (file.type.startsWith("video/")) md = `[Video](${data.url})`;
+      
+      inputElement.value = (inputElement.value + (inputElement.value ? " " : "") + md).trim();
+      if (autoSend && sendFunction) {
+        sendFunction();
+      }
+    }
+  } catch (err) {
+    console.error("Upload failed", err);
+  } finally {
+    inputElement.placeholder = originalPlaceholder;
+    inputElement.disabled = false;
+    inputElement.focus();
+    if (uploadInputElement) uploadInputElement.value = "";
+  }
+}
+
 const uploadBtn = document.getElementById("upload-btn");
 const fileUpload = document.getElementById("file-upload");
 if (uploadBtn && fileUpload) {
   uploadBtn.addEventListener("click", () => fileUpload.click());
-  fileUpload.addEventListener("change", async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    const originalPlaceholder = inputEl.placeholder;
-    inputEl.placeholder = "Uploading...";
-    inputEl.disabled = true;
-    
-    const formData = new FormData();
-    formData.append("file", file);
-    
-    try {
-      const response = await fetch(`${API_BASE}/chat/upload`, {
-        method: "POST",
-        body: formData
-      });
-      const data = await response.json();
-      if (data.url) {
-        let md = `[Document](${data.url})`;
-        if (file.type.startsWith("image/")) md = `![Image](${data.url})`;
-        else if (file.type.startsWith("audio/")) md = `[Audio](${data.url})`;
-        else if (file.type.startsWith("video/")) md = `[Video](${data.url})`;
-        
-        inputEl.value = (inputEl.value + " " + md).trim();
-      }
-    } catch (err) {
-      console.error("Upload failed", err);
-    } finally {
-      inputEl.placeholder = originalPlaceholder;
-      inputEl.disabled = false;
-      inputEl.focus();
-      fileUpload.value = "";
-    }
-  });
+  fileUpload.addEventListener("change", (e) => handleFileUpload(e.target.files[0], inputEl, fileUpload, false, null));
+}
+
+const photoBtn = document.getElementById("photo-btn");
+const photoUpload = document.getElementById("photo-upload");
+if (photoBtn && photoUpload) {
+  photoBtn.addEventListener("click", () => photoUpload.click());
+  photoUpload.addEventListener("change", (e) => handleFileUpload(e.target.files[0], inputEl, photoUpload, true, sendMessage));
+}
+
+const voiceBtn = document.getElementById("voice-btn");
+const voiceUpload = document.getElementById("voice-upload");
+if (voiceBtn && voiceUpload) {
+  voiceBtn.addEventListener("click", () => voiceUpload.click());
+  voiceUpload.addEventListener("change", (e) => handleFileUpload(e.target.files[0], inputEl, voiceUpload, true, sendMessage));
 }
 
 // ── History & WebSocket ────────────────────────────────────────────
@@ -217,7 +252,7 @@ async function loadHistory() {
       
       if (dateStr === todayStr) dateDiv.textContent = "Today";
       else if (dateStr === yesterdayStr) dateDiv.textContent = "Yesterday";
-      else dateDiv.textContent = dateObj.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+      else dateDiv.textContent = dateObj.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
       
       messagesEl.appendChild(dateDiv);
       lastDateStr = dateStr;
@@ -369,7 +404,8 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   let nameHtml = "";
   if (uiRole === "bot" || uiRole === "agent") {
       const displayName = uiRole === "bot" ? "AI Assistant" : (name || "Support Agent");
-      nameHtml = `<div class="msg-name">${displayName}</div>`;
+      const badgeHtml = uiRole === "agent" ? `<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; vertical-align: middle;">Agent</span>` : "";
+      nameHtml = `<div class="msg-name" style="display: flex; align-items: center;">${displayName}${badgeHtml}</div>`;
   }
   
   let timeHtml = "";

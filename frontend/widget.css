@@ -244,7 +244,7 @@ body {
 @keyframes bounce { 0%, 80%, 100% { transform: scale(0); opacity: 0.4;} 40% { transform: scale(1.2); opacity: 1;} }
 
 /* --- Light Mode Overrides --- */
-body.light-mode {
+#wrennon-widget.light-mode {
   --ink: #111827;
   --ink-soft: #4B5563;
   --paper: rgba(255, 255, 255, 0.95);
@@ -254,63 +254,63 @@ body.light-mode {
   background-color: var(--paper-dim);
 }
 
-body.light-mode #panel-header {
+#wrennon-widget.light-mode #panel-header {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(243, 244, 246, 0.95));
 }
 
-body.light-mode #input-row {
+#wrennon-widget.light-mode #input-row {
   background: rgba(255, 255, 255, 0.95);
 }
 
-body.light-mode #message-input {
+#wrennon-widget.light-mode #message-input {
   background: rgba(0, 0, 0, 0.04);
   border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-body.light-mode .msg--bot {
+#wrennon-widget.light-mode .msg--bot {
   background: rgba(219, 234, 254, 0.6);
   border-color: rgba(59, 130, 246, 0.3);
 }
 
-body.light-mode .msg--agent {
+#wrennon-widget.light-mode .msg--agent {
   background: rgba(209, 250, 229, 0.6);
   border-color: rgba(16, 185, 129, 0.3);
 }
 
-body.light-mode .msg-name {
+#wrennon-widget.light-mode .msg-name {
   color: #2563EB;
 }
 
-body.light-mode .msg--agent .msg-name {
+#wrennon-widget.light-mode .msg--agent .msg-name {
   color: #059669;
 }
 
-body.light-mode .msg-avatar {
+#wrennon-widget.light-mode .msg-avatar {
   background: linear-gradient(135deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.01));
   border-color: rgba(0, 0, 0, 0.1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
-body.light-mode .msg--human {
+#wrennon-widget.light-mode .msg--human {
   background: rgba(0, 0, 0, 0.03);
   border-color: rgba(0, 0, 0, 0.05);
 }
 
-body.light-mode .msg-ticks {
+#wrennon-widget.light-mode .msg-ticks {
   color: #2563EB;
 }
 
-body.light-mode .date-separator {
+#wrennon-widget.light-mode .date-separator {
   background: rgba(0, 0, 0, 0.05);
   border-color: rgba(0, 0, 0, 0.08);
   color: var(--ink-soft);
 }
 
-body.light-mode #close-btn {
+#wrennon-widget.light-mode #close-btn {
   background: rgba(0, 0, 0, 0.05);
   border-color: rgba(0, 0, 0, 0.1);
 }
-body.light-mode #close-btn:hover {
+#wrennon-widget.light-mode #close-btn:hover {
   background: rgba(0, 0, 0, 0.1);
 }
 

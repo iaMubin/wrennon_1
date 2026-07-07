@@ -223,16 +223,12 @@ async def generate_conversation_summary(messages: list) -> str:
     
     prompt = (
         "You are an expert assistant. Summarize the following customer support conversation "
-        "briefly and concisely. You MUST use a short bulleted list.\n"
-        "Do not include any intro like 'Here is the summary' or headers. Start directly with the bullets.\n\n"
-        "Focus ONLY on:\n"
-        "- What the customer's main issue/request is.\n"
-        "- What has been done so far.\n"
-        "- What the human agent needs to do next (Provide specific suggestions for the agent).\n\n"
+        "extremely briefly (max 5-10 words per bullet). You MUST use a short bulleted list.\n"
+        "Do not include any intro. Start directly with the bullets.\n\n"
         "Format your response exactly like this:\n"
-        "- **Issue**: [brief issue]\n"
-        "- **Actions Taken**: [brief actions]\n"
-        "- **Suggestions**: [actionable suggestions]"
+        "• **Issue**: [brief issue]\n"
+        "• **Status**: [brief status]\n"
+        "• **Next Step**: [actionable suggestion for agent]"
     )
     
     # Build conversation history for the LLM

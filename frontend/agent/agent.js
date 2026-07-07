@@ -26,16 +26,32 @@ const agentMessages = document.getElementById("agent-messages");
 const agentInput = document.getElementById("agent-message-input");
 
 // ── Theme Management ───────────────────────────────────────────────
+function updateThemeIcon(isLight, btnId) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  if (isLight) {
+    // Sun icon
+    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
+  } else {
+    // Moon icon
+    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
+  }
+}
+
 const themeBtn = document.getElementById("theme-btn");
 if (themeBtn) {
   themeBtn.addEventListener("click", () => {
     document.body.classList.toggle("light-mode");
     const isLight = document.body.classList.contains("light-mode");
     localStorage.setItem("wrennon_theme", isLight ? "light" : "dark");
+    updateThemeIcon(isLight, "theme-btn");
   });
   
   if (localStorage.getItem("wrennon_theme") === "light") {
     document.body.classList.add("light-mode");
+    updateThemeIcon(true, "theme-btn");
+  } else {
+    updateThemeIcon(false, "theme-btn");
   }
 }
 
@@ -262,7 +278,7 @@ function renderConversationList(conversations) {
     item.innerHTML = `
       <div class="conv-item-header">
         <span class="conv-item-email">${escapeHtml(conv.customer_email || "Unknown Customer")}</span>
-        <span class="conv-item-time">${formatTime(conv.updated_at)}</span>
+        <span class="conv-item-time">${formatSidebarTime(conv.updated_at)}</span>
       </div>
       <div class="conv-item-preview">${escapeHtml(conv.last_message || "No messages yet")}</div>
       <div class="badge-row">
@@ -271,13 +287,13 @@ function renderConversationList(conversations) {
       </div>
     `;
 
-    item.addEventListener("click", () => openConversation(conv.session_id, conv.customer_email, conv.short_id, conv.resolved));
+    item.addEventListener("click", () => openConversation(conv.session_id, conv.customer_email, conv.short_id, conv.resolved, conv.updated_at));
     conversationList.appendChild(item);
   }
 }
 
 // --- Opening and viewing a conversation ---
-async function openConversation(sessionId, customerEmail, shortId, isResolved) {
+async function openConversation(sessionId, customerEmail, shortId, isResolved, updatedAt) {
   if (activeSessionId && activeSessionId !== sessionId) {
     drafts[activeSessionId] = agentInput.value;
   }
@@ -290,14 +306,20 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved) {
   conversationEmail.textContent = customerEmail || "Unknown Customer";
   conversationSession.textContent = shortId || sessionId;
   
+  const resolveTimeEl = document.getElementById("resolve-time");
   if (isResolved) {
     resolveBtn.textContent = "Resolved";
     resolveBtn.disabled = true;
     resolveBtn.classList.remove("btn-primary");
+    if (updatedAt) {
+      resolveTimeEl.textContent = `at ${formatSidebarTime(updatedAt)}`;
+      resolveTimeEl.classList.remove("hidden");
+    }
   } else {
     resolveBtn.textContent = "Mark resolved";
     resolveBtn.disabled = false;
     resolveBtn.classList.add("btn-primary");
+    resolveTimeEl.classList.add("hidden");
   }
 
   agentMessages.innerHTML = "<div class='loading-spinner'></div>";
@@ -319,7 +341,7 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved) {
         
         if (dateStr === todayStr) dateDiv.textContent = "Today";
         else if (dateStr === yesterdayStr) dateDiv.textContent = "Yesterday";
-        else dateDiv.textContent = dateObj.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        else dateDiv.textContent = dateObj.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
         
         agentMessages.appendChild(dateDiv);
         lastDateStr = dateStr;
@@ -358,45 +380,63 @@ agentInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendAgentReply();
 });
 
+async function handleAgentFileUpload(file, inputElement, uploadInputElement, autoSend = false, sendFunction = null) {
+  if (!file) return;
+  
+  const originalPlaceholder = inputElement.placeholder;
+  inputElement.placeholder = "Uploading...";
+  inputElement.disabled = true;
+  
+  const formData = new FormData();
+  formData.append("file", file);
+  
+  try {
+    const response = await fetch(`${API_BASE}/chat/upload`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${localStorage.getItem("agent_token")}` },
+      body: formData
+    });
+    const data = await response.json();
+    if (data.url) {
+      let md = `[Document](${data.url})`;
+      if (file.type.startsWith("image/")) md = `![Image](${data.url})`;
+      else if (file.type.startsWith("audio/")) md = `[Audio](${data.url})`;
+      else if (file.type.startsWith("video/")) md = `[Video](${data.url})`;
+      
+      inputElement.value = (inputElement.value + (inputElement.value ? " " : "") + md).trim();
+      if (autoSend && sendFunction) {
+        sendFunction();
+      }
+    }
+  } catch (err) {
+    console.error("Upload failed", err);
+  } finally {
+    inputElement.placeholder = originalPlaceholder;
+    inputElement.disabled = false;
+    inputElement.focus();
+    if (uploadInputElement) uploadInputElement.value = "";
+  }
+}
+
 const agentUploadBtn = document.getElementById("agent-upload-btn");
 const agentFileUpload = document.getElementById("agent-file-upload");
 if (agentUploadBtn && agentFileUpload) {
   agentUploadBtn.addEventListener("click", () => agentFileUpload.click());
-  agentFileUpload.addEventListener("change", async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    const originalPlaceholder = agentInput.placeholder;
-    agentInput.placeholder = "Uploading...";
-    agentInput.disabled = true;
-    
-    const formData = new FormData();
-    formData.append("file", file);
-    
-    try {
-      const response = await fetch(`${API_BASE}/chat/upload`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${localStorage.getItem("agent_token")}` },
-        body: formData
-      });
-      const data = await response.json();
-      if (data.url) {
-        let md = `[Document](${data.url})`;
-        if (file.type.startsWith("image/")) md = `![Image](${data.url})`;
-        else if (file.type.startsWith("audio/")) md = `[Audio](${data.url})`;
-        else if (file.type.startsWith("video/")) md = `[Video](${data.url})`;
-        
-        agentInput.value = (agentInput.value + " " + md).trim();
-      }
-    } catch (err) {
-      console.error("Upload failed", err);
-    } finally {
-      agentInput.placeholder = originalPlaceholder;
-      agentInput.disabled = false;
-      agentInput.focus();
-      agentFileUpload.value = "";
-    }
-  });
+  agentFileUpload.addEventListener("change", (e) => handleAgentFileUpload(e.target.files[0], agentInput, agentFileUpload, false, null));
+}
+
+const agentPhotoBtn = document.getElementById("agent-photo-btn");
+const agentPhotoUpload = document.getElementById("agent-photo-upload");
+if (agentPhotoBtn && agentPhotoUpload) {
+  agentPhotoBtn.addEventListener("click", () => agentPhotoUpload.click());
+  agentPhotoUpload.addEventListener("change", (e) => handleAgentFileUpload(e.target.files[0], agentInput, agentPhotoUpload, true, sendAgentReply));
+}
+
+const agentVoiceBtn = document.getElementById("agent-voice-btn");
+const agentVoiceUpload = document.getElementById("agent-voice-upload");
+if (agentVoiceBtn && agentVoiceUpload) {
+  agentVoiceBtn.addEventListener("click", () => agentVoiceUpload.click());
+  agentVoiceUpload.addEventListener("change", (e) => handleAgentFileUpload(e.target.files[0], agentInput, agentVoiceUpload, true, sendAgentReply));
 }
 
 function sendAgentReply() {
@@ -417,6 +457,11 @@ resolveBtn.addEventListener("click", async () => {
     resolveBtn.textContent = "Resolved";
     resolveBtn.disabled = true;
     resolveBtn.classList.remove("btn-primary");
+    const resolveTimeEl = document.getElementById("resolve-time");
+    if (resolveTimeEl) {
+      resolveTimeEl.textContent = `at ${formatSidebarTime(new Date().toISOString())}`;
+      resolveTimeEl.classList.remove("hidden");
+    }
     loadConversations();
   }
 });
@@ -494,6 +539,13 @@ function escapeHtml(text) {
 function formatTime(isoString) {
   const date = new Date(isoString);
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatSidebarTime(isoString) {
+  const date = new Date(isoString);
+  const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return `${dateStr}, ${timeStr}`;
 }
 
 function logout() {
