@@ -151,7 +151,7 @@ def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None) -
                 
             db.commit()
 
-            _save_message(db, conversation.id, sender="system", content=f"[System] AI generated summary for agent handoff: {updated_state.get('conversation_summary', '')}")
+
             summary = updated_state.get("handoff_summary", "")
             if summary:
                 _save_message(db, conversation.id, sender="system", content=f"📋 Summary: {summary}")

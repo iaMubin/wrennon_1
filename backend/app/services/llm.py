@@ -225,12 +225,14 @@ async def generate_conversation_summary(messages: list) -> str:
     
     prompt = (
         "You are an expert assistant. Summarize the following customer support conversation "
-        "extremely briefly (max 5-10 words per bullet). You MUST use a short bulleted list.\n"
+        "extremely briefly (max 5-10 words per bullet) and in a clean, organized manner. You MUST use a short bulleted list.\n"
         "Do not include any intro. Start directly with the bullets.\n\n"
+        "Do NOT include basic next steps like 'transfer to human agent' or 'request order number'. "
+        "Only include a 'Suggestion' bullet if you have a specific, non-obvious recommendation for the human agent based on the context.\n\n"
         "Format your response exactly like this:\n"
         "• **Issue**: [brief issue]\n"
         "• **Status**: [brief status]\n"
-        "• **Next Step**: [actionable suggestion for agent]"
+        "• **Suggestion**: [optional, only if needed]"
     )
     
     # Build conversation history for the LLM
@@ -241,7 +243,7 @@ async def generate_conversation_summary(messages: list) -> str:
         content = mask_pii(msg.content) if role == "user" else msg.content
         llm_messages.append({"role": role, "content": content})
     
-    result = await _safe_llm_call(messages=llm_messages, temperature=0.1, max_tokens=250)
+    result = await _safe_llm_call(messages=llm_messages, temperature=0.1, max_tokens=1024)
     return result or "Customer requested to speak with a human agent."
 
 
