@@ -242,7 +242,7 @@ def delete_internal_note(
 @router.post("/agent/conversations/{session_id}/pin")
 def pin_message(
     session_id: str,
-    message_id: str = Body(..., embed=True),
+    message_id: int | None = Body(None, embed=True),
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent)
 ) -> dict:

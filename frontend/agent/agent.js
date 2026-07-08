@@ -516,32 +516,27 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
     displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
     div.style.backgroundColor = "rgba(217, 119, 6, 0.1)"; // Warm yellow
     div.style.border = "1px solid rgba(217, 119, 6, 0.3)";
-    div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:flex-start;">
-      <div>
-        <svg style="vertical-align:text-bottom; margin-right:4px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-        <strong>Internal Note</strong><br/>
-        ${escapeHtml(displayContent)}
-      </div>
-      <div>
-        ${msgId ? `<button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(displayContent)}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Pin message"><svg style="transform: rotate(45deg);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>` : ''}
-        ${msgId ? `<button class="delete-note-btn" data-id="${msgId}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Delete note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>` : ''}
-      </div>
+    div.innerHTML = `<div>
+      <span style="font-size:11px; font-weight:700; color:#B45309; text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom:4px;">Internal Note</span>
+      ${escapeHtml(displayContent)}
+    </div>
+    <div class="msg-actions" style="display:flex; justify-content:flex-end; gap:4px; margin-top:4px;">
+      ${msgId ? `<button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(displayContent)}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Pin message"><svg style="transform: rotate(45deg);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>` : ''}
+      ${msgId ? `<button class="delete-note-btn" data-id="${msgId}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Delete note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>` : ''}
     </div>`;
   } else if (sender === "ai" || sender === "agent" || sender === "system") {
     div.innerHTML = renderMarkdown(content);
     if (msgId) {
-      div.innerHTML = `<div style="position:absolute;top:4px;right:4px;" class="msg-actions">
+      div.innerHTML += `<div style="display:flex; justify-content:flex-end; gap:4px; margin-top:4px;" class="msg-actions">
         <button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(content)}" style="background:none;border:none;cursor:pointer;color:inherit;padding:4px;" title="Pin message"><svg style="transform: rotate(45deg);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>
-      </div>` + div.innerHTML;
-      div.style.position = "relative";
+      </div>`;
     }
   } else {
     div.innerHTML = escapeHtml(content);
     if (msgId) {
-      div.innerHTML = `<div style="position:absolute;top:4px;right:4px;" class="msg-actions">
+      div.innerHTML += `<div style="display:flex; justify-content:flex-end; gap:4px; margin-top:4px;" class="msg-actions">
         <button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(content)}" style="background:none;border:none;cursor:pointer;color:inherit;padding:4px;" title="Pin message"><svg style="transform: rotate(45deg);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>
-      </div>` + div.innerHTML;
-      div.style.position = "relative";
+      </div>`;
     }
   }
   contentWrapper.appendChild(div);
@@ -579,7 +574,7 @@ document.addEventListener("click", async (e) => {
     const content = pinBtn.dataset.content;
     if (!msgId || !activeSessionId) return;
     
-    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: msgId });
+    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: parseInt(msgId, 10) });
     if (result) {
       updatePinnedMessageUI(msgId, content);
     }
@@ -589,7 +584,7 @@ document.addEventListener("click", async (e) => {
   if (unpinBtn) {
     if (!activeSessionId) return;
     
-    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: "" });
+    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: null });
     if (result) {
       updatePinnedMessageUI(null, null);
     }
