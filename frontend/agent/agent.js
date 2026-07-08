@@ -235,7 +235,7 @@ function connectSocket() {
       }
     } else if (data.type === "new_message") {
       if (data.session_id === activeSessionId) {
-        appendMessage(data.sender, data.content, new Date().toISOString(), data.message_id);
+        appendMessage(data.sender, data.content, new Date().toISOString(), data.sender === "agent_internal", data.message_id);
         if (data.is_resolved) {
           resolveBtn.textContent = "Resolved";
           resolveBtn.disabled = true;
