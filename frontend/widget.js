@@ -15,6 +15,26 @@ const closeBtn = document.getElementById("close-btn");
 const messagesEl = document.getElementById("messages");
 const inputEl = document.getElementById("message-input");
 const sendBtn = document.getElementById("send-btn");
+const wsStatus = document.getElementById("ws-status");
+
+// Create scroll-to-bottom button dynamically
+const scrollToBottomBtn = document.createElement("button");
+scrollToBottomBtn.id = "scroll-to-bottom-btn";
+scrollToBottomBtn.className = "hidden";
+scrollToBottomBtn.innerHTML = `New Message <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; vertical-align: middle;"><path d="M6 9l6 6 6-6"/></svg>`;
+document.getElementById("panel").appendChild(scrollToBottomBtn);
+
+scrollToBottomBtn.addEventListener("click", () => {
+  scrollToBottom(true);
+  scrollToBottomBtn.classList.add("hidden");
+});
+
+messagesEl.addEventListener("scroll", () => {
+  const isNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 100;
+  if (isNearBottom) {
+    scrollToBottomBtn.classList.add("hidden");
+  }
+});
 
 let socket = null;
 let hasLoadedHistory = false;
@@ -582,7 +602,12 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   
   wrapper.appendChild(contentWrapper);
   messagesEl.appendChild(wrapper);
-  scrollToBottom(uiRole === 'user' || wasNearBottom);
+  
+  if (wasNearBottom || uiRole === 'user') {
+    scrollToBottom(true);
+  } else if (uiRole !== 'system') {
+    scrollToBottomBtn.classList.remove("hidden");
+  }
   
   if (save && uiRole !== "system") {
     saveToHistory(role, text);
@@ -602,7 +627,12 @@ function showTypingIndicator() {
       <span class="dot"></span><span class="dot"></span><span class="dot"></span>
     </div>
   `;
+  
+  const wasNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 100;
   messagesEl.appendChild(wrapper);
+  if (wasNearBottom) {
+    scrollToBottom(true);
+  }
 }
 
 function hideTypingIndicator() {
