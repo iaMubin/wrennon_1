@@ -517,6 +517,7 @@ document.addEventListener("visibilitychange", () => {
 });
 
 function appendMessage(role, text, save = true, timestamp = Date.now(), name = null) {
+  const wasNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 100;
   const uiRole = role === "human" ? "user" : (role === "ai" ? "bot" : role);
   
   if (!save && uiRole !== "system") {
@@ -581,7 +582,7 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   
   wrapper.appendChild(contentWrapper);
   messagesEl.appendChild(wrapper);
-  scrollToBottom(uiRole === 'user');
+  scrollToBottom(uiRole === 'user' || wasNearBottom);
   
   if (save && uiRole !== "system") {
     saveToHistory(role, text);
@@ -602,7 +603,6 @@ function showTypingIndicator() {
     </div>
   `;
   messagesEl.appendChild(wrapper);
-  scrollToBottom();
 }
 
 function hideTypingIndicator() {
