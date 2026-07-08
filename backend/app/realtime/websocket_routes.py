@@ -469,7 +469,11 @@ async def agent_websocket(websocket: WebSocket, access_token: str | None = Cooki
                     "is_resolved": reply_data["resolved"],
                 })
 
-            if not is_internal:
+            # SECURITY: Defense-in-depth — check both the is_internal flag
+            # AND the actual stored sender. Even if is_internal is somehow
+            # wrong, the sender check prevents internal notes from leaking.
+            msg_sender = "agent_internal" if is_internal else "agent"
+            if not is_internal and msg_sender != "agent_internal":
                 # Customer receives same shape as AI reply — seamless handoff.
                 await manager.send_to_customer(session_id, {
                     "reply": reply_text, 

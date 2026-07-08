@@ -97,6 +97,84 @@ def get_order_status(order_id: str) -> Optional[dict]:
     return None
 
 
+def get_order_by_email(email: str) -> Optional[dict]:
+    """Look up the most recent order by customer email.
+    Simulates:
+    GET /admin/api/2024-01/orders.json?email={email}&limit=1
+    
+    Args:
+        email: The customer's email address
+        
+    Returns:
+        A dictionary containing order status, or None if no match.
+    """
+    # --- MOCK BODY ---
+    mock_orders = {
+        "1001": {"order_id": "1001", "email": "customer1@example.com", "status": "shipped", "carrier": "Pathao Courier", "eta": "2026-06-27", "tracking_url": "https://example.com/track/1001"},
+        "1002": {"order_id": "1002", "email": "test@example.com", "status": "processing", "carrier": None, "eta": "2026-06-30", "tracking_url": None},
+        "1003": {"order_id": "1003", "email": "customer3@example.com", "status": "delivered", "carrier": "Sundarban Courier", "eta": "2026-06-20", "tracking_url": "https://example.com/track/1003"},
+        "1004": {"order_id": "1004", "email": "test@example.com", "status": "cancelled", "carrier": None, "eta": None, "tracking_url": None},
+        "1005": {"order_id": "1005", "email": "test@example.com", "status": "processing", "carrier": None, "eta": "2026-07-15", "tracking_url": None},
+        "1006": {"order_id": "1006", "email": "customer6@example.com", "status": "shipped", "carrier": "DHL", "eta": "2026-07-08", "tracking_url": "https://dhl.com/track/1006"},
+        "1007": {"order_id": "1007", "email": "customer7@example.com", "status": "delivered", "carrier": "FedEx", "eta": "2026-06-05", "tracking_url": "https://fedex.com/track/1007"},
+    }
+    
+    if not email:
+        return None
+    email_lower = email.lower().strip()
+    matches = [
+        order for order in mock_orders.values()
+        if order.get("email", "").lower() == email_lower
+    ]
+    if not matches:
+        return None
+    # Return the latest (highest order_id)
+    latest = max(matches, key=lambda x: x["order_id"])
+    result = latest.copy()
+    if "email" in result:
+        del result["email"]
+    return result
+
+
+def get_order_by_email(email: str) -> Optional[dict]:
+    """Look up the most recent order by customer email.
+    Simulates:
+    GET /admin/api/2024-01/orders.json?email={email}&limit=1
+    
+    Args:
+        email: The customer's email address
+        
+    Returns:
+        A dictionary containing order status, or None if no match.
+    """
+    # --- MOCK BODY ---
+    mock_orders = {
+        "1001": {"order_id": "1001", "email": "customer1@example.com", "status": "shipped", "carrier": "Pathao Courier", "eta": "2026-06-27", "tracking_url": "https://example.com/track/1001"},
+        "1002": {"order_id": "1002", "email": "test@example.com", "status": "processing", "carrier": None, "eta": "2026-06-30", "tracking_url": None},
+        "1003": {"order_id": "1003", "email": "customer3@example.com", "status": "delivered", "carrier": "Sundarban Courier", "eta": "2026-06-20", "tracking_url": "https://example.com/track/1003"},
+        "1004": {"order_id": "1004", "email": "test@example.com", "status": "cancelled", "carrier": None, "eta": None, "tracking_url": None},
+        "1005": {"order_id": "1005", "email": "test@example.com", "status": "processing", "carrier": None, "eta": "2026-07-15", "tracking_url": None},
+        "1006": {"order_id": "1006", "email": "customer6@example.com", "status": "shipped", "carrier": "DHL", "eta": "2026-07-08", "tracking_url": "https://dhl.com/track/1006"},
+        "1007": {"order_id": "1007", "email": "customer7@example.com", "status": "delivered", "carrier": "FedEx", "eta": "2026-06-05", "tracking_url": "https://fedex.com/track/1007"},
+    }
+    
+    if not email:
+        return None
+    email_lower = email.lower().strip()
+    matches = [
+        order for order in mock_orders.values()
+        if order.get("email", "").lower() == email_lower
+    ]
+    if not matches:
+        return None
+    # Return the latest (highest order_id)
+    latest = max(matches, key=lambda x: x["order_id"])
+    result = latest.copy()
+    if "email" in result:
+        del result["email"]
+    return result
+
+
 def create_support_ticket(
     customer_email: str,
     conversation_summary: str,

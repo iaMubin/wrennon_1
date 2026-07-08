@@ -233,12 +233,9 @@ async function handleFileUpload(file, inputElement, uploadInputElement, autoSend
   }
 }
 
-const uploadBtn = document.getElementById("upload-btn");
-const fileUpload = document.getElementById("file-upload");
-if (uploadBtn && fileUpload) {
-  uploadBtn.addEventListener("click", () => fileUpload.click());
-  fileUpload.addEventListener("change", (e) => handleFileUpload(e.target.files[0], inputEl, fileUpload, false, null));
-}
+// NOTE: General file upload removed for customers — customers can only
+// send photos (via photo button) and voice messages. Agents retain full
+// file upload capabilities through the agent dashboard.
 
 const photoBtn = document.getElementById("photo-btn");
 const photoUpload = document.getElementById("photo-upload");
@@ -396,6 +393,15 @@ function connectSocket() {
     try {
       const data = JSON.parse(event.data);
       
+      // SECURITY: Client-side defense-in-depth — reject any message
+      // with "internal" in the sender. This is the last line of defense
+      // in case all server-side guards fail.
+      const rawSender = String(data.sender || "").toLowerCase();
+      if (rawSender.includes("internal")) {
+        console.warn("SECURITY: Blocked internal message on client side.", data.sender);
+        return;
+      }
+      
       if (data.type === "typing") {
         showTypingIndicator();
         return;
@@ -479,7 +485,20 @@ function renderMarkdown(text) {
 
 function inlineMarkdown(text) {
   let escaped = escapeHtml(text);
-  escaped = escaped.replace(/\[Audio\]\((https?:\/\/[^\)]+)\)/g, '<audio controls src="$1" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 20px;"></audio>');
+  escaped = escaped.replace(/\[Audio\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
+    const playerId = 'vp_' + Math.random().toString(36).substr(2, 9);
+    return `<div class="voice-player" id="${playerId}" data-src="${url}">` +
+      `<button class="voice-player__btn" aria-label="Play voice message" onclick="toggleVoicePlayer('${playerId}')">` +
+        `<svg class="voice-player__icon-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>` +
+        `<svg class="voice-player__icon-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>` +
+      `</button>` +
+      `<div class="voice-player__waveform">` +
+        Array.from({length: 20}, (_, i) => `<span class="voice-player__bar" style="animation-delay:${i * 0.05}s; height:${Math.floor(Math.random() * 60) + 20}%"></span>`).join('') +
+      `</div>` +
+      `<span class="voice-player__time">0:00</span>` +
+      `<audio preload="metadata" src="${url}"></audio>` +
+    `</div>`;
+  });
   escaped = escaped.replace(/\[Video\]\((https?:\/\/[^\)]+)\)/g, '<video controls src="$1" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;"></video>');
   escaped = escaped.replace(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g, '<img src="$1" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;" />');
   escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline;">$1</a>');
@@ -491,6 +510,66 @@ function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
+}
+
+// --- Voice Player Logic ---
+function toggleVoicePlayer(playerId) {
+  const container = document.getElementById(playerId);
+  if (!container) return;
+  const audio = container.querySelector('audio');
+  const playIcon = container.querySelector('.voice-player__icon-play');
+  const pauseIcon = container.querySelector('.voice-player__icon-pause');
+  const timeEl = container.querySelector('.voice-player__time');
+  const bars = container.querySelectorAll('.voice-player__bar');
+
+  if (!audio._initialized) {
+    audio.addEventListener('timeupdate', () => {
+      const mins = Math.floor(audio.currentTime / 60);
+      const secs = Math.floor(audio.currentTime % 60).toString().padStart(2, '0');
+      timeEl.textContent = `${mins}:${secs}`;
+      const pct = audio.duration ? (audio.currentTime / audio.duration) : 0;
+      bars.forEach((bar, i) => {
+        bar.style.opacity = (i / bars.length) <= pct ? '1' : '0.4';
+      });
+    });
+    audio.addEventListener('ended', () => {
+      playIcon.style.display = '';
+      pauseIcon.style.display = 'none';
+      container.classList.remove('voice-player--playing');
+      bars.forEach(bar => bar.style.opacity = '0.4');
+      const mins = Math.floor(audio.duration / 60);
+      const secs = Math.floor(audio.duration % 60).toString().padStart(2, '0');
+      timeEl.textContent = `${mins}:${secs}`;
+    });
+    audio.addEventListener('loadedmetadata', () => {
+      const mins = Math.floor(audio.duration / 60);
+      const secs = Math.floor(audio.duration % 60).toString().padStart(2, '0');
+      timeEl.textContent = `${mins}:${secs}`;
+    });
+    audio._initialized = true;
+  }
+
+  document.querySelectorAll('.voice-player--playing').forEach(other => {
+    if (other.id !== playerId) {
+      const otherAudio = other.querySelector('audio');
+      if (otherAudio) otherAudio.pause();
+      other.classList.remove('voice-player--playing');
+      other.querySelector('.voice-player__icon-play').style.display = '';
+      other.querySelector('.voice-player__icon-pause').style.display = 'none';
+    }
+  });
+
+  if (audio.paused) {
+    audio.play();
+    playIcon.style.display = 'none';
+    pauseIcon.style.display = '';
+    container.classList.add('voice-player--playing');
+  } else {
+    audio.pause();
+    playIcon.style.display = '';
+    pauseIcon.style.display = 'none';
+    container.classList.remove('voice-player--playing');
+  }
 }
 
 function formatTime(timestamp) {

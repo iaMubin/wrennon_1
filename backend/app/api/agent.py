@@ -17,10 +17,14 @@ from sqlalchemy import or_
 from app.auth.dependencies import get_current_agent
 from app.auth.security import create_access_token, verify_password
 from app.config import settings
+import re
+from app.services.mock_apis import get_order_status, get_order_by_email
 from app.db.models import Agent, Conversation, Message, AuditLog
 from app.db.session import get_db
 from app.realtime.connection_manager import manager
 from app.config import settings
+import re
+from app.services.mock_apis import get_order_status, get_order_by_email
 import redis.asyncio as redis
 
 # Create a Redis client for rate limiting
@@ -259,6 +263,60 @@ def pin_message(
     conversation.pinned_message_id = message_id or None
     db.commit()
     return {"status": "success", "pinned_message_id": conversation.pinned_message_id}
+
+
+@router.get("/agent/conversations/{session_id}/order-context")
+def get_order_context(
+    session_id: str,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent),
+) -> dict | None:
+    """Retrieve order context for the customer in a conversation.
+    Checks last_order_id first, then scans messages for order IDs or emails."""
+    conversation = db.query(Conversation).filter_by(session_id=session_id).first()
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    # Strategy 1: Use stored last_order_id
+    if conversation.last_order_id:
+        order = get_order_status(conversation.last_order_id)
+        if order:
+            return {"order": order, "source": "conversation_state"}
+    
+    # Strategy 2: Use customer email if available
+    if conversation.customer_email:
+        order = get_order_by_email(conversation.customer_email)
+        if order:
+            return {"order": order, "source": "customer_email"}
+    
+    # Strategy 3: Scan messages for order ID patterns or email
+    messages = (
+        db.query(Message)
+        .filter_by(conversation_id=conversation.id)
+        .filter(Message.sender == "human")
+        .order_by(Message.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    
+    for msg in messages:
+        # Look for order ID patterns: #1001, order 1001, order #1001, order: 1001
+        order_match = re.search(r'(?:order\s*[#:]?\s*|#)(\d{4,})', msg.content, re.IGNORECASE)
+        if order_match:
+            order = get_order_status(order_match.group(1))
+            if order:
+                return {"order": order, "source": "message_scan"}
+        
+        # Look for email patterns
+        email_match = re.search(r'[\w.+-]+@[\w-]+\.[\w.]+', msg.content)
+        if email_match:
+            order = get_order_by_email(email_match.group(0))
+            if order:
+                return {"order": order, "source": "email_scan"}
+    
+    # No order context found
+    from fastapi.responses import Response as FastAPIResponse
+    return FastAPIResponse(status_code=204)
 
 
 def _conversation_summary(c: Conversation) -> dict:

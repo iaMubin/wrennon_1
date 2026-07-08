@@ -64,6 +64,18 @@ class ConnectionManager:
                 task.cancel()
 
     async def send_to_customer(self, session_id: str, payload: dict) -> None:
+        # SECURITY: Defense-in-depth — never forward internal messages to
+        # customers, regardless of what the caller intended. This guard
+        # catches bugs in upstream code (e.g. websocket_routes.py) that
+        # might accidentally pass an internal message through.
+        sender = payload.get("sender", "")
+        if "internal" in str(sender).lower():
+            logger.error(
+                f"SECURITY: Blocked internal message from reaching customer {session_id}. "
+                f"Sender='{sender}'. This indicates a bug in the calling code."
+            )
+            return
+
         # Directly send to local connection if available (bypasses Redis for reliability in single-instance deployments)
         if session_id in self._customer_connections:
             try:

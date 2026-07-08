@@ -242,6 +242,10 @@ function connectSocket() {
     } else if (data.type === "new_message") {
       if (data.session_id === activeSessionId) {
         appendMessage(data.sender, data.content, new Date().toISOString(), data.sender === "agent_internal", data.message_id);
+        // Refresh order context when customer sends a new message
+        if (data.sender === "human") {
+          fetchOrderContext(data.session_id);
+        }
         if (data.is_resolved) {
           resolveBtn.textContent = "Resolved";
           resolveBtn.disabled = true;
@@ -419,6 +423,7 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
     updatePinnedMessageUI(pinnedId, pinnedContent);
   }
   
+  fetchOrderContext(sessionId);
   loadConversations();
 }
 
@@ -717,6 +722,51 @@ function sendAgentReply() {
   drafts[activeSessionId] = ""; 
 }
 
+// --- Order Context Popup ---
+async function fetchOrderContext(sessionId) {
+  const result = await authedFetch(`/agent/conversations/${sessionId}/order-context`);
+  if (result && result.order) {
+    showOrderPopup(result.order);
+  } else {
+    hideOrderPopup();
+  }
+}
+
+function showOrderPopup(order) {
+  const popup = document.getElementById('order-popup');
+  const body = document.getElementById('order-popup-body');
+  if (!popup || !body) return;
+  
+  const statusClass = `order-status-badge--${(order.status || '').toLowerCase()}`;
+  
+  body.innerHTML = `
+    <div class="order-popup__field">
+      <span class="order-popup__label">Order ID</span>
+      <span class="order-popup__value">#${escapeHtml(order.order_id)}</span>
+    </div>
+    <div class="order-popup__field">
+      <span class="order-popup__label">Status</span>
+      <span class="order-popup__value"><span class="order-status-badge ${statusClass}">${escapeHtml(order.status)}</span></span>
+    </div>
+    ${order.carrier ? `<div class="order-popup__field"><span class="order-popup__label">Carrier</span><span class="order-popup__value">${escapeHtml(order.carrier)}</span></div>` : ''}
+    ${order.eta ? `<div class="order-popup__field"><span class="order-popup__label">ETA</span><span class="order-popup__value">${escapeHtml(order.eta)}</span></div>` : ''}
+    ${order.tracking_url ? `<div class="order-popup__field" style="grid-column: span 2;"><span class="order-popup__label">Tracking</span><span class="order-popup__value"><a href="${escapeHtml(order.tracking_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(order.tracking_url)}</a></span></div>` : ''}
+  `;
+  popup.classList.remove('hidden');
+}
+
+function hideOrderPopup() {
+  const popup = document.getElementById('order-popup');
+  if (popup) popup.classList.add('hidden');
+}
+
+// Close button for order popup
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#order-popup-close')) {
+    hideOrderPopup();
+  }
+});
+
 // --- Resolving a conversation ---
 resolveBtn.addEventListener("click", async () => {
   if (!activeSessionId) return;
@@ -805,7 +855,20 @@ function renderMarkdown(text) {
 
 function inlineMarkdown(text) {
   let escaped = escapeHtml(text);
-  escaped = escaped.replace(/\[Audio\]\((https?:\/\/[^\)]+)\)/g, '<audio controls src="$1" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 20px;"></audio>');
+  escaped = escaped.replace(/\[Audio\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
+    const playerId = 'vp_' + Math.random().toString(36).substr(2, 9);
+    return `<div class="voice-player" id="${playerId}" data-src="${url}">` +
+      `<button class="voice-player__btn" aria-label="Play voice message" onclick="toggleVoicePlayer('${playerId}')">` +
+        `<svg class="voice-player__icon-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>` +
+        `<svg class="voice-player__icon-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>` +
+      `</button>` +
+      `<div class="voice-player__waveform">` +
+        Array.from({length: 20}, (_, i) => `<span class="voice-player__bar" style="animation-delay:${i * 0.05}s; height:${Math.floor(Math.random() * 60) + 20}%"></span>`).join('') +
+      `</div>` +
+      `<span class="voice-player__time">0:00</span>` +
+      `<audio preload="metadata" src="${url}"></audio>` +
+    `</div>`;
+  });
   escaped = escaped.replace(/\[Video\]\((https?:\/\/[^\)]+)\)/g, '<video controls src="$1" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;"></video>');
   escaped = escaped.replace(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g, '<img src="$1" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;" />');
   escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline;">$1</a>');
@@ -817,6 +880,67 @@ function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
+}
+
+// --- Voice Player Logic ---
+function toggleVoicePlayer(playerId) {
+  const container = document.getElementById(playerId);
+  if (!container) return;
+  const audio = container.querySelector('audio');
+  const playIcon = container.querySelector('.voice-player__icon-play');
+  const pauseIcon = container.querySelector('.voice-player__icon-pause');
+  const timeEl = container.querySelector('.voice-player__time');
+  const bars = container.querySelectorAll('.voice-player__bar');
+
+  if (!audio._initialized) {
+    audio.addEventListener('timeupdate', () => {
+      const mins = Math.floor(audio.currentTime / 60);
+      const secs = Math.floor(audio.currentTime % 60).toString().padStart(2, '0');
+      timeEl.textContent = `${mins}:${secs}`;
+      const pct = audio.duration ? (audio.currentTime / audio.duration) : 0;
+      bars.forEach((bar, i) => {
+        bar.style.opacity = (i / bars.length) <= pct ? '1' : '0.4';
+      });
+    });
+    audio.addEventListener('ended', () => {
+      playIcon.style.display = '';
+      pauseIcon.style.display = 'none';
+      container.classList.remove('voice-player--playing');
+      bars.forEach(bar => bar.style.opacity = '0.4');
+      const mins = Math.floor(audio.duration / 60);
+      const secs = Math.floor(audio.duration % 60).toString().padStart(2, '0');
+      timeEl.textContent = `${mins}:${secs}`;
+    });
+    audio.addEventListener('loadedmetadata', () => {
+      const mins = Math.floor(audio.duration / 60);
+      const secs = Math.floor(audio.duration % 60).toString().padStart(2, '0');
+      timeEl.textContent = `${mins}:${secs}`;
+    });
+    audio._initialized = true;
+  }
+
+  // Pause all other players first
+  document.querySelectorAll('.voice-player--playing').forEach(other => {
+    if (other.id !== playerId) {
+      const otherAudio = other.querySelector('audio');
+      if (otherAudio) otherAudio.pause();
+      other.classList.remove('voice-player--playing');
+      other.querySelector('.voice-player__icon-play').style.display = '';
+      other.querySelector('.voice-player__icon-pause').style.display = 'none';
+    }
+  });
+
+  if (audio.paused) {
+    audio.play();
+    playIcon.style.display = 'none';
+    pauseIcon.style.display = '';
+    container.classList.add('voice-player--playing');
+  } else {
+    audio.pause();
+    playIcon.style.display = '';
+    pauseIcon.style.display = 'none';
+    container.classList.remove('voice-player--playing');
+  }
 }
 
 function formatTime(isoString) {

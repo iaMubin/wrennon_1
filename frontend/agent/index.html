@@ -124,6 +124,20 @@
           </div>
         </header>
 
+        <!-- Order Context Popup -->
+        <div id="order-popup" class="order-popup hidden">
+          <div class="order-popup__header">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+              <span class="order-popup__title">Order Details</span>
+            </div>
+            <button id="order-popup-close" aria-label="Close" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:4px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+          <div id="order-popup-body" class="order-popup__body"></div>
+        </div>
+
         <div id="agent-messages"></div>
 
         <div id="agent-input-row">
@@ -152,7 +166,7 @@
     </main>
   </div>
 
-  <script src="/agent/agent.js?v=6"></script>
+  <script src="/agent/agent.js?v=7"></script>
 </body>
 </html>
 

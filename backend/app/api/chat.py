@@ -98,19 +98,25 @@ def get_history(
     conversation = db.query(Conversation).filter_by(session_id=session_id).first()
     if conversation is None:
         return []
+    # SECURITY: Whitelist-only approach — only explicitly approved sender
+    # types are ever returned to the customer. If a new sender type is
+    # added in the future, it will NOT leak to customers unless it is
+    # explicitly added to this frozenset.
+    #
     # sender is intentionally collapsed to "bot" for anything that
     # isn't the customer — this is where the "customer never knows it's
     # a human" rule actually gets enforced on the way out. The database
     # keeps the true sender ("ai" vs "agent") for the agent dashboard
     # and any future analytics; the customer-facing history never
     # exposes that distinction.
+    CUSTOMER_VISIBLE_SENDERS = frozenset({"human", "ai", "agent"})
     return [
         {
             "sender": "user" if m.sender == "human" else "bot",
             "content": m.content,
         }
         for m in conversation.messages
-        if m.sender != "system"  # Hide internal summaries from customer
+        if m.sender in CUSTOMER_VISIBLE_SENDERS
     ]
 
 
