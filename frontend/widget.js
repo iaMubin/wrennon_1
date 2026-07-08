@@ -502,11 +502,13 @@ function clearUnreadIndicator() {
 }
 
 function scrollToBottom(force = false) {
-  const threshold = 150;
-  const isNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < threshold;
-  if (force || isNearBottom) {
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
+  setTimeout(() => {
+    const threshold = 300;
+    const isNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < threshold;
+    if (force || isNearBottom) {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  }, 10);
 }
 
 document.addEventListener("visibilitychange", () => {
@@ -547,7 +549,7 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   }
   
   const contentWrapper = document.createElement("div");
-  contentWrapper.className = "msg-content";
+  contentWrapper.className = `msg-content msg-content--${uiRole}${isGrouped ? ' msg-content--grouped' : ''}`;
   contentWrapper.style.display = "flex";
   contentWrapper.style.flexDirection = "column";
   

@@ -188,7 +188,8 @@ body {
 .msg-avatar--agent { background: var(--accent); color: white; border: none; }
 
 .msg {
-  max-width: 82%;
+  max-width: 100%;
+  width: fit-content;
   font-size: 14px;
   line-height: 1.6;
   padding: 14px 18px;
@@ -196,6 +197,20 @@ body {
   position: relative;
   word-wrap: break-word;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.msg-content {
+  display: flex;
+  flex-direction: column;
+  max-width: 82%;
+}
+
+.msg-content--user {
+  align-items: flex-end;
+}
+
+.msg-content--bot, .msg-content--agent {
+  align-items: flex-start;
 }
 .msg--bot { background: var(--paper); color: var(--ink); border: 1px solid rgba(0,0,0,0.06); }
 .msg--agent { background: var(--paper); color: var(--ink); border: 1px solid rgba(0,0,0,0.06); }

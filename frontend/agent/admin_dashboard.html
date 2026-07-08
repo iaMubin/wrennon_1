@@ -495,58 +495,7 @@
         const _IS_LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.protocol === "file:";
         const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/api`;
         
-        function setupThemeDropdown() {
-            const menuBtn = document.getElementById("theme-menu-btn");
-            const dropdown = document.getElementById("theme-dropdown");
-            const options = document.querySelectorAll(".theme-option");
-            if (!menuBtn || !dropdown) return;
 
-            function applyTheme(themeValue) {
-                localStorage.setItem("wrennon_theme", themeValue);
-                if (themeValue === "system") {
-                    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
-                } else {
-                    document.documentElement.setAttribute("data-theme", themeValue);
-                }
-                
-                options.forEach(opt => {
-                    opt.classList.toggle("active", opt.dataset.themeValue === themeValue);
-                });
-            }
-
-            menuBtn.addEventListener("click", (e) => {
-                e.stopPropagation();
-                const isExpanded = menuBtn.getAttribute("aria-expanded") === "true";
-                menuBtn.setAttribute("aria-expanded", !isExpanded);
-                dropdown.classList.toggle("hidden");
-            });
-
-            document.addEventListener("click", (e) => {
-                if (!dropdown.contains(e.target) && e.target !== menuBtn) {
-                    dropdown.classList.add("hidden");
-                    menuBtn.setAttribute("aria-expanded", "false");
-                }
-            });
-
-            options.forEach(opt => {
-                opt.addEventListener("click", () => {
-                    applyTheme(opt.dataset.themeValue);
-                    dropdown.classList.add("hidden");
-                    menuBtn.setAttribute("aria-expanded", "false");
-                });
-            });
-
-            const currentTheme = localStorage.getItem("wrennon_theme") || "system";
-            applyTheme(currentTheme);
-
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-                if (localStorage.getItem("wrennon_theme") === "system") {
-                    document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
-                }
-            });
-        }
-        setupThemeDropdown();
         
         // Toggle password logic
         const togglePwdBtn = document.getElementById("toggle-pwd");
