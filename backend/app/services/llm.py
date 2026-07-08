@@ -251,25 +251,26 @@ async def generate_conversation_summary(messages: list) -> str:
     """Generate a short summary of the conversation for the human agent."""
     logger.info("Generating conversation summary for handoff")
     
+    transcript_lines = []
+    for msg in messages:
+        sender = "Customer" if msg.type == "human" else "Bot"
+        content = mask_pii(msg.content) if msg.type == "human" else msg.content
+        transcript_lines.append(f"{sender}: {content}")
+        
+    transcript_text = "\n".join(transcript_lines)
+    
     prompt = (
-        "You are an expert assistant. Summarize the following customer support conversation "
-        "extremely briefly (max 5-10 words per bullet) and in a clean, organized manner. You MUST use a short bulleted list.\n"
-        "Do not include any intro. Start directly with the bullets.\n\n"
-        "Do NOT include basic next steps like 'transfer to human agent' or 'request order number'. "
-        "Only include a 'Suggestion' bullet if you have a specific, non-obvious recommendation for the human agent based on the context.\n\n"
-        "Format your response exactly like this:\n"
-        "• **Issue**: [brief issue]\n"
-        "• **Status**: [brief status]\n"
-        "• **Suggestion**: [optional, only if needed]"
+        "You are an expert support supervisor summarizing a chat transcript for a human agent handoff.\n"
+        "Read the transcript below and generate a structured summary. Do NOT reply to the customer. "
+        "Do NOT act as the customer support bot.\n\n"
+        "Format your response EXACTLY like this:\n"
+        "• **Issue**: [brief issue, max 10 words]\n"
+        "• **Status**: [brief status, max 10 words]\n"
+        "• **Suggestion**: [optional recommendation for the human agent]\n\n"
+        f"Transcript:\n{transcript_text}"
     )
     
-    # Build conversation history for the LLM
-    llm_messages = [{"role": "system", "content": prompt}]
-    
-    for msg in messages:
-        role = "user" if msg.type == "human" else "assistant"
-        content = mask_pii(msg.content) if role == "user" else msg.content
-        llm_messages.append({"role": role, "content": content})
+    llm_messages = [{"role": "user", "content": prompt}]
     
     result = await _safe_llm_call(messages=llm_messages, temperature=0.1, max_tokens=1024)
     return result or "Customer requested to speak with a human agent."

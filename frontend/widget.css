@@ -226,7 +226,7 @@ body {
 .msg li { margin-bottom: 6px; }
 .msg strong { font-weight: 600; color: var(--ink); }
 
-.msg-meta { display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 10px; opacity: 0.8; margin-top: 6px; font-family: ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.05em; }
+.msg-meta { display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 10px; opacity: 0.8; margin-top: 6px; font-family: ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); }
 .msg-ticks { color: var(--accent); font-weight: bold; letter-spacing: -2px; margin-left: 2px; }
 .msg--user .msg-ticks { color: var(--accent); }
 

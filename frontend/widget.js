@@ -503,12 +503,8 @@ function clearUnreadIndicator() {
 
 function scrollToBottom(force = false) {
   setTimeout(() => {
-    const threshold = 300;
-    const isNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < threshold;
-    if (force || isNearBottom) {
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-  }, 10);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }, 50);
 }
 
 document.addEventListener("visibilitychange", () => {

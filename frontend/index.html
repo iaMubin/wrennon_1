@@ -40,20 +40,20 @@
         <div class="panel-header__title">
           <span class="panel-header__brand">Northbound Goods support</span>
         </div>
-        <div style="position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; align-items: center; gap: 4px;">
-          <button id="close-btn" class="theme-toggle-btn" aria-label="Close chat">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </button>
-          <div class="theme-dropdown-container">
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <div class="theme-dropdown-container" style="position: relative;">
             <button id="theme-menu-btn" class="theme-toggle-btn" aria-label="Theme options" aria-haspopup="true" aria-expanded="false">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
             </button>
-            <div id="theme-dropdown" class="theme-dropdown-menu hidden" role="menu" style="right: 100%; top: 0; margin-right: 8px; margin-top: 0;">
+            <div id="theme-dropdown" class="theme-dropdown-menu hidden" role="menu" style="right: 0; top: 100%; margin-top: 8px;">
               <button class="theme-option" data-theme-value="light" role="menuitem">Light</button>
               <button class="theme-option" data-theme-value="dark" role="menuitem">Dark</button>
               <button class="theme-option" data-theme-value="system" role="menuitem">System</button>
             </div>
           </div>
+          <button id="close-btn" class="theme-toggle-btn" aria-label="Close chat">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
         </div>
       </header>
 

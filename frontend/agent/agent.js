@@ -429,12 +429,8 @@ function clearUnreadIndicator() {
 
 function scrollToBottom(force = false) {
   setTimeout(() => {
-    const threshold = 300;
-    const isNearBottom = agentMessages.scrollHeight - agentMessages.scrollTop - agentMessages.clientHeight < threshold;
-    if (force || isNearBottom) {
-      agentMessages.scrollTop = agentMessages.scrollHeight;
-    }
-  }, 10);
+    agentMessages.scrollTop = agentMessages.scrollHeight;
+  }, 50);
 }
 
 document.addEventListener("visibilitychange", () => {
