@@ -285,7 +285,6 @@ async function loadConversations() {
   ]);
 
   if (!conversations) {
-    logout();
     return;
   }
 
@@ -743,15 +742,24 @@ resolveBtn.addEventListener("click", async () => {
 });
 
 // --- Helpers ---
-async function authedFetch(path, method = "GET") {
+async function authedFetch(path, method = "GET", body = null) {
   try {
     const token = localStorage.getItem("agent_token");
-    const response = await fetch(`${API_BASE}${path}`, {
+    const options = {
       method,
       headers: {
         "Authorization": `Bearer ${token}`
       }
-    });
+    };
+    if (body) {
+      options.headers["Content-Type"] = "application/json";
+      options.body = JSON.stringify(body);
+    }
+    const response = await fetch(`${API_BASE}${path}`, options);
+    if (response.status === 401) {
+      logout();
+      return null;
+    }
     if (!response.ok) return null;
     return await response.json();
   } catch (err) {
