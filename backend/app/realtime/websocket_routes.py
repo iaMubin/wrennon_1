@@ -374,20 +374,20 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
 
             # Broadcast AI messages to agent dashboard
             _t0 = time.time()
-            asyncio.create_task(manager.broadcast_to_agents({
+            await manager.broadcast_to_agents({
                 "type": "new_message",
                 "session_id": session_id,
                 "sender": "ai",
                 "content": reply_text,
                 "is_resolved": phase3_data["resolved"],
-            }))
+            })
             logger.info(f"[TIMING] broadcast_to_agents (ai msg) dispatched in {time.time() - _t0:.3f}s")
 
             # Handle handoff/reopen events returned from sync_phase3
             for event in phase3_data["events"]:
                 event["session_id"] = session_id
                 _t0 = time.time()
-                asyncio.create_task(manager.broadcast_to_agents(event))
+                await manager.broadcast_to_agents(event)
                 logger.info(f"[TIMING] broadcast_to_agents ({event['type']}) dispatched in {time.time() - _t0:.3f}s")
 
             phase3_duration = time.time() - phase3_start

@@ -211,9 +211,18 @@ body {
 .msg li { margin-bottom: 6px; }
 .msg strong { font-weight: 600; color: var(--ink); }
 
-.msg-meta { display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 10px; opacity: 0.8; margin-top: 10px; font-family: ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.05em; }
+.msg-meta { display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 10px; opacity: 0.8; margin-top: 6px; font-family: ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.05em; }
 .msg-ticks { color: var(--accent); font-weight: bold; letter-spacing: -2px; margin-left: 2px; }
 .msg--user .msg-ticks { color: var(--accent); }
+
+.msg-wrapper--user:has(+ .msg-wrapper--user.msg-wrapper--grouped) .msg-meta,
+.msg-wrapper--bot:has(+ .msg-wrapper--bot.msg-wrapper--grouped) .msg-meta,
+.msg-wrapper--agent:has(+ .msg-wrapper--agent.msg-wrapper--grouped) .msg-meta {
+  display: none;
+}
+
+.msg--bot, .msg--agent { border-left: 3px solid var(--accent); }
+.msg--user { border-right: 3px solid var(--accent); }
 
 .date-separator {
   align-self: center;

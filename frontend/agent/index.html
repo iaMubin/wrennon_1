@@ -10,9 +10,22 @@
 <link rel="stylesheet" href="/agent/agent.css">
 <script>
   (function() {
+    function applyTheme(theme) {
+      var isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    }
     var storedTheme = localStorage.getItem('wrennon_theme') || 'system';
-    var isDark = storedTheme === 'dark' || (storedTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    applyTheme(storedTheme);
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+      if (localStorage.getItem("wrennon_theme") === "system") {
+        applyTheme("system");
+      }
+    });
+    window.addEventListener('storage', (e) => {
+      if (e.key === "wrennon_theme") {
+        applyTheme(e.newValue || "system");
+      }
+    });
   })();
   if (localStorage.getItem("agent_username")) {
     document.write('<style id="anti-flash-style">#login-screen { display: none !important; }</style>');

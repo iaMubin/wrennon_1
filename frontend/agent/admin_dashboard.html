@@ -937,6 +937,12 @@
                     document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
                 }
             });
+
+            window.addEventListener('storage', (e) => {
+                if (e.key === "wrennon_theme") {
+                    applyTheme(e.newValue || "system");
+                }
+            });
         }
         setupThemeDropdown();
 

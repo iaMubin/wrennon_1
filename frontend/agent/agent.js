@@ -219,7 +219,7 @@ function connectSocket() {
       loadConversations();
       if (data.session_id === activeSessionId) {
         if (data.summary) {
-          appendMessage("system", `📋 Summary: ${data.summary}`, new Date().toISOString());
+          appendMessage("system", `📋 ${data.summary}`);
         }
         if (data.is_resolved) {
           resolveBtn.textContent = "Resolved";
@@ -454,25 +454,32 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
   }
   lastMsgTime = timestamp;
 
+  const contentWrapper = document.createElement("div");
+  contentWrapper.className = `msg-content msg-content--${sender}${isGrouped ? ' msg-content--grouped' : ''}${isInternal ? ' msg-content--internal' : ''}`;
+  contentWrapper.style.display = "flex";
+  contentWrapper.style.flexDirection = "column";
+
   const div = document.createElement("div");
-  div.className = `msg msg--${sender}${isGrouped ? ' msg--grouped' : ''}${isInternal ? ' msg--internal' : ''}`;
+  div.className = `msg msg--${sender}${isInternal ? ' msg--internal' : ''}`;
   div.setAttribute("role", "listitem");
   
-  let timeHtml = "";
-  if (isoString && !isGrouped) {
-      const timeStr = formatTime(isoString);
-      // Double ticks for outbound messages (ai or agent)
-      const ticks = (sender === "ai" || sender === "agent") ? `<span class="msg-ticks">✓✓</span>` : "";
-      timeHtml = `<div class="msg-meta"><span>${timeStr}</span>${ticks}</div>`;
+  if (sender === "ai" || sender === "agent" || sender === "system") {
+    div.innerHTML = renderMarkdown(content);
+  } else {
+    div.innerHTML = escapeHtml(content);
+  }
+  contentWrapper.appendChild(div);
+
+  if (sender !== "system") {
+    const timeStr = formatTime(isoString);
+    const ticks = (sender === "ai" || sender === "agent") ? `<span class="msg-ticks">✓✓</span>` : "";
+    const metaDiv = document.createElement("div");
+    metaDiv.className = `msg-meta msg-meta--${sender}`;
+    metaDiv.innerHTML = `<span>${timeStr}</span>${ticks}`;
+    contentWrapper.appendChild(metaDiv);
   }
 
-  
-  if (sender === "ai" || sender === "agent" || sender === "system") {
-    div.innerHTML = renderMarkdown(content) + timeHtml;
-  } else {
-    div.innerHTML = escapeHtml(content) + timeHtml;
-  }
-  agentMessages.appendChild(div);
+  agentMessages.appendChild(contentWrapper);
   scrollToBottom(sender === 'agent');
 }
 

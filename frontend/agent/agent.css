@@ -622,17 +622,18 @@ body {
 
 /* System Message (Summary) */
 .msg--system {
-  align-self: center;
+  align-self: stretch;
   background: var(--bg-surface);
-  color: var(--ink-soft);
-  font-size: 12px;
-  max-width: 90%;
-  border-radius: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  max-width: 100%;
+  border-radius: var(--radius-sm);
   font-weight: 500;
-  border: 1px solid var(--line);
-  padding: 10px 14px;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  box-shadow: none;
+  border: 1px solid var(--accent);
+  border-left: 4px solid var(--accent);
+  padding: 14px 16px;
+  font-family: 'Inter', sans-serif;
+  margin: 16px 0;
 }
 
 .msg-meta {
@@ -643,6 +644,20 @@ body {
   font-size: 10px;
   opacity: 0.6;
   margin-top: 6px;
+}
+
+.msg-content--user:has(+ .msg-content--user.msg-content--grouped) .msg-meta,
+.msg-content--agent:has(+ .msg-content--agent.msg-content--grouped) .msg-meta,
+.msg-content--ai:has(+ .msg-content--ai.msg-content--grouped) .msg-meta {
+  display: none;
+}
+
+.msg--user {
+  border-left: 3px solid var(--accent);
+}
+.msg--agent, .msg--bot, .msg--ai {
+  border-right: 3px solid var(--accent);
+}
   font-family: 'JetBrains Mono', ui-monospace, monospace;
 }
 .msg--agent .msg-meta {

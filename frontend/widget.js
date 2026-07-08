@@ -546,6 +546,11 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
     wrapper.innerHTML += `<div class="msg-avatar ${uiRole === 'agent' ? 'msg-avatar--agent' : 'msg-avatar--bot'}">${avatarImg}</div>`;
   }
   
+  const contentWrapper = document.createElement("div");
+  contentWrapper.className = "msg-content";
+  contentWrapper.style.display = "flex";
+  contentWrapper.style.flexDirection = "column";
+  
   const div = document.createElement("div");
   div.className = `msg msg--${uiRole}`;
   
@@ -556,20 +561,24 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
       nameHtml = `<div class="msg-name" style="display: flex; align-items: center;">${displayName}${badgeHtml}</div>`;
   }
   
-  let timeHtml = "";
-  if (uiRole !== "system" && !isGrouped) {
+  if (uiRole === "bot" || uiRole === "agent") {
+    div.innerHTML = nameHtml + renderMarkdown(text);
+  } else {
+    div.innerHTML = escapeHtml(text);
+  }
+  
+  contentWrapper.appendChild(div);
+  
+  if (uiRole !== "system") {
       const timeStr = formatTime(timestamp);
       const ticks = (uiRole === "user") ? `<span class="msg-ticks">✓✓</span>` : "";
-      timeHtml = `<div class="msg-meta"><span>${timeStr}</span>${ticks}</div>`;
+      const metaDiv = document.createElement("div");
+      metaDiv.className = `msg-meta msg-meta--${uiRole}`;
+      metaDiv.innerHTML = `<span>${timeStr}</span>${ticks}`;
+      contentWrapper.appendChild(metaDiv);
   }
   
-  if (uiRole === "bot" || uiRole === "agent") {
-    div.innerHTML = nameHtml + renderMarkdown(text) + timeHtml;
-  } else {
-    div.innerHTML = escapeHtml(text) + timeHtml;
-  }
-  
-  wrapper.appendChild(div);
+  wrapper.appendChild(contentWrapper);
   messagesEl.appendChild(wrapper);
   scrollToBottom(uiRole === 'user');
   
