@@ -599,7 +599,6 @@ function showTypingIndicator() {
     </div>
   `;
   messagesEl.appendChild(wrapper);
-  scrollToBottom();
 }
 
 function hideTypingIndicator() {

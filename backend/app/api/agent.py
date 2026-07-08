@@ -120,7 +120,7 @@ def needs_attention(
 ) -> list[dict]:
     conversations = (
         db.query(Conversation)
-        .filter_by(handoff_active=True, resolved=False)
+        .filter_by(handoff_active=True, resolved=False, handled_by=None)
         .options(selectinload(Conversation.messages))
         .order_by(Conversation.updated_at.desc())
         .all()
@@ -176,16 +176,19 @@ def conversation_messages(
     session_id: str,
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
-) -> list[dict]:
+) -> dict:
     """Full message history for one conversation — used when an agent
     clicks into a conversation to see what's been said so far."""
     conversation = db.query(Conversation).filter_by(session_id=session_id).first()
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    return [
-        {"sender": m.sender, "content": m.content, "created_at": m.created_at.isoformat()}
-        for m in conversation.messages
-    ]
+    return {
+        "pinned_message_id": conversation.pinned_message_id,
+        "messages": [
+            {"id": m.id, "sender": m.sender, "content": m.content, "created_at": m.created_at.isoformat()}
+            for m in conversation.messages
+        ]
+    }
 
 
 @router.post("/agent/conversations/{session_id}/resolve")
@@ -210,6 +213,52 @@ def resolve_conversation(
     db.add(audit)
     db.commit()
     return {"status": "resolved", "session_id": session_id}
+
+@router.delete("/agent/messages/{message_id}")
+def delete_internal_note(
+    message_id: str,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent)
+) -> dict:
+    msg = db.query(Message).filter_by(id=message_id).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+        
+    if msg.sender != "agent_internal":
+        raise HTTPException(status_code=403, detail="Only internal notes can be deleted")
+        
+    db.delete(msg)
+    
+    audit = AuditLog(
+        actor_username=agent.username,
+        action="delete_internal_note",
+        target_username=message_id
+    )
+    db.add(audit)
+    db.commit()
+    return {"status": "deleted", "message_id": message_id}
+
+
+@router.post("/agent/conversations/{session_id}/pin")
+def pin_message(
+    session_id: str,
+    message_id: str = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent)
+) -> dict:
+    conversation = db.query(Conversation).filter_by(session_id=session_id).first()
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+        
+    # If message_id is empty/null, we unpin.
+    if message_id:
+        msg = db.query(Message).filter_by(id=message_id, conversation_id=conversation.id).first()
+        if not msg:
+            raise HTTPException(status_code=404, detail="Message not found in this conversation")
+            
+    conversation.pinned_message_id = message_id or None
+    db.commit()
+    return {"status": "success", "pinned_message_id": conversation.pinned_message_id}
 
 
 def _conversation_summary(c: Conversation) -> dict:

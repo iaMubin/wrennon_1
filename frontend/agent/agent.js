@@ -7,7 +7,7 @@ const WS_URL  = `${_IS_LOCAL ? "ws"   : "wss"}://${_IS_LOCAL ? "localhost:8000" 
 
 let socket = null;
 let activeSessionId = null;
-let activeSection = "my_cases"; // "attention" | "active" | "all"
+let activeSection = "active"; // "attention" | "active" | "all"
 const drafts = {};
 
 // --- Elements ---
@@ -101,6 +101,8 @@ let typingTimeout;
 let isTyping = false;
 agentInput.addEventListener("input", (e) => {
   if (!activeSessionId || !socket || socket.readyState !== WebSocket.OPEN) return;
+  const isInternal = noteTypeSelect && noteTypeSelect.value === "internal";
+  if (isInternal) return; // Don't broadcast typing for internal notes
   
   if (!isTyping) {
     socket.send(JSON.stringify({ type: "typing", session_id: activeSessionId }));
@@ -375,11 +377,19 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
   }
 
   agentMessages.innerHTML = "<div class='loading-spinner'></div>";
-  const messages = await authedFetch(`/agent/conversations/${sessionId}/messages`);
+  const responseData = await authedFetch(`/agent/conversations/${sessionId}/messages`);
   agentMessages.innerHTML = "";
-  if (messages) {
+  
+  if (responseData) {
+    const messages = responseData.messages || [];
+    const pinnedId = responseData.pinned_message_id;
+    let pinnedContent = null;
+    
     let lastDateStr = null;
     for (const msg of messages) {
+      if (msg.id === pinnedId) {
+        pinnedContent = msg.content;
+      }
       const dateObj = new Date(msg.created_at);
       const dateStr = dateObj.toLocaleDateString();
       if (dateStr !== lastDateStr) {
@@ -398,8 +408,10 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
         agentMessages.appendChild(dateDiv);
         lastDateStr = dateStr;
       }
-      appendMessage(msg.sender, msg.content, msg.created_at);
+      appendMessage(msg.sender, msg.content, msg.created_at, msg.sender === "agent_internal", msg.id);
     }
+    
+    updatePinnedMessageUI(pinnedId, pinnedContent);
   }
   
   loadConversations();
@@ -433,13 +445,49 @@ function scrollToBottom(force = false) {
   }, 50);
 }
 
+function updatePinnedMessageUI(msgId, content) {
+  let pinnedContainer = document.getElementById("pinned-message-container");
+  
+  if (!msgId) {
+    if (pinnedContainer) pinnedContainer.remove();
+    return;
+  }
+  
+  if (!pinnedContainer) {
+    pinnedContainer = document.createElement("div");
+    pinnedContainer.id = "pinned-message-container";
+    pinnedContainer.className = "pinned-message";
+    
+    // Insert after chat-header
+    const header = document.querySelector(".chat-header");
+    header.parentNode.insertBefore(pinnedContainer, header.nextSibling);
+  }
+  
+  let displayContent = content;
+  if (displayContent.startsWith("*Internal Note:*")) {
+    displayContent = displayContent.replace(/^\*Internal Note:\* /, "[Internal] ");
+  }
+  
+  pinnedContainer.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="display:flex; align-items:center; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">
+        <svg style="margin-right:8px; color:var(--primary); flex-shrink:0;" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg>
+        <span style="font-weight:500; font-size:13px; text-overflow:ellipsis; overflow:hidden;">${escapeHtml(displayContent)}</span>
+      </div>
+      <button class="unpin-btn" data-id="${msgId}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;flex-shrink:0;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+  `;
+}
+
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && !activeConversationEl.classList.contains("hidden")) {
     clearUnreadIndicator();
   }
 });
 
-function appendMessage(sender, content, isoString = new Date().toISOString(), isInternal = false) {
+function appendMessage(sender, content, isoString = new Date().toISOString(), isInternal = false, msgId = null) {
   if (document.hidden) {
     injectUnreadIndicator();
   }
@@ -453,26 +501,57 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
   lastMsgTime = timestamp;
 
   const contentWrapper = document.createElement("div");
-  contentWrapper.className = `msg-content msg-content--${sender}${isGrouped ? ' msg-content--grouped' : ''}${isInternal ? ' msg-content--internal' : ''}`;
+  const actualSender = isInternal ? "agent" : sender;
+  contentWrapper.className = `msg-content msg-content--${actualSender}${isGrouped ? ' msg-content--grouped' : ''}${isInternal ? ' msg-content--internal' : ''}`;
   contentWrapper.style.display = "flex";
   contentWrapper.style.flexDirection = "column";
+  if (msgId) contentWrapper.dataset.msgId = msgId;
 
   const div = document.createElement("div");
-  div.className = `msg msg--${sender}${isInternal ? ' msg--internal' : ''}`;
+  div.className = `msg msg--${actualSender}${isInternal ? ' msg--internal' : ''}`;
   div.setAttribute("role", "listitem");
   
-  if (sender === "ai" || sender === "agent" || sender === "system") {
+  // Format internal note
+  let displayContent = content;
+  if (isInternal) {
+    displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
+    div.style.backgroundColor = "rgba(217, 119, 6, 0.1)"; // Warm yellow
+    div.style.border = "1px solid rgba(217, 119, 6, 0.3)";
+    div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:flex-start;">
+      <div>
+        <svg style="vertical-align:text-bottom; margin-right:4px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        <strong>Internal Note</strong><br/>
+        ${escapeHtml(displayContent)}
+      </div>
+      <div>
+        ${msgId ? `<button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(displayContent)}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Pin message"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>` : ''}
+        ${msgId ? `<button class="delete-note-btn" data-id="${msgId}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Delete note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>` : ''}
+      </div>
+    </div>`;
+  } else if (sender === "ai" || sender === "agent" || sender === "system") {
     div.innerHTML = renderMarkdown(content);
+    if (msgId) {
+      div.innerHTML = `<div style="position:absolute;top:4px;right:4px;opacity:0.3" class="msg-actions">
+        <button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(content)}" style="background:none;border:none;cursor:pointer;color:inherit;padding:4px;" title="Pin message"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>
+      </div>` + div.innerHTML;
+      div.style.position = "relative";
+    }
   } else {
     div.innerHTML = escapeHtml(content);
+    if (msgId) {
+      div.innerHTML = `<div style="position:absolute;top:4px;right:4px;opacity:0.3" class="msg-actions">
+        <button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(content)}" style="background:none;border:none;cursor:pointer;color:inherit;padding:4px;" title="Pin message"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>
+      </div>` + div.innerHTML;
+      div.style.position = "relative";
+    }
   }
   contentWrapper.appendChild(div);
 
   if (sender !== "system") {
     const timeStr = formatTime(isoString);
-    const ticks = (sender === "ai" || sender === "agent") ? `<span class="msg-ticks">✓✓</span>` : "";
+    const ticks = (sender === "ai" || sender === "agent" || isInternal) ? `<span class="msg-ticks">✓✓</span>` : "";
     const metaDiv = document.createElement("div");
-    metaDiv.className = `msg-meta msg-meta--${sender}`;
+    metaDiv.className = `msg-meta msg-meta--${actualSender}`;
     metaDiv.innerHTML = `<span>${timeStr}</span>${ticks}`;
     contentWrapper.appendChild(metaDiv);
   }
@@ -480,6 +559,43 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
   agentMessages.appendChild(contentWrapper);
   scrollToBottom(sender === 'agent');
 }
+
+document.addEventListener("click", async (e) => {
+  const deleteBtn = e.target.closest(".delete-note-btn");
+  if (deleteBtn) {
+    const msgId = deleteBtn.dataset.id;
+    if (!msgId) return;
+    if (!confirm("Are you sure you want to delete this internal note?")) return;
+    
+    const result = await authedFetch(`/agent/messages/${msgId}`, "DELETE");
+    if (result) {
+      const wrapper = document.querySelector(`[data-msg-id="${msgId}"]`);
+      if (wrapper) wrapper.remove();
+    }
+  }
+  
+  const pinBtn = e.target.closest(".pin-note-btn");
+  if (pinBtn) {
+    const msgId = pinBtn.dataset.id;
+    const content = pinBtn.dataset.content;
+    if (!msgId || !activeSessionId) return;
+    
+    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: msgId });
+    if (result) {
+      updatePinnedMessageUI(msgId, content);
+    }
+  }
+
+  const unpinBtn = e.target.closest(".unpin-btn");
+  if (unpinBtn) {
+    if (!activeSessionId) return;
+    
+    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: "" });
+    if (result) {
+      updatePinnedMessageUI(null, null);
+    }
+  }
+});
 
 // --- Sending a reply ---
 agentSendBtn.addEventListener("click", sendAgentReply);
@@ -603,11 +719,7 @@ function sendAgentReply() {
 
   const isInternal = noteTypeSelect && noteTypeSelect.value === "internal";
   
-  if (isInternal) {
-    appendMessage("agent", `*Internal Note:* ${text}`, new Date().toISOString(), true);
-  } else {
-    socket.send(JSON.stringify({ session_id: activeSessionId, message: text }));
-  }
+  socket.send(JSON.stringify({ session_id: activeSessionId, message: text, is_internal: isInternal }));
   
   agentInput.value = "";
   drafts[activeSessionId] = ""; 

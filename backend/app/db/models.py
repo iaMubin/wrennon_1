@@ -66,6 +66,7 @@ class Conversation(Base):
     active_topic: Mapped[str | None] = mapped_column(String, nullable=True)
     last_order_id: Mapped[str | None] = mapped_column(String, nullable=True)
     turn_count: Mapped[int] = mapped_column(Integer, default=0)
+    pinned_message_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
     messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation", order_by="Message.created_at"

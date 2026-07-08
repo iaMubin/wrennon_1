@@ -154,7 +154,7 @@ def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None) -
 
             summary = updated_state.get("handoff_summary", "")
             if summary:
-                _save_message(db, conversation.id, sender="system", content=f"📋 Summary: {summary}")
+                _save_message(db, conversation.id, sender="system", content=f"📋 {summary}")
 
             events.append({
                 "type": "handoff",
@@ -199,18 +199,21 @@ def _sync_validate_agent(username: str, pwd_frag: str | None) -> dict | None:
         return {"full_name": agent.full_name}
 
 
-def _sync_agent_reply(session_id: str, username: str, reply_text: str) -> dict | None:
+def _sync_agent_reply(session_id: str, username: str, reply_text: str, is_internal: bool = False) -> dict | None:
     with SessionLocal() as db:
         conversation = db.query(Conversation).filter_by(session_id=session_id).first()
         if conversation is None:
             return None
 
-        _save_message(db, conversation.id, sender="agent", content=reply_text)
+        msg_sender = "agent_internal" if is_internal else "agent"
+        _save_message(db, conversation.id, sender=msg_sender, content=reply_text)
 
-        if not conversation.handoff_active:
+        if not is_internal and not conversation.handoff_active:
             conversation.handoff_active = True
             
-        conversation.handled_by = username
+        if not is_internal:
+            conversation.handled_by = username
+            
         db.commit()
         
         return {
@@ -443,17 +446,18 @@ async def agent_websocket(websocket: WebSocket, access_token: str | None = Cooki
                 continue
                 
             reply_text = data.get("message")
+            is_internal = data.get("is_internal", False)
             
             if not session_id or not reply_text:
                 continue
                 
-            logger.info(f"Agent {username} replied to conversation {session_id}")
+            logger.info(f"Agent {username} replied to conversation {session_id} (Internal: {is_internal})")
 
-            reply_data = await asyncio.to_thread(_sync_agent_reply, session_id, username, reply_text)
+            reply_data = await asyncio.to_thread(_sync_agent_reply, session_id, username, reply_text, is_internal)
             if not reply_data:
                 continue
                 
-            if reply_data["handoff_active"]:
+            if not is_internal and reply_data["handoff_active"]:
                 await manager.broadcast_to_agents({
                     "type": "handoff",
                     "session_id": session_id,
@@ -461,18 +465,19 @@ async def agent_websocket(websocket: WebSocket, access_token: str | None = Cooki
                     "is_resolved": reply_data["resolved"],
                 })
 
-            # Customer receives same shape as AI reply — seamless handoff.
-            await manager.send_to_customer(session_id, {
-                "reply": reply_text, 
-                "sender": "agent", 
-                "name": agent_data["full_name"]
-            })
+            if not is_internal:
+                # Customer receives same shape as AI reply — seamless handoff.
+                await manager.send_to_customer(session_id, {
+                    "reply": reply_text, 
+                    "sender": "agent", 
+                    "name": agent_data["full_name"]
+                })
             
-            # Also broadcast to all agents so they stay in sync
+            # Broadcast to all agents so they stay in sync
             await manager.broadcast_to_agents({
                 "type": "new_message",
                 "session_id": session_id,
-                "sender": "agent",
+                "sender": "agent_internal" if is_internal else "agent",
                 "content": reply_text,
                 "is_resolved": reply_data["resolved"],
             })

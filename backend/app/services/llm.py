@@ -263,10 +263,9 @@ async def generate_conversation_summary(messages: list) -> str:
         "You are an expert support supervisor summarizing a chat transcript for a human agent handoff.\n"
         "Read the transcript below and generate a structured summary. Do NOT reply to the customer. "
         "Do NOT act as the customer support bot.\n\n"
-        "Format your response EXACTLY like this:\n"
-        "• **Issue**: [brief issue, max 10 words]\n"
-        "• **Status**: [brief status, max 10 words]\n"
-        "• **Suggestion**: [optional recommendation for the human agent]\n\n"
+        "Format your response as a list of key-value pairs (e.g., • **Issue**: ...). "
+        "Do NOT include the word 'Summary' at the top. Only use headings that are contextually relevant (e.g., Issue, Status). "
+        "Do NOT include a 'Suggestion' heading unless you have a highly specific and actionable recommendation for the agent based on the conversation.\n\n"
         f"Transcript:\n{transcript_text}"
     )
     
