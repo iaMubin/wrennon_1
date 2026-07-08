@@ -55,11 +55,13 @@ class ConnectionManager:
         task = asyncio.create_task(listen_to_customer_channel())
         self._customer_tasks[session_id] = task
 
-    def disconnect_customer(self, session_id: str) -> None:
-        self._customer_connections.pop(session_id, None)
-        task = self._customer_tasks.pop(session_id, None)
-        if task:
-            task.cancel()
+    def disconnect_customer(self, session_id: str, websocket: WebSocket) -> None:
+        # Only remove if the disconnecting websocket is the currently active one
+        if self._customer_connections.get(session_id) == websocket:
+            self._customer_connections.pop(session_id, None)
+            task = self._customer_tasks.pop(session_id, None)
+            if task:
+                task.cancel()
 
     async def send_to_customer(self, session_id: str, payload: dict) -> None:
         # Directly send to local connection if available (bypasses Redis for reliability in single-instance deployments)

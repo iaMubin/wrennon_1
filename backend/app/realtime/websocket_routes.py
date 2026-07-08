@@ -400,10 +400,10 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
 
     except WebSocketDisconnect:
         logger.info(f"Customer disconnected: {session_id}")
-        manager.disconnect_customer(session_id)
+        manager.disconnect_customer(session_id, websocket)
     except Exception as e:
         logger.error(f"Error in customer_websocket: {e}", exc_info=True)
-        manager.disconnect_customer(session_id)
+        manager.disconnect_customer(session_id, websocket)
 
 
 @router.websocket("/ws/agent")
