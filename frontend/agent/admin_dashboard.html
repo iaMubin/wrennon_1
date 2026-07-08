@@ -4,31 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard — Wrennon</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
         :root {
-            --ink: #FFFFFF;
+            --bg-base: #1C1C1C;
+            --bg-surface: #242424;
+            --ink: #E4E4E7;
             --ink-soft: #A1A1AA;
-            --paper: rgba(9, 9, 11, 0.7);
-            --paper-dim: #09090b;
-            --line: rgba(255, 255, 255, 0.08);
-            --accent: #3b82f6;
-            --accent-glow: rgba(59, 130, 246, 0.6);
+            --line: #333333;
+            --accent: #E4E4E7;
+            --accent-alert: #D97706;
             --danger: #ef4444;
-            --radius: 28px;
-            --radius-sm: 18px;
-            --transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-            --shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+            --radius: 4px;
+            --radius-sm: 2px;
+            --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         body {
             font-family: 'Inter', sans-serif;
-            background-color: var(--paper-dim);
-            background-image: 
-                radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.08), transparent 25%),
-                radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 25%);
+            background-color: var(--bg-base);
             color: var(--ink);
             min-height: 100vh;
             padding: 40px 20px;
@@ -44,13 +40,11 @@
             width: 96%;
             max-width: 1600px;
             margin: 0 auto;
-            background: var(--paper);
-            backdrop-filter: blur(40px);
-            -webkit-backdrop-filter: blur(40px);
+            background: var(--bg-surface);
+            border: 1px solid var(--line);
             border-radius: var(--radius);
-            box-shadow: var(--shadow);
             padding: 40px;
-            animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
         .admin-header {
@@ -63,21 +57,19 @@
         }
 
         .admin-header h2 {
-            font-size: 24px;
-            font-weight: 800;
-            letter-spacing: -0.03em;
-            background: linear-gradient(135deg, #fff, #9CA3AF);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            color: var(--ink);
         }
 
         .btn {
-            background: rgba(255,255,255,0.05);
-            color: var(--ink);
-            border: 1px solid rgba(255,255,255,0.1);
-            padding: 10px 18px;
+            background: var(--bg-base);
+            color: var(--ink-soft);
+            border: 1px solid var(--line);
+            padding: 8px 16px;
             border-radius: var(--radius-sm);
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 600;
             cursor: pointer;
             transition: var(--transition);
@@ -85,32 +77,31 @@
         }
 
         .btn:hover {
-            background: rgba(255,255,255,0.1);
+            background: var(--line);
+            color: var(--ink);
             transform: translateY(-1px);
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #3B82F6, #2563EB);
-            color: white;
+            background: var(--ink);
+            color: var(--bg-base);
             border: none;
-            box-shadow: 0 4px 14px var(--accent-glow);
         }
 
         .btn-primary:hover {
-            background: #2563EB;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6);
+            background: #FFF;
+            transform: translateY(-1px);
         }
 
         .btn-danger {
-            background: rgba(239, 68, 68, 0.15);
-            color: #F87171;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            box-shadow: none;
+            background: var(--bg-base);
+            color: var(--danger);
+            border: 1px solid var(--danger);
         }
 
         .btn-danger:hover {
-            background: rgba(239, 68, 68, 0.25);
+            background: var(--danger);
+            color: var(--bg-base);
             transform: translateY(-1px);
         }
 
@@ -126,7 +117,7 @@
             grid-template-columns: 1fr 1fr 1fr auto;
             gap: 16px;
             align-items: end;
-            background: rgba(0,0,0,0.2);
+            background: var(--bg-base);
             padding: 24px;
             border-radius: var(--radius-sm);
             border: 1px solid var(--line);
@@ -156,25 +147,24 @@
 
         .input-wrapper input, .form-group select {
             width: 100%;
-            padding: 12px 16px;
+            padding: 10px 14px;
             border: 1px solid var(--line);
-            background: rgba(255, 255, 255, 0.03);
+            background: var(--bg-surface);
             color: var(--ink);
-            border-radius: 8px;
-            font-size: 14px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
             outline: none;
             transition: var(--transition);
-            font-family: inherit;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
         }
 
         .input-wrapper input:focus, .form-group select:focus {
-            background: rgba(255, 255, 255, 0.06);
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            background: var(--bg-surface);
+            border-color: var(--accent-alert);
         }
         
         .form-group select option {
-            background: var(--paper-dim);
+            background: var(--bg-surface);
             color: var(--ink);
         }
 
@@ -224,28 +214,29 @@
         }
 
         tbody tr:hover {
-            background: rgba(255,255,255,0.03);
+            background: var(--bg-base);
         }
 
         .role-badge {
-            font-size: 11px;
-            padding: 4px 10px;
-            border-radius: 8px;
-            font-weight: 700;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 2px;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
 
         .role-manager {
-            background: rgba(139, 92, 246, 0.15);
-            color: #C4B5FD;
-            border: 1px solid rgba(139, 92, 246, 0.3);
+            background: var(--line);
+            color: var(--ink-soft);
+            border: 1px solid transparent;
         }
 
         .role-agent {
-            background: rgba(59, 130, 246, 0.15);
-            color: #93C5FD;
-            border: 1px solid rgba(59, 130, 246, 0.3);
+            background: transparent;
+            color: var(--ink);
+            border: 1px solid var(--line);
         }
 
         #error-msg {
@@ -256,73 +247,9 @@
             grid-column: 1 / -1;
         }
 
-        /* --- Light Mode Overrides --- */
-        body.light-mode {
-            --ink: #18181b;
-            --ink-soft: #71717A;
-            --paper: #FFFFFF;
-            --paper-dim: #F9FAFB;
-            --line: rgba(0, 0, 0, 0.06);
-            --shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.03) inset;
-            background-image: none;
-            background-color: var(--paper-dim);
-        }
-
-        body.light-mode .admin-header h2 {
-            background: none;
-            color: var(--ink);
-        }
-
-        body.light-mode .form-group label,
-        body.light-mode .input-wrapper label {
-            color: var(--ink-soft);
-        }
-
-        body.light-mode .input-wrapper input, 
-        body.light-mode .form-group select {
-            background: rgba(0, 0, 0, 0.02);
-            border-color: rgba(0, 0, 0, 0.1);
-        }
-
-        body.light-mode .input-wrapper input:focus, 
-        body.light-mode .form-group select:focus {
-            background: rgba(0, 0, 0, 0.05);
-        }
-        
-        body.light-mode .form-group select option {
-            background: #FFFFFF;
-            color: var(--ink);
-        }
-
-        body.light-mode .btn {
-            background: rgba(0, 0, 0, 0.02);
-            border-color: rgba(0, 0, 0, 0.1);
-        }
-
-        body.light-mode .btn:hover {
-            background: rgba(0, 0, 0, 0.05);
-        }
-        
-        body.light-mode tbody tr:hover {
-            background: rgba(0, 0, 0, 0.03);
-        }
-
         /* Theme Toggle Button */
         .theme-toggle-btn {
-            background: transparent;
-            border: none;
-            color: var(--ink-soft);
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: var(--transition);
-        }
-        .theme-toggle-btn:hover {
-            color: var(--ink);
-            background: rgba(128, 128, 128, 0.1);
+            display: none;
         }
     </style>
 </head>
