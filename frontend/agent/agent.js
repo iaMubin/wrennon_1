@@ -521,23 +521,17 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
   } else {
     div.innerHTML = escapeHtml(content);
   }
-  contentWrapper.appendChild(div);
 
   if (msgId) {
-    const actionsDiv = document.createElement("div");
-    actionsDiv.className = "msg-actions";
-    actionsDiv.style.display = "flex";
-    actionsDiv.style.justifyContent = actualSender === "agent" ? "flex-end" : "flex-start";
-    actionsDiv.style.gap = "4px";
-    actionsDiv.style.marginTop = "4px";
-    
-    let actionsHtml = `<button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(displayContent)}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Pin message"><svg style="transform: rotate(45deg);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>`;
+    let actionsHtml = `<div class="msg-actions" style="position:absolute; bottom:4px; ${actualSender === 'agent' ? 'left:-28px;' : 'right:-28px;'} display:flex; flex-direction:column; gap:4px;">`;
+    actionsHtml += `<button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(displayContent)}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Pin message"><svg style="transform: rotate(45deg);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>`;
     if (isInternal) {
       actionsHtml += `<button class="delete-note-btn" data-id="${msgId}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Delete note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
     }
-    actionsDiv.innerHTML = actionsHtml;
-    contentWrapper.appendChild(actionsDiv);
+    actionsHtml += `</div>`;
+    div.innerHTML += actionsHtml;
   }
+  contentWrapper.appendChild(div);
 
   if (sender !== "system") {
     const timeStr = formatTime(isoString);

@@ -663,6 +663,7 @@ body {
 }
 
 .msg-content--user:has(+ .msg-content--user.msg-content--grouped) .msg-meta,
+.msg-content--human:has(+ .msg-content--human.msg-content--grouped) .msg-meta,
 .msg-content--agent:has(+ .msg-content--agent.msg-content--grouped) .msg-meta,
 .msg-content--ai:has(+ .msg-content--ai.msg-content--grouped) .msg-meta {
   display: none;
