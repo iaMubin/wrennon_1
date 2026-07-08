@@ -19,13 +19,14 @@
 }
 
 :root[data-theme="dark"] {
-  --ink: #EBE5E0;
-  --ink-soft: #A39B96;
-  --bg-base: #1C1816;
-  --bg-surface: #221D1A;
-  --line: rgba(217, 169, 74, 0.15);
-  --accent: #D9A94A;
-  --accent-alert: #D97706;
+  --ink: #E2E8F0;
+  --ink-soft: #94A3B8;
+  --bg-base: #0F172A;
+  --bg-surface: #1E293B;
+  --line: rgba(255, 255, 255, 0.1);
+  --accent: #D4A373;
+  --accent-glow: rgba(212, 163, 115, 0.15);
+  --accent-alert: #D4A373;
 }
 
 body {
@@ -552,7 +553,7 @@ body {
 }
 
 /* Customer Message */
-.msg--human {
+.msg--human, .msg--user {
   align-self: flex-start;
   background: var(--bg-surface);
   color: var(--ink);
@@ -560,14 +561,14 @@ body {
 }
 
 /* AI Message */
-.msg--ai {
-  align-self: flex-start;
+.msg--ai, .msg--bot {
+  align-self: flex-end;
   background: var(--bg-base);
   color: var(--ink);
-  border-radius: 14px 14px 14px 4px;
-  border-left: 3px solid var(--ink-soft);
+  border-radius: 14px 14px 4px 14px;
+  border-right: 3px solid var(--ink-soft);
 }
-.msg--ai::before {
+.msg--ai::before, .msg--bot::before {
   content: "SYSTEM AI";
   display: block;
   font-family: 'JetBrains Mono', ui-monospace, monospace;
@@ -576,6 +577,7 @@ body {
   color: var(--ink-soft);
   margin-bottom: 4px;
   letter-spacing: 0.05em;
+  text-align: right;
 }
 
 /* Agent Message */

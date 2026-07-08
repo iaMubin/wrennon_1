@@ -31,11 +31,14 @@ function setupThemeDropdown() {
 
   function applyTheme(themeValue) {
     localStorage.setItem("wrennon_theme", themeValue);
+    const widget = document.getElementById("wrennon-widget");
+    if (!widget) return;
+    
     if (themeValue === "system") {
       const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+      widget.setAttribute("data-theme", isDark ? "dark" : "light");
     } else {
-      document.documentElement.setAttribute("data-theme", themeValue);
+      widget.setAttribute("data-theme", themeValue);
     }
     
     options.forEach(opt => {
@@ -81,7 +84,10 @@ function setupThemeDropdown() {
 
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
     if (localStorage.getItem("wrennon_theme") === "system") {
-      document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
+      const widget = document.getElementById("wrennon-widget");
+      if (widget) {
+        widget.setAttribute("data-theme", e.matches ? "dark" : "light");
+      }
     }
   });
 }

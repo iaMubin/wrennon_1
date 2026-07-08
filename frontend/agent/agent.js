@@ -601,7 +601,7 @@ function sendAgentReply() {
   if (isInternal) {
     appendMessage("agent", `*Internal Note:* ${text}`, new Date().toISOString(), true);
   } else {
-    socket.send(JSON.stringify({ type: "message", session_id: activeSessionId, message: text }));
+    socket.send(JSON.stringify({ session_id: activeSessionId, message: text }));
   }
   
   agentInput.value = "";
