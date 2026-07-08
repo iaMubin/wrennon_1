@@ -800,3 +800,12 @@ body {
   color: var(--accent);
   background: rgba(128,128,128,0.05);
 }
+
+.msg-actions {
+  opacity: 0 !important;
+  transition: opacity 0.2s ease;
+}
+
+.msg-content:hover .msg-actions {
+  opacity: 0.8 !important;
+}

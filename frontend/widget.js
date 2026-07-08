@@ -502,9 +502,12 @@ function clearUnreadIndicator() {
 }
 
 function scrollToBottom(force = false) {
-  setTimeout(() => {
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }, 50);
+  const isNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 100;
+  if (force || isNearBottom) {
+    setTimeout(() => {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }, 50);
+  }
 }
 
 document.addEventListener("visibilitychange", () => {
@@ -599,6 +602,7 @@ function showTypingIndicator() {
     </div>
   `;
   messagesEl.appendChild(wrapper);
+  scrollToBottom();
 }
 
 function hideTypingIndicator() {

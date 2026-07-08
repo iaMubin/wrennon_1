@@ -235,7 +235,7 @@ function connectSocket() {
       }
     } else if (data.type === "new_message") {
       if (data.session_id === activeSessionId) {
-        appendMessage(data.sender, data.content, new Date().toISOString());
+        appendMessage(data.sender, data.content, new Date().toISOString(), data.message_id);
         if (data.is_resolved) {
           resolveBtn.textContent = "Resolved";
           resolveBtn.disabled = true;
@@ -524,23 +524,23 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
         ${escapeHtml(displayContent)}
       </div>
       <div>
-        ${msgId ? `<button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(displayContent)}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Pin message"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>` : ''}
+        ${msgId ? `<button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(displayContent)}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Pin message"><svg style="transform: rotate(45deg);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>` : ''}
         ${msgId ? `<button class="delete-note-btn" data-id="${msgId}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Delete note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>` : ''}
       </div>
     </div>`;
   } else if (sender === "ai" || sender === "agent" || sender === "system") {
     div.innerHTML = renderMarkdown(content);
     if (msgId) {
-      div.innerHTML = `<div style="position:absolute;top:4px;right:4px;opacity:0.3" class="msg-actions">
-        <button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(content)}" style="background:none;border:none;cursor:pointer;color:inherit;padding:4px;" title="Pin message"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>
+      div.innerHTML = `<div style="position:absolute;top:4px;right:4px;" class="msg-actions">
+        <button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(content)}" style="background:none;border:none;cursor:pointer;color:inherit;padding:4px;" title="Pin message"><svg style="transform: rotate(45deg);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>
       </div>` + div.innerHTML;
       div.style.position = "relative";
     }
   } else {
     div.innerHTML = escapeHtml(content);
     if (msgId) {
-      div.innerHTML = `<div style="position:absolute;top:4px;right:4px;opacity:0.3" class="msg-actions">
-        <button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(content)}" style="background:none;border:none;cursor:pointer;color:inherit;padding:4px;" title="Pin message"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>
+      div.innerHTML = `<div style="position:absolute;top:4px;right:4px;" class="msg-actions">
+        <button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(content)}" style="background:none;border:none;cursor:pointer;color:inherit;padding:4px;" title="Pin message"><svg style="transform: rotate(45deg);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>
       </div>` + div.innerHTML;
       div.style.position = "relative";
     }

@@ -74,8 +74,7 @@ def _sync_phase1(session_id: str, customer_text: str) -> dict | None:
         conversation = db.query(Conversation).filter_by(session_id=session_id).first()
         if not conversation:
             return None
-            
-        _save_message(db, conversation.id, sender="human", content=customer_text)
+        msg = _save_message(db, conversation.id, sender="human", content=customer_text)
 
         reopened = False
         if conversation.resolved:
@@ -112,7 +111,8 @@ def _sync_phase1(session_id: str, customer_text: str) -> dict | None:
             "active_topic": conversation.active_topic,
             "last_order_id": conversation.last_order_id,
             "turn_count": conversation.turn_count,
-            "messages": messages_data
+            "messages": messages_data,
+            "message_id": msg.id
         }
 
 
@@ -135,7 +135,7 @@ def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None) -
             conversation.last_order_id = updated_state.get("last_order_id")
             conversation.turn_count = updated_state.get("turn_count", conversation.turn_count) + 1
 
-        _save_message(db, conversation.id, sender="ai", content=reply_text)
+        msg = _save_message(db, conversation.id, sender="ai", content=reply_text)
         
         events = []
 
@@ -184,7 +184,8 @@ def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None) -
         db.commit()
         return {
             "resolved": conversation.resolved,
-            "events": events
+            "events": events,
+            "message_id": msg.id
         }
 
 
@@ -206,7 +207,7 @@ def _sync_agent_reply(session_id: str, username: str, reply_text: str, is_intern
             return None
 
         msg_sender = "agent_internal" if is_internal else "agent"
-        _save_message(db, conversation.id, sender=msg_sender, content=reply_text)
+        msg = _save_message(db, conversation.id, sender=msg_sender, content=reply_text)
 
         if not is_internal and not conversation.handoff_active:
             conversation.handoff_active = True
@@ -218,7 +219,8 @@ def _sync_agent_reply(session_id: str, username: str, reply_text: str, is_intern
         
         return {
             "handoff_active": conversation.handoff_active,
-            "resolved": conversation.resolved
+            "resolved": conversation.resolved,
+            "message_id": msg.id
         }
 
 # --- END SYNC WRAPPERS ---
@@ -298,6 +300,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
                 "sender": "human",
                 "content": customer_text,
                 "is_resolved": phase1_data["resolved"],
+                "message_id": phase1_data["message_id"]
             }))
             logger.info(f"[TIMING] broadcast_to_agents (human msg) dispatched in {time.time() - _t0:.3f}s")
 
@@ -383,6 +386,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
                 "sender": "ai",
                 "content": reply_text,
                 "is_resolved": phase3_data["resolved"],
+                "message_id": phase3_data["message_id"]
             })
             logger.info(f"[TIMING] broadcast_to_agents (ai msg) dispatched in {time.time() - _t0:.3f}s")
 
@@ -480,6 +484,7 @@ async def agent_websocket(websocket: WebSocket, access_token: str | None = Cooki
                 "sender": "agent_internal" if is_internal else "agent",
                 "content": reply_text,
                 "is_resolved": reply_data["resolved"],
+                "message_id": reply_data["message_id"]
             })
 
     except WebSocketDisconnect:
