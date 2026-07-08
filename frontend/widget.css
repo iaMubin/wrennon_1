@@ -1,17 +1,31 @@
 :root {
-  --ink: #18181B;
-  --ink-soft: #71717A;
-  --paper: #FAFAFA;
-  --paper-dim: #F4F4F5;
-  --line: rgba(0, 0, 0, 0.1);
-  --accent: #059669;
-  --accent-glow: rgba(5, 150, 105, 0.2);
-  --agent-accent: #059669;
+  --ink: #3A2E2A;
+  --ink-soft: #8C7C75;
+  --paper: #FDFBF7;
+  --paper-dim: #F5EFE6;
+  --line: rgba(168, 90, 50, 0.15);
+  --accent: #A85A32;
+  --accent-subtle: rgba(168, 90, 50, 0.08);
+  --accent-glow: rgba(168, 90, 50, 0.2);
+  --agent-accent: #A85A32;
   --radius: 12px;
   --radius-sm: 4px;
   --transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  --shadow: 0 12px 32px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  --shadow: 0 12px 32px rgba(58, 46, 42, 0.08), 0 0 0 1px rgba(168, 90, 50, 0.05);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+:root[data-theme="dark"] {
+  --ink: #EBE5E0;
+  --ink-soft: #A39B96;
+  --paper: #1C1816;
+  --paper-dim: #221D1A;
+  --line: rgba(217, 169, 74, 0.15);
+  --accent: #D9A94A;
+  --accent-subtle: rgba(217, 169, 74, 0.1);
+  --accent-glow: rgba(217, 169, 74, 0.15);
+  --agent-accent: #D9A94A;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(217, 169, 74, 0.1);
 }
 
 * { box-sizing: border-box; }
@@ -148,6 +162,14 @@ body {
 }
 .msg-wrapper--user { flex-direction: row-reverse; }
 
+.msg-wrapper--grouped {
+  margin-top: -16px;
+}
+.msg-wrapper--grouped.msg-wrapper--bot, 
+.msg-wrapper--grouped.msg-wrapper--agent {
+  margin-left: 46px;
+}
+
 .msg-avatar {
   width: 32px;
   height: 32px;
@@ -236,7 +258,10 @@ body {
 .typing-indicator .dot:nth-child(3) { animation-delay: 0s; }
 @keyframes bounce { 0%, 80%, 100% { transform: scale(0); opacity: 0.4;} 40% { transform: scale(1.2); opacity: 1;} }
 
-/* Theme Toggle Button */
+/* Theme Toggle Button & Dropdown */
+.theme-dropdown-container {
+  position: relative;
+}
 .theme-toggle-btn {
   background: transparent;
   border: 1px solid transparent;
@@ -254,3 +279,42 @@ body {
   background: rgba(0, 0, 0, 0.04);
 }
 .theme-toggle-btn:focus-visible { outline: 2px solid var(--ink); }
+
+.theme-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+  box-shadow: var(--shadow);
+  z-index: 1000;
+}
+.theme-dropdown-menu.hidden {
+  display: none;
+}
+.theme-option {
+  background: transparent;
+  border: none;
+  color: var(--ink);
+  padding: 8px 12px;
+  text-align: left;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+}
+.theme-option:hover, .theme-option:focus {
+  background: var(--paper-dim);
+}
+.theme-option.active {
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-subtle);
+}

@@ -23,35 +23,69 @@ let SESSION_TOKEN = null;
 let reconnectInterval = null;
 
 // ── Theme Management ───────────────────────────────────────────────
-function updateThemeIcon(isLight, btnId) {
-  const btn = document.getElementById(btnId);
-  if (!btn) return;
-  if (isLight) {
-    // Sun icon
-    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
-  } else {
-    // Moon icon
-    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
-  }
-}
+function setupThemeDropdown() {
+  const menuBtn = document.getElementById("theme-menu-btn");
+  const dropdown = document.getElementById("theme-dropdown");
+  const options = document.querySelectorAll(".theme-option");
+  if (!menuBtn || !dropdown) return;
 
-const themeBtn = document.getElementById("theme-btn");
-const widgetContainer = document.getElementById("wrennon-widget");
-if (themeBtn && widgetContainer) {
-  themeBtn.addEventListener("click", () => {
-    widgetContainer.classList.toggle("light-mode");
-    const isLight = widgetContainer.classList.contains("light-mode");
-    localStorage.setItem("wrennon_theme", isLight ? "light" : "dark");
-    updateThemeIcon(isLight, "theme-btn");
-  });
-  
-  if (localStorage.getItem("wrennon_theme") === "light") {
-    widgetContainer.classList.add("light-mode");
-    updateThemeIcon(true, "theme-btn");
-  } else {
-    updateThemeIcon(false, "theme-btn");
+  function applyTheme(themeValue) {
+    localStorage.setItem("wrennon_theme", themeValue);
+    if (themeValue === "system") {
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+    } else {
+      document.documentElement.setAttribute("data-theme", themeValue);
+    }
+    
+    options.forEach(opt => {
+      opt.classList.toggle("active", opt.dataset.themeValue === themeValue);
+    });
   }
+
+  menuBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isExpanded = menuBtn.getAttribute("aria-expanded") === "true";
+    menuBtn.setAttribute("aria-expanded", !isExpanded);
+    dropdown.classList.toggle("hidden");
+    if (!isExpanded) {
+      options[0].focus();
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!dropdown.contains(e.target) && e.target !== menuBtn) {
+      dropdown.classList.add("hidden");
+      menuBtn.setAttribute("aria-expanded", "false");
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      dropdown.classList.add("hidden");
+      menuBtn.setAttribute("aria-expanded", "false");
+      menuBtn.focus();
+    }
+  });
+
+  options.forEach(opt => {
+    opt.addEventListener("click", () => {
+      applyTheme(opt.dataset.themeValue);
+      dropdown.classList.add("hidden");
+      menuBtn.setAttribute("aria-expanded", "false");
+    });
+  });
+
+  const currentTheme = localStorage.getItem("wrennon_theme") || "system";
+  applyTheme(currentTheme);
+
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+    if (localStorage.getItem("wrennon_theme") === "system") {
+      document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
+    }
+  });
 }
+setupThemeDropdown();
 
 // ── Session Management ─────────────────────────────────────────────
 // Persist session_id in localStorage so the customer can continue
@@ -100,6 +134,8 @@ launcher.addEventListener("click", async (e) => {
   e.stopPropagation();
   if (panel.classList.contains("hidden")) {
     panel.classList.remove("hidden");
+    clearUnreadIndicator();
+    scrollToBottom(true);
     if (!hasLoadedHistory) {
       await resolveSessionId();
       await loadHistory();
@@ -340,12 +376,22 @@ function connectSocket() {
       } else if (data.type === "stopped_typing") {
         hideTypingIndicator();
         return;
+      } else if (data.type === "new_message") {
+        hideTypingIndicator();
+        const sender = data.sender || "bot";
+        const name = sender === "agent" ? (data.name || "Support Agent") : "AI Assistant";
+        appendMessage(sender, data.content, true, Date.now(), name);
+        return;
+      } else if (data.reply) {
+        hideTypingIndicator();
+        const sender = data.sender || "bot";
+        const name = data.name || "AI Assistant";
+        appendMessage(sender, data.reply, true, Date.now(), name);
+        return;
+      } else {
+        console.warn("Unrecognized WebSocket message:", data);
+        return;
       }
-      
-      hideTypingIndicator();
-      const sender = data.sender || "bot";
-      const name = data.name || "AI Assistant";
-      appendMessage(sender, data.reply, true, Date.now(), name);
     } catch (err) {
       console.error("Failed to parse WebSocket message:", err);
     }
@@ -428,16 +474,67 @@ function formatTime(timestamp) {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+let lastMsgRole = null;
+let lastMsgName = null;
+let lastMsgTime = 0;
+
+let hasUnreadIndicator = false;
+
+function injectUnreadIndicator() {
+  if (hasUnreadIndicator) return;
+  const div = document.createElement("div");
+  div.className = "date-separator unread-indicator";
+  div.style.color = "var(--accent)";
+  div.style.borderColor = "var(--accent-subtle)";
+  div.textContent = "New Messages";
+  messagesEl.appendChild(div);
+  hasUnreadIndicator = true;
+}
+
+function clearUnreadIndicator() {
+  const indicators = messagesEl.querySelectorAll(".unread-indicator");
+  indicators.forEach(el => el.remove());
+  hasUnreadIndicator = false;
+}
+
+function scrollToBottom(force = false) {
+  const threshold = 150;
+  const isNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < threshold;
+  if (force || isNearBottom) {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && !panel.classList.contains("hidden")) {
+    clearUnreadIndicator();
+  }
+});
+
 function appendMessage(role, text, save = true, timestamp = Date.now(), name = null) {
-  // Standardize role names for UI styling
   const uiRole = role === "human" ? "user" : (role === "ai" ? "bot" : role);
   
+  if (!save && uiRole !== "system") {
+    // When loading history, don't show unread indicators.
+  } else if ((panel.classList.contains("hidden") || document.hidden) && uiRole !== "system" && uiRole !== "user") {
+    injectUnreadIndicator();
+  }
+
+  const isGrouped = (uiRole === lastMsgRole && name === lastMsgName && (timestamp - lastMsgTime < 60000) && uiRole !== "system");
+  
+  if (!isGrouped) {
+      lastMsgRole = uiRole;
+      lastMsgName = name;
+  }
+  lastMsgTime = timestamp;
+  
   const wrapper = document.createElement("div");
-  wrapper.className = `msg-wrapper msg-wrapper--${uiRole}`;
+  wrapper.className = `msg-wrapper msg-wrapper--${uiRole}${isGrouped ? ' msg-wrapper--grouped' : ''}`;
+  // For ARIA accessibility
+  wrapper.setAttribute("role", "listitem");
   
   // Add Avatar for incoming messages
-  if (uiRole === "bot" || uiRole === "agent") {
-    // Premium SVG Avatars for better human feel
+  if ((uiRole === "bot" || uiRole === "agent") && !isGrouped) {
     const botSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
     const agentSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
     
@@ -449,16 +546,15 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   div.className = `msg msg--${uiRole}`;
   
   let nameHtml = "";
-  if (uiRole === "bot" || uiRole === "agent") {
+  if ((uiRole === "bot" || uiRole === "agent") && !isGrouped) {
       const displayName = uiRole === "bot" ? "AI Assistant" : (name || "Support Agent");
-      const badgeHtml = uiRole === "agent" ? `<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; vertical-align: middle;">Agent</span>` : "";
+      const badgeHtml = uiRole === "agent" ? `<span style="background: var(--agent-accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; vertical-align: middle;">Agent</span>` : "";
       nameHtml = `<div class="msg-name" style="display: flex; align-items: center;">${displayName}${badgeHtml}</div>`;
   }
   
   let timeHtml = "";
-  if (uiRole !== "system") {
+  if (uiRole !== "system" && !isGrouped) {
       const timeStr = formatTime(timestamp);
-      // Double ticks for outbound messages from the customer
       const ticks = (uiRole === "user") ? `<span class="msg-ticks">✓✓</span>` : "";
       timeHtml = `<div class="msg-meta"><span>${timeStr}</span>${ticks}</div>`;
   }
@@ -471,7 +567,7 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   
   wrapper.appendChild(div);
   messagesEl.appendChild(wrapper);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  scrollToBottom(uiRole === 'user');
   
   if (save && uiRole !== "system") {
     saveToHistory(role, text);
@@ -492,7 +588,7 @@ function showTypingIndicator() {
     </div>
   `;
   messagesEl.appendChild(wrapper);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  scrollToBottom();
 }
 
 function hideTypingIndicator() {
@@ -510,7 +606,7 @@ function sendMessage() {
   inputEl.value = "";
   
   if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ message: text }));
+    socket.send(JSON.stringify({ type: "message", message: text }));
   } else {
     // Backend is down or disconnected
     addToOfflineQueue(text);

@@ -29,37 +29,69 @@ const agentMessages = document.getElementById("agent-messages");
 const agentInput = document.getElementById("agent-message-input");
 
 // ── Theme Management ───────────────────────────────────────────────
-function updateThemeIcon(isLight, btnId) {
-  const btn = document.getElementById(btnId);
-  if (!btn) return;
-  if (isLight) {
-    // Sun icon
-    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
-  } else {
-    // Moon icon
-    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
-  }
-}
+function setupThemeDropdown() {
+  const menuBtn = document.getElementById("theme-menu-btn");
+  const dropdown = document.getElementById("theme-dropdown");
+  const options = document.querySelectorAll(".theme-option");
+  if (!menuBtn || !dropdown) return;
 
-const themeBtn = document.getElementById("theme-btn");
-if (themeBtn) {
-  themeBtn.addEventListener("click", () => {
-    document.body.classList.toggle("light-mode");
-    const isLight = document.body.classList.contains("light-mode");
-    localStorage.setItem("wrennon_theme", isLight ? "light" : "dark");
-    updateThemeIcon(isLight, "theme-btn");
-  });
-  
-  const savedTheme = localStorage.getItem("wrennon_theme");
-  const systemLight = window.matchMedia('(prefers-color-scheme: light)').matches;
-  
-  if (savedTheme === "light" || (!savedTheme && systemLight)) {
-    document.body.classList.add("light-mode");
-    updateThemeIcon(true, "theme-btn");
-  } else {
-    updateThemeIcon(false, "theme-btn");
+  function applyTheme(themeValue) {
+    localStorage.setItem("wrennon_theme", themeValue);
+    if (themeValue === "system") {
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+    } else {
+      document.documentElement.setAttribute("data-theme", themeValue);
+    }
+    
+    options.forEach(opt => {
+      opt.classList.toggle("active", opt.dataset.themeValue === themeValue);
+    });
   }
+
+  menuBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isExpanded = menuBtn.getAttribute("aria-expanded") === "true";
+    menuBtn.setAttribute("aria-expanded", !isExpanded);
+    dropdown.classList.toggle("hidden");
+    if (!isExpanded) {
+      options[0].focus();
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!dropdown.contains(e.target) && e.target !== menuBtn) {
+      dropdown.classList.add("hidden");
+      menuBtn.setAttribute("aria-expanded", "false");
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      dropdown.classList.add("hidden");
+      menuBtn.setAttribute("aria-expanded", "false");
+      menuBtn.focus();
+    }
+  });
+
+  options.forEach(opt => {
+    opt.addEventListener("click", () => {
+      applyTheme(opt.dataset.themeValue);
+      dropdown.classList.add("hidden");
+      menuBtn.setAttribute("aria-expanded", "false");
+    });
+  });
+
+  const currentTheme = localStorage.getItem("wrennon_theme") || "system";
+  applyTheme(currentTheme);
+
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+    if (localStorage.getItem("wrennon_theme") === "system") {
+      document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
+    }
+  });
 }
+setupThemeDropdown();
 
 if (logoutBtn) {
   logoutBtn.addEventListener("click", logout);
@@ -213,6 +245,10 @@ function connectSocket() {
         }
       }
       loadConversations();
+    } else if (data.type === "typing" || data.type === "stopped_typing") {
+      // Typing indicators could be handled here in the future
+    } else {
+      console.warn("Unrecognized WebSocket message:", data);
     }
   };
 }
@@ -369,17 +405,67 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
   loadConversations();
 }
 
-function appendMessage(sender, content, isoString = new Date().toISOString()) {
+let lastMsgSender = null;
+let lastMsgTime = 0;
+
+let hasUnreadIndicator = false;
+
+function injectUnreadIndicator() {
+  if (hasUnreadIndicator) return;
   const div = document.createElement("div");
-  div.className = `msg msg--${sender}`;
+  div.className = "date-separator unread-indicator";
+  div.style.color = "var(--accent-alert)";
+  div.style.borderColor = "var(--line)";
+  div.textContent = "New Messages";
+  agentMessages.appendChild(div);
+  hasUnreadIndicator = true;
+}
+
+function clearUnreadIndicator() {
+  const indicators = agentMessages.querySelectorAll(".unread-indicator");
+  indicators.forEach(el => el.remove());
+  hasUnreadIndicator = false;
+}
+
+function scrollToBottom(force = false) {
+  const threshold = 150;
+  const isNearBottom = agentMessages.scrollHeight - agentMessages.scrollTop - agentMessages.clientHeight < threshold;
+  if (force || isNearBottom) {
+    agentMessages.scrollTop = agentMessages.scrollHeight;
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && !activeConversationEl.classList.contains("hidden")) {
+    clearUnreadIndicator();
+  }
+});
+
+function appendMessage(sender, content, isoString = new Date().toISOString(), isInternal = false) {
+  if (document.hidden) {
+    injectUnreadIndicator();
+  }
+
+  const timestamp = new Date(isoString).getTime();
+  const isGrouped = (sender === lastMsgSender && (timestamp - lastMsgTime < 60000) && sender !== "system");
+  
+  if (!isGrouped) {
+    lastMsgSender = sender;
+  }
+  lastMsgTime = timestamp;
+
+  const div = document.createElement("div");
+  div.className = `msg msg--${sender}${isGrouped ? ' msg--grouped' : ''}${isInternal ? ' msg--internal' : ''}`;
+  div.setAttribute("role", "listitem");
   
   let timeHtml = "";
-  if (isoString) {
+  if (isoString && !isGrouped) {
       const timeStr = formatTime(isoString);
       // Double ticks for outbound messages (ai or agent)
       const ticks = (sender === "ai" || sender === "agent") ? `<span class="msg-ticks">✓✓</span>` : "";
       timeHtml = `<div class="msg-meta"><span>${timeStr}</span>${ticks}</div>`;
   }
+
   
   if (sender === "ai" || sender === "agent" || sender === "system") {
     div.innerHTML = renderMarkdown(content) + timeHtml;
@@ -387,7 +473,7 @@ function appendMessage(sender, content, isoString = new Date().toISOString()) {
     div.innerHTML = escapeHtml(content) + timeHtml;
   }
   agentMessages.appendChild(div);
-  agentMessages.scrollTop = agentMessages.scrollHeight;
+  scrollToBottom(sender === 'agent');
 }
 
 // --- Sending a reply ---
@@ -493,12 +579,31 @@ if (agentVoiceBtn) {
   });
 }
 
+const noteTypeSelect = document.getElementById("note-type-select");
+if (noteTypeSelect) {
+  noteTypeSelect.addEventListener("change", () => {
+    if (noteTypeSelect.value === "internal") {
+      agentInput.style.backgroundColor = "rgba(217, 119, 6, 0.1)"; // accent-alert tint
+      agentInput.placeholder = "Type an internal note (only visible to agents)";
+    } else {
+      agentInput.style.backgroundColor = "var(--bg-base)";
+      agentInput.placeholder = "Type a reply";
+    }
+  });
+}
+
 function sendAgentReply() {
   const text = agentInput.value.trim();
   if (!text || !activeSessionId || !socket || socket.readyState !== WebSocket.OPEN) return;
 
-  socket.send(JSON.stringify({ session_id: activeSessionId, message: text }));
-  // Message will be appended when it is broadcasted back via the websocket
+  const isInternal = noteTypeSelect && noteTypeSelect.value === "internal";
+  
+  if (isInternal) {
+    appendMessage("agent", `*Internal Note:* ${text}`, new Date().toISOString(), true);
+  } else {
+    socket.send(JSON.stringify({ type: "message", session_id: activeSessionId, message: text }));
+  }
+  
   agentInput.value = "";
   drafts[activeSessionId] = ""; 
 }
