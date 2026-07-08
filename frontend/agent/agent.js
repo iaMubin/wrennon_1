@@ -192,6 +192,12 @@ let reconnectTimeout = null;
 function connectSocket() {
   if (reconnectTimeout) clearTimeout(reconnectTimeout);
   const token = localStorage.getItem("agent_token");
+  
+  if (!token) {
+    console.warn("No agent token found, aborting WebSocket connection.");
+    return;
+  }
+
   socket = new WebSocket(`${WS_URL}?token=${token}`);
 
   socket.onopen = () => {
