@@ -15,9 +15,9 @@ async def manager_node(state: ConversationState) -> ConversationState:
         "1. get_order_status: Fetches tracking information. Requires 'order_id'. Use this immediately if the user provides an order ID.\n"
         "2. search_knowledge_base: Fetches policy info (returns, shipping, etc.). Requires 'query'.\n\n"
         "Rules:\n"
-        "1. If the user is just saying hello, thank you, or engaging in small talk, you DO NOT need any tools.\n"
-        "2. If the user asks for something outside our capabilities (e.g., 'cancel my order', 'change address', 'refund me') OR is highly frustrated/angry, set 'handoff_required' to true.\n"
-        "3. If the user indicates their problem is completely solved, says goodbye, or explicitly says they have no more questions (e.g. 'I am good', 'thanks bye', 'all good'), set 'resolved_required' to true to close the chat.\n"
+        "1. If the user indicates their problem is completely solved, says they are done, says goodbye, or explicitly says they have no more questions (e.g. 'I am done', 'I am good', 'thanks bye', 'no more questions', 'that is all'), set 'resolved_required' to true to close the chat. DO NOT trigger handoff if the user is just trying to end the chat.\n"
+        "2. If the user explicitly asks to speak to a human, or asks for something outside our capabilities (e.g., 'cancel my order', 'change address', 'refund me') OR is highly frustrated/angry, set 'handoff_required' to true.\n"
+        "3. If the user is just saying hello, thank you, or engaging in small talk, you DO NOT need any tools.\n"
         "4. You MUST output your decision as a JSON object with this exact structure:\n"
         "{\n"
         "  \"tools_to_run\": [{\"name\": \"tool_name\", \"args\": {\"arg_name\": \"value\"}}],\n"
@@ -31,7 +31,7 @@ async def manager_node(state: ConversationState) -> ConversationState:
         "Output: {\"tools_to_run\": [{\"name\": \"search_knowledge_base\", \"args\": {\"query\": \"return policy\"}}], \"handoff_required\": false, \"resolved_required\": false}\n\n"
         "Example 3: User says 'Cancel my account'\n"
         "Output: {\"tools_to_run\": [], \"handoff_required\": true, \"resolved_required\": false}\n\n"
-        "Example 4: User says 'Thanks that helped a lot, bye'\n"
+        "Example 4: User says 'Thanks that helped a lot, bye' or 'i am done'\n"
         "Output: {\"tools_to_run\": [], \"handoff_required\": false, \"resolved_required\": true}\n"
     )
 
