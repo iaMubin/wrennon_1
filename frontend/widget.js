@@ -382,17 +382,15 @@ function connectSocket() {
       } else if (data.type === "stopped_typing") {
         hideTypingIndicator();
         return;
-      } else if (data.type === "new_message") {
+      } else if (data.type === "new_message" || data.reply || data.message || data.content) {
         hideTypingIndicator();
         const sender = data.sender || "bot";
-        const name = sender === "agent" ? (data.name || "Support Agent") : "AI Assistant";
-        appendMessage(sender, data.content, true, Date.now(), name);
-        return;
-      } else if (data.reply) {
-        hideTypingIndicator();
-        const sender = data.sender || "bot";
-        const name = data.name || "AI Assistant";
-        appendMessage(sender, data.reply, true, Date.now(), name);
+        const name = data.name || (sender === "agent" ? "Support Agent" : "AI Assistant");
+        const text = data.reply || data.content || data.message;
+        
+        if (text) {
+          appendMessage(sender, text, true, Date.now(), name);
+        }
         return;
       } else {
         console.warn("Unrecognized WebSocket message:", data);
