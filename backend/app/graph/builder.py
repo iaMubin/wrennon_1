@@ -3,10 +3,11 @@ from langgraph.graph import END, StateGraph
 from app.logger import logger
 
 from app.graph.nodes.handoff_node import handoff_node
-from app.graph.nodes.manager_node import manager_node
+from app.graph.nodes.manager_node import manager_node, MAX_ITERATIONS
 from app.graph.nodes.tool_executor import tool_executor_node
 from app.graph.nodes.final_reply_node import final_reply_node
 from app.graph.state import ConversationState
+
 
 def build_graph():
     graph = StateGraph(ConversationState)
@@ -19,47 +20,52 @@ def build_graph():
     graph.set_entry_point("manager")
 
     def route_after_manager(state: ConversationState) -> str:
-        if state.get("turn_count", 0) >= 15 and state["conversation_mode"] != "pending_human":
-            logger.info("Forcing handoff due to turn_count limit.")
-            state["handoff_requested"] = True
-            return "handoff"
-            
+        # NOTE: routing functions must be pure reads. LangGraph does not
+        # persist mutations made inside a conditional-edge function back
+        # into the graph's state — only a node's return value counts.
+        # The turn_count safety valve therefore lives in manager_node.py
+        # itself (it sets handoff_requested there); this function just
+        # reacts to what's already in state.
         if state.get("handoff_requested") and state["conversation_mode"] != "pending_human":
-            # Just route to handoff. The handoff node will create the ticket and change the mode,
-            # then it will go to final_reply_node to generate the natural response.
-            pass # We'll handle handoff conditionally below if tools are empty
-            
+            return "handoff"
+
         if state.get("planned_tools"):
             return "tool_executor"
-        
-        # Even if handoff is requested, we go to handoff node first, then to final_reply.
-        if state.get("handoff_requested") and state["conversation_mode"] != "pending_human":
-            return "handoff"
-            
+
         return "final_reply"
 
     graph.add_conditional_edges(
-        "manager", 
-        route_after_manager, 
+        "manager",
+        route_after_manager,
         {
-            "tool_executor": "tool_executor", 
+            "tool_executor": "tool_executor",
             "handoff": "handoff",
-            "final_reply": "final_reply"
-        }
+            "final_reply": "final_reply",
+        },
     )
 
     def route_after_tools(state: ConversationState) -> str:
         if state.get("handoff_requested") and state["conversation_mode"] != "pending_human":
             return "handoff"
-        return "final_reply"
-        
+
+        # Loop back to the manager so it can react to what the tool(s)
+        # actually returned, instead of blindly finalizing — this is what
+        # makes the agent genuinely ReAct instead of one-shot classify.
+        # iteration_count was already incremented by tool_executor_node
+        # itself (a real node) — this function only reads it.
+        if state.get("iteration_count", 0) >= MAX_ITERATIONS:
+            logger.info("Manager reached max re-planning passes — finalizing reply now.")
+            return "final_reply"
+        return "manager"
+
     graph.add_conditional_edges(
         "tool_executor",
         route_after_tools,
         {
             "handoff": "handoff",
-            "final_reply": "final_reply"
-        }
+            "final_reply": "final_reply",
+            "manager": "manager",
+        },
     )
 
     graph.add_edge("handoff", "final_reply")

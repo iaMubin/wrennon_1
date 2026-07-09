@@ -709,6 +709,10 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   
   if (uiRole === "bot" || uiRole === "agent") {
     div.innerHTML = nameHtml + renderMarkdown(text);
+  } else if (uiRole === "user") {
+    // User messages also need media rendering (voice, images)
+    // but without the bot name/badge header
+    div.innerHTML = renderMarkdown(text);
   } else {
     div.innerHTML = escapeHtml(text);
   }

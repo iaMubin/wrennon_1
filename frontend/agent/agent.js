@@ -530,7 +530,8 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
   } else if (sender === "ai" || sender === "agent" || sender === "system") {
     div.innerHTML = renderMarkdown(content);
   } else {
-    div.innerHTML = escapeHtml(content);
+    // Human messages also need media rendering (voice, images, photos)
+    div.innerHTML = renderMarkdown(content);
   }
 
   if (msgId) {
