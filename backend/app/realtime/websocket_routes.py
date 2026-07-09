@@ -226,6 +226,19 @@ def _sync_agent_reply(session_id: str, username: str, reply_text: str, is_intern
 # --- END SYNC WRAPPERS ---
 
 
+DEBOUNCE_SECONDS = 2.5
+# How long to wait, after a customer's message, before actually invoking the
+# AI. If another message arrives inside this window the wait resets. This
+# is what stops "hi" / "my order is 1002" / "it hasn't arrived" — sent as
+# three quick separate messages — from being treated as three separate AI
+# turns with three separate bot replies. Every message is still saved to
+# the DB and broadcast to the agent dashboard the instant it arrives,
+# exactly as before; only the AI's turn is deferred until the customer
+# actually pauses, at which point it sees the full history built up during
+# that pause in one shot. Tune this value if 2.5s feels too slow/fast for
+# real usage; keep it well under the rate-limit window (60s/15msgs) either way.
+
+
 @router.websocket("/ws/customer/{session_id}")
 async def customer_websocket(websocket: WebSocket, session_id: str, token: str | None = None):
     logger.info(f"Customer connected: {session_id}")
@@ -243,6 +256,135 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
 
     await manager.connect_customer(session_id, websocket)
 
+    # --- Debounce state for this connection ---
+    # These are local to this function call, i.e. scoped per-connection —
+    # no shared/global dict needed, since one customer_websocket() coroutine
+    # already exists per connection.
+    pending_event = asyncio.Event()
+    latest_phase1_data: dict | None = None
+
+    async def _run_ai_turn(phase1_data: dict):
+        """Everything that used to run immediately after phase1 for a single
+        message now runs once per debounce-settled batch, using the most
+        up-to-date phase1 snapshot — which already reflects every message
+        the customer sent during the quiet window, since each one was saved
+        to the DB (and broadcast to agents) as soon as it arrived."""
+        msg_start_time = time.time()
+        customer_text = phase1_data["messages"][-1]["content"] if phase1_data["messages"] else ""
+
+        state = initial_state(customer_email=phase1_data["customer_email"])
+
+        if phase1_data["handoff_ticket_id"]:
+            state["existing_ticket_id"] = phase1_data["handoff_ticket_id"]
+
+        state["conversation_summary"] = phase1_data["summary"]
+        state["active_topic"] = phase1_data["active_topic"]
+        state["last_order_id"] = phase1_data["last_order_id"]
+        state["turn_count"] = phase1_data["turn_count"]
+
+        for msg in phase1_data["messages"]:
+            if msg["sender"] == "human":
+                state["messages"].append(HumanMessage(content=msg["content"]))
+            elif msg["sender"] in ("ai", "agent"):
+                state["messages"].append(AIMessage(content=msg["content"]))
+
+        # Update rolling summary if conversation gets long (e.g., every 6 messages)
+        if len(state["messages"]) > 0 and len(state["messages"]) % 6 == 0:
+            new_summary = await update_conversation_summary(state["messages"][-6:], phase1_data["summary"])
+            await asyncio.to_thread(_sync_update_summary, session_id, new_summary)
+            state["conversation_summary"] = new_summary
+
+        # Semantic Cache logic: Only check cache for early generic questions
+        reply_text = None
+        updated_state = None
+        if len(state["messages"]) == 1:
+            cached_reply = await get_cache(customer_text)
+            if cached_reply:
+                reply_text = cached_reply
+                logger.info(f"Semantic Cache HIT for '{customer_text}'")
+
+        # Phase 2: AI Processing (LangGraph)
+        phase2_start = time.time()
+        if not reply_text:
+            updated_state = await _graph.ainvoke(state)
+            reply_text = updated_state["messages"][-1].content
+
+            # Store RAG/Generic questions in cache
+            if updated_state.get("tool_call_history"):
+                tool_names = [entry.split(":", 1)[0] for entry in updated_state["tool_call_history"]]
+                if tool_names == ["search_knowledge_base"]:
+                    await set_cache(customer_text, reply_text, ttl=3600)
+
+        phase2_duration = time.time() - phase2_start
+        logger.info(f"[TIMING] Phase 2 (AI Graph Execution) took {phase2_duration:.3f}s")
+
+        # Phase 3: Post-processing & DB Save
+        phase3_start = time.time()
+        phase3_data = await asyncio.to_thread(_sync_phase3, session_id, reply_text, updated_state)
+        if not phase3_data:
+            return
+
+        # Broadcast AI messages to agent dashboard
+        _t0 = time.time()
+        await manager.broadcast_to_agents({
+            "type": "new_message",
+            "session_id": session_id,
+            "sender": "ai",
+            "content": reply_text,
+            "is_resolved": phase3_data["resolved"],
+            "message_id": phase3_data["message_id"]
+        })
+        logger.info(f"[TIMING] broadcast_to_agents (ai msg) dispatched in {time.time() - _t0:.3f}s")
+
+        # Handle handoff/reopen events returned from sync_phase3
+        for event in phase3_data["events"]:
+            event["session_id"] = session_id
+            _t0 = time.time()
+            await manager.broadcast_to_agents(event)
+            logger.info(f"[TIMING] broadcast_to_agents ({event['type']}) dispatched in {time.time() - _t0:.3f}s")
+
+        phase3_duration = time.time() - phase3_start
+        logger.info(f"[TIMING] Phase 3 (DB Post-processing) took {phase3_duration:.3f}s")
+
+        await websocket.send_json({"reply": reply_text, "sender": "bot"})
+
+        total_time = time.time() - msg_start_time
+        logger.info(f"[TIMING] Total Message Turnaround Time: {total_time:.3f}s")
+
+    async def _debounce_worker():
+        nonlocal latest_phase1_data
+        while True:
+            await pending_event.wait()
+            pending_event.clear()
+
+            # Keep resetting the wait while messages keep arriving — only
+            # proceed once the customer has genuinely gone quiet.
+            while True:
+                try:
+                    await asyncio.wait_for(pending_event.wait(), timeout=DEBOUNCE_SECONDS)
+                    pending_event.clear()
+                except asyncio.TimeoutError:
+                    break
+
+            if latest_phase1_data is None:
+                continue
+
+            # Re-check handoff status right before firing — a human agent
+            # may have claimed the conversation during the wait window,
+            # even though it wasn't claimed when the last message arrived.
+            recheck = await asyncio.to_thread(_sync_setup_conversation, session_id)
+            if recheck["handoff_active"]:
+                latest_phase1_data = None
+                continue
+
+            phase1_data, latest_phase1_data = latest_phase1_data, None
+            try:
+                await _run_ai_turn(phase1_data)
+            except Exception as e:
+                logger.error(f"Error processing debounced AI turn for {session_id}: {e}", exc_info=True)
+
+    debounce_worker_task = asyncio.create_task(_debounce_worker())
+
     try:
         # One-off connection for initial setup (non-blocking)
         init_data = await asyncio.to_thread(_sync_setup_conversation, session_id)
@@ -259,18 +401,19 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             customer_text = data.get("message")
             if not customer_text:
                 continue
-                
+
             if len(customer_text) > 2000:
                 logger.warning(f"Message from {session_id} exceeded max length. Truncating.")
                 customer_text = customer_text[:2000]
-                
+
             # Check for audio and transcribe it
             customer_text = await transcribe_audio_if_present(customer_text)
-                
-            msg_start_time = time.time()
+
             logger.info(f"Received message from customer {session_id}: {mask_pii(customer_text)}")
 
-            # Rate Limiting (max 15 msgs / minute)
+            # Rate Limiting (max 15 msgs / minute) — unchanged, still applies
+            # per raw message regardless of debouncing, to guard against
+            # socket flooding.
             try:
                 r = get_redis()
                 rate_key = f"rate_limit:{session_id}"
@@ -286,12 +429,15 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             except Exception as e:
                 logger.error(f"Rate limiting error: {e}")
 
-            # Phase 1: Pre-processing & DB Save
+            # Phase 1: Pre-processing & DB Save — unchanged, still runs
+            # immediately per raw message so agents see live messages as
+            # they're typed.
             phase1_start = time.time()
             phase1_data = await asyncio.to_thread(_sync_phase1, session_id, customer_text)
             if not phase1_data:
                 continue
-                
+            logger.info(f"[TIMING] Phase 1 (DB Pre-processing) took {time.time() - phase1_start:.3f}s")
+
             # Broadcast ALL customer messages to the agent dashboard for real-time sync in background.
             _t0 = time.time()
             asyncio.create_task(manager.broadcast_to_agents({
@@ -318,99 +464,10 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
                 }))
                 logger.info(f"[TIMING] broadcast_to_agents (reopen) dispatched in {time.time() - _t0:.3f}s")
 
-            state = initial_state(customer_email=phase1_data["customer_email"])
-
-            # Pass existing ticket_id so handoff_node can reopen it instead of creating new
-            if phase1_data["handoff_ticket_id"]:
-                state["existing_ticket_id"] = phase1_data["handoff_ticket_id"]
-
-            state["conversation_summary"] = phase1_data["summary"]
-            state["active_topic"] = phase1_data["active_topic"]
-            state["last_order_id"] = phase1_data["last_order_id"]
-            state["turn_count"] = phase1_data["turn_count"]
-
-            for msg in phase1_data["messages"]:
-                if msg["sender"] == "human":
-                    state["messages"].append(HumanMessage(content=msg["content"]))
-                elif msg["sender"] in ("ai", "agent"):
-                    state["messages"].append(AIMessage(content=msg["content"]))
-
-            # Add the current message
-            state["messages"].append(HumanMessage(content=customer_text))
-
-            # Update rolling summary if conversation gets long (e.g., every 6 messages)
-            if len(state["messages"]) > 0 and len(state["messages"]) % 6 == 0:
-                new_summary = await update_conversation_summary(state["messages"][-6:], phase1_data["summary"])
-                await asyncio.to_thread(_sync_update_summary, session_id, new_summary)
-                state["conversation_summary"] = new_summary
-
-            # Run graph in a separate thread to avoid blocking the main async event loop
-            # Semantic Cache logic: Only check cache for early generic questions
-            reply_text = None
-            updated_state = None
-            if len(state["messages"]) == 1:
-                cached_reply = await get_cache(customer_text)
-                if cached_reply:
-                    reply_text = cached_reply
-                    logger.info(f"Semantic Cache HIT for '{customer_text}'")
-            
-            phase1_duration = time.time() - phase1_start
-            logger.info(f"[TIMING] Phase 1 (DB Pre-processing) took {phase1_duration:.3f}s")
-
-            # Phase 2: AI Processing (LangGraph)
-            phase2_start = time.time()
-            if not reply_text:
-                updated_state = await _graph.ainvoke(state)
-                reply_text = updated_state["messages"][-1].content
-                
-                   # Store RAG/Generic questions in cache
-                   # (uses tool_call_history, not planned_tools — the new
-                   # ReAct loop in builder.py means planned_tools reflects
-                   # only the LAST manager decision, which is empty once
-                   # it's ready to reply. tool_call_history has everything
-                   # actually run this turn, across all loop passes.)
-                if updated_state.get("tool_call_history"):
-                       tool_names = [
-                           entry.split(":", 1)[0] for entry in updated_state["tool_call_history"]
-                       ]
-                       if tool_names == ["search_knowledge_base"]:
-                           await set_cache(customer_text, reply_text, ttl=3600)
-            
-            phase2_duration = time.time() - phase2_start
-            logger.info(f"[TIMING] Phase 2 (AI Graph Execution) took {phase2_duration:.3f}s")
-
-            # Phase 3: Post-processing & DB Save
-            phase3_start = time.time()
-            phase3_data = await asyncio.to_thread(_sync_phase3, session_id, reply_text, updated_state)
-            if not phase3_data:
-                continue
-
-            # Broadcast AI messages to agent dashboard
-            _t0 = time.time()
-            await manager.broadcast_to_agents({
-                "type": "new_message",
-                "session_id": session_id,
-                "sender": "ai",
-                "content": reply_text,
-                "is_resolved": phase3_data["resolved"],
-                "message_id": phase3_data["message_id"]
-            })
-            logger.info(f"[TIMING] broadcast_to_agents (ai msg) dispatched in {time.time() - _t0:.3f}s")
-
-            # Handle handoff/reopen events returned from sync_phase3
-            for event in phase3_data["events"]:
-                event["session_id"] = session_id
-                _t0 = time.time()
-                await manager.broadcast_to_agents(event)
-                logger.info(f"[TIMING] broadcast_to_agents ({event['type']}) dispatched in {time.time() - _t0:.3f}s")
-
-            phase3_duration = time.time() - phase3_start
-            logger.info(f"[TIMING] Phase 3 (DB Post-processing) took {phase3_duration:.3f}s")
-
-            await websocket.send_json({"reply": reply_text, "sender": "bot"})
-            
-            total_time = time.time() - msg_start_time
-            logger.info(f"[TIMING] Total Message Turnaround Time: {total_time:.3f}s")
+            # Hand off to the debounce worker instead of processing the AI
+            # turn immediately — it'll fire once the customer actually pauses.
+            latest_phase1_data = phase1_data
+            pending_event.set()
 
     except WebSocketDisconnect:
         logger.info(f"Customer disconnected: {session_id}")
@@ -418,6 +475,8 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
     except Exception as e:
         logger.error(f"Error in customer_websocket: {e}", exc_info=True)
         manager.disconnect_customer(session_id, websocket)
+    finally:
+        debounce_worker_task.cancel()
 
 
 @router.websocket("/ws/agent")
