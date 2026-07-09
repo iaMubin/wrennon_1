@@ -1,18 +1,21 @@
 // ── Backend URL detection ──────────────────────────────────────────
-const API_BASE = (location.protocol === "file:" ? "http://localhost:8000" : location.origin) + "/api";
-const WS_URL = (location.protocol === "https:" ? "wss://" : "ws://") + (location.protocol === "file:" ? "localhost:8000" : location.host) + "/ws/agent";
+const _RENDER_HOST = "wrennon-backend.onrender.com";
+const _IS_LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.protocol === "file:";
+const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/api`;
+const WS_URL  = `${_IS_LOCAL ? "ws"   : "wss"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/ws/agent`;
 
 
 let socket = null;
 let activeSessionId = null;
-let activeSection = "attention"; // "attention" | "active" | "all"
+let activeSection = "active"; // "attention" | "active" | "all"
 const drafts = {};
 
 // --- Elements ---
 const loginScreen = document.getElementById("login-screen");
+const dashboard = document.getElementById("dashboard");
 const loginForm = document.getElementById("login-form");
 const loginError = document.getElementById("login-error");
-const dashboard = document.getElementById("dashboard");
+const logoutBtn = document.getElementById("logout-btn");
 const connectionDot = document.getElementById("connection-dot");
 const sectionTabs = document.querySelectorAll(".tab");
 const conversationList = document.getElementById("conversation-list");
@@ -25,15 +28,92 @@ const conversationSession = document.getElementById("conversation-session");
 const agentMessages = document.getElementById("agent-messages");
 const agentInput = document.getElementById("agent-message-input");
 
+// ── Theme Management ───────────────────────────────────────────────
+function setupThemeDropdown() {
+  const menuBtn = document.getElementById("theme-menu-btn");
+  const dropdown = document.getElementById("theme-dropdown");
+  const options = document.querySelectorAll(".theme-option");
+  if (!menuBtn || !dropdown) return;
+
+  function applyTheme(themeValue) {
+    localStorage.setItem("wrennon_theme", themeValue);
+    if (themeValue === "system") {
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+    } else {
+      document.documentElement.setAttribute("data-theme", themeValue);
+    }
+    
+    options.forEach(opt => {
+      opt.classList.toggle("active", opt.dataset.themeValue === themeValue);
+    });
+  }
+
+  menuBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isExpanded = menuBtn.getAttribute("aria-expanded") === "true";
+    menuBtn.setAttribute("aria-expanded", !isExpanded);
+    dropdown.classList.toggle("hidden");
+    if (!isExpanded) {
+      options[0].focus();
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!dropdown.contains(e.target) && e.target !== menuBtn) {
+      dropdown.classList.add("hidden");
+      menuBtn.setAttribute("aria-expanded", "false");
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      dropdown.classList.add("hidden");
+      menuBtn.setAttribute("aria-expanded", "false");
+      menuBtn.focus();
+    }
+  });
+
+  options.forEach(opt => {
+    opt.addEventListener("click", () => {
+      applyTheme(opt.dataset.themeValue);
+      dropdown.classList.add("hidden");
+      menuBtn.setAttribute("aria-expanded", "false");
+    });
+  });
+
+  const currentTheme = localStorage.getItem("wrennon_theme") || "system";
+  applyTheme(currentTheme);
+
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+    if (localStorage.getItem("wrennon_theme") === "system") {
+      document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
+    }
+  });
+}
+setupThemeDropdown();
+
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", logout);
+}
+
 let typingTimeout;
+let isTyping = false;
 agentInput.addEventListener("input", (e) => {
   if (!activeSessionId || !socket || socket.readyState !== WebSocket.OPEN) return;
-  socket.send(JSON.stringify({ type: "typing", session_id: activeSessionId }));
+  const isInternal = noteTypeSelect && noteTypeSelect.value === "internal";
+  if (isInternal) return; // Don't broadcast typing for internal notes
+  
+  if (!isTyping) {
+    socket.send(JSON.stringify({ type: "typing", session_id: activeSessionId }));
+    isTyping = true;
+  }
   
   clearTimeout(typingTimeout);
   typingTimeout = setTimeout(() => {
     socket.send(JSON.stringify({ type: "stopped_typing", session_id: activeSessionId }));
-  }, 1000);
+    isTyping = false;
+  }, 1500);
 });
 
 const agentSendBtn = document.getElementById("agent-send-btn");
@@ -112,6 +192,12 @@ let reconnectTimeout = null;
 function connectSocket() {
   if (reconnectTimeout) clearTimeout(reconnectTimeout);
   const token = localStorage.getItem("agent_token");
+  
+  if (!token || token === "null" || token === "undefined") {
+    console.warn("No agent token found, aborting WebSocket connection.");
+    return;
+  }
+
   socket = new WebSocket(`${WS_URL}?token=${token}`);
 
   socket.onopen = () => {
@@ -141,7 +227,7 @@ function connectSocket() {
       loadConversations();
       if (data.session_id === activeSessionId) {
         if (data.summary) {
-          appendMessage("system", `📋 Summary: ${data.summary}`, new Date().toISOString());
+          appendMessage("system", `📋 ${data.summary}`);
         }
         if (data.is_resolved) {
           resolveBtn.textContent = "Resolved";
@@ -155,7 +241,12 @@ function connectSocket() {
       }
     } else if (data.type === "new_message") {
       if (data.session_id === activeSessionId) {
-        appendMessage(data.sender, data.content, new Date().toISOString());
+        hideCustomerTypingIndicator();
+        appendMessage(data.sender, data.content, new Date().toISOString(), data.sender === "agent_internal", data.message_id);
+        // Refresh order context when customer sends a new message
+        if (data.sender === "human") {
+          fetchOrderContext(data.session_id);
+        }
         if (data.is_resolved) {
           resolveBtn.textContent = "Resolved";
           resolveBtn.disabled = true;
@@ -167,6 +258,19 @@ function connectSocket() {
         }
       }
       loadConversations();
+    } else if (data.type === "typing" || data.type === "stopped_typing") {
+      // Customer -> agent typing indicator (mirrors the agent -> customer
+      // one in widget.js). Only relevant if we're currently looking at
+      // that customer's conversation.
+      if (data.session_id === activeSessionId) {
+        if (data.type === "typing") {
+          showCustomerTypingIndicator();
+        } else {
+          hideCustomerTypingIndicator();
+        }
+      }
+    } else {
+      console.warn("Unrecognized WebSocket message:", data);
     }
   };
 }
@@ -184,26 +288,31 @@ sectionTabs.forEach((tab) => {
 // --- Loading conversation lists ---
 async function loadConversations() {
   const endpoints = {
+    "my_cases": "/agent/conversations/my-cases",
     "attention": "/agent/conversations/needs-attention",
     "active": "/agent/conversations/active",
     "all": "/agent/conversations"
   };
   
-  const endpoint = endpoints[activeSection] || endpoints["attention"];
+  const endpoint = endpoints[activeSection] || endpoints["my_cases"];
   
   // Use Promise.all to fetch concurrently and save time
-  const [conversations, attnList, actList] = await Promise.all([
+  const [conversations, myCasesList, attnList, actList] = await Promise.all([
     authedFetch(endpoint),
+    activeSection === "my_cases" ? null : authedFetch(endpoints["my_cases"]),
     activeSection === "attention" ? null : authedFetch(endpoints["attention"]),
     activeSection === "active" ? null : authedFetch(endpoints["active"])
   ]);
 
   if (!conversations) {
-    logout();
     return;
   }
 
   // Update badges
+  const myCasesCountEl = document.getElementById("my-cases-count");
+  if (myCasesCountEl) {
+      myCasesCountEl.textContent = activeSection === "my_cases" ? conversations.length : (myCasesList ? myCasesList.length : 0);
+  }
   attentionCount.textContent = activeSection === "attention" ? conversations.length : (attnList ? attnList.length : 0);
   activeCount.textContent = activeSection === "active" ? conversations.length : (actList ? actList.length : 0);
 
@@ -226,8 +335,13 @@ function renderConversationList(conversations) {
       badgeClass = "badge--resolved";
       stageText = conv.handled_by ? conv.handled_by : "AI";
     } else if (conv.handoff_active) {
-      badgeClass = "badge--human";
-      stageText = conv.handled_by ? conv.handled_by : "Needs Attention";
+      if (conv.handled_by) {
+        badgeClass = "badge--agent";
+        stageText = conv.handled_by;
+      } else {
+        badgeClass = "badge--human";
+        stageText = "Needs Attention";
+      }
     }
 
     const reopenBadge = conv.reopen_count > 0
@@ -237,7 +351,7 @@ function renderConversationList(conversations) {
     item.innerHTML = `
       <div class="conv-item-header">
         <span class="conv-item-email">${escapeHtml(conv.customer_email || "Unknown Customer")}</span>
-        <span class="conv-item-time">${formatTime(conv.updated_at)}</span>
+        <span class="conv-item-time">${formatSidebarTime(conv.updated_at)}</span>
       </div>
       <div class="conv-item-preview">${escapeHtml(conv.last_message || "No messages yet")}</div>
       <div class="badge-row">
@@ -246,16 +360,17 @@ function renderConversationList(conversations) {
       </div>
     `;
 
-    item.addEventListener("click", () => openConversation(conv.session_id, conv.customer_email, conv.short_id, conv.resolved));
+    item.addEventListener("click", () => openConversation(conv.session_id, conv.customer_email, conv.short_id, conv.resolved, conv.updated_at));
     conversationList.appendChild(item);
   }
 }
 
 // --- Opening and viewing a conversation ---
-async function openConversation(sessionId, customerEmail, shortId, isResolved) {
+async function openConversation(sessionId, customerEmail, shortId, isResolved, updatedAt) {
   if (activeSessionId && activeSessionId !== sessionId) {
     drafts[activeSessionId] = agentInput.value;
   }
+  hideCustomerTypingIndicator(); // clear any stale indicator from the previously-open conversation
   activeSessionId = sessionId;
   emptyState.classList.add("hidden");
   activeConversationEl.classList.remove("hidden");
@@ -265,22 +380,36 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved) {
   conversationEmail.textContent = customerEmail || "Unknown Customer";
   conversationSession.textContent = shortId || sessionId;
   
+  const resolveTimeEl = document.getElementById("resolve-time");
   if (isResolved) {
     resolveBtn.textContent = "Resolved";
     resolveBtn.disabled = true;
     resolveBtn.classList.remove("btn-primary");
+    if (updatedAt) {
+      resolveTimeEl.textContent = `at ${formatSidebarTime(updatedAt)}`;
+      resolveTimeEl.classList.remove("hidden");
+    }
   } else {
     resolveBtn.textContent = "Mark resolved";
     resolveBtn.disabled = false;
     resolveBtn.classList.add("btn-primary");
+    resolveTimeEl.classList.add("hidden");
   }
 
   agentMessages.innerHTML = "<div class='loading-spinner'></div>";
-  const messages = await authedFetch(`/agent/conversations/${sessionId}/messages`);
+  const responseData = await authedFetch(`/agent/conversations/${sessionId}/messages`);
   agentMessages.innerHTML = "";
-  if (messages) {
+  
+  if (responseData) {
+    const messages = responseData.messages || [];
+    const pinnedId = responseData.pinned_message_id;
+    let pinnedContent = null;
+    
     let lastDateStr = null;
     for (const msg of messages) {
+      if (msg.id === pinnedId) {
+        pinnedContent = msg.content;
+      }
       const dateObj = new Date(msg.created_at);
       const dateStr = dateObj.toLocaleDateString();
       if (dateStr !== lastDateStr) {
@@ -294,34 +423,212 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved) {
         
         if (dateStr === todayStr) dateDiv.textContent = "Today";
         else if (dateStr === yesterdayStr) dateDiv.textContent = "Yesterday";
-        else dateDiv.textContent = dateObj.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        else dateDiv.textContent = dateObj.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
         
         agentMessages.appendChild(dateDiv);
         lastDateStr = dateStr;
       }
-      appendMessage(msg.sender, msg.content, msg.created_at);
+      appendMessage(msg.sender, msg.content, msg.created_at, msg.sender === "agent_internal", msg.id);
     }
+    
+    updatePinnedMessageUI(pinnedId, pinnedContent);
   }
   
+  fetchOrderContext(sessionId);
   loadConversations();
 }
 
-function appendMessage(sender, content, isoString = new Date().toISOString()) {
+let lastMsgSender = null;
+let lastMsgTime = 0;
+
+let hasUnreadIndicator = false;
+
+function injectUnreadIndicator() {
+  if (hasUnreadIndicator) return;
   const div = document.createElement("div");
-  div.className = `msg msg--${sender}`;
+  div.className = "date-separator unread-indicator";
+  div.style.color = "var(--accent-alert)";
+  div.style.borderColor = "var(--line)";
+  div.textContent = "New Messages";
+  agentMessages.appendChild(div);
+  hasUnreadIndicator = true;
+}
+
+function clearUnreadIndicator() {
+  const indicators = agentMessages.querySelectorAll(".unread-indicator");
+  indicators.forEach(el => el.remove());
+  hasUnreadIndicator = false;
+}
+
+// --- Customer typing indicator (customer -> agent) ---
+// Mirrors widget.js's showTypingIndicator/hideTypingIndicator, just shown
+// as the customer's own bubble style instead of the agent/AI one.
+function showCustomerTypingIndicator() {
+  if (document.getElementById("customer-typing-wrapper")) return;
+  const wrapper = document.createElement("div");
+  wrapper.id = "customer-typing-wrapper";
+  wrapper.className = "msg-content msg-content--human";
+  wrapper.innerHTML = `
+    <div class="msg msg--human typing-indicator">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    </div>
+  `;
+  agentMessages.appendChild(wrapper);
+  scrollToBottom();
+}
+
+function hideCustomerTypingIndicator() {
+  const wrapper = document.getElementById("customer-typing-wrapper");
+  if (wrapper) {
+    wrapper.remove();
+  }
+}
+
+
+function scrollToBottom(force = false) {
+  setTimeout(() => {
+    agentMessages.scrollTop = agentMessages.scrollHeight;
+  }, 50);
+}
+
+function updatePinnedMessageUI(msgId, content) {
+  let pinnedContainer = document.getElementById("pinned-message-container");
   
-  let timeHtml = "";
-  if (isoString) {
-      const timeStr = formatTime(isoString);
-      // Double ticks for outbound messages (ai or agent)
-      const ticks = (sender === "ai" || sender === "agent") ? `<span class="msg-ticks">✓✓</span>` : "";
-      timeHtml = `<div class="msg-meta"><span>${timeStr}</span>${ticks}</div>`;
+  if (!msgId) {
+    if (pinnedContainer) pinnedContainer.remove();
+    return;
   }
   
-  div.innerHTML = `${escapeHtml(content)}${timeHtml}`;
-  agentMessages.appendChild(div);
-  agentMessages.scrollTop = agentMessages.scrollHeight;
+  if (!pinnedContainer) {
+    pinnedContainer = document.createElement("div");
+    pinnedContainer.id = "pinned-message-container";
+    pinnedContainer.className = "pinned-message";
+    
+    // Insert after chat-header
+    const header = document.querySelector(".chat-header");
+    header.parentNode.insertBefore(pinnedContainer, header.nextSibling);
+  }
+  
+  let displayContent = content;
+  if (displayContent.startsWith("*Internal Note:*")) {
+    displayContent = displayContent.replace(/^\*Internal Note:\* /, "[Internal] ");
+  }
+  
+  pinnedContainer.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="display:flex; align-items:center; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">
+        <svg style="margin-right:8px; color:var(--primary); flex-shrink:0;" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg>
+        <span style="font-weight:500; font-size:13px; text-overflow:ellipsis; overflow:hidden;">${escapeHtml(displayContent)}</span>
+      </div>
+      <button class="unpin-btn" data-id="${msgId}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;flex-shrink:0;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+  `;
 }
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && !activeConversationEl.classList.contains("hidden")) {
+    clearUnreadIndicator();
+  }
+});
+
+function appendMessage(sender, content, isoString = new Date().toISOString(), isInternal = false, msgId = null) {
+  if (document.hidden) {
+    injectUnreadIndicator();
+  }
+
+  const timestamp = new Date(isoString).getTime();
+  const isGrouped = (sender === lastMsgSender && (timestamp - lastMsgTime < 60000) && sender !== "system");
+  
+  if (!isGrouped) {
+    lastMsgSender = sender;
+  }
+  lastMsgTime = timestamp;
+
+  const contentWrapper = document.createElement("div");
+  const actualSender = isInternal ? "agent" : sender;
+  contentWrapper.className = `msg-content msg-content--${actualSender}${isGrouped ? ' msg-content--grouped' : ''}${isInternal ? ' msg-content--internal' : ''}`;
+  contentWrapper.style.display = "flex";
+  contentWrapper.style.flexDirection = "column";
+  if (msgId) contentWrapper.dataset.msgId = msgId;
+
+  const div = document.createElement("div");
+  div.className = `msg msg--${actualSender}${isInternal ? ' msg--internal' : ''}`;
+  div.setAttribute("role", "listitem");
+  
+  // Format internal note
+  // Format message content
+  let displayContent = content;
+  if (isInternal) {
+    displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
+    div.innerHTML = escapeHtml(displayContent);
+  } else if (sender === "ai" || sender === "agent" || sender === "system") {
+    div.innerHTML = renderMarkdown(content);
+  } else {
+    div.innerHTML = escapeHtml(content);
+  }
+
+  if (msgId) {
+    let actionsHtml = `<div class="msg-actions" style="position:absolute; bottom:4px; ${actualSender === 'agent' ? 'left:-28px;' : 'right:-28px;'} display:flex; flex-direction:column; gap:4px;">`;
+    actionsHtml += `<button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(displayContent)}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Pin message"><svg style="transform: rotate(45deg);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>`;
+    if (isInternal) {
+      actionsHtml += `<button class="delete-note-btn" data-id="${msgId}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Delete note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
+    }
+    actionsHtml += `</div>`;
+    div.innerHTML += actionsHtml;
+  }
+  contentWrapper.appendChild(div);
+
+  if (sender !== "system") {
+    const timeStr = formatTime(isoString);
+    const ticks = (sender === "ai" || sender === "agent" || isInternal) ? `<span class="msg-ticks">✓✓</span>` : "";
+    const metaDiv = document.createElement("div");
+    metaDiv.className = `msg-meta msg-meta--${actualSender}`;
+    metaDiv.innerHTML = `<span>${timeStr}</span>${ticks}`;
+    contentWrapper.appendChild(metaDiv);
+  }
+
+  agentMessages.appendChild(contentWrapper);
+  scrollToBottom(sender === 'agent');
+}
+
+document.addEventListener("click", async (e) => {
+  const deleteBtn = e.target.closest(".delete-note-btn");
+  if (deleteBtn) {
+    const msgId = deleteBtn.dataset.id;
+    if (!msgId) return;
+    if (!confirm("Are you sure you want to delete this internal note?")) return;
+    
+    const result = await authedFetch(`/agent/messages/${msgId}`, "DELETE");
+    if (result) {
+      const wrapper = document.querySelector(`[data-msg-id="${msgId}"]`);
+      if (wrapper) wrapper.remove();
+    }
+  }
+  
+  const pinBtn = e.target.closest(".pin-note-btn");
+  if (pinBtn) {
+    const msgId = pinBtn.dataset.id;
+    const content = pinBtn.dataset.content;
+    if (!msgId || !activeSessionId) return;
+    
+    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: parseInt(msgId, 10) });
+    if (result) {
+      updatePinnedMessageUI(msgId, content);
+    }
+  }
+
+  const unpinBtn = e.target.closest(".unpin-btn");
+  if (unpinBtn) {
+    if (!activeSessionId) return;
+    
+    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: null });
+    if (result) {
+      updatePinnedMessageUI(null, null);
+    }
+  }
+});
 
 // --- Sending a reply ---
 agentSendBtn.addEventListener("click", sendAgentReply);
@@ -329,15 +636,172 @@ agentInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendAgentReply();
 });
 
+async function handleAgentFileUpload(file, inputElement, uploadInputElement, autoSend = false, sendFunction = null) {
+  if (!file) return;
+  
+  const originalPlaceholder = inputElement.placeholder;
+  inputElement.placeholder = "Uploading...";
+  inputElement.disabled = true;
+  
+  const formData = new FormData();
+  formData.append("file", file);
+  
+  try {
+    const response = await fetch(`${API_BASE}/chat/upload/${activeSessionId}`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${localStorage.getItem("agent_token")}` },
+      body: formData
+    });
+    const data = await response.json();
+    if (data.url) {
+      let md = `[Document](${data.url})`;
+      if (file.type.startsWith("image/")) md = `![Image](${data.url})`;
+      else if (file.type.startsWith("audio/")) md = `[Audio](${data.url})`;
+      else if (file.type.startsWith("video/")) md = `[Video](${data.url})`;
+      
+      inputElement.value = (inputElement.value + (inputElement.value ? " " : "") + md).trim();
+      if (autoSend && sendFunction) {
+        sendFunction();
+      }
+    }
+  } catch (err) {
+    console.error("Upload failed", err);
+  } finally {
+    inputElement.placeholder = originalPlaceholder;
+    inputElement.disabled = false;
+    inputElement.focus();
+    if (uploadInputElement) uploadInputElement.value = "";
+  }
+}
+
+const agentUploadBtn = document.getElementById("agent-upload-btn");
+const agentFileUpload = document.getElementById("agent-file-upload");
+if (agentUploadBtn && agentFileUpload) {
+  agentUploadBtn.addEventListener("click", () => agentFileUpload.click());
+  agentFileUpload.addEventListener("change", (e) => handleAgentFileUpload(e.target.files[0], agentInput, agentFileUpload, false, null));
+}
+
+const agentPhotoBtn = document.getElementById("agent-photo-btn");
+const agentPhotoUpload = document.getElementById("agent-photo-upload");
+if (agentPhotoBtn && agentPhotoUpload) {
+  agentPhotoBtn.addEventListener("click", () => agentPhotoUpload.click());
+  agentPhotoUpload.addEventListener("change", (e) => handleAgentFileUpload(e.target.files[0], agentInput, agentPhotoUpload, true, sendAgentReply));
+}
+
+const agentVoiceBtn = document.getElementById("agent-voice-btn");
+const agentVoiceUpload = document.getElementById("agent-voice-upload");
+// --- Agent Voice Recording Logic ---
+let agentMediaRecorder;
+let agentAudioChunks = [];
+let agentIsRecording = false;
+
+if (agentVoiceBtn) {
+  agentVoiceBtn.addEventListener("click", async () => {
+    if (!agentIsRecording) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        agentMediaRecorder = new MediaRecorder(stream);
+        agentAudioChunks = [];
+        
+        agentMediaRecorder.addEventListener("dataavailable", event => {
+          agentAudioChunks.push(event.data);
+        });
+        
+        agentMediaRecorder.addEventListener("stop", () => {
+          const audioBlob = new Blob(agentAudioChunks, { type: 'audio/webm' });
+          const file = new File([audioBlob], "voice_message.webm", { type: 'audio/webm' });
+          handleAgentFileUpload(file, agentInput, null, true, sendAgentReply);
+          
+          // Stop all tracks
+          stream.getTracks().forEach(track => track.stop());
+        });
+        
+        agentMediaRecorder.start();
+        agentIsRecording = true;
+        agentVoiceBtn.style.color = "#EF4444";
+        agentVoiceBtn.style.animation = "pulse-glow 1s infinite";
+      } catch (err) {
+        console.error("Error accessing microphone:", err);
+        alert("Could not access microphone.");
+      }
+    } else {
+      agentMediaRecorder.stop();
+      agentIsRecording = false;
+      agentVoiceBtn.style.color = "#9CA3AF";
+      agentVoiceBtn.style.animation = "none";
+    }
+  });
+}
+
+const noteTypeSelect = document.getElementById("note-type-select");
+if (noteTypeSelect) {
+  noteTypeSelect.addEventListener("change", () => {
+    if (noteTypeSelect.value === "internal") {
+      agentInput.style.backgroundColor = "rgba(217, 119, 6, 0.1)"; // accent-alert tint
+      agentInput.placeholder = "Type an internal note (only visible to agents)";
+    } else {
+      agentInput.style.backgroundColor = "var(--bg-base)";
+      agentInput.placeholder = "Type a reply";
+    }
+  });
+}
+
 function sendAgentReply() {
   const text = agentInput.value.trim();
   if (!text || !activeSessionId || !socket || socket.readyState !== WebSocket.OPEN) return;
 
-  socket.send(JSON.stringify({ session_id: activeSessionId, message: text }));
-  // Message will be appended when it is broadcasted back via the websocket
+  const isInternal = noteTypeSelect && noteTypeSelect.value === "internal";
+  
+  socket.send(JSON.stringify({ session_id: activeSessionId, message: text, is_internal: isInternal }));
+  
   agentInput.value = "";
   drafts[activeSessionId] = ""; 
 }
+
+// --- Order Context Popup ---
+async function fetchOrderContext(sessionId) {
+  const result = await authedFetch(`/agent/conversations/${sessionId}/order-context`);
+  if (result && result.order) {
+    showOrderPopup(result.order);
+  } else {
+    hideOrderPopup();
+  }
+}
+
+function showOrderPopup(order) {
+  const popup = document.getElementById('order-popup');
+  const body = document.getElementById('order-popup-body');
+  if (!popup || !body) return;
+  
+  const statusClass = `order-status-badge--${(order.status || '').toLowerCase()}`;
+  
+  body.innerHTML = `
+    <div class="order-popup__field">
+      <span class="order-popup__label">Order ID</span>
+      <span class="order-popup__value">#${escapeHtml(order.order_id)}</span>
+    </div>
+    <div class="order-popup__field">
+      <span class="order-popup__label">Status</span>
+      <span class="order-popup__value"><span class="order-status-badge ${statusClass}">${escapeHtml(order.status)}</span></span>
+    </div>
+    ${order.carrier ? `<div class="order-popup__field"><span class="order-popup__label">Carrier</span><span class="order-popup__value">${escapeHtml(order.carrier)}</span></div>` : ''}
+    ${order.eta ? `<div class="order-popup__field"><span class="order-popup__label">ETA</span><span class="order-popup__value">${escapeHtml(order.eta)}</span></div>` : ''}
+    ${order.tracking_url ? `<div class="order-popup__field" style="grid-column: span 2;"><span class="order-popup__label">Tracking</span><span class="order-popup__value"><a href="${escapeHtml(order.tracking_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(order.tracking_url)}</a></span></div>` : ''}
+  `;
+  popup.classList.remove('hidden');
+}
+
+function hideOrderPopup() {
+  const popup = document.getElementById('order-popup');
+  if (popup) popup.classList.add('hidden');
+}
+
+// Close button for order popup
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#order-popup-close')) {
+    hideOrderPopup();
+  }
+});
 
 // --- Resolving a conversation ---
 resolveBtn.addEventListener("click", async () => {
@@ -347,20 +811,34 @@ resolveBtn.addEventListener("click", async () => {
     resolveBtn.textContent = "Resolved";
     resolveBtn.disabled = true;
     resolveBtn.classList.remove("btn-primary");
+    const resolveTimeEl = document.getElementById("resolve-time");
+    if (resolveTimeEl) {
+      resolveTimeEl.textContent = `at ${formatSidebarTime(new Date().toISOString())}`;
+      resolveTimeEl.classList.remove("hidden");
+    }
     loadConversations();
   }
 });
 
 // --- Helpers ---
-async function authedFetch(path, method = "GET") {
+async function authedFetch(path, method = "GET", body = null) {
   try {
     const token = localStorage.getItem("agent_token");
-    const response = await fetch(`${API_BASE}${path}`, {
+    const options = {
       method,
       headers: {
         "Authorization": `Bearer ${token}`
       }
-    });
+    };
+    if (body) {
+      options.headers["Content-Type"] = "application/json";
+      options.body = JSON.stringify(body);
+    }
+    const response = await fetch(`${API_BASE}${path}`, options);
+    if (response.status === 401) {
+      logout();
+      return null;
+    }
     if (!response.ok) return null;
     return await response.json();
   } catch (err) {
@@ -369,15 +847,148 @@ async function authedFetch(path, method = "GET") {
   }
 }
 
+function renderMarkdown(text) {
+  const lines = text.split("\n");
+  let html = "";
+  let inList = false;
+  let listTag = "ul";
+
+  const closeList = () => {
+    if (inList) {
+      html += `</${listTag}>`;
+      inList = false;
+    }
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      closeList();
+      continue;
+    }
+
+    const numbered = line.match(/^(\d+)[.)]\s+(.*)/);
+    const bulleted = line.match(/^[-*]\s+(.*)/);
+
+    if (numbered || bulleted) {
+      const tag = numbered ? "ol" : "ul";
+      if (!inList || listTag !== tag) {
+        closeList();
+        html += `<${tag}>`;
+        inList = true;
+        listTag = tag;
+      }
+      const content = numbered ? numbered[2] : bulleted[1];
+      html += `<li>${inlineMarkdown(content)}</li>`;
+    } else {
+      closeList();
+      html += `<p>${inlineMarkdown(line)}</p>`;
+    }
+  }
+  closeList();
+  return html;
+}
+
+function inlineMarkdown(text) {
+  let escaped = escapeHtml(text);
+  escaped = escaped.replace(/\[Audio\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
+    const playerId = 'vp_' + Math.random().toString(36).substr(2, 9);
+    return `<div class="voice-player" id="${playerId}" data-src="${url}">` +
+      `<button class="voice-player__btn" aria-label="Play voice message" onclick="toggleVoicePlayer('${playerId}')">` +
+        `<svg class="voice-player__icon-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>` +
+        `<svg class="voice-player__icon-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>` +
+      `</button>` +
+      `<div class="voice-player__waveform">` +
+        Array.from({length: 20}, (_, i) => `<span class="voice-player__bar" style="animation-delay:${i * 0.05}s; height:${Math.floor(Math.random() * 60) + 20}%"></span>`).join('') +
+      `</div>` +
+      `<span class="voice-player__time">0:00</span>` +
+      `<audio preload="metadata" src="${url}"></audio>` +
+    `</div>`;
+  });
+  escaped = escaped.replace(/\[Video\]\((https?:\/\/[^\)]+)\)/g, '<video controls src="$1" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;"></video>');
+  escaped = escaped.replace(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g, '<img src="$1" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;" />');
+  escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline;">$1</a>');
+  escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  return escaped;
+}
+
 function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
 }
 
+// --- Voice Player Logic ---
+function toggleVoicePlayer(playerId) {
+  const container = document.getElementById(playerId);
+  if (!container) return;
+  const audio = container.querySelector('audio');
+  const playIcon = container.querySelector('.voice-player__icon-play');
+  const pauseIcon = container.querySelector('.voice-player__icon-pause');
+  const timeEl = container.querySelector('.voice-player__time');
+  const bars = container.querySelectorAll('.voice-player__bar');
+
+  if (!audio._initialized) {
+    audio.addEventListener('timeupdate', () => {
+      const mins = Math.floor(audio.currentTime / 60);
+      const secs = Math.floor(audio.currentTime % 60).toString().padStart(2, '0');
+      timeEl.textContent = `${mins}:${secs}`;
+      const pct = audio.duration ? (audio.currentTime / audio.duration) : 0;
+      bars.forEach((bar, i) => {
+        bar.style.opacity = (i / bars.length) <= pct ? '1' : '0.4';
+      });
+    });
+    audio.addEventListener('ended', () => {
+      playIcon.style.display = '';
+      pauseIcon.style.display = 'none';
+      container.classList.remove('voice-player--playing');
+      bars.forEach(bar => bar.style.opacity = '0.4');
+      const mins = Math.floor(audio.duration / 60);
+      const secs = Math.floor(audio.duration % 60).toString().padStart(2, '0');
+      timeEl.textContent = `${mins}:${secs}`;
+    });
+    audio.addEventListener('loadedmetadata', () => {
+      const mins = Math.floor(audio.duration / 60);
+      const secs = Math.floor(audio.duration % 60).toString().padStart(2, '0');
+      timeEl.textContent = `${mins}:${secs}`;
+    });
+    audio._initialized = true;
+  }
+
+  // Pause all other players first
+  document.querySelectorAll('.voice-player--playing').forEach(other => {
+    if (other.id !== playerId) {
+      const otherAudio = other.querySelector('audio');
+      if (otherAudio) otherAudio.pause();
+      other.classList.remove('voice-player--playing');
+      other.querySelector('.voice-player__icon-play').style.display = '';
+      other.querySelector('.voice-player__icon-pause').style.display = 'none';
+    }
+  });
+
+  if (audio.paused) {
+    audio.play();
+    playIcon.style.display = 'none';
+    pauseIcon.style.display = '';
+    container.classList.add('voice-player--playing');
+  } else {
+    audio.pause();
+    playIcon.style.display = '';
+    pauseIcon.style.display = 'none';
+    container.classList.remove('voice-player--playing');
+  }
+}
+
 function formatTime(isoString) {
   const date = new Date(isoString);
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatSidebarTime(isoString) {
+  const date = new Date(isoString);
+  const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return `${dateStr}, ${timeStr}`;
 }
 
 function logout() {
@@ -423,3 +1034,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 });
+
+// --- Resizable Sidebar Logic ---
+const resizer = document.getElementById("resizer");
+const sidebar = document.getElementById("sidebar");
+let isResizing = false;
+
+if (resizer && sidebar) {
+  resizer.addEventListener("mousedown", (e) => {
+    isResizing = true;
+    document.body.style.cursor = "col-resize";
+    e.preventDefault(); // Prevent text selection
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isResizing) return;
+    const newWidth = e.clientX - sidebar.getBoundingClientRect().left;
+    if (newWidth >= 450 && newWidth <= 1000) {
+      sidebar.style.width = `${newWidth}px`;
+    }
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (isResizing) {
+      isResizing = false;
+      document.body.style.cursor = "default";
+    }
+  });
+}

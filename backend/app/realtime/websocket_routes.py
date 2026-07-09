@@ -226,17 +226,22 @@ def _sync_agent_reply(session_id: str, username: str, reply_text: str, is_intern
 # --- END SYNC WRAPPERS ---
 
 
-DEBOUNCE_SECONDS = 2.5
-# How long to wait, after a customer's message, before actually invoking the
-# AI. If another message arrives inside this window the wait resets. This
-# is what stops "hi" / "my order is 1002" / "it hasn't arrived" — sent as
-# three quick separate messages — from being treated as three separate AI
-# turns with three separate bot replies. Every message is still saved to
-# the DB and broadcast to the agent dashboard the instant it arrives,
-# exactly as before; only the AI's turn is deferred until the customer
-# actually pauses, at which point it sees the full history built up during
-# that pause in one shot. Tune this value if 2.5s feels too slow/fast for
-# real usage; keep it well under the rate-limit window (60s/15msgs) either way.
+TYPING_STOPPED_GRACE_SECONDS = 1.0
+# Once the customer's typing indicator says they've stopped (or a message
+# arrives with no typing signal at all — e.g. paste-and-send), wait this
+# long before actually processing. If nothing else happens in that window,
+# the AI turn fires. Mirrors the "1 second after typing stops" behavior
+# requested — this is the ONLY fixed wait once typing has genuinely ended.
+
+TYPING_ACTIVE_SAFETY_CAP_SECONDS = 20.0
+# While the typing indicator says "still typing", we don't apply any fixed
+# debounce at all — we simply wait for the next signal (more typing,
+# stopped_typing, or an actual message). This cap exists purely as a
+# defensive fallback: if a customer's "stopped_typing" is ever lost (flaky
+# connection, tab killed mid-type, older cached widget.js) we don't want
+# the AI to wait forever. It should essentially never be hit in normal use,
+# since widget.js reliably fires stopped_typing 1.5s after the last
+# keystroke as long as the tab is alive.
 
 
 @router.websocket("/ws/customer/{session_id}")
@@ -262,6 +267,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
     # already exists per connection.
     pending_event = asyncio.Event()
     latest_phase1_data: dict | None = None
+    is_typing = False
 
     async def _run_ai_turn(phase1_data: dict):
         """Everything that used to run immediately after phase1 for a single
@@ -306,6 +312,15 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
         # Phase 2: AI Processing (LangGraph)
         phase2_start = time.time()
         if not reply_text:
+            # Bonus UX addition: widget.js already knows how to render a
+            # "typing..." bubble on {"type": "typing"} and remove it the
+            # moment a reply arrives — it just never had a reason to fire
+            # for the AI itself (only human-agent typing used it before).
+            # Groq calls can take several seconds, especially under rate
+            # limiting, so this gives the customer real feedback instead of
+            # a dead-looking widget.
+            await manager.send_to_customer(session_id, {"type": "typing"})
+
             updated_state = await _graph.ainvoke(state)
             reply_text = updated_state["messages"][-1].content
 
@@ -351,20 +366,48 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
         total_time = time.time() - msg_start_time
         logger.info(f"[TIMING] Total Message Turnaround Time: {total_time:.3f}s")
 
+    async def _wait_until_quiet():
+        """Blocks until it's genuinely safe to process: the customer isn't
+        (or is no longer) typing, AND nothing new has happened for
+        TYPING_STOPPED_GRACE_SECONDS. Governed primarily by the real-time
+        typing signal, not a fixed timer — a fixed grace period only
+        applies once typing has actually stopped (or never started, e.g. a
+        paste-and-send with no keystrokes)."""
+        nonlocal is_typing
+        while True:
+            if is_typing:
+                # Don't apply any fixed wait while the customer is actively
+                # typing — just wait for the next signal (more typing,
+                # stopped_typing, or a sent message). The safety cap is a
+                # defensive fallback only, see the constant's docstring.
+                try:
+                    await asyncio.wait_for(pending_event.wait(), timeout=TYPING_ACTIVE_SAFETY_CAP_SECONDS)
+                    pending_event.clear()
+                    continue  # re-check is_typing — it may have just flipped
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        f"Typing indicator for {session_id} stayed active longer than "
+                        f"{TYPING_ACTIVE_SAFETY_CAP_SECONDS}s with no stopped_typing — "
+                        "treating as stopped."
+                    )
+                    is_typing = False
+                    continue
+            else:
+                # Not typing (or just stopped) — short, fixed grace window.
+                try:
+                    await asyncio.wait_for(pending_event.wait(), timeout=TYPING_STOPPED_GRACE_SECONDS)
+                    pending_event.clear()
+                    continue  # something happened during the grace window — recheck from the top
+                except asyncio.TimeoutError:
+                    return  # genuinely quiet
+
     async def _debounce_worker():
         nonlocal latest_phase1_data
         while True:
             await pending_event.wait()
             pending_event.clear()
 
-            # Keep resetting the wait while messages keep arriving — only
-            # proceed once the customer has genuinely gone quiet.
-            while True:
-                try:
-                    await asyncio.wait_for(pending_event.wait(), timeout=DEBOUNCE_SECONDS)
-                    pending_event.clear()
-                except asyncio.TimeoutError:
-                    break
+            await _wait_until_quiet()
 
             if latest_phase1_data is None:
                 continue
@@ -398,6 +441,21 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
 
         while True:
             data = await websocket.receive_json()
+
+            # Real-time typing signal from the customer. This drives the
+            # debounce logic in _wait_until_quiet() directly, and is also
+            # relayed to the agent dashboard so a human agent can see
+            # "customer is typing" too, exactly like the existing
+            # agent -> customer typing indicator, just in reverse.
+            if data.get("type") in ("typing", "stopped_typing"):
+                is_typing = data["type"] == "typing"
+                asyncio.create_task(manager.broadcast_to_agents({
+                    "type": data["type"],
+                    "session_id": session_id,
+                }))
+                pending_event.set()
+                continue
+
             customer_text = data.get("message")
             if not customer_text:
                 continue
@@ -410,6 +468,12 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             customer_text = await transcribe_audio_if_present(customer_text)
 
             logger.info(f"Received message from customer {session_id}: {mask_pii(customer_text)}")
+
+            # A message arriving always means typing has effectively ended
+            # for debounce purposes, even if stopped_typing hasn't fired yet
+            # (e.g. Enter pressed before the 1.5s client-side timeout) — the
+            # grace period in _wait_until_quiet() still applies from here.
+            is_typing = False
 
             # Rate Limiting (max 15 msgs / minute) — unchanged, still applies
             # per raw message regardless of debouncing, to guard against

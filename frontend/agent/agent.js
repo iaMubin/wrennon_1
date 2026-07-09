@@ -241,6 +241,7 @@ function connectSocket() {
       }
     } else if (data.type === "new_message") {
       if (data.session_id === activeSessionId) {
+        hideCustomerTypingIndicator();
         appendMessage(data.sender, data.content, new Date().toISOString(), data.sender === "agent_internal", data.message_id);
         // Refresh order context when customer sends a new message
         if (data.sender === "human") {
@@ -258,7 +259,16 @@ function connectSocket() {
       }
       loadConversations();
     } else if (data.type === "typing" || data.type === "stopped_typing") {
-      // Typing indicators could be handled here in the future
+      // Customer -> agent typing indicator (mirrors the agent -> customer
+      // one in widget.js). Only relevant if we're currently looking at
+      // that customer's conversation.
+      if (data.session_id === activeSessionId) {
+        if (data.type === "typing") {
+          showCustomerTypingIndicator();
+        } else {
+          hideCustomerTypingIndicator();
+        }
+      }
     } else {
       console.warn("Unrecognized WebSocket message:", data);
     }
@@ -360,6 +370,7 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
   if (activeSessionId && activeSessionId !== sessionId) {
     drafts[activeSessionId] = agentInput.value;
   }
+  hideCustomerTypingIndicator(); // clear any stale indicator from the previously-open conversation
   activeSessionId = sessionId;
   emptyState.classList.add("hidden");
   activeConversationEl.classList.remove("hidden");
@@ -449,6 +460,31 @@ function clearUnreadIndicator() {
   hasUnreadIndicator = false;
 }
 
+// --- Customer typing indicator (customer -> agent) ---
+// Mirrors widget.js's showTypingIndicator/hideTypingIndicator, just shown
+// as the customer's own bubble style instead of the agent/AI one.
+function showCustomerTypingIndicator() {
+  if (document.getElementById("customer-typing-wrapper")) return;
+  const wrapper = document.createElement("div");
+  wrapper.id = "customer-typing-wrapper";
+  wrapper.className = "msg-content msg-content--human";
+  wrapper.innerHTML = `
+    <div class="msg msg--human typing-indicator">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    </div>
+  `;
+  agentMessages.appendChild(wrapper);
+  scrollToBottom();
+}
+
+function hideCustomerTypingIndicator() {
+  const wrapper = document.getElementById("customer-typing-wrapper");
+  if (wrapper) {
+    wrapper.remove();
+  }
+}
+
+
 function scrollToBottom(force = false) {
   setTimeout(() => {
     agentMessages.scrollTop = agentMessages.scrollHeight;
@@ -530,8 +566,7 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
   } else if (sender === "ai" || sender === "agent" || sender === "system") {
     div.innerHTML = renderMarkdown(content);
   } else {
-    // Human messages also need media rendering (voice, images, photos)
-    div.innerHTML = renderMarkdown(content);
+    div.innerHTML = escapeHtml(content);
   }
 
   if (msgId) {
@@ -847,14 +882,7 @@ function renderMarkdown(text) {
       html += `<li>${inlineMarkdown(content)}</li>`;
     } else {
       closeList();
-      const rendered = inlineMarkdown(line);
-      // Don't wrap block-level media (voice-player, video, img) in <p> tags
-      // as it creates invalid HTML and breaks rendering
-      if (rendered.includes('voice-player') || rendered.includes('<video') || rendered.includes('<img')) {
-        html += rendered;
-      } else {
-        html += `<p>${rendered}</p>`;
-      }
+      html += `<p>${inlineMarkdown(line)}</p>`;
     }
   }
   closeList();
@@ -865,27 +893,15 @@ function inlineMarkdown(text) {
   let escaped = escapeHtml(text);
   escaped = escaped.replace(/\[Audio\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
     const playerId = 'vp_' + Math.random().toString(36).substr(2, 9);
-    // Generate natural waveform pattern (Gaussian-like: taller in middle, shorter at edges)
-    const barCount = 40;
-    const bars = Array.from({length: barCount}, (_, i) => {
-      const center = barCount / 2;
-      const dist = Math.abs(i - center) / center;
-      const base = (1 - dist * 0.6) * 70 + 10;
-      const jitter = (Math.sin(i * 2.7) * 15 + Math.cos(i * 4.1) * 10);
-      const h = Math.max(12, Math.min(95, base + jitter));
-      return `<span class="voice-player__bar" data-idx="${i}" style="height:${h.toFixed(1)}%"></span>`;
-    }).join('');
-    return `<div class="voice-player" id="${playerId}">` +
+    return `<div class="voice-player" id="${playerId}" data-src="${url}">` +
       `<button class="voice-player__btn" aria-label="Play voice message" onclick="toggleVoicePlayer('${playerId}')">` +
-        `<svg class="voice-player__icon-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>` +
-        `<svg class="voice-player__icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="5" y="3" width="4" height="18" rx="1"></rect><rect x="15" y="3" width="4" height="18" rx="1"></rect></svg>` +
+        `<svg class="voice-player__icon-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>` +
+        `<svg class="voice-player__icon-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>` +
       `</button>` +
-      `<div class="voice-player__track" onclick="seekVoicePlayer(event,'${playerId}')">` +
-        `<div class="voice-player__waveform">${bars}</div>` +
-        `<div class="voice-player__progress"></div>` +
+      `<div class="voice-player__waveform">` +
+        Array.from({length: 20}, (_, i) => `<span class="voice-player__bar" style="animation-delay:${i * 0.05}s; height:${Math.floor(Math.random() * 60) + 20}%"></span>`).join('') +
       `</div>` +
       `<span class="voice-player__time">0:00</span>` +
-      `<button class="voice-player__speed" onclick="cycleSpeed('${playerId}')">1x</button>` +
       `<audio preload="metadata" src="${url}"></audio>` +
     `</div>`;
   });
@@ -911,7 +927,6 @@ function toggleVoicePlayer(playerId) {
   const pauseIcon = container.querySelector('.voice-player__icon-pause');
   const timeEl = container.querySelector('.voice-player__time');
   const bars = container.querySelectorAll('.voice-player__bar');
-  const progress = container.querySelector('.voice-player__progress');
 
   if (!audio._initialized) {
     audio.addEventListener('timeupdate', () => {
@@ -919,18 +934,15 @@ function toggleVoicePlayer(playerId) {
       const secs = Math.floor(audio.currentTime % 60).toString().padStart(2, '0');
       timeEl.textContent = `${mins}:${secs}`;
       const pct = audio.duration ? (audio.currentTime / audio.duration) : 0;
-      if (progress) progress.style.width = `${pct * 100}%`;
-      // Color bars based on progress
       bars.forEach((bar, i) => {
-        bar.classList.toggle('voice-player__bar--played', (i / bars.length) <= pct);
+        bar.style.opacity = (i / bars.length) <= pct ? '1' : '0.4';
       });
     });
     audio.addEventListener('ended', () => {
       playIcon.style.display = '';
       pauseIcon.style.display = 'none';
       container.classList.remove('voice-player--playing');
-      if (progress) progress.style.width = '0%';
-      bars.forEach(bar => bar.classList.remove('voice-player__bar--played'));
+      bars.forEach(bar => bar.style.opacity = '0.4');
       const mins = Math.floor(audio.duration / 60);
       const secs = Math.floor(audio.duration % 60).toString().padStart(2, '0');
       timeEl.textContent = `${mins}:${secs}`;
@@ -965,32 +977,6 @@ function toggleVoicePlayer(playerId) {
     pauseIcon.style.display = 'none';
     container.classList.remove('voice-player--playing');
   }
-}
-
-function seekVoicePlayer(event, playerId) {
-  const container = document.getElementById(playerId);
-  if (!container) return;
-  const audio = container.querySelector('audio');
-  const track = container.querySelector('.voice-player__track');
-  if (!audio || !track || !audio.duration) return;
-  const rect = track.getBoundingClientRect();
-  const x = event.clientX - rect.left;
-  const pct = Math.max(0, Math.min(1, x / rect.width));
-  audio.currentTime = pct * audio.duration;
-}
-
-function cycleSpeed(playerId) {
-  const container = document.getElementById(playerId);
-  if (!container) return;
-  const audio = container.querySelector('audio');
-  const btn = container.querySelector('.voice-player__speed');
-  if (!audio || !btn) return;
-  const speeds = [1, 1.5, 2];
-  const current = audio.playbackRate;
-  const idx = speeds.indexOf(current);
-  const next = speeds[(idx + 1) % speeds.length];
-  audio.playbackRate = next;
-  btn.textContent = next + 'x';
 }
 
 function formatTime(isoString) {

@@ -193,6 +193,30 @@ inputEl.addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendMessage();
 });
 
+// ── Typing indicator (customer -> backend) ──────────────────────────
+// Mirrors agent.js's exact pattern 1:1 for stability/consistency: a single
+// "typing" ping guarded by isTyping (not resent on every keystroke), and a
+// "stopped_typing" fired 1.5s after the last keystroke via a reset timer.
+// The backend uses this to decide when the AI should actually respond
+// (see websocket_routes.py), and also relays it to the agent dashboard so
+// a human agent can see "customer is typing" too.
+let typingTimeout;
+let isTyping = false;
+inputEl.addEventListener("input", () => {
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+  if (!isTyping) {
+    socket.send(JSON.stringify({ type: "typing" }));
+    isTyping = true;
+  }
+
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => {
+    socket.send(JSON.stringify({ type: "stopped_typing" }));
+    isTyping = false;
+  }, 1500);
+});
+
 async function handleFileUpload(file, inputElement, uploadInputElement, autoSend = false, sendFunction = null) {
   if (!file) return;
   
@@ -476,12 +500,7 @@ function renderMarkdown(text) {
       html += `<li>${inlineMarkdown(content)}</li>`;
     } else {
       closeList();
-      const rendered = inlineMarkdown(line);
-      if (rendered.includes('voice-player') || rendered.includes('<video') || rendered.includes('<img')) {
-        html += rendered;
-      } else {
-        html += `<p>${rendered}</p>`;
-      }
+      html += `<p>${inlineMarkdown(line)}</p>`;
     }
   }
   closeList();
@@ -492,26 +511,15 @@ function inlineMarkdown(text) {
   let escaped = escapeHtml(text);
   escaped = escaped.replace(/\[Audio\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
     const playerId = 'vp_' + Math.random().toString(36).substr(2, 9);
-    const barCount = 40;
-    const bars = Array.from({length: barCount}, (_, i) => {
-      const center = barCount / 2;
-      const dist = Math.abs(i - center) / center;
-      const base = (1 - dist * 0.6) * 70 + 10;
-      const jitter = (Math.sin(i * 2.7) * 15 + Math.cos(i * 4.1) * 10);
-      const h = Math.max(12, Math.min(95, base + jitter));
-      return `<span class="voice-player__bar" data-idx="${i}" style="height:${h.toFixed(1)}%"></span>`;
-    }).join('');
-    return `<div class="voice-player" id="${playerId}">` +
+    return `<div class="voice-player" id="${playerId}" data-src="${url}">` +
       `<button class="voice-player__btn" aria-label="Play voice message" onclick="toggleVoicePlayer('${playerId}')">` +
-        `<svg class="voice-player__icon-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>` +
-        `<svg class="voice-player__icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="5" y="3" width="4" height="18" rx="1"></rect><rect x="15" y="3" width="4" height="18" rx="1"></rect></svg>` +
+        `<svg class="voice-player__icon-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>` +
+        `<svg class="voice-player__icon-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>` +
       `</button>` +
-      `<div class="voice-player__track" onclick="seekVoicePlayer(event,'${playerId}')">` +
-        `<div class="voice-player__waveform">${bars}</div>` +
-        `<div class="voice-player__progress"></div>` +
+      `<div class="voice-player__waveform">` +
+        Array.from({length: 20}, (_, i) => `<span class="voice-player__bar" style="animation-delay:${i * 0.05}s; height:${Math.floor(Math.random() * 60) + 20}%"></span>`).join('') +
       `</div>` +
       `<span class="voice-player__time">0:00</span>` +
-      `<button class="voice-player__speed" onclick="cycleSpeed('${playerId}')">1x</button>` +
       `<audio preload="metadata" src="${url}"></audio>` +
     `</div>`;
   });
@@ -537,7 +545,6 @@ function toggleVoicePlayer(playerId) {
   const pauseIcon = container.querySelector('.voice-player__icon-pause');
   const timeEl = container.querySelector('.voice-player__time');
   const bars = container.querySelectorAll('.voice-player__bar');
-  const progress = container.querySelector('.voice-player__progress');
 
   if (!audio._initialized) {
     audio.addEventListener('timeupdate', () => {
@@ -545,17 +552,15 @@ function toggleVoicePlayer(playerId) {
       const secs = Math.floor(audio.currentTime % 60).toString().padStart(2, '0');
       timeEl.textContent = `${mins}:${secs}`;
       const pct = audio.duration ? (audio.currentTime / audio.duration) : 0;
-      if (progress) progress.style.width = `${pct * 100}%`;
       bars.forEach((bar, i) => {
-        bar.classList.toggle('voice-player__bar--played', (i / bars.length) <= pct);
+        bar.style.opacity = (i / bars.length) <= pct ? '1' : '0.4';
       });
     });
     audio.addEventListener('ended', () => {
       playIcon.style.display = '';
       pauseIcon.style.display = 'none';
       container.classList.remove('voice-player--playing');
-      if (progress) progress.style.width = '0%';
-      bars.forEach(bar => bar.classList.remove('voice-player__bar--played'));
+      bars.forEach(bar => bar.style.opacity = '0.4');
       const mins = Math.floor(audio.duration / 60);
       const secs = Math.floor(audio.duration % 60).toString().padStart(2, '0');
       timeEl.textContent = `${mins}:${secs}`;
@@ -589,32 +594,6 @@ function toggleVoicePlayer(playerId) {
     pauseIcon.style.display = 'none';
     container.classList.remove('voice-player--playing');
   }
-}
-
-function seekVoicePlayer(event, playerId) {
-  const container = document.getElementById(playerId);
-  if (!container) return;
-  const audio = container.querySelector('audio');
-  const track = container.querySelector('.voice-player__track');
-  if (!audio || !track || !audio.duration) return;
-  const rect = track.getBoundingClientRect();
-  const x = event.clientX - rect.left;
-  const pct = Math.max(0, Math.min(1, x / rect.width));
-  audio.currentTime = pct * audio.duration;
-}
-
-function cycleSpeed(playerId) {
-  const container = document.getElementById(playerId);
-  if (!container) return;
-  const audio = container.querySelector('audio');
-  const btn = container.querySelector('.voice-player__speed');
-  if (!audio || !btn) return;
-  const speeds = [1, 1.5, 2];
-  const current = audio.playbackRate;
-  const idx = speeds.indexOf(current);
-  const next = speeds[(idx + 1) % speeds.length];
-  audio.playbackRate = next;
-  btn.textContent = next + 'x';
 }
 
 function formatTime(timestamp) {
@@ -709,10 +688,6 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   
   if (uiRole === "bot" || uiRole === "agent") {
     div.innerHTML = nameHtml + renderMarkdown(text);
-  } else if (uiRole === "user") {
-    // User messages also need media rendering (voice, images)
-    // but without the bot name/badge header
-    div.innerHTML = renderMarkdown(text);
   } else {
     div.innerHTML = escapeHtml(text);
   }
@@ -776,7 +751,18 @@ function sendMessage() {
 
   appendMessage("user", text);
   inputEl.value = "";
-  
+
+  // A sent message means typing has definitely ended — tell the backend
+  // right away instead of waiting for the 1.5s idle timeout to expire on
+  // its own, so the AI's grace period can start immediately.
+  if (isTyping) {
+    clearTimeout(typingTimeout);
+    isTyping = false;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "stopped_typing" }));
+    }
+  }
+
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({ type: "message", message: text }));
   } else {
