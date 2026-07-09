@@ -811,25 +811,27 @@ body {
   opacity: 0.8 !important;
 }
 
-/* ── Voice Player ──────────────────────────────────────────── */
+/* ── Voice Player (WhatsApp-style) ─────────────────────────── */
 .voice-player {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
-  border-radius: 24px;
+  padding: 8px 12px;
+  border-radius: 18px;
   background: var(--bg-surface);
   border: 1px solid var(--line);
-  max-width: 320px;
-  margin: 8px 0;
+  max-width: 360px;
+  width: 100%;
+  margin: 6px 0;
   transition: var(--transition);
 }
 .voice-player:hover {
   border-color: var(--accent);
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06);
 }
 .voice-player__btn {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   border: none;
   background: var(--accent);
@@ -839,66 +841,108 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition: transform 0.12s, box-shadow 0.12s;
 }
 .voice-player__btn:hover {
-  transform: scale(1.1);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  transform: scale(1.08);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
 }
 .voice-player__btn:active {
-  transform: scale(0.95);
+  transform: scale(0.94);
+}
+.voice-player__track {
+  flex: 1;
+  min-width: 80px;
+  position: relative;
+  cursor: pointer;
+  padding: 4px 0;
 }
 .voice-player__waveform {
   display: flex;
   align-items: center;
-  gap: 2px;
-  height: 32px;
-  flex: 1;
-  min-width: 100px;
+  gap: 1.5px;
+  height: 30px;
+  position: relative;
+  z-index: 1;
 }
 .voice-player__bar {
-  width: 3px;
-  border-radius: 2px;
+  width: 2px;
+  flex-shrink: 0;
+  border-radius: 1px;
+  background: var(--ink-soft);
+  opacity: 0.35;
+  transition: opacity 0.15s;
+  min-height: 3px;
+}
+.voice-player__bar--played {
   background: var(--accent);
-  opacity: 0.4;
-  transition: opacity 0.2s, height 0.3s;
-  min-height: 4px;
+  opacity: 1;
 }
-.voice-player--playing .voice-player__bar {
-  animation: voiceWave 0.6s ease-in-out infinite alternate;
-}
-.voice-player__bar:nth-child(odd) { animation-delay: 0.1s; }
-.voice-player__bar:nth-child(3n) { animation-delay: 0.2s; }
-.voice-player__bar:nth-child(5n) { animation-delay: 0.3s; }
-@keyframes voiceWave {
-  0% { height: 20%; }
-  100% { height: 80%; }
+.voice-player__progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 1px;
+  transition: width 0.1s linear;
 }
 .voice-player__time {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--ink-soft);
-  min-width: 32px;
+  min-width: 30px;
   text-align: right;
   flex-shrink: 0;
+}
+.voice-player__speed {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(var(--accent-rgb, 0,0,0), 0.08);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 2px 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  min-width: 26px;
+  text-align: center;
+}
+.voice-player__speed:hover {
+  background: rgba(var(--accent-rgb, 0,0,0), 0.15);
 }
 .voice-player audio {
   display: none;
 }
-/* Voice player inside agent messages (accent bg) */
+/* Voice player inside agent's own (accent bg) messages */
 .msg--agent .voice-player {
-  background: rgba(255,255,255,0.15);
-  border-color: rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.2);
 }
 .msg--agent .voice-player__btn {
   background: var(--bg-base);
   color: var(--accent);
 }
 .msg--agent .voice-player__bar {
-  background: var(--bg-base);
+  background: rgba(255,255,255,0.5);
+}
+.msg--agent .voice-player__bar--played {
+  background: #fff;
+  opacity: 1;
+}
+.msg--agent .voice-player__progress {
+  background: #fff;
 }
 .msg--agent .voice-player__time {
   color: rgba(255,255,255,0.8);
+}
+.msg--agent .voice-player__speed {
+  color: #fff;
+  background: rgba(255,255,255,0.15);
+  border-color: rgba(255,255,255,0.25);
 }
 
 /* ── Order Context Popup ─────────────────────────────────────── */
