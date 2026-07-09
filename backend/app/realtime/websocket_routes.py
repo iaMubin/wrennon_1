@@ -363,11 +363,18 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
                 updated_state = await _graph.ainvoke(state)
                 reply_text = updated_state["messages"][-1].content
                 
-                # Store RAG/Generic questions in cache
-                if updated_state.get("planned_tools"):
-                    tool_names = [t.get("name") for t in updated_state["planned_tools"]]
-                    if tool_names == ["search_knowledge_base"]:
-                        await set_cache(customer_text, reply_text, ttl=3600)
+                   # Store RAG/Generic questions in cache
+                   # (uses tool_call_history, not planned_tools — the new
+                   # ReAct loop in builder.py means planned_tools reflects
+                   # only the LAST manager decision, which is empty once
+                   # it's ready to reply. tool_call_history has everything
+                   # actually run this turn, across all loop passes.)
+                if updated_state.get("tool_call_history"):
+                       tool_names = [
+                           entry.split(":", 1)[0] for entry in updated_state["tool_call_history"]
+                       ]
+                       if tool_names == ["search_knowledge_base"]:
+                           await set_cache(customer_text, reply_text, ttl=3600)
             
             phase2_duration = time.time() - phase2_start
             logger.info(f"[TIMING] Phase 2 (AI Graph Execution) took {phase2_duration:.3f}s")
