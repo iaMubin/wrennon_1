@@ -248,6 +248,17 @@ TYPING_ACTIVE_SAFETY_CAP_SECONDS = 20.0
 async def customer_websocket(websocket: WebSocket, session_id: str, token: str | None = None):
     logger.info(f"Customer connected: {session_id}")
 
+    # Accept BEFORE validating. Starlette/ASGI only delivers a real
+    # WebSocket close FRAME (carrying our custom code) to the browser if
+    # the handshake has already been accepted. Closing before accept()
+    # instead makes uvicorn reject the opening HTTP upgrade request
+    # outright — logged as "403 Forbidden" / "connection rejected" — and
+    # the browser's onclose event never actually receives our code; it
+    # just sees an abnormal closure (code 1006). That silently broke the
+    # frontend's ability to tell "auth failed, don't retry" apart from any
+    # other disconnect, no matter what the frontend checked for.
+    await websocket.accept()
+
     if not token:
         logger.warning(f"Customer {session_id} rejected: missing token")
         await websocket.close(code=4401)
@@ -312,15 +323,6 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
         # Phase 2: AI Processing (LangGraph)
         phase2_start = time.time()
         if not reply_text:
-            # Bonus UX addition: widget.js already knows how to render a
-            # "typing..." bubble on {"type": "typing"} and remove it the
-            # moment a reply arrives — it just never had a reason to fire
-            # for the AI itself (only human-agent typing used it before).
-            # Groq calls can take several seconds, especially under rate
-            # limiting, so this gives the customer real feedback instead of
-            # a dead-looking widget.
-            await manager.send_to_customer(session_id, {"type": "typing"})
-
             updated_state = await _graph.ainvoke(state)
             reply_text = updated_state["messages"][-1].content
 
@@ -557,6 +559,15 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
 
 @router.websocket("/ws/agent")
 async def agent_websocket(websocket: WebSocket, access_token: str | None = Cookie(None), token: str | None = None):
+    # Accept BEFORE validating — see the matching comment in
+    # customer_websocket() for the full explanation. In short: a
+    # pre-accept close() can't carry a custom code to the browser, it just
+    # shows up as an HTTP 403 during the handshake (exactly what the
+    # "Agent connection rejected: unauthorized" / "403 Forbidden" log
+    # pairing was) and the frontend has no way to distinguish it from any
+    # other disconnect reason, so it kept retrying forever.
+    await websocket.accept()
+
     raw_token = token or access_token
     if not raw_token:
         logger.warning("Agent connection rejected: missing token")

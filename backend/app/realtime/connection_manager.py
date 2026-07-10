@@ -66,7 +66,12 @@ class ConnectionManager:
             except Exception:
                 pass
 
-        await websocket.accept()
+        # NOTE: accept() is NOT called here — the caller (customer_websocket
+        # in websocket_routes.py) must accept() the connection itself,
+        # before validating the session token, so that an auth failure can
+        # close() with a real code the browser can read. See that
+        # function's comment for the full reasoning. Calling accept() here
+        # too would raise (a WebSocket can only be accepted once).
         self._customer_connections[session_id] = websocket
         
         # Subscribe to a unique channel for this customer
@@ -134,7 +139,9 @@ class ConnectionManager:
     # --- Agent side ---
 
     async def connect_agent(self, websocket: WebSocket) -> None:
-        await websocket.accept()
+        # NOTE: accept() is NOT called here — see connect_customer's
+        # comment above; the same reasoning applies (agent_websocket() in
+        # websocket_routes.py accepts before validating the token).
         self._agent_connections.append(websocket)
         
         if self._agent_task is None:

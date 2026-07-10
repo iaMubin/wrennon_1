@@ -24,6 +24,17 @@ scrollToBottomBtn.className = "hidden";
 scrollToBottomBtn.innerHTML = `New Message <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; vertical-align: middle;"><path d="M6 9l6 6 6-6"/></svg>`;
 document.getElementById("panel").appendChild(scrollToBottomBtn);
 
+// Fixed typing-indicator bar, sitting between #messages and #input-row.
+// Deliberately NOT part of the scrolling message list (unlike the old
+// implementation) — it stays anchored right above the input box no
+// matter how many messages come in while it's visible, instead of
+// visually drifting up as new messages get appended below it.
+const typingIndicatorBar = document.createElement("div");
+typingIndicatorBar.id = "typing-indicator-bar";
+typingIndicatorBar.className = "hidden";
+typingIndicatorBar.innerHTML = `<span class="dot"></span><span class="dot"></span><span class="dot"></span>`;
+document.getElementById("panel").insertBefore(typingIndicatorBar, document.getElementById("input-row"));
+
 scrollToBottomBtn.addEventListener("click", () => {
   scrollToBottom(true);
   scrollToBottomBtn.classList.add("hidden");
@@ -451,7 +462,23 @@ function connectSocket() {
     }
   };
 
-  socket.onclose = () => {
+  socket.onclose = (event) => {
+    // 4409: this specific connection was superseded by a newer one for
+    // the same session (see connection_manager.py's connect_customer) —
+    // that newer connection already exists, so reconnecting here again
+    // would just create another redundant connection. Do nothing.
+    if (event.code === 4409) {
+      return;
+    }
+
+    // 4401: the session token itself is invalid/expired — retrying with
+    // the same dead token will never succeed. Let the person know instead
+    // of silently retrying forever.
+    if (event.code === 4401) {
+      appendMessage("system", "Your session has expired. Please refresh the page to start a new conversation.", false);
+      return;
+    }
+
     widgetReconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, widgetReconnectAttempts), 30000); // max 30s
     appendMessage("system", `Connection lost. Reconnecting in ${delay/1000}s...`, false);
@@ -718,31 +745,11 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
 }
 
 function showTypingIndicator() {
-  if (document.getElementById("typing-wrapper")) return;
-  const wrapper = document.createElement("div");
-  wrapper.id = "typing-wrapper";
-  wrapper.className = "msg-wrapper msg-wrapper--agent typing-wrapper";
-  wrapper.innerHTML = `
-    <div class="msg-avatar msg-avatar--agent">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-    </div>
-    <div class="msg msg--agent typing-indicator">
-      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-    </div>
-  `;
-  
-  const wasNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 100;
-  messagesEl.appendChild(wrapper);
-  if (wasNearBottom) {
-    scrollToBottom(true);
-  }
+  typingIndicatorBar.classList.remove("hidden");
 }
 
 function hideTypingIndicator() {
-  const wrapper = document.getElementById("typing-wrapper");
-  if (wrapper) {
-    wrapper.remove();
-  }
+  typingIndicatorBar.classList.add("hidden");
 }
 
 function sendMessage() {

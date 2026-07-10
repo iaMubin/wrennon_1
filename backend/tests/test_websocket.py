@@ -55,18 +55,51 @@ def test_websocket_connection_missing_token_rejected():
     from starlette.websockets import WebSocketDisconnect
     init_resp = client.post("/api/chat/init")
     session_id = init_resp.json()["session_id"]
-    
+
     with pytest.raises(WebSocketDisconnect) as excinfo:
         with client.websocket_connect(f"/ws/customer/{session_id}") as websocket:
-            websocket.send_text("Hello")
+            # The connection is accepted first (necessary so the 4401 close
+            # code below can actually reach the client instead of becoming
+            # an opaque HTTP-level rejection — see the comment in
+            # customer_websocket()), then immediately closed since no token
+            # was provided. The disconnect surfaces on the next receive.
+            websocket.receive_json()
     assert excinfo.value.code == 4401
 
 def test_websocket_connection_invalid_token_rejected():
     from starlette.websockets import WebSocketDisconnect
     init_resp = client.post("/api/chat/init")
     session_id = init_resp.json()["session_id"]
-    
+
     with pytest.raises(WebSocketDisconnect) as excinfo:
         with client.websocket_connect(f"/ws/customer/{session_id}?token=invalid.token.here") as websocket:
-            websocket.send_text("Hello")
+            websocket.receive_json()
+    assert excinfo.value.code == 4401
+
+
+def test_agent_websocket_missing_token_delivers_real_close_code():
+    """This is the endpoint from the actual production bug report: an
+    agent dashboard with a missing/expired/invalid token kept retrying
+    forever because the close code never reached the browser. Root cause
+    was calling websocket.close(code=4401) BEFORE websocket.accept() —
+    ASGI/Starlette can only deliver a real close code to the client if the
+    handshake was already accepted; closing before accept() instead
+    surfaces as a bare HTTP-level rejection with no code the client can
+    read. This test would have caught that: without the accept()-first
+    fix, this assertion fails because no real WebSocketDisconnect with
+    code 4401 is ever observable by the client."""
+    from starlette.websockets import WebSocketDisconnect
+
+    with pytest.raises(WebSocketDisconnect) as excinfo:
+        with client.websocket_connect("/ws/agent") as websocket:
+            websocket.receive_json()
+    assert excinfo.value.code == 4401
+
+
+def test_agent_websocket_invalid_token_delivers_real_close_code():
+    from starlette.websockets import WebSocketDisconnect
+
+    with pytest.raises(WebSocketDisconnect) as excinfo:
+        with client.websocket_connect("/ws/agent?token=invalid.token.here") as websocket:
+            websocket.receive_json()
     assert excinfo.value.code == 4401
