@@ -4,6 +4,11 @@ import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+import warnings
+
+# Suppress known noisy third-party warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic")
+warnings.filterwarnings("ignore", category=PendingDeprecationWarning, module="sentry_sdk")
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 

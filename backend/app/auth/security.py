@@ -34,7 +34,7 @@
 #     """subject is the agent's username. Encoded into a signed JWT that
 #     proves, without hitting the database again, who this is and that
 #     they logged in successfully within the last jwt_expire_minutes."""
-#     expire = datetime.datetime.utcnow() + datetime.timedelta(
+#     expire = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) + datetime.timedelta(
 #         minutes=settings.jwt_expire_minutes
 #     )
 #     payload = {"sub": subject, "exp": expire}
@@ -78,7 +78,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def create_access_token(subject: str, pwd_hash: str) -> str:
-    expire = datetime.datetime.utcnow() + datetime.timedelta(
+    expire = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) + datetime.timedelta(
         minutes=settings.jwt_expire_minutes
     )
     pwd_frag = pwd_hash[-10:] if pwd_hash else ""
@@ -95,7 +95,7 @@ def decode_access_token(token: str) -> dict | None:
 
 
 def create_session_token(session_id: str) -> str:
-    expire = datetime.datetime.utcnow() + datetime.timedelta(hours=72)
+    expire = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) + datetime.timedelta(hours=72)
     payload = {"session_id": session_id, "exp": expire}
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 

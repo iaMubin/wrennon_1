@@ -333,6 +333,17 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
         phase2_duration = time.time() - phase2_start
         logger.info(f"[TIMING] Phase 2 (AI Graph Execution) took {phase2_duration:.3f}s")
 
+        # Belt-and-suspenders check: connect_customer() cancels a superseded
+        # connection's debounce task, which should stop this turn before it
+        # gets here — but that cancellation only takes effect at the next
+        # await point. If a new connection for this session_id took over
+        # while this turn's (slow) LLM calls were in flight, don't write a
+        # second/duplicate reply for a conversation another connection is
+        # now actively handling.
+        if manager.get_customer_websocket(session_id) is not websocket:
+            logger.warning(f"Dropping AI turn for {session_id}: superseded by a newer connection.")
+            return
+
         # Phase 3: Post-processing & DB Save
         phase3_start = time.time()
         phase3_data = await asyncio.to_thread(_sync_phase3, session_id, reply_text, updated_state)
@@ -427,6 +438,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
                 logger.error(f"Error processing debounced AI turn for {session_id}: {e}", exc_info=True)
 
     debounce_worker_task = asyncio.create_task(_debounce_worker())
+    manager.register_customer_debounce_task(session_id, debounce_worker_task)
 
     try:
         # One-off connection for initial setup (non-blocking)

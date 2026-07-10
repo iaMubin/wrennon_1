@@ -77,7 +77,7 @@ def session_status(
 
     # Conversation was resolved — check if within 72-hour window
     if conversation.resolved_at:
-        elapsed = datetime.datetime.utcnow() - conversation.resolved_at
+        elapsed = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - conversation.resolved_at
         if elapsed.total_seconds() < REOPEN_WINDOW_HOURS * 3600:
             return {"status": "resolved_recent"}
         else:

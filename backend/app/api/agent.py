@@ -205,7 +205,7 @@ def resolve_conversation(
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
     conversation.resolved = True
-    conversation.resolved_at = datetime.datetime.utcnow()
+    conversation.resolved_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
     conversation.handoff_active = False
     conversation.handled_by = agent.username
     

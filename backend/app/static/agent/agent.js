@@ -207,15 +207,28 @@ function connectSocket() {
     connectionDot.title = "Connected";
   };
 
-  socket.onclose = () => {
+  socket.onclose = (event) => {
     connectionDot.classList.remove("dot--online");
     connectionDot.classList.add("dot--offline");
-    
-    // Exponential backoff
+
+    // The backend closes with code 4401 specifically for auth failures
+    // (missing/expired/invalid/revoked token — see websocket_routes.py).
+    // Retrying an auth failure with the same dead token forever (this used
+    // to keep exponential-backoff-retrying indefinitely, hammering the
+    // server every 30s with a token that will never become valid again)
+    // helps no one — the fix is to stop and send the agent back to login.
+    if (event.code === 4401) {
+      connectionDot.title = "Session expired. Please log in again.";
+      logout();
+      return;
+    }
+
+    // Any other disconnect (network blip, server restart, etc.) — keep the
+    // existing exponential backoff retry behavior.
     reconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // max 30s
     connectionDot.title = `Disconnected. Reconnecting in ${delay/1000}s...`;
-    
+
     reconnectTimeout = setTimeout(connectSocket, delay);
   };
 

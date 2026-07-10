@@ -33,11 +33,39 @@ class ConnectionManager:
         self._customer_connections: dict[str, WebSocket] = {}
         self._agent_connections: list[WebSocket] = []
         self._customer_tasks: dict[str, asyncio.Task] = {}
+        self._customer_debounce_tasks: dict[str, asyncio.Task] = {}
         self._agent_task: asyncio.Task | None = None
 
     # --- Customer side ---
 
     async def connect_customer(self, session_id: str, websocket: WebSocket) -> None:
+        # If a connection already exists for this session, tear it down
+        # BEFORE registering the new one. This matters because WebSockets
+        # behind a reverse proxy / on flaky networks (e.g. a customer's
+        # connection going idle for a while during manual testing) can be
+        # silently dropped without the server ever seeing a close frame —
+        # the old customer_websocket() coroutine, and critically its
+        # per-session debounce worker task, would otherwise keep running
+        # indefinitely, completely unaware the browser has already
+        # reconnected. That orphaned worker still fires its own
+        # independent AI turn on whatever stale message batch it had
+        # already captured, producing a second (sometimes third) bot
+        # reply for the same customer input — this is the actual
+        # mechanism, not a race in the debounce logic itself.
+        old_ws = self._customer_connections.get(session_id)
+        if old_ws is not None and old_ws is not websocket:
+            logger.warning(f"Replacing a stale/orphaned customer connection for session {session_id}.")
+            old_debounce_task = self._customer_debounce_tasks.pop(session_id, None)
+            if old_debounce_task:
+                old_debounce_task.cancel()
+            old_listen_task = self._customer_tasks.pop(session_id, None)
+            if old_listen_task:
+                old_listen_task.cancel()
+            try:
+                await old_ws.close(code=4409)  # 4409: replaced by a newer connection
+            except Exception:
+                pass
+
         await websocket.accept()
         self._customer_connections[session_id] = websocket
         
@@ -55,6 +83,20 @@ class ConnectionManager:
         task = asyncio.create_task(listen_to_customer_channel())
         self._customer_tasks[session_id] = task
 
+    def register_customer_debounce_task(self, session_id: str, task: asyncio.Task) -> None:
+        """Called by customer_websocket() right after it creates its
+        per-connection debounce worker, so connect_customer() can find and
+        cancel it later if this connection ever gets superseded by a newer
+        one for the same session (see connect_customer's docstring)."""
+        self._customer_debounce_tasks[session_id] = task
+
+    def get_customer_websocket(self, session_id: str) -> WebSocket | None:
+        """Returns the currently-registered active websocket for this
+        session, or None. Used as a last-line identity check right before
+        an AI turn writes its reply, in case a connection got superseded
+        mid-turn (see the check in websocket_routes.py's _run_ai_turn)."""
+        return self._customer_connections.get(session_id)
+
     def disconnect_customer(self, session_id: str, websocket: WebSocket) -> None:
         # Only remove if the disconnecting websocket is the currently active one
         if self._customer_connections.get(session_id) == websocket:
@@ -62,6 +104,9 @@ class ConnectionManager:
             task = self._customer_tasks.pop(session_id, None)
             if task:
                 task.cancel()
+            debounce_task = self._customer_debounce_tasks.pop(session_id, None)
+            if debounce_task:
+                debounce_task.cancel()
 
     async def send_to_customer(self, session_id: str, payload: dict) -> None:
         # SECURITY: Defense-in-depth — never forward internal messages to

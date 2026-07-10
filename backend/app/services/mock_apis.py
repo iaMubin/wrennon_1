@@ -200,7 +200,7 @@ def create_support_ticket(
     return {
         "ticket_id": f"TICKET-{uuid.uuid4().hex[:8].upper()}",
         "status": "open",
-        "created_at": datetime.datetime.utcnow().isoformat(),
+        "created_at": datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat(),
     }
 
 
@@ -227,5 +227,5 @@ def reopen_support_ticket(
     return {
         "ticket_id": ticket_id,  # Same ticket ID — not a new one
         "status": "reopened",
-        "reopened_at": datetime.datetime.utcnow().isoformat(),
+        "reopened_at": datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat(),
     }
