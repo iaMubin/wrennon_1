@@ -6,6 +6,7 @@
 }
 
 :root {
+  var(--ink): #3A2E2A;
   --ink: #3A2E2A;
   --ink-soft: #8C7C75;
   --bg-base: #FDFBF7;
@@ -18,6 +19,16 @@
   --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+:root[data-theme="light"] {
+  --ink: #3A2E2A;
+  --ink-soft: #8C7C75;
+  --bg-base: #FDFBF7;
+  --bg-surface: #F5EFE6;
+  --line: rgba(168, 90, 50, 0.15);
+  --accent: #A85A32;
+  --accent-alert: #D97706;
+}
+
 :root[data-theme="dark"] {
   --ink: #E2E8F0;
   --ink-soft: #94A3B8;
@@ -27,6 +38,228 @@
   --accent: #D4A373;
   --accent-glow: rgba(212, 163, 115, 0.15);
   --accent-alert: #D4A373;
+}
+
+/* ── Light Mode Themes (Muted, Elegant, Crisp) ── */
+/* 1. Ivory & Champagne */
+:root[data-theme="ivory-champagne"] {
+  --ink: #4A4036;
+  --ink-soft: #8B7E74;
+  --bg-base: #FDFBF7;
+  --bg-surface: #F4EFE6;
+  --line: rgba(200, 182, 166, 0.3);
+  --accent: #B8977E;
+  --accent-alert: #C77D7D;
+}
+
+/* 2. Cashmere & Sage */
+:root[data-theme="cashmere-sage"] {
+  --ink: #3D4035;
+  --ink-soft: #7A806B;
+  --bg-base: #F5F3EC;
+  --bg-surface: #EBE8DE;
+  --line: rgba(163, 171, 143, 0.3);
+  --accent: #869075;
+  --accent-alert: #D18C73;
+}
+
+/* 3. Pearl & Taupe */
+:root[data-theme="pearl-taupe"] {
+  --ink: #403D39;
+  --ink-soft: #7C7771;
+  --bg-base: #F8F9FA;
+  --bg-surface: #EAE6DF;
+  --line: rgba(176, 169, 160, 0.3);
+  --accent: #9A8C78;
+  --accent-alert: #A36B6B;
+}
+
+/* 4. Alabaster & Rose Gold */
+:root[data-theme="alabaster-rose"] {
+  --ink: #3E3636;
+  --ink-soft: #877777;
+  --bg-base: #FAFAFA;
+  --bg-surface: #F5EBEB;
+  --line: rgba(212, 184, 184, 0.4);
+  --accent: #C79595;
+  --accent-alert: #B56B6B;
+}
+
+/* 5. Linen & Slate */
+:root[data-theme="linen-slate"] {
+  --ink: #2C3E50;
+  --ink-soft: #63768D;
+  --bg-base: #F4F1EA;
+  --bg-surface: #E8E5DF;
+  --line: rgba(154, 166, 178, 0.3);
+  --accent: #5D738E;
+  --accent-alert: #A06464;
+}
+
+/* 6. Vanilla & Cognac */
+:root[data-theme="vanilla-cognac"] {
+  --ink: #4A2B1D;
+  --ink-soft: #8C5C44;
+  --bg-base: #FDF9EE;
+  --bg-surface: #F2E7D5;
+  --line: rgba(184, 126, 92, 0.3);
+  --accent: #9C5535;
+  --accent-alert: #A13D3D;
+}
+
+/* 7. Silk & Cerulean */
+:root[data-theme="silk-cerulean"] {
+  --ink: #1B3B4D;
+  --ink-soft: #5A7E94;
+  --bg-base: #F3F7F9;
+  --bg-surface: #E1EAF0;
+  --line: rgba(132, 164, 186, 0.3);
+  --accent: #377296;
+  --accent-alert: #964F4F;
+}
+
+/* 8. Porcelain & Olive */
+:root[data-theme="porcelain-olive"] {
+  --ink: #303A2B;
+  --ink-soft: #6E7C66;
+  --bg-base: #FFFFFF;
+  --bg-surface: #F2F5F0;
+  --line: rgba(138, 153, 128, 0.3);
+  --accent: #5B6E50;
+  --accent-alert: #A16A46;
+}
+
+/* 9. Crepe & Truffle */
+:root[data-theme="crepe-truffle"] {
+  --ink: #3C3530;
+  --ink-soft: #7A6F66;
+  --bg-base: #F5F2EF;
+  --bg-surface: #EBE5DF;
+  --line: rgba(166, 152, 138, 0.3);
+  --accent: #7D6B5D;
+  --accent-alert: #915454;
+}
+
+/* 10. Chiffon & Mulberry */
+:root[data-theme="chiffon-mulberry"] {
+  --ink: #4D2B36;
+  --ink-soft: #8A5666;
+  --bg-base: #FCF9FA;
+  --bg-surface: #F2E6EA;
+  --line: rgba(181, 128, 145, 0.3);
+  --accent: #8F435C;
+  --accent-alert: #A35B47;
+}
+
+/* ── Dark Mode Themes (Deep, Rich, High-Contrast) ── */
+/* 11. Onyx & Amber */
+:root[data-theme="onyx-amber"] {
+  --ink: #F0E8D9;
+  --ink-soft: #A69E8C;
+  --bg-base: #111111;
+  --bg-surface: #1E1E1E;
+  --line: rgba(204, 153, 51, 0.2);
+  --accent: #D49A36;
+  --accent-alert: #C75233;
+}
+
+/* 12. Obsidian & Emerald */
+:root[data-theme="obsidian-emerald"] {
+  --ink: #E0F0E8;
+  --ink-soft: #85A394;
+  --bg-base: #0B110E;
+  --bg-surface: #151F1A;
+  --line: rgba(43, 133, 89, 0.3);
+  --accent: #2B8559;
+  --accent-alert: #D1893D;
+}
+
+/* 13. Carbon & Copper */
+:root[data-theme="carbon-copper"] {
+  --ink: #F2E4DF;
+  --ink-soft: #9E8C85;
+  --bg-base: #141414;
+  --bg-surface: #222222;
+  --line: rgba(184, 115, 81, 0.3);
+  --accent: #B87351;
+  --accent-alert: #C94C4C;
+}
+
+/* 14. Velvet Navy & Platinum */
+:root[data-theme="navy-platinum"] {
+  --ink: #EAECEF;
+  --ink-soft: #8D99A8;
+  --bg-base: #0A111F;
+  --bg-surface: #131E32;
+  --line: rgba(154, 173, 196, 0.2);
+  --accent: #879BBB;
+  --accent-alert: #D16D6D;
+}
+
+/* 15. Matte Black & Ruby */
+:root[data-theme="black-ruby"] {
+  --ink: #F2E3E5;
+  --ink-soft: #A38C8F;
+  --bg-base: #0F0F0F;
+  --bg-surface: #1A1A1A;
+  --line: rgba(163, 49, 64, 0.3);
+  --accent: #A33140;
+  --accent-alert: #CC7A43;
+}
+
+/* 16. Graphite & Champagne */
+:root[data-theme="graphite-champagne"] {
+  --ink: #F0EDE4;
+  --ink-soft: #A8A393;
+  --bg-base: #1B1D1F;
+  --bg-surface: #292C2F;
+  --line: rgba(201, 185, 143, 0.2);
+  --accent: #BFA873;
+  --accent-alert: #C46C6C;
+}
+
+/* 17. Midnight & Indigo */
+:root[data-theme="midnight-indigo"] {
+  --ink: #E6E8F2;
+  --ink-soft: #8A92B8;
+  --bg-base: #070914;
+  --bg-surface: #111429;
+  --line: rgba(79, 93, 168, 0.3);
+  --accent: #4F5DA8;
+  --accent-alert: #A85A82;
+}
+
+/* 18. Charcoal & Terracotta */
+:root[data-theme="charcoal-terracotta"] {
+  --ink: #F2EBE9;
+  --ink-soft: #A89B96;
+  --bg-base: #1F1F1F;
+  --bg-surface: #2E2D2D;
+  --line: rgba(189, 107, 85, 0.3);
+  --accent: #BD6B55;
+  --accent-alert: #BAA55D;
+}
+
+/* 19. Gunmetal & Sapphire */
+:root[data-theme="gunmetal-sapphire"] {
+  --ink: #E0EBF2;
+  --ink-soft: #7C98A8;
+  --bg-base: #14181C;
+  --bg-surface: #21262B;
+  --line: rgba(43, 107, 153, 0.3);
+  --accent: #2B6B99;
+  --accent-alert: #993B4E;
+}
+
+/* 20. Eclipse & Amethyst */
+:root[data-theme="eclipse-amethyst"] {
+  --ink: #F0E8F2;
+  --ink-soft: #A28DA8;
+  --bg-base: #0E0A12;
+  --bg-surface: #1A1321;
+  --line: rgba(142, 93, 166, 0.3);
+  --accent: #8E5DA6;
+  --accent-alert: #5D9EA6;
 }
 
 body {
@@ -174,7 +407,7 @@ body {
 }
 
 #login-form button[type="submit"]:hover {
-  background: #FFF;
+  background: var(--ink-soft);
 }
 
 .error {
@@ -786,10 +1019,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 120px;
+  min-width: 180px;
+  max-height: 300px;
+  overflow-y: auto;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   z-index: 1000;
 }
+.theme-dropdown-menu::-webkit-scrollbar { width: 6px; }
+.theme-dropdown-menu::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.2); border-radius: 4px; }
 .theme-dropdown-menu.hidden {
   display: none;
 }
@@ -811,6 +1048,48 @@ body {
   font-weight: 600;
   color: var(--accent);
   background: rgba(128,128,128,0.05);
+}
+.theme-category {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  padding: 12px 12px 4px 12px;
+  user-select: none;
+}
+.theme-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+.theme-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--ink-soft);
+  padding: 10px 0;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+.theme-tab:hover {
+  color: var(--ink);
+}
+.theme-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.theme-tab-content.hidden {
+  display: none;
+}
+.theme-divider {
+  height: 1px;
+  background-color: var(--line);
+  margin: 4px 0;
 }
 
 .msg-actions {
