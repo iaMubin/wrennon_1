@@ -1075,3 +1075,23 @@ if (resizer && sidebar) {
     }
   });
 }
+
+// --- Tab switching logic for theme dropdown ---
+document.querySelectorAll('.theme-tab').forEach(tab => {
+  tab.addEventListener('click', (e) => {
+    e.stopPropagation(); // prevent dropdown from closing
+    const targetId = tab.getAttribute('data-target');
+    const dropdown = tab.closest('.theme-dropdown-menu');
+    
+    // Remove active class from all tabs
+    dropdown.querySelectorAll('.theme-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    
+    // Hide all contents
+    dropdown.querySelectorAll('.theme-tab-content').forEach(c => c.classList.add('hidden'));
+    
+    // Show target content
+    const targetContent = dropdown.querySelector('#' + targetId);
+    if(targetContent) targetContent.classList.remove('hidden');
+  });
+});

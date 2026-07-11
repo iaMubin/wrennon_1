@@ -567,6 +567,33 @@
             padding: 12px 12px 4px 12px;
             user-select: none;
         }
+        .theme-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--line);
+            margin-bottom: 4px;
+        }
+        .theme-tab {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--ink-soft);
+            padding: 10px 0;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+        .theme-tab:hover {
+            color: var(--ink);
+        }
+        .theme-tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+        .theme-tab-content.hidden {
+            display: none;
+        }
         .theme-divider {
             height: 1px;
             background-color: var(--line);
@@ -585,32 +612,36 @@
                     </button>
                     <div id="theme-dropdown" class="theme-dropdown-menu hidden" role="menu">
                         <button class="theme-option" data-theme-value="system" role="menuitem">System Preference</button>
-                        <div class="theme-divider"></div>
-                        <div class="theme-category">Light Themes</div>
-                        <button class="theme-option" data-theme-value="light" role="menuitem">Default Light</button>
-                        <button class="theme-option" data-theme-value="ivory-champagne" role="menuitem">Ivory & Champagne</button>
-                        <button class="theme-option" data-theme-value="cashmere-sage" role="menuitem">Cashmere & Sage</button>
-                        <button class="theme-option" data-theme-value="pearl-taupe" role="menuitem">Pearl & Taupe</button>
-                        <button class="theme-option" data-theme-value="alabaster-rose" role="menuitem">Alabaster & Rose Gold</button>
-                        <button class="theme-option" data-theme-value="linen-slate" role="menuitem">Linen & Slate</button>
-                        <button class="theme-option" data-theme-value="vanilla-cognac" role="menuitem">Vanilla & Cognac</button>
-                        <button class="theme-option" data-theme-value="silk-cerulean" role="menuitem">Silk & Cerulean</button>
-                        <button class="theme-option" data-theme-value="porcelain-olive" role="menuitem">Porcelain & Olive</button>
-                        <button class="theme-option" data-theme-value="crepe-truffle" role="menuitem">Crepe & Truffle</button>
-                        <button class="theme-option" data-theme-value="chiffon-mulberry" role="menuitem">Chiffon & Mulberry</button>
-                        <div class="theme-divider"></div>
-                        <div class="theme-category">Dark Themes</div>
-                        <button class="theme-option" data-theme-value="dark" role="menuitem">Default Dark</button>
-                        <button class="theme-option" data-theme-value="onyx-amber" role="menuitem">Onyx & Amber</button>
-                        <button class="theme-option" data-theme-value="obsidian-emerald" role="menuitem">Obsidian & Emerald</button>
-                        <button class="theme-option" data-theme-value="carbon-copper" role="menuitem">Carbon & Copper</button>
-                        <button class="theme-option" data-theme-value="navy-platinum" role="menuitem">Velvet Navy & Platinum</button>
-                        <button class="theme-option" data-theme-value="black-ruby" role="menuitem">Matte Black & Ruby</button>
-                        <button class="theme-option" data-theme-value="graphite-champagne" role="menuitem">Graphite & Champagne</button>
-                        <button class="theme-option" data-theme-value="midnight-indigo" role="menuitem">Midnight & Indigo</button>
-                        <button class="theme-option" data-theme-value="charcoal-terracotta" role="menuitem">Charcoal & Terracotta</button>
-                        <button class="theme-option" data-theme-value="gunmetal-sapphire" role="menuitem">Gunmetal & Sapphire</button>
-                        <button class="theme-option" data-theme-value="eclipse-amethyst" role="menuitem">Eclipse & Amethyst</button>
+                        <div class="theme-tabs">
+                            <button class="theme-tab active" data-target="admin-light-themes">Light</button>
+                            <button class="theme-tab" data-target="admin-dark-themes">Dark</button>
+                        </div>
+                        <div id="admin-light-themes" class="theme-tab-content active">
+                            <button class="theme-option" data-theme-value="light" role="menuitem">Default Light</button>
+                            <button class="theme-option" data-theme-value="ivory-champagne" role="menuitem">Ivory & Champagne</button>
+                            <button class="theme-option" data-theme-value="cashmere-sage" role="menuitem">Cashmere & Sage</button>
+                            <button class="theme-option" data-theme-value="pearl-taupe" role="menuitem">Pearl & Taupe</button>
+                            <button class="theme-option" data-theme-value="alabaster-rose" role="menuitem">Alabaster & Rose Gold</button>
+                            <button class="theme-option" data-theme-value="linen-slate" role="menuitem">Linen & Slate</button>
+                            <button class="theme-option" data-theme-value="vanilla-cognac" role="menuitem">Vanilla & Cognac</button>
+                            <button class="theme-option" data-theme-value="silk-cerulean" role="menuitem">Silk & Cerulean</button>
+                            <button class="theme-option" data-theme-value="porcelain-olive" role="menuitem">Porcelain & Olive</button>
+                            <button class="theme-option" data-theme-value="crepe-truffle" role="menuitem">Crepe & Truffle</button>
+                            <button class="theme-option" data-theme-value="chiffon-mulberry" role="menuitem">Chiffon & Mulberry</button>
+                        </div>
+                        <div id="admin-dark-themes" class="theme-tab-content hidden">
+                            <button class="theme-option" data-theme-value="dark" role="menuitem">Default Dark</button>
+                            <button class="theme-option" data-theme-value="onyx-amber" role="menuitem">Onyx & Amber</button>
+                            <button class="theme-option" data-theme-value="obsidian-emerald" role="menuitem">Obsidian & Emerald</button>
+                            <button class="theme-option" data-theme-value="carbon-copper" role="menuitem">Carbon & Copper</button>
+                            <button class="theme-option" data-theme-value="navy-platinum" role="menuitem">Velvet Navy & Platinum</button>
+                            <button class="theme-option" data-theme-value="black-ruby" role="menuitem">Matte Black & Ruby</button>
+                            <button class="theme-option" data-theme-value="graphite-champagne" role="menuitem">Graphite & Champagne</button>
+                            <button class="theme-option" data-theme-value="midnight-indigo" role="menuitem">Midnight & Indigo</button>
+                            <button class="theme-option" data-theme-value="charcoal-terracotta" role="menuitem">Charcoal & Terracotta</button>
+                            <button class="theme-option" data-theme-value="gunmetal-sapphire" role="menuitem">Gunmetal & Sapphire</button>
+                            <button class="theme-option" data-theme-value="eclipse-amethyst" role="menuitem">Eclipse & Amethyst</button>
+                        </div>
                     </div>
                 </div>
                 <button class="btn" onclick="window.location.href='index.html'">Back to Agent Chat</button>
@@ -1179,6 +1210,26 @@
 
         fetchAgents();
         fetchLogs();
+    </script>
+    <script>
+        // Tab switching logic for theme dropdown
+        document.querySelectorAll('.theme-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                e.stopPropagation(); // prevent dropdown from closing
+                const targetId = tab.getAttribute('data-target');
+                const dropdown = tab.closest('.theme-dropdown-menu');
+                
+                // Remove active class from all tabs
+                dropdown.querySelectorAll('.theme-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Hide all contents
+                dropdown.querySelectorAll('.theme-tab-content').forEach(c => c.classList.add('hidden'));
+                // Show target content
+                const targetContent = dropdown.querySelector('#' + targetId);
+                if(targetContent) targetContent.classList.remove('hidden');
+            });
+        });
     </script>
 </body>
 </html>

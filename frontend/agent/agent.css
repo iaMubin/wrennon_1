@@ -407,7 +407,7 @@ body {
 }
 
 #login-form button[type="submit"]:hover {
-  background: #FFF;
+  background: var(--ink-soft);
 }
 
 .error {
@@ -1058,6 +1058,33 @@ body {
   color: var(--ink-soft);
   padding: 12px 12px 4px 12px;
   user-select: none;
+}
+.theme-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+.theme-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--ink-soft);
+  padding: 10px 0;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+.theme-tab:hover {
+  color: var(--ink);
+}
+.theme-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.theme-tab-content.hidden {
+  display: none;
 }
 .theme-divider {
   height: 1px;
