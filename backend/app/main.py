@@ -117,6 +117,20 @@ with SessionLocal() as db:
     if agents_without_id:
         db.commit()
 
+    # Manual migrations for SQLite (to add new columns to existing tables)
+    from sqlalchemy import text
+    try:
+        db.execute(text("ALTER TABLE conversations ADD COLUMN sentiment VARCHAR"))
+        db.commit()
+    except Exception:
+        pass
+        
+    try:
+        db.execute(text("ALTER TABLE conversations ADD COLUMN language VARCHAR"))
+        db.commit()
+    except Exception:
+        pass
+
 app.include_router(chat_router, prefix="/api")
 app.include_router(agent_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
