@@ -229,3 +229,92 @@ def reopen_support_ticket(
         "status": "reopened",
         "reopened_at": datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat(),
     }
+
+
+def process_refund(order_id: str, amount: float) -> dict:
+    """Process a refund for a given order (L4 Pipeline).
+    
+    Returns:
+        dict: Refund status
+    """
+    # --- MOCK BODY ---
+    import datetime
+    import uuid
+    return {
+        "refund_id": f"REF-{uuid.uuid4().hex[:6].upper()}",
+        "order_id": order_id,
+        "amount_refunded": amount,
+        "status": "approved",
+        "processed_at": datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat()
+    }
+
+
+def update_subscription(customer_email: str, action: str) -> dict:
+    """Update a customer's subscription (L3 Pipeline).
+    
+    Args:
+        action: 'skip', 'cancel', or 'resume'
+        
+    Returns:
+        dict: New subscription status
+    """
+    # --- MOCK BODY ---
+    import datetime
+    
+    status_map = {
+        "skip": "skipped_next_delivery",
+        "cancel": "cancelled",
+        "resume": "active"
+    }
+    
+    return {
+        "email": customer_email,
+        "subscription_status": status_map.get(action, "unknown"),
+        "updated_at": datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat()
+    }
+
+
+def recommend_product(context_keywords: str) -> list[dict]:
+    """Act as a shopping assistant and recommend a product.
+    
+    Args:
+        context_keywords: Search terms or context
+        
+    Returns:
+        List of recommended products.
+    """
+    # --- MOCK BODY ---
+    return [
+        {
+            "product_id": "PROD-X2",
+            "name": "Premium Plan Upgrade",
+            "price": 29.99,
+            "description": "Upgrade to our premium tier for faster shipping and exclusive content.",
+            "link": "https://example.com/upgrade/PROD-X2"
+        },
+        {
+            "product_id": "PROD-Y1",
+            "name": "Limited Edition Merch",
+            "price": 15.00,
+            "description": "Show your support with our limited edition merch.",
+            "link": "https://example.com/merch/PROD-Y1"
+        }
+    ]
+
+
+def track_purchase(product_id: str) -> dict:
+    """Simulate the customer buying a recommended product to track revenue.
+    
+    Returns:
+        dict: Revenue details
+    """
+    # --- MOCK BODY ---
+    price_map = {
+        "PROD-X2": 29.99,
+        "PROD-Y1": 15.00
+    }
+    return {
+        "success": True,
+        "product_id": product_id,
+        "revenue_generated": price_map.get(product_id, 10.00)
+    }

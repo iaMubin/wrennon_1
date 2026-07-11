@@ -17,6 +17,8 @@ from contextlib import asynccontextmanager
 from app.api.agent import router as agent_router
 from app.api.admin import router as admin_router
 from app.api.chat import router as chat_router
+from app.api.analytics import router as analytics_router
+from app.api.copilot import router as copilot_router
 from app.config import settings
 from app.db.models import Base, Agent
 from app.db.session import engine, SessionLocal
@@ -111,6 +113,8 @@ with SessionLocal() as db:
 app.include_router(chat_router, prefix="/api")
 app.include_router(agent_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
+app.include_router(analytics_router, prefix="/api/analytics")
+app.include_router(copilot_router, prefix="/api/copilot")
 app.include_router(realtime_router)  # no /api prefix — /ws/... paths
 
 

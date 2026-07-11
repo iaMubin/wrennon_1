@@ -84,6 +84,10 @@ class ConversationState(TypedDict):
     refund_policy_check: Optional[dict]
     refund_approval_status: Optional[Literal["pending", "approved", "rejected"]]
 
+    # --- Analytics & Copilot ---
+    revenue_generated: float
+    resolution_logged: bool
+
 
 def initial_state(customer_email: Optional[str] = None) -> ConversationState:
     """Factory for a fresh conversation state. Keeps the TypedDict literal
@@ -117,4 +121,6 @@ def initial_state(customer_email: Optional[str] = None) -> ConversationState:
         refund_requested=False,
         refund_policy_check=None,
         refund_approval_status=None,
+        revenue_generated=0.0,
+        resolution_logged=False,
     )

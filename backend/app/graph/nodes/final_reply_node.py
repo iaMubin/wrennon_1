@@ -46,6 +46,13 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
             "\nThis conversation is being closed at the customer's request. Give a short, "
             "warm closing message and do not ask if they need anything else."
         )
+        if not state.get("resolution_logged"):
+            from app.services.analytics import log_resolution, log_revenue
+            if not state.get("handoff_requested"):
+                log_resolution(was_autonomous=True)
+            if state.get("revenue_generated"):
+                log_revenue(state["revenue_generated"])
+            state["resolution_logged"] = True
 
     context_parts = []
 

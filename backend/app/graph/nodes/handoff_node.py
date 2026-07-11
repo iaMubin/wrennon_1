@@ -42,4 +42,9 @@ async def handoff_node(state: ConversationState) -> ConversationState:
     state["handoff_summary"] = conversation_summary
     state["conversation_mode"] = "pending_human"
 
+    if not state.get("resolution_logged"):
+        from app.services.analytics import log_resolution
+        log_resolution(was_autonomous=False)
+        state["resolution_logged"] = True
+
     return state
