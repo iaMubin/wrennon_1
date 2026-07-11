@@ -96,7 +96,9 @@
     </main>
 
     <script>
-        const API_BASE = "http://localhost:8000/api";
+        const _IS_LOCAL = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost";
+        const _RENDER_HOST = "wrennon-backend.onrender.com";
+        const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/api`;
 
         async function fetchAnalytics() {
             try {
