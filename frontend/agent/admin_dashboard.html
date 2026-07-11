@@ -720,6 +720,40 @@
             </tbody>
         </table>
 
+        <!-- Analytics & Copilot Section -->
+        <h3 style="margin-top: 48px;">System Analytics & Copilot Insights</h3>
+        <p style="color: var(--ink-soft); font-size: 14px; margin-bottom: 20px;">Real-time performance metrics and recent AI assistant actions.</p>
+        
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px;">
+            <div style="background: var(--bg-base); padding: 24px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+                <div style="color: var(--ink-soft); font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">Total Support Tickets</div>
+                <div id="analytics-total-tickets" style="font-size: 28px; font-weight: 700; color: var(--ink);">0</div>
+            </div>
+            <div style="background: var(--bg-base); padding: 24px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+                <div style="color: var(--ink-soft); font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">AI Resolution Rate</div>
+                <div style="display: flex; align-items: baseline; gap: 8px;">
+                    <div id="analytics-deflection-rate" style="font-size: 28px; font-weight: 700; color: var(--accent);">0%</div>
+                    <div id="analytics-ai-resolved" style="color: var(--ink-soft); font-size: 13px;">(0 resolved)</div>
+                </div>
+            </div>
+            <div style="background: var(--bg-base); padding: 24px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+                <div style="color: var(--ink-soft); font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">Revenue Generated</div>
+                <div id="analytics-revenue" style="font-size: 28px; font-weight: 700; color: #10B981;">$0.00</div>
+            </div>
+            <div style="background: var(--bg-base); padding: 24px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+                <div style="color: var(--ink-soft); font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">Total Upsells</div>
+                <div id="analytics-upsells" style="font-size: 28px; font-weight: 700; color: var(--ink);">0</div>
+            </div>
+        </div>
+
+        <div style="background: var(--bg-base); border-radius: var(--radius-sm); border: 1px solid var(--line); padding: 24px;">
+            <h4 style="margin-bottom: 16px; font-size: 16px; color: var(--ink);">Recent Copilot Activity</h4>
+            <div id="copilot-activity-list" style="display: flex; flex-direction: column; gap: 16px;">
+                <!-- Populated by JS -->
+                <div style="color: var(--ink-soft); font-size: 14px; text-align: center; padding: 20px;">Fetching latest copilot actions...</div>
+            </div>
+        </div>
+
         <div style="margin-top: 48px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 12px;">
             <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent);">
@@ -1208,8 +1242,59 @@
             window.location.href = "index.html";
         }
 
+        async function fetchAnalytics() {
+            try {
+                const res = await fetch(`${API_BASE}/analytics/stats`);
+                if (!res.ok) return;
+                const data = await res.json();
+                document.getElementById('analytics-total-tickets').innerText = data.total_tickets;
+                document.getElementById('analytics-deflection-rate').innerText = data.deflection_rate + "%";
+                document.getElementById('analytics-ai-resolved').innerText = `(${data.resolved_by_ai} resolved by AI)`;
+                document.getElementById('analytics-revenue').innerText = `$${data.revenue_generated.toFixed(2)}`;
+                document.getElementById('analytics-upsells').innerText = data.upsell_count;
+            } catch (err) {
+                console.error("Failed to fetch analytics:", err);
+            }
+        }
+
+        async function fetchCopilot() {
+            try {
+                const req = {
+                    ticket_id: "TICKET-" + Math.floor(Math.random() * 10000),
+                    conversation_summary: "Customer inquiring about product specs."
+                };
+                const res = await fetch(`${API_BASE}/copilot/suggest`, {
+                    method: 'POST',
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(req)
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                const list = document.getElementById('copilot-activity-list');
+                list.innerHTML = `
+                    <div style="background: var(--bg-surface); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                            <span style="color: var(--ink-soft); font-size: 12px; font-weight: 600;">RECOMMENDED ACTION</span>
+                            <span style="background: rgba(16, 185, 129, 0.1); color: #10B981; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">High Confidence</span>
+                        </div>
+                        <div style="color: var(--ink); font-weight: 500; font-size: 15px; margin-bottom: 8px;">${data.next_best_action}</div>
+                        
+                        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--line);">
+                            <span style="color: var(--ink-soft); font-size: 12px; font-weight: 600;">SUGGESTED REPLY DRAFT</span>
+                            <p style="color: var(--ink); font-size: 14px; margin-top: 8px; font-style: italic;">"${data.suggested_reply}"</p>
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                console.error("Failed to fetch copilot:", err);
+            }
+        }
+
         fetchAgents();
         fetchLogs();
+        fetchAnalytics();
+        fetchCopilot();
     </script>
     <script>
         // Tab switching logic for theme dropdown
