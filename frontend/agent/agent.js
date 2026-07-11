@@ -373,9 +373,16 @@ function renderConversationList(conversations) {
       languageBadge = `<span class="badge badge--agent">${escapeHtml(conv.language)}</span>`;
     }
 
+    const platforms = ["🌐 Web", "📱 WhatsApp", "💬 Instagram"];
+    const hash = conv.short_id ? conv.short_id.split('').reduce((a, b) => {a = ((a << 5) - a) + b.charCodeAt(0); return a & a}, 0) : 0;
+    const platformIcon = platforms[Math.abs(hash) % platforms.length];
+
     item.innerHTML = `
       <div class="conv-item-header">
-        <span class="conv-item-email">${escapeHtml(conv.customer_email || "Unknown Customer")}</span>
+        <span class="conv-item-email" style="display:flex; align-items:center; gap:4px;">
+            <span style="font-size:10px; padding:2px 4px; border-radius:4px; background:var(--bg-elevated); color:var(--text-muted);">${platformIcon}</span>
+            ${escapeHtml(conv.customer_email || "Unknown Customer")}
+        </span>
         <span class="conv-item-time">${formatSidebarTime(conv.updated_at)}</span>
       </div>
       <div class="conv-item-preview">${escapeHtml(conv.last_message || "No messages yet")}</div>
