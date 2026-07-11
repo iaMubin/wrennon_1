@@ -49,10 +49,16 @@ if os.environ.get("SENTRY_DSN"):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Connecting to Redis Pub/Sub...")
-    await broadcast.connect()
+    try:
+        await broadcast.connect()
+    except Exception as e:
+        logger.warning(f"Failed to connect to Redis Pub/Sub: {e}. Running in single-instance mode without Redis.")
     yield
     logger.info("Disconnecting from Redis Pub/Sub...")
-    await broadcast.disconnect()
+    try:
+        await broadcast.disconnect()
+    except Exception:
+        pass
 
 logger.info("Starting Wrennon Showcase Agent...")
 app = FastAPI(title="Wrennon Showcase Agent", version="0.2.0", lifespan=lifespan)

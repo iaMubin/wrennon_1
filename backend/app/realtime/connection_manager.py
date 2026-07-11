@@ -76,14 +76,17 @@ class ConnectionManager:
         
         # Subscribe to a unique channel for this customer
         async def listen_to_customer_channel():
-            async with broadcast.subscribe(f"customer_{session_id}") as subscriber:
-                async for event in subscriber:
-                    if session_id in self._customer_connections:
-                        payload = json.loads(event.message)
-                        try:
-                            await self._customer_connections[session_id].send_json(payload)
-                        except Exception:
-                            pass
+            try:
+                async with broadcast.subscribe(f"customer_{session_id}") as subscriber:
+                    async for event in subscriber:
+                        if session_id in self._customer_connections:
+                            payload = json.loads(event.message)
+                            try:
+                                await self._customer_connections[session_id].send_json(payload)
+                            except Exception:
+                                pass
+            except Exception as e:
+                logger.warning(f"Redis subscribe failed for customer {session_id}: {e}")
 
         task = asyncio.create_task(listen_to_customer_channel())
         self._customer_tasks[session_id] = task
@@ -134,7 +137,10 @@ class ConnectionManager:
                 logger.error(f"Error sending directly to customer {session_id}: {e}")
         else:
             # Fallback to Redis if multi-instance
-            await broadcast.publish(f"customer_{session_id}", json.dumps(payload))
+            try:
+                await broadcast.publish(f"customer_{session_id}", json.dumps(payload))
+            except Exception as e:
+                logger.warning(f"Skipping Redis send_to_customer (Redis unavailable): {e}")
 
     # --- Agent side ---
 
@@ -146,17 +152,20 @@ class ConnectionManager:
         
         if self._agent_task is None:
             async def listen_to_agent_channel():
-                async with broadcast.subscribe("agent_dashboard") as subscriber:
-                    async for event in subscriber:
-                        payload = json.loads(event.message)
-                        dead_connections = []
-                        for ws in self._agent_connections:
-                            try:
-                                await ws.send_json(payload)
-                            except Exception:
-                                dead_connections.append(ws)
-                        for ws in dead_connections:
-                            self.disconnect_agent(ws)
+                try:
+                    async with broadcast.subscribe("agent_dashboard") as subscriber:
+                        async for event in subscriber:
+                            payload = json.loads(event.message)
+                            dead_connections = []
+                            for ws in self._agent_connections:
+                                try:
+                                    await ws.send_json(payload)
+                                except Exception:
+                                    dead_connections.append(ws)
+                            for ws in dead_connections:
+                                self.disconnect_agent(ws)
+                except Exception as e:
+                    logger.warning(f"Redis subscribe failed for agent_dashboard: {e}")
                             
             self._agent_task = asyncio.create_task(listen_to_agent_channel())
 
@@ -166,7 +175,19 @@ class ConnectionManager:
 
     async def broadcast_to_agents(self, payload: dict) -> None:
         # Publish to the global agent dashboard channel via Redis
-        await broadcast.publish("agent_dashboard", json.dumps(payload))
+        try:
+            await broadcast.publish("agent_dashboard", json.dumps(payload))
+        except Exception as e:
+            logger.warning(f"Skipping Redis broadcast_to_agents (Redis unavailable): {e}")
+            # Fallback for single-instance: send directly to connected agents
+            dead_connections = []
+            for ws in self._agent_connections:
+                try:
+                    await ws.send_json(payload)
+                except Exception:
+                    dead_connections.append(ws)
+            for ws in dead_connections:
+                self.disconnect_agent(ws)
 
 
 manager = ConnectionManager()
