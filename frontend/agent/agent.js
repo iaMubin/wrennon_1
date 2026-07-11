@@ -759,6 +759,42 @@ if (noteTypeSelect) {
   });
 }
 
+const agentCopilotBtn = document.getElementById("agent-copilot-btn");
+if (agentCopilotBtn) {
+  agentCopilotBtn.addEventListener("click", async () => {
+    if (!activeSessionId) return;
+    
+    const originalText = agentCopilotBtn.innerHTML;
+    agentCopilotBtn.innerHTML = "Generating...";
+    agentCopilotBtn.disabled = true;
+    agentInput.disabled = true;
+
+    try {
+      const req = {
+          ticket_id: activeSessionId,
+          conversation_summary: "Customer inquiring about an issue."
+      };
+      const res = await fetch(`${API_BASE}/copilot/suggest`, {
+          method: 'POST',
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(req)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Insert suggested draft into the input field
+        agentInput.value = data.suggested_reply;
+      }
+    } catch (err) {
+      console.error("Copilot failed", err);
+    } finally {
+      agentCopilotBtn.innerHTML = originalText;
+      agentCopilotBtn.disabled = false;
+      agentInput.disabled = false;
+      agentInput.focus();
+    }
+  });
+}
+
 function sendAgentReply() {
   const text = agentInput.value.trim();
   if (!text || !activeSessionId || !socket || socket.readyState !== WebSocket.OPEN) return;
