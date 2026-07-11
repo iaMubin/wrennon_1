@@ -6,6 +6,7 @@
 }
 
 :root {
+  var(--ink): #3A2E2A;
   --ink: #3A2E2A;
   --ink-soft: #8C7C75;
   --bg-base: #FDFBF7;
@@ -18,6 +19,16 @@
   --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+:root[data-theme="light"] {
+  --ink: #3A2E2A;
+  --ink-soft: #8C7C75;
+  --bg-base: #FDFBF7;
+  --bg-surface: #F5EFE6;
+  --line: rgba(168, 90, 50, 0.15);
+  --accent: #A85A32;
+  --accent-alert: #D97706;
+}
+
 :root[data-theme="dark"] {
   --ink: #E2E8F0;
   --ink-soft: #94A3B8;
@@ -27,6 +38,226 @@
   --accent: #D4A373;
   --accent-glow: rgba(212, 163, 115, 0.15);
   --accent-alert: #D4A373;
+}
+
+/* 1. Neon lime & Violet ink (Dark mode base) */
+:root[data-theme="neon-violet"] {
+  --ink: #D1FAFF;
+  --ink-soft: #A5B4FC;
+  --bg-base: #1E1B4B;
+  --bg-surface: #312E81;
+  --line: rgba(167, 139, 250, 0.2);
+  --accent: #A3E635; /* Neon lime */
+  --accent-alert: #F43F5E;
+}
+
+/* 2. Burnt Orange & Vanilla (Light mode base) */
+:root[data-theme="orange-vanilla"] {
+  --ink: #431407;
+  --ink-soft: #78350F;
+  --bg-base: #FEF3C7; /* Vanilla */
+  --bg-surface: #FDE68A;
+  --line: rgba(194, 65, 12, 0.2);
+  --accent: #C2410C; /* Burnt Orange */
+  --accent-alert: #DC2626;
+}
+
+/* 3. Sky mint & Graphite (Light mode base) */
+:root[data-theme="mint-graphite"] {
+  --ink: #1F2937; /* Graphite */
+  --ink-soft: #4B5563;
+  --bg-base: #ECFDF5; /* Sky Mint */
+  --bg-surface: #D1FAE5;
+  --line: rgba(16, 185, 129, 0.2);
+  --accent: #059669;
+  --accent-alert: #E11D48;
+}
+
+/* 4. Warm lime & Olive ink (Light mode base) */
+:root[data-theme="lime-olive"] {
+  --ink: #3F6212; /* Olive ink */
+  --ink-soft: #65A30D;
+  --bg-base: #F7FEE7;
+  --bg-surface: #ECFCCB; /* Warm lime */
+  --line: rgba(101, 163, 13, 0.2);
+  --accent: #4D7C0F;
+  --accent-alert: #B91C1C;
+}
+
+/* 5. Electric indigo & Soft lilac (Dark mode base) */
+:root[data-theme="indigo-lilac"] {
+  --ink: #E0E7FF; /* Soft lilac */
+  --ink-soft: #A5B4FC;
+  --bg-base: #0F172A;
+  --bg-surface: #1E1B4B;
+  --line: rgba(99, 102, 241, 0.2);
+  --accent: #6366F1; /* Electric indigo */
+  --accent-alert: #EC4899;
+}
+
+/* 6. Electric orchid & Deep plum (Dark mode base) */
+:root[data-theme="orchid-plum"] {
+  --ink: #FBCFE8;
+  --ink-soft: #F472B6;
+  --bg-base: #4A044E; /* Deep plum */
+  --bg-surface: #701A75;
+  --line: rgba(217, 70, 239, 0.2);
+  --accent: #D946EF; /* Electric orchid */
+  --accent-alert: #F43F5E;
+}
+
+/* 7. Ocean Breeze: Teal and Navy (Light) */
+:root[data-theme="ocean-breeze"] {
+  --ink: #172554;
+  --ink-soft: #1E3A8A;
+  --bg-base: #F0FDF4;
+  --bg-surface: #CCFBF1;
+  --line: rgba(20, 184, 166, 0.2);
+  --accent: #0F766E;
+  --accent-alert: #BE123C;
+}
+
+/* 8. Forest Whisper: Pine green and Sage (Dark) */
+:root[data-theme="forest-whisper"] {
+  --ink: #D1FAE5;
+  --ink-soft: #6EE7B7;
+  --bg-base: #064E3B;
+  --bg-surface: #065F46;
+  --line: rgba(16, 185, 129, 0.2);
+  --accent: #10B981;
+  --accent-alert: #F59E0B;
+}
+
+/* 9. Midnight Quartz: Deep blue and Silver (Dark) */
+:root[data-theme="midnight-quartz"] {
+  --ink: #F8FAFC;
+  --ink-soft: #CBD5E1;
+  --bg-base: #020617;
+  --bg-surface: #0F172A;
+  --line: rgba(148, 163, 184, 0.2);
+  --accent: #94A3B8;
+  --accent-alert: #38BDF8;
+}
+
+/* 10. Desert Sand: Terracotta and Beige (Light) */
+:root[data-theme="desert-sand"] {
+  --ink: #7C2D12;
+  --ink-soft: #9A3412;
+  --bg-base: #FFEDD5;
+  --bg-surface: #FED7AA;
+  --line: rgba(234, 88, 12, 0.2);
+  --accent: #EA580C;
+  --accent-alert: #B91C1C;
+}
+
+/* 11. Arctic Frost: Ice blue and Slate (Light) */
+:root[data-theme="arctic-frost"] {
+  --ink: #334155;
+  --ink-soft: #475569;
+  --bg-base: #F0F9FF;
+  --bg-surface: #E0F2FE;
+  --line: rgba(56, 189, 248, 0.2);
+  --accent: #0284C7;
+  --accent-alert: #E11D48;
+}
+
+/* 12. Cosmic Latte: Cream and Mocha (Light) */
+:root[data-theme="cosmic-latte"] {
+  --ink: #451A03;
+  --ink-soft: #78350F;
+  --bg-base: #FFFBEB;
+  --bg-surface: #FEF3C7;
+  --line: rgba(217, 119, 6, 0.2);
+  --accent: #D97706;
+  --accent-alert: #DC2626;
+}
+
+/* 13. Crimson Twilight: Burgundy and Ash (Dark) */
+:root[data-theme="crimson-twilight"] {
+  --ink: #F3F4F6;
+  --ink-soft: #D1D5DB;
+  --bg-base: #4C0519;
+  --bg-surface: #881337;
+  --line: rgba(225, 29, 72, 0.2);
+  --accent: #E11D48;
+  --accent-alert: #FBBF24;
+}
+
+/* 14. Golden Hour: Amber and Charcoal (Dark) */
+:root[data-theme="golden-hour"] {
+  --ink: #FFFDE7;
+  --ink-soft: #FDE047;
+  --bg-base: #27272A;
+  --bg-surface: #3F3F46;
+  --line: rgba(250, 204, 21, 0.2);
+  --accent: #FACC15;
+  --accent-alert: #EF4444;
+}
+
+/* 15. Lavender Dream: Soft purple and White (Light) */
+:root[data-theme="lavender-dream"] {
+  --ink: #4C1D95;
+  --ink-soft: #6D28D9;
+  --bg-base: #FAF5FF;
+  --bg-surface: #F3E8FF;
+  --line: rgba(168, 85, 247, 0.2);
+  --accent: #9333EA;
+  --accent-alert: #E11D48;
+}
+
+/* 16. Emerald City: Vibrant green and Dark grey (Dark) */
+:root[data-theme="emerald-city"] {
+  --ink: #ECFDF5;
+  --ink-soft: #A7F3D0;
+  --bg-base: #18181B;
+  --bg-surface: #27272A;
+  --line: rgba(16, 185, 129, 0.2);
+  --accent: #10B981;
+  --accent-alert: #F43F5E;
+}
+
+/* 17. Coral Reef: Coral and Sand (Light) */
+:root[data-theme="coral-reef"] {
+  --ink: #881337;
+  --ink-soft: #9F1239;
+  --bg-base: #FFF1F2;
+  --bg-surface: #FFE4E6;
+  --line: rgba(244, 63, 94, 0.2);
+  --accent: #F43F5E;
+  --accent-alert: #B91C1C;
+}
+
+/* 18. Obsidian Edge: Jet black and Neon cyan (Dark) */
+:root[data-theme="obsidian-edge"] {
+  --ink: #E0F2FE;
+  --ink-soft: #7DD3FC;
+  --bg-base: #000000;
+  --bg-surface: #0F172A;
+  --line: rgba(6, 182, 212, 0.3);
+  --accent: #06B6D4;
+  --accent-alert: #F43F5E;
+}
+
+/* 19. Matcha Calm: Matcha green and Espresso (Light) */
+:root[data-theme="matcha-calm"] {
+  --ink: #291D16;
+  --ink-soft: #5C4A3E;
+  --bg-base: #F4F6F0;
+  --bg-surface: #E8EDE1;
+  --line: rgba(135, 153, 119, 0.2);
+  --accent: #6C8059;
+  --accent-alert: #C9665B;
+}
+
+/* 20. Sakura Bloom: Cherry blossom pink and Rosewood (Light) */
+:root[data-theme="sakura-bloom"] {
+  --ink: #5C2A3C;
+  --ink-soft: #8A465B;
+  --bg-base: #FFF5F7;
+  --bg-surface: #FDE8ED;
+  --line: rgba(242, 160, 184, 0.3);
+  --accent: #D65A7C;
+  --accent-alert: #B02345;
 }
 
 body {
@@ -786,10 +1017,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 120px;
+  min-width: 180px;
+  max-height: 300px;
+  overflow-y: auto;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   z-index: 1000;
 }
+.theme-dropdown-menu::-webkit-scrollbar { width: 6px; }
+.theme-dropdown-menu::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.2); border-radius: 4px; }
 .theme-dropdown-menu.hidden {
   display: none;
 }
