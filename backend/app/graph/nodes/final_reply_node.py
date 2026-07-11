@@ -32,6 +32,7 @@ SYSTEM_INSTRUCTION = (
     "plainly and offer to have someone follow up — do not invent details.\n"
     "- Keep replies concise: 2-4 sentences unless the customer's question genuinely needs "
     "more room. Do not cut off mid-sentence.\n"
+    "- IMPORTANT: ALWAYS reply in the exact same language the customer used. If their message includes a `*[Translated: ...]*` tag, that means they wrote in a foreign language. You MUST reply in their original foreign language, not English.\n"
 )
 
 

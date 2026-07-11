@@ -777,3 +777,33 @@ function sendMessage() {
     addToOfflineQueue(text);
   }
 }
+
+// --- Proactive AI Engagement ---
+let proactiveTriggered = false;
+setTimeout(() => {
+    if (!proactiveTriggered && panel.classList.contains("hidden")) {
+        proactiveTriggered = true;
+        // Check if there are already messages in history
+        const history = getLocalHistory();
+        if (history.length === 0) {
+            panel.classList.remove("hidden");
+            clearUnreadIndicator();
+            scrollToBottom(true);
+            if (!hasLoadedHistory) {
+                resolveSessionId().then(() => {
+                    loadHistory().then(() => {
+                        connectSocket();
+                        hasLoadedHistory = true;
+                        
+                        // Wait a bit, then show a proactive message
+                        setTimeout(() => {
+                            appendMessage("bot", "Hi! I noticed you've been here a while. How can I assist you today?", true, Date.now(), "AI Assistant");
+                        }, 500);
+                    });
+                });
+            } else {
+                appendMessage("bot", "Hi! I noticed you've been here a while. How can I assist you today?", true, Date.now(), "AI Assistant");
+            }
+        }
+    }
+}, 12000); // 12 seconds

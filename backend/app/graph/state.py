@@ -87,6 +87,8 @@ class ConversationState(TypedDict):
     # --- Analytics & Copilot ---
     revenue_generated: float
     resolution_logged: bool
+    sentiment: Optional[str]
+    language: Optional[str]
 
 
 def initial_state(customer_email: Optional[str] = None) -> ConversationState:
@@ -123,4 +125,6 @@ def initial_state(customer_email: Optional[str] = None) -> ConversationState:
         refund_approval_status=None,
         revenue_generated=0.0,
         resolution_logged=False,
+        sentiment=None,
+        language="English",
     )

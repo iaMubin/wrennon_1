@@ -720,6 +720,26 @@
             </tbody>
         </table>
 
+        <!-- Knowledge Base Generator -->
+        <h3 style="margin-top: 48px; display: flex; align-items: center; gap: 8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent);">
+                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path>
+            </svg>
+            Knowledge Base Generator
+        </h3>
+        <p style="color: var(--ink-soft); font-size: 14px; margin-bottom: 20px;">Generate KB articles based on recent customer interactions and trends.</p>
+        <div style="background: var(--bg-base); border-radius: var(--radius-sm); border: 1px solid var(--line); padding: 24px;">
+            <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+                <button class="btn btn-primary" id="generate-kb-btn" onclick="generateKBArticle()" style="display: flex; align-items: center; gap: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                    Generate Draft
+                </button>
+            </div>
+            <div id="kb-results" style="display: flex; flex-direction: column; gap: 16px;">
+                <div style="color: var(--ink-soft); font-size: 14px;">Click "Generate Draft" to create a new article based on recent unresolved or complex cases.</div>
+            </div>
+        </div>
+
         <!-- Analytics & Copilot Section -->
         <h3 style="margin-top: 48px;">System Analytics & Copilot Insights</h3>
         <p style="color: var(--ink-soft); font-size: 14px; margin-bottom: 20px;">Real-time performance metrics and recent AI assistant actions.</p>
@@ -1288,6 +1308,43 @@
                 `;
             } catch (err) {
                 console.error("Failed to fetch copilot:", err);
+            }
+        }
+
+        async function generateKBArticle() {
+            const btn = document.getElementById('generate-kb-btn');
+            const results = document.getElementById('kb-results');
+            
+            btn.disabled = true;
+            btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg> Generating...`;
+            
+            try {
+                const res = await fetch(`${API_BASE}/kb/suggest`, { method: 'POST' });
+                if (res.ok) {
+                    const data = await res.json();
+                    results.innerHTML = `
+                        <div style="background: var(--bg-surface); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                                <span style="color: var(--ink-soft); font-size: 12px; font-weight: 600;">NEW KB DRAFT</span>
+                                <span style="background: rgba(16, 185, 129, 0.1); color: #10B981; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">${data.confidence} Confidence</span>
+                            </div>
+                            <div style="color: var(--ink); font-weight: 600; font-size: 16px; margin-bottom: 8px;">${data.title}</div>
+                            <p style="color: var(--ink-soft); font-size: 14px; line-height: 1.5; margin-bottom: 16px;">${data.content}</p>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-primary" onclick="alert('KB Article Published!')">Publish</button>
+                                <button class="btn">Edit Draft</button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    results.innerHTML = `<div style="color: var(--danger); font-size: 14px;">Failed to generate KB article.</div>`;
+                }
+            } catch (err) {
+                console.error("Failed to generate KB article:", err);
+                results.innerHTML = `<div style="color: var(--danger); font-size: 14px;">An error occurred.</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg> Generate Draft`;
             }
         }
 

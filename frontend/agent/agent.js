@@ -361,6 +361,18 @@ function renderConversationList(conversations) {
       ? `<span class="conv-item__reopen-badge">↩ Reopened${conv.reopen_count > 1 ? ` ×${conv.reopen_count}` : ""}</span>`
       : "";
 
+    let sentimentBadge = '';
+    if (conv.sentiment) {
+      const color = conv.sentiment.toLowerCase() === 'angry' ? 'var(--accent-alert)' : 
+                   conv.sentiment.toLowerCase() === 'happy' ? 'var(--accent-success)' : 'var(--text-muted)';
+      sentimentBadge = `<span class="badge" style="border-color:${color}; color:${color}">${escapeHtml(conv.sentiment)}</span>`;
+    }
+    
+    let languageBadge = '';
+    if (conv.language && conv.language.toUpperCase() !== 'ENGLISH') {
+      languageBadge = `<span class="badge badge--agent">${escapeHtml(conv.language)}</span>`;
+    }
+
     item.innerHTML = `
       <div class="conv-item-header">
         <span class="conv-item-email">${escapeHtml(conv.customer_email || "Unknown Customer")}</span>
@@ -369,6 +381,8 @@ function renderConversationList(conversations) {
       <div class="conv-item-preview">${escapeHtml(conv.last_message || "No messages yet")}</div>
       <div class="badge-row">
         <span class="badge ${badgeClass}">${stageText}</span>
+        ${sentimentBadge}
+        ${languageBadge}
         ${reopenBadge}
       </div>
     `;
@@ -746,7 +760,7 @@ if (agentVoiceBtn) {
   });
 }
 
-const noteTypeSelect = document.getElementById("note-type-select");
+  const noteTypeSelect = document.getElementById("note-type-select");
 if (noteTypeSelect) {
   noteTypeSelect.addEventListener("change", () => {
     if (noteTypeSelect.value === "internal") {
@@ -771,8 +785,7 @@ if (agentCopilotBtn) {
 
     try {
       const req = {
-          ticket_id: activeSessionId,
-          conversation_summary: "Customer inquiring about an issue."
+          ticket_id: activeSessionId
       };
       const res = await fetch(`${API_BASE}/copilot/suggest`, {
           method: 'POST',
@@ -783,6 +796,11 @@ if (agentCopilotBtn) {
         const data = await res.json();
         // Insert suggested draft into the input field
         agentInput.value = data.suggested_reply;
+        
+        // Render action buttons if any
+        if (data.actions && data.actions.length > 0) {
+            renderCopilotActions(data.actions);
+        }
       }
     } catch (err) {
       console.error("Copilot failed", err);
@@ -795,6 +813,49 @@ if (agentCopilotBtn) {
   });
 }
 
+function renderCopilotActions(actions) {
+    let actionContainer = document.getElementById('copilot-action-container');
+    if (!actionContainer) {
+        actionContainer = document.createElement('div');
+        actionContainer.id = 'copilot-action-container';
+        actionContainer.className = 'copilot-actions';
+        actionContainer.style.display = 'flex';
+        actionContainer.style.gap = '8px';
+        actionContainer.style.marginTop = '8px';
+        const inputRow = document.querySelector('.chat-input-row');
+        inputRow.parentNode.insertBefore(actionContainer, inputRow.nextSibling);
+    }
+    
+    actionContainer.innerHTML = '';
+    actions.forEach(action => {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-secondary btn-sm';
+        btn.innerHTML = `⚡ ${escapeHtml(action.label)}`;
+        btn.onclick = async () => {
+            btn.innerHTML = 'Executing...';
+            btn.disabled = true;
+            try {
+                // Mock execution
+                await new Promise(r => setTimeout(r, 1000));
+                
+                // Append action result to chat as an internal note
+                const note = `[Copilot Action Executed] ${action.label}`;
+                socket.send(JSON.stringify({ 
+                    type: "new_message", 
+                    session_id: activeSessionId,
+                    message: `*Internal Note:* ${note}`,
+                    is_internal: true
+                }));
+                
+                actionContainer.innerHTML = '';
+            } catch (err) {
+                console.error("Action failed", err);
+            }
+        };
+        actionContainer.appendChild(btn);
+    });
+}
+
 function sendAgentReply() {
   const text = agentInput.value.trim();
   if (!text || !activeSessionId || !socket || socket.readyState !== WebSocket.OPEN) return;
@@ -805,6 +866,7 @@ function sendAgentReply() {
   
   agentInput.value = "";
   drafts[activeSessionId] = ""; 
+  agentInput.style.height = "auto";
 }
 
 // --- Order Context Popup ---

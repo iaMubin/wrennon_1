@@ -68,7 +68,9 @@ Respond with ONLY a JSON object, no other text, shaped exactly like this:
   "ready_to_respond": true or false,
   "handoff_required": true or false,
   "handoff_reason": "short reason, only if handoff_required is true, else empty string",
-  "resolved_required": true or false
+  "resolved_required": true or false,
+  "sentiment": "Happy, Neutral, Frustrated, or Angry",
+  "language": "Detect the language the customer is using (e.g. English, Spanish, Bengali)"
 }
 "reasoning" is never shown to the customer — use it to actually think, not to restate the rules.
 
@@ -189,8 +191,14 @@ async def manager_node(state: ConversationState) -> ConversationState:
         deduped_tools.append(tool_call)
 
     state["planned_tools"] = deduped_tools
+    state["sentiment"] = decision.get("sentiment", "Neutral")
+    state["language"] = decision.get("language", "English")
 
-    if decision.get("handoff_required"):
+    if state["sentiment"] == "Angry":
+        logger.warning("Auto-escalating due to Angry sentiment detected.")
+        state["handoff_requested"] = True
+        state["handoff_reason"] = "Auto-escalated by AI due to Angry sentiment."
+    elif decision.get("handoff_required"):
         state["handoff_requested"] = True
         state["handoff_reason"] = decision.get("handoff_reason") or "Escalated per manager decision."
     elif decision.get("resolved_required"):

@@ -54,6 +54,8 @@ class Conversation(Base):
     handled_by: Mapped[str | None] = mapped_column(String, nullable=True)
     handoff_ticket_id: Mapped[str | None] = mapped_column(String, nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sentiment: Mapped[str | None] = mapped_column(String, nullable=True)
+    language: Mapped[str | None] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)

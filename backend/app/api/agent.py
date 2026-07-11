@@ -339,4 +339,6 @@ def _conversation_summary(c: Conversation) -> dict:
         "handled_by": getattr(c, "handled_by", None),
         "last_message": last_message,
         "updated_at": c.updated_at.isoformat(),
+        "sentiment": getattr(c, "sentiment", None),
+        "language": getattr(c, "language", None),
     }

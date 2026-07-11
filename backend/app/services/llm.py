@@ -181,6 +181,23 @@ async def transcribe_audio_if_present(text: str) -> str:
         return text + "\n\n(Transcript: [Failed to process audio])"
 
 
+async def auto_translate_if_needed(text: str) -> str:
+    """Detects if text is non-English. If so, appends an English translation tag."""
+    if len(text.strip()) < 3:
+        return text
+        
+    prompt = f"Detect the language of the following text. If it is already in English, reply with exactly 'ENGLISH'. If it is NOT in English, reply with its English translation ONLY, wrapped in [Translated: ...]. Do not add any other text.\n\nText: {text}"
+    
+    try:
+        result = await _safe_llm_call([{"role": "user", "content": prompt}], temperature=0.0, max_tokens=200)
+        if result and "ENGLISH" not in result.strip().upper():
+            return f"{text}\n\n*{result.strip()}*"
+        return text
+    except Exception as e:
+        logger.error(f"Translation failed: {e}")
+        return text
+
+
 def parse_image_urls(text: str) -> list[str]:
     """Finds all ![Image](url) and returns the URLs"""
     return re.findall(r'!\[.*?\]\((https?://[^\)]+)\)', text)

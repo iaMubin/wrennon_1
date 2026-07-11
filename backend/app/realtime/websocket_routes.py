@@ -24,7 +24,7 @@ from app.graph.state import initial_state
 from app.logger import logger
 from app.realtime.connection_manager import manager
 from app.config import settings
-from app.services.llm import mask_pii, update_conversation_summary, transcribe_audio_if_present
+from app.services.llm import mask_pii, update_conversation_summary, transcribe_audio_if_present, auto_translate_if_needed
 from app.services.cache import get_cache, set_cache
 from app.api.agent import get_redis
 
@@ -146,6 +146,8 @@ def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None, m
             conversation.active_topic = updated_state.get("active_topic")
             conversation.last_order_id = updated_state.get("last_order_id")
             conversation.turn_count = updated_state.get("turn_count", conversation.turn_count) + 1
+            conversation.sentiment = updated_state.get("sentiment")
+            conversation.language = updated_state.get("language")
 
         msg = _save_message(db, conversation.id, sender="ai", content=reply_text)
         
@@ -575,6 +577,9 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
 
             # Check for audio and transcribe it
             customer_text = await transcribe_audio_if_present(customer_text)
+
+            # Auto-translate if not English (for the Agent Console)
+            customer_text = await auto_translate_if_needed(customer_text)
 
             logger.info(f"Received message from customer {session_id}: {mask_pii(customer_text)}")
 

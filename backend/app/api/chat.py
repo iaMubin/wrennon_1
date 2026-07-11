@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Request, Header, HTTPException, status, 
 from sqlalchemy.orm import Session
 import shutil
 import os
+import re
 
 from app.db.models import Conversation
 from app.db.session import get_db
@@ -110,10 +111,14 @@ def get_history(
     # and any future analytics; the customer-facing history never
     # exposes that distinction.
     CUSTOMER_VISIBLE_SENDERS = frozenset({"human", "ai", "agent"})
+    # Strip [Translated: ...] tags from customer history so they don't see their own translations
+    def clean_content(text):
+        return re.sub(r'\n\n\*\[Translated:.*?\]\*', '', text, flags=re.IGNORECASE | re.DOTALL)
+
     return [
         {
             "sender": "user" if m.sender == "human" else "bot",
-            "content": m.content,
+            "content": clean_content(m.content),
         }
         for m in conversation.messages
         if m.sender in CUSTOMER_VISIBLE_SENDERS
