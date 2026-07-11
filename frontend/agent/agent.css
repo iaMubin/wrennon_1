@@ -40,224 +40,226 @@
   --accent-alert: #D4A373;
 }
 
-/* 1. Neon lime & Violet ink (Dark mode base) */
-:root[data-theme="neon-violet"] {
-  --ink: #D1FAFF;
-  --ink-soft: #A5B4FC;
-  --bg-base: #1E1B4B;
-  --bg-surface: #312E81;
-  --line: rgba(167, 139, 250, 0.2);
-  --accent: #A3E635; /* Neon lime */
-  --accent-alert: #F43F5E;
+/* ── Light Mode Themes (Muted, Elegant, Crisp) ── */
+/* 1. Ivory & Champagne */
+:root[data-theme="ivory-champagne"] {
+  --ink: #4A4036;
+  --ink-soft: #8B7E74;
+  --bg-base: #FDFBF7;
+  --bg-surface: #F4EFE6;
+  --line: rgba(200, 182, 166, 0.3);
+  --accent: #B8977E;
+  --accent-alert: #C77D7D;
 }
 
-/* 2. Burnt Orange & Vanilla (Light mode base) */
-:root[data-theme="orange-vanilla"] {
-  --ink: #431407;
-  --ink-soft: #78350F;
-  --bg-base: #FEF3C7; /* Vanilla */
-  --bg-surface: #FDE68A;
-  --line: rgba(194, 65, 12, 0.2);
-  --accent: #C2410C; /* Burnt Orange */
-  --accent-alert: #DC2626;
+/* 2. Cashmere & Sage */
+:root[data-theme="cashmere-sage"] {
+  --ink: #3D4035;
+  --ink-soft: #7A806B;
+  --bg-base: #F5F3EC;
+  --bg-surface: #EBE8DE;
+  --line: rgba(163, 171, 143, 0.3);
+  --accent: #869075;
+  --accent-alert: #D18C73;
 }
 
-/* 3. Sky mint & Graphite (Light mode base) */
-:root[data-theme="mint-graphite"] {
-  --ink: #1F2937; /* Graphite */
-  --ink-soft: #4B5563;
-  --bg-base: #ECFDF5; /* Sky Mint */
-  --bg-surface: #D1FAE5;
-  --line: rgba(16, 185, 129, 0.2);
-  --accent: #059669;
-  --accent-alert: #E11D48;
+/* 3. Pearl & Taupe */
+:root[data-theme="pearl-taupe"] {
+  --ink: #403D39;
+  --ink-soft: #7C7771;
+  --bg-base: #F8F9FA;
+  --bg-surface: #EAE6DF;
+  --line: rgba(176, 169, 160, 0.3);
+  --accent: #9A8C78;
+  --accent-alert: #A36B6B;
 }
 
-/* 4. Warm lime & Olive ink (Light mode base) */
-:root[data-theme="lime-olive"] {
-  --ink: #3F6212; /* Olive ink */
-  --ink-soft: #65A30D;
-  --bg-base: #F7FEE7;
-  --bg-surface: #ECFCCB; /* Warm lime */
-  --line: rgba(101, 163, 13, 0.2);
-  --accent: #4D7C0F;
-  --accent-alert: #B91C1C;
+/* 4. Alabaster & Rose Gold */
+:root[data-theme="alabaster-rose"] {
+  --ink: #3E3636;
+  --ink-soft: #877777;
+  --bg-base: #FAFAFA;
+  --bg-surface: #F5EBEB;
+  --line: rgba(212, 184, 184, 0.4);
+  --accent: #C79595;
+  --accent-alert: #B56B6B;
 }
 
-/* 5. Electric indigo & Soft lilac (Dark mode base) */
-:root[data-theme="indigo-lilac"] {
-  --ink: #E0E7FF; /* Soft lilac */
-  --ink-soft: #A5B4FC;
-  --bg-base: #0F172A;
-  --bg-surface: #1E1B4B;
-  --line: rgba(99, 102, 241, 0.2);
-  --accent: #6366F1; /* Electric indigo */
-  --accent-alert: #EC4899;
+/* 5. Linen & Slate */
+:root[data-theme="linen-slate"] {
+  --ink: #2C3E50;
+  --ink-soft: #63768D;
+  --bg-base: #F4F1EA;
+  --bg-surface: #E8E5DF;
+  --line: rgba(154, 166, 178, 0.3);
+  --accent: #5D738E;
+  --accent-alert: #A06464;
 }
 
-/* 6. Electric orchid & Deep plum (Dark mode base) */
-:root[data-theme="orchid-plum"] {
-  --ink: #FBCFE8;
-  --ink-soft: #F472B6;
-  --bg-base: #4A044E; /* Deep plum */
-  --bg-surface: #701A75;
-  --line: rgba(217, 70, 239, 0.2);
-  --accent: #D946EF; /* Electric orchid */
-  --accent-alert: #F43F5E;
+/* 6. Vanilla & Cognac */
+:root[data-theme="vanilla-cognac"] {
+  --ink: #4A2B1D;
+  --ink-soft: #8C5C44;
+  --bg-base: #FDF9EE;
+  --bg-surface: #F2E7D5;
+  --line: rgba(184, 126, 92, 0.3);
+  --accent: #9C5535;
+  --accent-alert: #A13D3D;
 }
 
-/* 7. Ocean Breeze: Teal and Navy (Light) */
-:root[data-theme="ocean-breeze"] {
-  --ink: #172554;
-  --ink-soft: #1E3A8A;
-  --bg-base: #F0FDF4;
-  --bg-surface: #CCFBF1;
-  --line: rgba(20, 184, 166, 0.2);
-  --accent: #0F766E;
-  --accent-alert: #BE123C;
+/* 7. Silk & Cerulean */
+:root[data-theme="silk-cerulean"] {
+  --ink: #1B3B4D;
+  --ink-soft: #5A7E94;
+  --bg-base: #F3F7F9;
+  --bg-surface: #E1EAF0;
+  --line: rgba(132, 164, 186, 0.3);
+  --accent: #377296;
+  --accent-alert: #964F4F;
 }
 
-/* 8. Forest Whisper: Pine green and Sage (Dark) */
-:root[data-theme="forest-whisper"] {
-  --ink: #D1FAE5;
-  --ink-soft: #6EE7B7;
-  --bg-base: #064E3B;
-  --bg-surface: #065F46;
-  --line: rgba(16, 185, 129, 0.2);
-  --accent: #10B981;
-  --accent-alert: #F59E0B;
+/* 8. Porcelain & Olive */
+:root[data-theme="porcelain-olive"] {
+  --ink: #303A2B;
+  --ink-soft: #6E7C66;
+  --bg-base: #FFFFFF;
+  --bg-surface: #F2F5F0;
+  --line: rgba(138, 153, 128, 0.3);
+  --accent: #5B6E50;
+  --accent-alert: #A16A46;
 }
 
-/* 9. Midnight Quartz: Deep blue and Silver (Dark) */
-:root[data-theme="midnight-quartz"] {
-  --ink: #F8FAFC;
-  --ink-soft: #CBD5E1;
-  --bg-base: #020617;
-  --bg-surface: #0F172A;
-  --line: rgba(148, 163, 184, 0.2);
-  --accent: #94A3B8;
-  --accent-alert: #38BDF8;
+/* 9. Crepe & Truffle */
+:root[data-theme="crepe-truffle"] {
+  --ink: #3C3530;
+  --ink-soft: #7A6F66;
+  --bg-base: #F5F2EF;
+  --bg-surface: #EBE5DF;
+  --line: rgba(166, 152, 138, 0.3);
+  --accent: #7D6B5D;
+  --accent-alert: #915454;
 }
 
-/* 10. Desert Sand: Terracotta and Beige (Light) */
-:root[data-theme="desert-sand"] {
-  --ink: #7C2D12;
-  --ink-soft: #9A3412;
-  --bg-base: #FFEDD5;
-  --bg-surface: #FED7AA;
-  --line: rgba(234, 88, 12, 0.2);
-  --accent: #EA580C;
-  --accent-alert: #B91C1C;
+/* 10. Chiffon & Mulberry */
+:root[data-theme="chiffon-mulberry"] {
+  --ink: #4D2B36;
+  --ink-soft: #8A5666;
+  --bg-base: #FCF9FA;
+  --bg-surface: #F2E6EA;
+  --line: rgba(181, 128, 145, 0.3);
+  --accent: #8F435C;
+  --accent-alert: #A35B47;
 }
 
-/* 11. Arctic Frost: Ice blue and Slate (Light) */
-:root[data-theme="arctic-frost"] {
-  --ink: #334155;
-  --ink-soft: #475569;
-  --bg-base: #F0F9FF;
-  --bg-surface: #E0F2FE;
-  --line: rgba(56, 189, 248, 0.2);
-  --accent: #0284C7;
-  --accent-alert: #E11D48;
+/* ── Dark Mode Themes (Deep, Rich, High-Contrast) ── */
+/* 11. Onyx & Amber */
+:root[data-theme="onyx-amber"] {
+  --ink: #F0E8D9;
+  --ink-soft: #A69E8C;
+  --bg-base: #111111;
+  --bg-surface: #1E1E1E;
+  --line: rgba(204, 153, 51, 0.2);
+  --accent: #D49A36;
+  --accent-alert: #C75233;
 }
 
-/* 12. Cosmic Latte: Cream and Mocha (Light) */
-:root[data-theme="cosmic-latte"] {
-  --ink: #451A03;
-  --ink-soft: #78350F;
-  --bg-base: #FFFBEB;
-  --bg-surface: #FEF3C7;
-  --line: rgba(217, 119, 6, 0.2);
-  --accent: #D97706;
-  --accent-alert: #DC2626;
+/* 12. Obsidian & Emerald */
+:root[data-theme="obsidian-emerald"] {
+  --ink: #E0F0E8;
+  --ink-soft: #85A394;
+  --bg-base: #0B110E;
+  --bg-surface: #151F1A;
+  --line: rgba(43, 133, 89, 0.3);
+  --accent: #2B8559;
+  --accent-alert: #D1893D;
 }
 
-/* 13. Crimson Twilight: Burgundy and Ash (Dark) */
-:root[data-theme="crimson-twilight"] {
-  --ink: #F3F4F6;
-  --ink-soft: #D1D5DB;
-  --bg-base: #4C0519;
-  --bg-surface: #881337;
-  --line: rgba(225, 29, 72, 0.2);
-  --accent: #E11D48;
-  --accent-alert: #FBBF24;
+/* 13. Carbon & Copper */
+:root[data-theme="carbon-copper"] {
+  --ink: #F2E4DF;
+  --ink-soft: #9E8C85;
+  --bg-base: #141414;
+  --bg-surface: #222222;
+  --line: rgba(184, 115, 81, 0.3);
+  --accent: #B87351;
+  --accent-alert: #C94C4C;
 }
 
-/* 14. Golden Hour: Amber and Charcoal (Dark) */
-:root[data-theme="golden-hour"] {
-  --ink: #FFFDE7;
-  --ink-soft: #FDE047;
-  --bg-base: #27272A;
-  --bg-surface: #3F3F46;
-  --line: rgba(250, 204, 21, 0.2);
-  --accent: #FACC15;
-  --accent-alert: #EF4444;
+/* 14. Velvet Navy & Platinum */
+:root[data-theme="navy-platinum"] {
+  --ink: #EAECEF;
+  --ink-soft: #8D99A8;
+  --bg-base: #0A111F;
+  --bg-surface: #131E32;
+  --line: rgba(154, 173, 196, 0.2);
+  --accent: #879BBB;
+  --accent-alert: #D16D6D;
 }
 
-/* 15. Lavender Dream: Soft purple and White (Light) */
-:root[data-theme="lavender-dream"] {
-  --ink: #4C1D95;
-  --ink-soft: #6D28D9;
-  --bg-base: #FAF5FF;
-  --bg-surface: #F3E8FF;
-  --line: rgba(168, 85, 247, 0.2);
-  --accent: #9333EA;
-  --accent-alert: #E11D48;
+/* 15. Matte Black & Ruby */
+:root[data-theme="black-ruby"] {
+  --ink: #F2E3E5;
+  --ink-soft: #A38C8F;
+  --bg-base: #0F0F0F;
+  --bg-surface: #1A1A1A;
+  --line: rgba(163, 49, 64, 0.3);
+  --accent: #A33140;
+  --accent-alert: #CC7A43;
 }
 
-/* 16. Emerald City: Vibrant green and Dark grey (Dark) */
-:root[data-theme="emerald-city"] {
-  --ink: #ECFDF5;
-  --ink-soft: #A7F3D0;
-  --bg-base: #18181B;
-  --bg-surface: #27272A;
-  --line: rgba(16, 185, 129, 0.2);
-  --accent: #10B981;
-  --accent-alert: #F43F5E;
+/* 16. Graphite & Champagne */
+:root[data-theme="graphite-champagne"] {
+  --ink: #F0EDE4;
+  --ink-soft: #A8A393;
+  --bg-base: #1B1D1F;
+  --bg-surface: #292C2F;
+  --line: rgba(201, 185, 143, 0.2);
+  --accent: #BFA873;
+  --accent-alert: #C46C6C;
 }
 
-/* 17. Coral Reef: Coral and Sand (Light) */
-:root[data-theme="coral-reef"] {
-  --ink: #881337;
-  --ink-soft: #9F1239;
-  --bg-base: #FFF1F2;
-  --bg-surface: #FFE4E6;
-  --line: rgba(244, 63, 94, 0.2);
-  --accent: #F43F5E;
-  --accent-alert: #B91C1C;
+/* 17. Midnight & Indigo */
+:root[data-theme="midnight-indigo"] {
+  --ink: #E6E8F2;
+  --ink-soft: #8A92B8;
+  --bg-base: #070914;
+  --bg-surface: #111429;
+  --line: rgba(79, 93, 168, 0.3);
+  --accent: #4F5DA8;
+  --accent-alert: #A85A82;
 }
 
-/* 18. Obsidian Edge: Jet black and Neon cyan (Dark) */
-:root[data-theme="obsidian-edge"] {
-  --ink: #E0F2FE;
-  --ink-soft: #7DD3FC;
-  --bg-base: #000000;
-  --bg-surface: #0F172A;
-  --line: rgba(6, 182, 212, 0.3);
-  --accent: #06B6D4;
-  --accent-alert: #F43F5E;
+/* 18. Charcoal & Terracotta */
+:root[data-theme="charcoal-terracotta"] {
+  --ink: #F2EBE9;
+  --ink-soft: #A89B96;
+  --bg-base: #1F1F1F;
+  --bg-surface: #2E2D2D;
+  --line: rgba(189, 107, 85, 0.3);
+  --accent: #BD6B55;
+  --accent-alert: #BAA55D;
 }
 
-/* 19. Matcha Calm: Matcha green and Espresso (Light) */
-:root[data-theme="matcha-calm"] {
-  --ink: #291D16;
-  --ink-soft: #5C4A3E;
-  --bg-base: #F4F6F0;
-  --bg-surface: #E8EDE1;
-  --line: rgba(135, 153, 119, 0.2);
-  --accent: #6C8059;
-  --accent-alert: #C9665B;
+/* 19. Gunmetal & Sapphire */
+:root[data-theme="gunmetal-sapphire"] {
+  --ink: #E0EBF2;
+  --ink-soft: #7C98A8;
+  --bg-base: #14181C;
+  --bg-surface: #21262B;
+  --line: rgba(43, 107, 153, 0.3);
+  --accent: #2B6B99;
+  --accent-alert: #993B4E;
 }
 
-/* 20. Sakura Bloom: Cherry blossom pink and Rosewood (Light) */
-:root[data-theme="sakura-bloom"] {
-  --ink: #5C2A3C;
-  --ink-soft: #8A465B;
-  --bg-base: #FFF5F7;
-  --bg-surface: #FDE8ED;
-  --line: rgba(242, 160, 184, 0.3);
-  --accent: #D65A7C;
-  --accent-alert: #B02345;
+/* 20. Eclipse & Amethyst */
+:root[data-theme="eclipse-amethyst"] {
+  --ink: #F0E8F2;
+  --ink-soft: #A28DA8;
+  --bg-base: #0E0A12;
+  --bg-surface: #1A1321;
+  --line: rgba(142, 93, 166, 0.3);
+  --accent: #8E5DA6;
+  --accent-alert: #5D9EA6;
 }
 
 body {
@@ -1046,6 +1048,21 @@ body {
   font-weight: 600;
   color: var(--accent);
   background: rgba(128,128,128,0.05);
+}
+.theme-category {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  padding: 12px 12px 4px 12px;
+  user-select: none;
+}
+.theme-divider {
+  height: 1px;
+  background-color: var(--line);
+  margin: 4px 0;
 }
 
 .msg-actions {
