@@ -124,12 +124,24 @@ def _sync_update_summary(session_id: str, new_summary: str):
             db.commit()
 
 
-def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None) -> dict | None:
+def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None, my_generation: int, turn_generation_ref: dict) -> dict | None:
     with SessionLocal() as db:
         conversation = db.query(Conversation).filter_by(session_id=session_id).first()
         if not conversation:
             return None
-            
+
+        # Race-proof guard: don't write anything if a follow-up message has
+        # already superseded this turn (see turn_generation's declaration
+        # in customer_websocket for the full reasoning). This check has to
+        # live HERE — inside the worker thread, before any write — because
+        # asyncio-level task cancellation of the calling coroutine cannot
+        # stop this synchronous function once it's already running in a
+        # thread pool worker (Python threads aren't preemptible). Checking
+        # only at the asyncio layer would leave a narrow window where a
+        # stale reply gets permanently committed anyway.
+        if turn_generation_ref["value"] != my_generation:
+            return None
+
         if updated_state:
             conversation.active_topic = updated_state.get("active_topic")
             conversation.last_order_id = updated_state.get("last_order_id")
@@ -226,7 +238,7 @@ def _sync_agent_reply(session_id: str, username: str, reply_text: str, is_intern
 # --- END SYNC WRAPPERS ---
 
 
-TYPING_STOPPED_GRACE_SECONDS = 1.0
+TYPING_STOPPED_GRACE_SECONDS = 1.5
 # Once the customer's typing indicator says they've stopped (or a message
 # arrives with no typing signal at all — e.g. paste-and-send), wait this
 # long before actually processing. If nothing else happens in that window,
@@ -280,7 +292,31 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
     latest_phase1_data: dict | None = None
     is_typing = False
 
-    async def _run_ai_turn(phase1_data: dict):
+    # --- Mid-turn interrupt/merge state ---
+    # current_turn_task: the AI turn currently in flight, if any. Checked
+    # by the receive loop to decide whether an incoming message should
+    # interrupt-and-merge (see below) instead of going through the normal
+    # pre-turn debounce.
+    current_turn_task: asyncio.Task | None = None
+    # turn_generation: a plain dict (not a bare int) so it can be read
+    # consistently from both this coroutine and the worker thread
+    # _sync_phase3 runs in — a simple counter comparison like this is safe
+    # under the GIL without needing an explicit lock. This is the ONLY
+    # reliable way to guarantee a superseded turn's reply never gets
+    # written, even in the narrow race where cancellation lands exactly
+    # while _sync_phase3's DB write is already running in a thread pool
+    # worker (asyncio can't preempt an already-started synchronous call).
+    turn_generation = {"value": 0}
+    # mid_turn_typing_event: deliberately SEPARATE from pending_event.
+    # pending_event is consumed by _debounce_worker's own pre-turn wait
+    # loop; if the in-turn "hold before committing a reply" logic below
+    # shared that same event, the two waiters would race for the same
+    # wakeup and could steal ticks from each other. Both get set together
+    # on every typing/stopped_typing signal, but each has its own
+    # independent waiter.
+    mid_turn_typing_event = asyncio.Event()
+
+    async def _run_ai_turn(phase1_data: dict, my_generation: int):
         """Everything that used to run immediately after phase1 for a single
         message now runs once per debounce-settled batch, using the most
         up-to-date phase1 snapshot — which already reflects every message
@@ -335,6 +371,39 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
         phase2_duration = time.time() - phase2_start
         logger.info(f"[TIMING] Phase 2 (AI Graph Execution) took {phase2_duration:.3f}s")
 
+        # Give a currently-typing customer a brief moment before committing
+        # this reply, in case they're about to send a follow-up that
+        # should be merged in instead of receiving two separate answers.
+        # If they actually send something, the receive loop cancels this
+        # whole turn (see below) and this wait raises CancelledError,
+        # which propagates normally — no special handling needed here. If
+        # they stop typing without sending anything, this releases the
+        # reply exactly as if nothing happened. If nobody was typing when
+        # the reply became ready (the common case), this adds zero delay.
+        if is_typing:
+            hold_deadline = time.time() + TYPING_STOPPED_GRACE_SECONDS
+            while is_typing:
+                remaining = hold_deadline - time.time()
+                if remaining <= 0:
+                    break
+                try:
+                    await asyncio.wait_for(mid_turn_typing_event.wait(), timeout=remaining)
+                    mid_turn_typing_event.clear()
+                except asyncio.TimeoutError:
+                    break
+
+        # Defense-in-depth: cancellation should normally have already
+        # stopped a superseded turn before it gets here. This only matters
+        # if a follow-up message landed in the narrow window between the
+        # hold-wait above resolving and this line. The REAL guarantee
+        # against a stale reply being written is the matching check inside
+        # _sync_phase3 itself (see its comment) — this one just avoids
+        # doing the belt-and-suspenders connection check and the DB call
+        # at all when we already know we've been superseded.
+        if my_generation != turn_generation["value"]:
+            logger.info(f"Dropping AI turn for {session_id}: superseded by a merged follow-up.")
+            return
+
         # Belt-and-suspenders check: connect_customer() cancels a superseded
         # connection's debounce task, which should stop this turn before it
         # gets here — but that cancellation only takes effect at the next
@@ -348,7 +417,9 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
 
         # Phase 3: Post-processing & DB Save
         phase3_start = time.time()
-        phase3_data = await asyncio.to_thread(_sync_phase3, session_id, reply_text, updated_state)
+        phase3_data = await asyncio.to_thread(
+            _sync_phase3, session_id, reply_text, updated_state, my_generation, turn_generation
+        )
         if not phase3_data:
             return
 
@@ -378,6 +449,23 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
 
         total_time = time.time() - msg_start_time
         logger.info(f"[TIMING] Total Message Turnaround Time: {total_time:.3f}s")
+
+    async def _run_ai_turn_safe(phase1_data: dict, my_generation: int):
+        try:
+            await _run_ai_turn(phase1_data, my_generation)
+        except asyncio.CancelledError:
+            logger.info(f"AI turn for {session_id} cancelled (superseded by a merged follow-up).")
+            raise
+        except Exception as e:
+            logger.error(f"Error processing AI turn for {session_id}: {e}", exc_info=True)
+
+    def _start_turn(phase1_data: dict) -> asyncio.Task:
+        nonlocal current_turn_task
+        turn_generation["value"] += 1
+        my_generation = turn_generation["value"]
+        task = asyncio.create_task(_run_ai_turn_safe(phase1_data, my_generation))
+        current_turn_task = task
+        return task
 
     async def _wait_until_quiet():
         """Blocks until it's genuinely safe to process: the customer isn't
@@ -434,10 +522,16 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
                 continue
 
             phase1_data, latest_phase1_data = latest_phase1_data, None
+            task = _start_turn(phase1_data)
             try:
-                await _run_ai_turn(phase1_data)
-            except Exception as e:
-                logger.error(f"Error processing debounced AI turn for {session_id}: {e}", exc_info=True)
+                await task
+            except asyncio.CancelledError:
+                # A follow-up message arrived while this turn was still in
+                # flight and superseded it (see the interrupt-and-merge
+                # branch in the receive loop below). The replacement turn
+                # is already running independently via its own _start_turn
+                # call — nothing more to do here, just loop back around.
+                pass
 
     debounce_worker_task = asyncio.create_task(_debounce_worker())
     manager.register_customer_debounce_task(session_id, debounce_worker_task)
@@ -468,6 +562,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
                     "session_id": session_id,
                 }))
                 pending_event.set()
+                mid_turn_typing_event.set()
                 continue
 
             customer_text = data.get("message")
@@ -482,6 +577,24 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             customer_text = await transcribe_audio_if_present(customer_text)
 
             logger.info(f"Received message from customer {session_id}: {mask_pii(customer_text)}")
+
+            # If a turn is already in flight for this conversation, cancel
+            # it and restart immediately with the freshest data (fetched
+            # just below via Phase 1, which always returns the FULL
+            # up-to-date history) instead of going through the normal
+            # quiet-period debounce. The customer already showed clear
+            # intent by finishing and sending this message, so there's no
+            # reason to make them wait further, and this produces exactly
+            # ONE fully-informed reply instead of a stale one followed by a
+            # corrected one. The cancelled turn's reply — whether it was
+            # still generating or already sitting in the "hold, in case a
+            # follow-up is coming" wait — is discarded entirely; nothing
+            # from it is reused, only the plain conversation history (which
+            # naturally includes both the old and new customer messages as
+            # separate turns, exactly as they were sent) feeds the fresh one.
+            interrupting_inflight_turn = current_turn_task is not None and not current_turn_task.done()
+            if interrupting_inflight_turn:
+                current_turn_task.cancel()
 
             # A message arriving always means typing has effectively ended
             # for debounce purposes, even if stopped_typing hasn't fired yet
@@ -542,10 +655,17 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
                 }))
                 logger.info(f"[TIMING] broadcast_to_agents (reopen) dispatched in {time.time() - _t0:.3f}s")
 
-            # Hand off to the debounce worker instead of processing the AI
-            # turn immediately — it'll fire once the customer actually pauses.
-            latest_phase1_data = phase1_data
-            pending_event.set()
+            # Hand off appropriately: if we just interrupted an in-flight
+            # turn above, restart immediately with this fresh data (no
+            # additional debounce wait — the customer already completed
+            # and sent a message, so there's nothing left to wait for).
+            # Otherwise, defer to the normal debounce worker as before —
+            # it'll fire once the customer actually pauses.
+            if interrupting_inflight_turn:
+                _start_turn(phase1_data)
+            else:
+                latest_phase1_data = phase1_data
+                pending_event.set()
 
     except WebSocketDisconnect:
         logger.info(f"Customer disconnected: {session_id}")
@@ -555,6 +675,8 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
         manager.disconnect_customer(session_id, websocket)
     finally:
         debounce_worker_task.cancel()
+        if current_turn_task is not None and not current_turn_task.done():
+            current_turn_task.cancel()
 
 
 @router.websocket("/ws/agent")
