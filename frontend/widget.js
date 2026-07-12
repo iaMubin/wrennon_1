@@ -1,8 +1,8 @@
 // ── Backend URL detection ──────────────────────────────────────────
 const _RENDER_HOST = "wrennon-backend.onrender.com";
 const _IS_LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.protocol === "file:";
-const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/api`;
-const WS_URL  = `${_IS_LOCAL ? "ws"   : "wss"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/ws/customer`;
+const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "127.0.0.1:8000" : _RENDER_HOST}/api`;
+const WS_URL  = `${_IS_LOCAL ? "ws"   : "wss"}://${_IS_LOCAL ? "127.0.0.1:8000" : _RENDER_HOST}/ws/customer`;
 
 const STORAGE_KEY = "wrennon_session_id";
 const TOKEN_KEY = "wrennon_session_token";
@@ -129,8 +129,16 @@ setupThemeDropdown();
 // their conversation after page refresh (within the 72-hour window).
 
 async function resolveSessionId() {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  const storedToken = localStorage.getItem(TOKEN_KEY);
+  let stored = localStorage.getItem(STORAGE_KEY);
+  let storedToken = localStorage.getItem(TOKEN_KEY);
+
+  // Safeguard against literal "null" strings from past bugs
+  if (stored === "null" || storedToken === "null") {
+    stored = null;
+    storedToken = null;
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+  }
 
   if (stored && storedToken) {
     try {

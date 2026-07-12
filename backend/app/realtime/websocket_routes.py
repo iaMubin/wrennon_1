@@ -116,6 +116,45 @@ def _sync_phase1(session_id: str, customer_text: str) -> dict | None:
         }
 
 
+def _sync_fetch_conversation_snapshot(session_id: str) -> dict | None:
+    """Read-only counterpart to _sync_phase1 — no write. Used to get one
+    fresh, authoritative read of the full conversation right before a turn
+    actually starts, after waiting for all in-flight Phase 1 writes for
+    this session to complete. This is what makes concurrent (not
+    serialized) Phase 1 writes safe: instead of trusting whichever write's
+    own returned snapshot happens to be, we always take one clean read
+    once everything dispatched so far is guaranteed committed."""
+    with SessionLocal() as db:
+        conversation = db.query(Conversation).filter_by(session_id=session_id).first()
+        if not conversation:
+            return None
+
+        messages_data = []
+        if not (conversation.handoff_active and not conversation.resolved):
+            prev_messages = (
+                db.query(Message)
+                .filter_by(conversation_id=conversation.id)
+                .order_by(Message.created_at.asc())
+                .all()
+            )
+            messages_data = [
+                {"sender": m.sender, "content": m.content}
+                for m in prev_messages
+                if m.sender != "system"
+            ]
+
+        return {
+            "handoff_active": conversation.handoff_active,
+            "customer_email": conversation.customer_email,
+            "handoff_ticket_id": conversation.handoff_ticket_id,
+            "summary": conversation.summary,
+            "active_topic": conversation.active_topic,
+            "last_order_id": conversation.last_order_id,
+            "turn_count": conversation.turn_count,
+            "messages": messages_data,
+        }
+
+
 def _sync_update_summary(session_id: str, new_summary: str):
     with SessionLocal() as db:
         conv = db.query(Conversation).filter_by(session_id=session_id).first()
@@ -291,7 +330,10 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
     # no shared/global dict needed, since one customer_websocket() coroutine
     # already exists per connection.
     pending_event = asyncio.Event()
-    latest_phase1_data: dict | None = None
+    has_pending_message = False
+    # Whether a real customer message (not just a typing signal) has come
+    # in since the last turn started — checked by _debounce_worker so it
+    # doesn't start a turn on bare typing noise with nothing to process.
     is_typing = False
 
     # --- Mid-turn interrupt/merge state ---
@@ -318,13 +360,88 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
     # independent waiter.
     mid_turn_typing_event = asyncio.Event()
 
-    async def _run_ai_turn(phase1_data: dict, my_generation: int):
-        """Everything that used to run immediately after phase1 for a single
-        message now runs once per debounce-settled batch, using the most
-        up-to-date phase1 snapshot — which already reflects every message
-        the customer sent during the quiet window, since each one was saved
-        to the DB (and broadcast to agents) as soon as it arrived."""
+    # --- Phase 1 (DB save) writes ---
+    # Dispatched CONCURRENTLY per message (not serialized through a single
+    # worker — an earlier version of this fix tried that, and it just
+    # moved the same 2-3+ second blocking problem one step over: since a
+    # single worker processes one write at a time, a second message's
+    # write wouldn't even START until the first one's ~2.3s write
+    # finished, so the debounce/interrupt logic still fired using only the
+    # first message's data). Each write still fully completes and commits
+    # normally; what changes is that the receive loop and the
+    # debounce/interrupt decision no longer wait for it — see
+    # _get_fresh_phase1_data() below for how a turn always gets a
+    # complete, correct picture regardless of write-completion order.
+    pending_write_tasks: list[asyncio.Task] = []
+
+    async def _write_and_broadcast(customer_text: str) -> None:
+        """Fire-and-forget per-message DB write + agent-dashboard
+        broadcast. Runs independently of the debounce/turn logic — a
+        turn never reads from this function's return value directly, only
+        from _get_fresh_phase1_data()'s own separate read."""
+        phase1_start = time.time()
+        phase1_data = await asyncio.to_thread(_sync_phase1, session_id, customer_text)
+        if not phase1_data:
+            return
+        logger.info(f"[TIMING] Phase 1 (DB Pre-processing) took {time.time() - phase1_start:.3f}s")
+
+        _t0 = time.time()
+        asyncio.create_task(manager.broadcast_to_agents({
+            "type": "new_message",
+            "session_id": session_id,
+            "sender": "human",
+            "content": customer_text,
+            "is_resolved": phase1_data["resolved"],
+            "message_id": phase1_data["message_id"]
+        }))
+        logger.info(f"[TIMING] broadcast_to_agents (human msg) dispatched in {time.time() - _t0:.3f}s")
+
+        if phase1_data["reopened"]:
+            _t0 = time.time()
+            asyncio.create_task(manager.broadcast_to_agents({
+                "type": "reopen",
+                "session_id": session_id,
+                "reopen_count": phase1_data["reopen_count"],
+                "is_resolved": phase1_data["resolved"],
+            }))
+            logger.info(f"[TIMING] broadcast_to_agents (reopen) dispatched in {time.time() - _t0:.3f}s")
+
+    async def _get_fresh_phase1_data() -> dict | None:
+        """Waits for every Phase 1 write dispatched so far to actually
+        commit, THEN takes one clean, authoritative read of the full
+        conversation. This is what makes concurrent (not serialized)
+        writes safe: we never trust any individual write's own returned
+        snapshot for deciding what a turn should see, since concurrent
+        writes can finish in a different order than they were sent.
+
+        Wrapped in asyncio.shield(): this function runs as the first step
+        of _run_ai_turn, which can itself get cancelled (a follow-up
+        message superseding this turn). Without shield(), that
+        cancellation would propagate into gather() and cancel the
+        still-running write tasks themselves — losing a customer's message
+        entirely. shield() ensures a cancelled turn only abandons its own
+        progress; every dispatched write always completes and commits
+        regardless of what happens to the turn that was waiting on it."""
+        nonlocal pending_write_tasks
+        if pending_write_tasks:
+            tasks, pending_write_tasks = pending_write_tasks, []
+            await asyncio.shield(asyncio.gather(*tasks, return_exceptions=True))
+        return await asyncio.to_thread(_sync_fetch_conversation_snapshot, session_id)
+
+    async def _run_ai_turn(my_generation: int):
+        """Fetches a fresh, authoritative snapshot of the conversation as
+        its very first step (see _get_fresh_phase1_data) — this happens
+        INSIDE the task current_turn_task points to, not before creating
+        it, specifically so that a message arriving during this wait is
+        still correctly seen as "a turn is in flight" and triggers
+        cancel-and-restart, rather than being missed because the task
+        object didn't exist yet."""
         msg_start_time = time.time()
+
+        phase1_data = await _get_fresh_phase1_data()
+        if phase1_data is None or phase1_data.get("handoff_active"):
+            return
+
         customer_text = phase1_data["messages"][-1]["content"] if phase1_data["messages"] else ""
 
         state = initial_state(customer_email=phase1_data["customer_email"])
@@ -452,20 +569,20 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
         total_time = time.time() - msg_start_time
         logger.info(f"[TIMING] Total Message Turnaround Time: {total_time:.3f}s")
 
-    async def _run_ai_turn_safe(phase1_data: dict, my_generation: int):
+    async def _run_ai_turn_safe(my_generation: int):
         try:
-            await _run_ai_turn(phase1_data, my_generation)
+            await _run_ai_turn(my_generation)
         except asyncio.CancelledError:
             logger.info(f"AI turn for {session_id} cancelled (superseded by a merged follow-up).")
             raise
         except Exception as e:
             logger.error(f"Error processing AI turn for {session_id}: {e}", exc_info=True)
 
-    def _start_turn(phase1_data: dict) -> asyncio.Task:
+    def _start_turn() -> asyncio.Task:
         nonlocal current_turn_task
         turn_generation["value"] += 1
         my_generation = turn_generation["value"]
-        task = asyncio.create_task(_run_ai_turn_safe(phase1_data, my_generation))
+        task = asyncio.create_task(_run_ai_turn_safe(my_generation))
         current_turn_task = task
         return task
 
@@ -505,26 +622,25 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
                     return  # genuinely quiet
 
     async def _debounce_worker():
-        nonlocal latest_phase1_data
+        nonlocal has_pending_message
         while True:
             await pending_event.wait()
             pending_event.clear()
 
             await _wait_until_quiet()
 
-            if latest_phase1_data is None:
+            if not has_pending_message:
                 continue
+            has_pending_message = False
 
             # Re-check handoff status right before firing — a human agent
             # may have claimed the conversation during the wait window,
             # even though it wasn't claimed when the last message arrived.
             recheck = await asyncio.to_thread(_sync_setup_conversation, session_id)
             if recheck["handoff_active"]:
-                latest_phase1_data = None
                 continue
 
-            phase1_data, latest_phase1_data = latest_phase1_data, None
-            task = _start_turn(phase1_data)
+            task = _start_turn()
             try:
                 await task
             except asyncio.CancelledError:
@@ -583,20 +699,9 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
 
             logger.info(f"Received message from customer {session_id}: {mask_pii(customer_text)}")
 
-            # If a turn is already in flight for this conversation, cancel
-            # it and restart immediately with the freshest data (fetched
-            # just below via Phase 1, which always returns the FULL
-            # up-to-date history) instead of going through the normal
-            # quiet-period debounce. The customer already showed clear
-            # intent by finishing and sending this message, so there's no
-            # reason to make them wait further, and this produces exactly
-            # ONE fully-informed reply instead of a stale one followed by a
-            # corrected one. The cancelled turn's reply — whether it was
-            # still generating or already sitting in the "hold, in case a
-            # follow-up is coming" wait — is discarded entirely; nothing
-            # from it is reused, only the plain conversation history (which
-            # naturally includes both the old and new customer messages as
-            # separate turns, exactly as they were sent) feeds the fresh one.
+            # Cancel any in-flight turn immediately — before this message's
+            # own Phase 1 DB write even starts — so the loop never has to
+            # "hear" this decision late.
             interrupting_inflight_turn = current_turn_task is not None and not current_turn_task.done()
             if interrupting_inflight_turn:
                 current_turn_task.cancel()
@@ -625,51 +730,20 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             except Exception as e:
                 logger.error(f"Rate limiting error: {e}")
 
-            # Phase 1: Pre-processing & DB Save — unchanged, still runs
-            # immediately per raw message so agents see live messages as
-            # they're typed.
-            phase1_start = time.time()
-            phase1_data = await asyncio.to_thread(_sync_phase1, session_id, customer_text)
-            if not phase1_data:
-                continue
-            logger.info(f"[TIMING] Phase 1 (DB Pre-processing) took {time.time() - phase1_start:.3f}s")
+            # Dispatch this message's DB write CONCURRENTLY — not queued
+            # behind any other message's write — so the receive loop stays
+            # free to react to the NEXT signal immediately, regardless of
+            # how long Phase 1 takes. _get_fresh_phase1_data() (called
+            # right before any turn actually starts) waits for every write
+            # dispatched so far and then takes one clean, authoritative
+            # read — so no message can ever be missed by a turn, no matter
+            # how writes happen to finish relative to each other.
+            pending_write_tasks.append(asyncio.create_task(_write_and_broadcast(customer_text)))
+            has_pending_message = True
 
-            # Broadcast ALL customer messages to the agent dashboard for real-time sync in background.
-            _t0 = time.time()
-            asyncio.create_task(manager.broadcast_to_agents({
-                "type": "new_message",
-                "session_id": session_id,
-                "sender": "human",
-                "content": customer_text,
-                "is_resolved": phase1_data["resolved"],
-                "message_id": phase1_data["message_id"]
-            }))
-            logger.info(f"[TIMING] broadcast_to_agents (human msg) dispatched in {time.time() - _t0:.3f}s")
-
-            if phase1_data.get("handoff_active"):
-                # A human agent already owns this conversation — the AI stays silent.
-                continue
-
-            if phase1_data["reopened"]:
-                _t0 = time.time()
-                asyncio.create_task(manager.broadcast_to_agents({
-                    "type": "reopen",
-                    "session_id": session_id,
-                    "reopen_count": phase1_data["reopen_count"],
-                    "is_resolved": phase1_data["resolved"],
-                }))
-                logger.info(f"[TIMING] broadcast_to_agents (reopen) dispatched in {time.time() - _t0:.3f}s")
-
-            # Hand off appropriately: if we just interrupted an in-flight
-            # turn above, restart immediately with this fresh data (no
-            # additional debounce wait — the customer already completed
-            # and sent a message, so there's nothing left to wait for).
-            # Otherwise, defer to the normal debounce worker as before —
-            # it'll fire once the customer actually pauses.
             if interrupting_inflight_turn:
-                _start_turn(phase1_data)
+                _start_turn()
             else:
-                latest_phase1_data = phase1_data
                 pending_event.set()
 
     except WebSocketDisconnect:
