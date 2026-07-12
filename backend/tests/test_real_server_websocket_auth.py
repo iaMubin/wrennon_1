@@ -53,6 +53,14 @@ def live_server():
     env = os.environ.copy()
     env["DATABASE_URL"] = "sqlite:///./real_server_test.db"
 
+    # Clean up stale DBs from previous failed runs before starting
+    for f in ("real_server_test.db", "real_server_test.db-shm", "real_server_test.db-wal"):
+        if os.path.exists(f):
+            try:
+                os.remove(f)
+            except OSError:
+                pass
+
     # Run migrations against this dedicated DB before starting the server
     subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
