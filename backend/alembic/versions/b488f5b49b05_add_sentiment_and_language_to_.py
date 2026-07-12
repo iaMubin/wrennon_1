@@ -20,8 +20,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    op.add_column('conversations', sa.Column('sentiment', sa.String(), nullable=True))
-    op.add_column('conversations', sa.Column('language', sa.String(), nullable=True))
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col['name'] for col in inspector.get_columns('conversations')]
+    
+    if 'sentiment' not in columns:
+        op.add_column('conversations', sa.Column('sentiment', sa.String(), nullable=True))
+    if 'language' not in columns:
+        op.add_column('conversations', sa.Column('language', sa.String(), nullable=True))
     # ### end Alembic commands ###
 
 
