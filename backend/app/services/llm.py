@@ -266,7 +266,7 @@ async def generate_conversation_summary(messages: list, escalation_reason: str |
         "Do NOT act as the customer support bot.\n\n"
         "Format your response as a list of key-value pairs (e.g., • **Issue**: ...). "
         "Do NOT include the word 'Summary' at the top. Only use headings that are contextually relevant (e.g., Issue, Status). "
-        "Do NOT include a 'Suggestion' heading unless you have a highly specific and actionable recommendation for the agent based on the conversation.\n\n"
+        "You MUST include a '**Macro Suggestion**' heading that provides a clear, draft response or action plan for the human agent to take. This acts as an Agent Copilot.\n\n"
     )
 
     if escalation_reason:

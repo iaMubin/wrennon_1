@@ -186,6 +186,7 @@ def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None, m
             conversation.last_order_id = updated_state.get("last_order_id")
             conversation.turn_count = updated_state.get("turn_count", conversation.turn_count) + 1
             conversation.sentiment = updated_state.get("sentiment")
+            conversation.intent_category = updated_state.get("intent_category")
             conversation.language = updated_state.get("language")
 
         msg = _save_message(db, conversation.id, sender="ai", content=reply_text)
@@ -375,10 +376,27 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
     pending_write_tasks: list[asyncio.Task] = []
 
     async def _write_and_broadcast(customer_text: str) -> None:
-        """Fire-and-forget per-message DB write + agent-dashboard
-        broadcast. Runs independently of the debounce/turn logic — a
-        turn never reads from this function's return value directly, only
-        from _get_fresh_phase1_data()'s own separate read."""
+        """Fire-and-forget per-message transcribe/translate + DB write +
+        agent-dashboard broadcast. Runs independently of the debounce/turn
+        logic — a turn never reads from this function's return value
+        directly, only from _get_fresh_phase1_data()'s own separate read.
+
+        Transcription and translation both moved HERE (off the main
+        receive loop) because both can make their own LLM call, which
+        reintroduces the exact same blocking bug Phase 1 had: an inline
+        `await` in the receive loop stalls it for however long that call
+        takes (0.5-15+s under rate limiting), during which the loop can't
+        hear the next typing signal or message at all — for the SAME
+        reason a slow Phase 1 write used to break multi-message merging.
+        The raw, untranslated text is still used immediately for the
+        interrupt-check and cancellation decision (see the receive loop
+        below); only the DB-write/broadcast content is enriched here,
+        asynchronously, off that critical path.
+        """
+        customer_text = await transcribe_audio_if_present(customer_text)
+        # Auto-translate is temporarily disabled to save LLM calls.
+        # customer_text = await auto_translate_if_needed(customer_text)
+
         phase1_start = time.time()
         phase1_data = await asyncio.to_thread(_sync_phase1, session_id, customer_text)
         if not phase1_data:
@@ -668,11 +686,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
         while True:
             data = await websocket.receive_json()
 
-            # Real-time typing signal from the customer. This drives the
-            # debounce logic in _wait_until_quiet() directly, and is also
-            # relayed to the agent dashboard so a human agent can see
-            # "customer is typing" too, exactly like the existing
-            # agent -> customer typing indicator, just in reverse.
+            # Real-time typing signal from the customer.
             if data.get("type") in ("typing", "stopped_typing"):
                 is_typing = data["type"] == "typing"
                 asyncio.create_task(manager.broadcast_to_agents({
@@ -682,22 +696,22 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
                 pending_event.set()
                 mid_turn_typing_event.set()
                 continue
+                
+            if data.get("type") == "page_event":
+                event_name = data.get("event")
+                context = data.get("context", "")
+                customer_text = f"[SYSTEM_EVENT: {event_name}] {context}"
+                logger.info(f"Received page_event for customer {session_id}: {customer_text}")
+            else:
+                customer_text = data.get("message")
+                if not customer_text:
+                    continue
 
-            customer_text = data.get("message")
-            if not customer_text:
-                continue
+                if len(customer_text) > 2000:
+                    logger.warning(f"Message from {session_id} exceeded max length. Truncating.")
+                    customer_text = customer_text[:2000]
 
-            if len(customer_text) > 2000:
-                logger.warning(f"Message from {session_id} exceeded max length. Truncating.")
-                customer_text = customer_text[:2000]
-
-            # Check for audio and transcribe it
-            customer_text = await transcribe_audio_if_present(customer_text)
-
-            # Auto-translate if not English (for the Agent Console)
-            customer_text = await auto_translate_if_needed(customer_text)
-
-            logger.info(f"Received message from customer {session_id}: {mask_pii(customer_text)}")
+                logger.info(f"Received message from customer {session_id}: {mask_pii(customer_text)}")
 
             # Cancel any in-flight turn immediately — before this message's
             # own Phase 1 DB write even starts — so the loop never has to

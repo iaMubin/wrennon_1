@@ -42,18 +42,21 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
 
     system_instruction = SYSTEM_INSTRUCTION
 
-    if state.get("conversation_mode") == "resolved":
+    if state.get("conversation_mode") == "resolved" and not state.get("resolution_logged"):
+        # The AI successfully closed the conversation on its own.
+        from app.services.analytics import log_resolution, log_revenue
+        log_resolution(
+            was_autonomous=True,
+            intent=state.get("intent_category"),
+            sentiment=state.get("sentiment")
+        )
+        if state.get("revenue_generated"):
+            log_revenue(state["revenue_generated"])
+        state["resolution_logged"] = True
         system_instruction += (
             "\nThis conversation is being closed at the customer's request. Give a short, "
             "warm closing message and do not ask if they need anything else."
         )
-        if not state.get("resolution_logged"):
-            from app.services.analytics import log_resolution, log_revenue
-            if not state.get("handoff_requested"):
-                log_resolution(was_autonomous=True)
-            if state.get("revenue_generated"):
-                log_revenue(state["revenue_generated"])
-            state["resolution_logged"] = True
 
     context_parts = []
 

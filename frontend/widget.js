@@ -791,26 +791,25 @@ let proactiveTriggered = false;
 setTimeout(() => {
     if (!proactiveTriggered && panel.classList.contains("hidden")) {
         proactiveTriggered = true;
-        // Check if there are already messages in history
         const history = getLocalHistory();
         if (history.length === 0) {
-            panel.classList.remove("hidden");
-            clearUnreadIndicator();
-            scrollToBottom(true);
+            // We want the backend to trigger a proactive message
             if (!hasLoadedHistory) {
                 resolveSessionId().then(() => {
                     loadHistory().then(() => {
                         connectSocket();
                         hasLoadedHistory = true;
-                        
-                        // Wait a bit, then show a proactive message
                         setTimeout(() => {
-                            appendMessage("bot", "Hi! I noticed you've been here a while. How can I assist you today?", true, Date.now(), "AI Assistant");
+                            if (socket && socket.readyState === WebSocket.OPEN) {
+                                socket.send(JSON.stringify({ type: "page_event", event: "page_stall", context: "User has been on the storefront for 12 seconds without interaction." }));
+                            }
                         }, 500);
                     });
                 });
             } else {
-                appendMessage("bot", "Hi! I noticed you've been here a while. How can I assist you today?", true, Date.now(), "AI Assistant");
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({ type: "page_event", event: "page_stall", context: "User has been on the storefront for 12 seconds without interaction." }));
+                }
             }
         }
     }

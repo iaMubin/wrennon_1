@@ -17,6 +17,8 @@
   --radius: 4px;
   --radius-sm: 2px;
   --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 :root[data-theme="light"] {
@@ -27,6 +29,8 @@
   --line: rgba(168, 90, 50, 0.15);
   --accent: #A85A32;
   --accent-alert: #D97706;
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 :root[data-theme="dark"] {
@@ -38,6 +42,8 @@
   --accent: #D4A373;
   --accent-glow: rgba(212, 163, 115, 0.15);
   --accent-alert: #D4A373;
+  --accent-warning: #F59E0B;
+  --accent-success: #10B981;
 }
 
 /* ── Light Mode Themes (Muted, Elegant, Crisp) ── */
@@ -50,6 +56,8 @@
   --line: rgba(200, 182, 166, 0.3);
   --accent: #B8977E;
   --accent-alert: #C77D7D;
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 /* 2. Cashmere & Sage */
@@ -61,6 +69,8 @@
   --line: rgba(163, 171, 143, 0.3);
   --accent: #869075;
   --accent-alert: #D18C73;
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 /* 3. Pearl & Taupe */
@@ -72,6 +82,8 @@
   --line: rgba(176, 169, 160, 0.3);
   --accent: #9A8C78;
   --accent-alert: #A36B6B;
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 /* 4. Alabaster & Rose Gold */
@@ -83,6 +95,8 @@
   --line: rgba(212, 184, 184, 0.4);
   --accent: #C79595;
   --accent-alert: #B56B6B;
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 /* 5. Linen & Slate */
@@ -94,6 +108,8 @@
   --line: rgba(154, 166, 178, 0.3);
   --accent: #5D738E;
   --accent-alert: #A06464;
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 /* 6. Vanilla & Cognac */
@@ -105,6 +121,8 @@
   --line: rgba(184, 126, 92, 0.3);
   --accent: #9C5535;
   --accent-alert: #A13D3D;
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 /* 7. Silk & Cerulean */
@@ -116,6 +134,8 @@
   --line: rgba(132, 164, 186, 0.3);
   --accent: #377296;
   --accent-alert: #964F4F;
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 /* 8. Porcelain & Olive */
@@ -127,6 +147,8 @@
   --line: rgba(138, 153, 128, 0.3);
   --accent: #5B6E50;
   --accent-alert: #A16A46;
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 /* 9. Crepe & Truffle */
@@ -138,6 +160,8 @@
   --line: rgba(166, 152, 138, 0.3);
   --accent: #7D6B5D;
   --accent-alert: #915454;
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 /* 10. Chiffon & Mulberry */
@@ -149,6 +173,8 @@
   --line: rgba(181, 128, 145, 0.3);
   --accent: #8F435C;
   --accent-alert: #A35B47;
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 /* ── Dark Mode Themes (Deep, Rich, High-Contrast) ── */
@@ -161,6 +187,8 @@
   --line: rgba(204, 153, 51, 0.2);
   --accent: #D49A36;
   --accent-alert: #C75233;
+  --accent-warning: #F59E0B;
+  --accent-success: #10B981;
 }
 
 /* 12. Obsidian & Emerald */
@@ -172,6 +200,8 @@
   --line: rgba(43, 133, 89, 0.3);
   --accent: #2B8559;
   --accent-alert: #D1893D;
+  --accent-warning: #F59E0B;
+  --accent-success: #10B981;
 }
 
 /* 13. Carbon & Copper */
@@ -183,6 +213,8 @@
   --line: rgba(184, 115, 81, 0.3);
   --accent: #B87351;
   --accent-alert: #C94C4C;
+  --accent-warning: #F59E0B;
+  --accent-success: #10B981;
 }
 
 /* 14. Velvet Navy & Platinum */
@@ -194,6 +226,8 @@
   --line: rgba(154, 173, 196, 0.2);
   --accent: #879BBB;
   --accent-alert: #D16D6D;
+  --accent-warning: #F59E0B;
+  --accent-success: #10B981;
 }
 
 /* 15. Matte Black & Ruby */
@@ -205,6 +239,8 @@
   --line: rgba(163, 49, 64, 0.3);
   --accent: #A33140;
   --accent-alert: #CC7A43;
+  --accent-warning: #F59E0B;
+  --accent-success: #10B981;
 }
 
 /* 16. Graphite & Champagne */
@@ -216,6 +252,8 @@
   --line: rgba(201, 185, 143, 0.2);
   --accent: #BFA873;
   --accent-alert: #C46C6C;
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 /* 17. Midnight & Indigo */
@@ -227,6 +265,8 @@
   --line: rgba(79, 93, 168, 0.3);
   --accent: #4F5DA8;
   --accent-alert: #A85A82;
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 /* 18. Charcoal & Terracotta */
@@ -238,6 +278,8 @@
   --line: rgba(189, 107, 85, 0.3);
   --accent: #BD6B55;
   --accent-alert: #BAA55D;
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 /* 19. Gunmetal & Sapphire */
@@ -249,6 +291,8 @@
   --line: rgba(43, 107, 153, 0.3);
   --accent: #2B6B99;
   --accent-alert: #993B4E;
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 /* 20. Eclipse & Amethyst */
@@ -260,6 +304,8 @@
   --line: rgba(142, 93, 166, 0.3);
   --accent: #8E5DA6;
   --accent-alert: #5D9EA6;
+  --accent-warning: #D97706;
+  --accent-success: #059669;
 }
 
 body {
@@ -614,22 +660,31 @@ body {
 }
 
 .badge--human {
-  background: transparent;
+  background: rgba(217, 119, 6, 0.1);
   color: var(--accent-alert);
   border-color: var(--accent-alert);
 }
 
 .badge--agent {
-  background: transparent;
-  color: var(--ink);
-  border-color: var(--ink-soft);
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--accent-warning);
+  border-color: var(--accent-warning);
 }
 
 .badge--resolved {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--accent-success);
+  border-color: var(--accent-success);
+  text-decoration: none;
+}
+
+.badge--platform {
   background: transparent;
   color: var(--ink-soft);
-  border-color: var(--line);
-  text-decoration: line-through;
+  border-color: transparent;
+  font-size: 12px;
+  padding: 0;
+  margin-left: auto;
 }
 
 .conv-item__reopen-badge {
@@ -839,17 +894,6 @@ body {
   border-color: transparent;
   border-radius: 14px 14px 4px 14px;
 }
-.msg--agent::before {
-  content: "OPERATOR";
-  display: block;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--bg-base);
-  opacity: 0.8;
-  margin-bottom: 4px;
-  letter-spacing: 0.05em;
-}
 
 /* Grouped Messages */
 .msg--grouped {
@@ -865,11 +909,7 @@ body {
   border: 1px dashed var(--accent-alert) !important;
   color: var(--ink) !important;
 }
-.msg--internal::before {
-  content: "INTERNAL NOTE" !important;
-  color: var(--accent-alert) !important;
-  display: block !important;
-}
+
 
 /* System Message (Summary) */
 .msg--system {
@@ -979,7 +1019,8 @@ body {
   transition: var(--transition);
 }
 #agent-send-btn:hover {
-  background: #FFF;
+  background: var(--accent);
+  color: var(--bg-base);
 }
 #agent-send-btn:active {
   transform: translateY(1px);

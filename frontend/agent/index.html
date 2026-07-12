@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wrennon Agent Console</title>
+<title>Wrennon Agent Workspace</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/agent/agent.css?v=8">
+<link rel="stylesheet" href="/agent/agent.css?v=15">
 <script>
   (function() {
     function applyTheme(theme) {
@@ -159,8 +159,8 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
               <span class="order-popup__title">Order Details</span>
             </div>
-            <button id="order-popup-close" aria-label="Close" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:4px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            <button id="order-popup-toggle" aria-label="Toggle" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:4px;transition:transform 0.2s;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </button>
           </div>
           <div id="order-popup-body" class="order-popup__body"></div>
@@ -182,14 +182,13 @@
           <button id="agent-voice-btn" aria-label="Record voice" style="background: none; border: none; cursor: pointer; color: #9CA3AF; padding: 4px;">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
           </button>
-          <button id="agent-copilot-btn" aria-label="Ask Copilot" title="Generate draft with AI" style="background: none; border: none; cursor: pointer; color: var(--accent); padding: 4px 8px; margin-right: 4px; display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; border-radius: var(--radius-sm); transition: background 0.2s;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
-            Copilot
+          <button id="agent-copilot-btn" aria-label="Ask Copilot" title="Generate draft with AI" style="background: none; border: none; cursor: pointer; color: var(--accent); padding: 4px; margin-right: 4px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.2s; width: 28px; height: 28px; box-shadow: 0 0 10px var(--accent-glow); background: linear-gradient(135deg, var(--bg-surface), var(--bg-base));">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
           </button>
           
           <input id="agent-message-input" type="text" placeholder="Type a reply" autocomplete="off">
-          <select id="note-type-select" style="background: var(--bg-base); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 13px; padding: 0 10px; height: 100%; outline: none; cursor: pointer;">
-            <option value="public">Public Reply</option>
+          <select id="note-type-select" style="background: var(--bg-base); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 13px; font-family: 'JetBrains Mono', ui-monospace, monospace; padding: 0 10px; height: 100%; outline: none; cursor: pointer;">
+            <option value="public">Reply</option>
             <option value="internal">Internal Note</option>
           </select>
           <button id="agent-send-btn">Send</button>
@@ -198,7 +197,7 @@
     </main>
   </div>
 
-  <script src="/agent/agent.js?v=8"></script>
+  <script src="/agent/agent.js?v=15"></script>
 </body>
 </html>
 

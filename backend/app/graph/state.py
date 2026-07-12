@@ -16,7 +16,7 @@ being a one-shot classifier.
 
 from __future__ import annotations
 
-from typing import Literal, Optional, TypedDict
+from typing import Literal, Optional, TypedDict, NotRequired
 
 from langchain_core.messages import BaseMessage
 
@@ -87,8 +87,9 @@ class ConversationState(TypedDict):
     # --- Analytics & Copilot ---
     revenue_generated: float
     resolution_logged: bool
-    sentiment: Optional[str]
-    language: Optional[str]
+    sentiment: NotRequired[str]
+    intent_category: NotRequired[str]
+    language: NotRequired[str]
 
 
 def initial_state(customer_email: Optional[str] = None) -> ConversationState:
@@ -126,5 +127,6 @@ def initial_state(customer_email: Optional[str] = None) -> ConversationState:
         revenue_generated=0.0,
         resolution_logged=False,
         sentiment=None,
+        intent_category=None,
         language="English",
     )

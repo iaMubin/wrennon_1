@@ -256,10 +256,8 @@ function connectSocket() {
       if (data.session_id === activeSessionId) {
         hideCustomerTypingIndicator();
         appendMessage(data.sender, data.content, new Date().toISOString(), data.sender === "agent_internal", data.message_id);
-        // Refresh order context when customer sends a new message
-        if (data.sender === "human") {
-          fetchOrderContext(data.session_id);
-        }
+        // Refresh order context whenever a new message arrives (human or bot/ai may trigger order fetching)
+        fetchOrderContext(data.session_id);
         if (data.is_resolved) {
           resolveBtn.textContent = "Resolved";
           resolveBtn.disabled = true;
@@ -373,14 +371,17 @@ function renderConversationList(conversations) {
       languageBadge = `<span class="badge badge--agent">${escapeHtml(conv.language)}</span>`;
     }
 
-    const platforms = ["🌐 Web", "📱 WhatsApp", "💬 Instagram"];
+    const webSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
+    const waSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>`;
+    const igSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>`;
+    
+    const platforms = [webSvg, waSvg, igSvg];
     const hash = conv.short_id ? conv.short_id.split('').reduce((a, b) => {a = ((a << 5) - a) + b.charCodeAt(0); return a & a}, 0) : 0;
     const platformIcon = platforms[Math.abs(hash) % platforms.length];
 
     item.innerHTML = `
       <div class="conv-item-header">
         <span class="conv-item-email" style="display:flex; align-items:center; gap:4px;">
-            <span style="font-size:10px; padding:2px 4px; border-radius:4px; background:var(--bg-elevated); color:var(--text-muted);">${platformIcon}</span>
             ${escapeHtml(conv.customer_email || "Unknown Customer")}
         </span>
         <span class="conv-item-time">${formatSidebarTime(conv.updated_at)}</span>
@@ -391,6 +392,7 @@ function renderConversationList(conversations) {
         ${sentimentBadge}
         ${languageBadge}
         ${reopenBadge}
+        <span class="badge badge--platform" title="Source">${platformIcon}</span>
       </div>
     `;
 
@@ -591,14 +593,27 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
   div.className = `msg msg--${actualSender}${isInternal ? ' msg--internal' : ''}`;
   div.setAttribute("role", "listitem");
   
-  // Format internal note
+  let nameHtml = "";
+  if (actualSender === "agent" && !isGrouped) {
+    const storedName = localStorage.getItem("agent_username") || "Agent";
+    const displayName = storedName.toUpperCase();
+    
+    if (isInternal) {
+      const badgeHtml = `<span style="background: var(--accent-alert); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; vertical-align: middle;">Agent</span>`;
+      nameHtml = `<div class="msg-name" style="display: flex; align-items: center; margin-bottom: 6px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 600; color: var(--ink); opacity: 0.9; letter-spacing: 0.05em; text-transform: uppercase;"><span style="font-weight: 800; margin-right: 4px; color: var(--accent-alert);">Note:</span> ${displayName}${badgeHtml}</div>`;
+    } else {
+      const badgeHtml = `<span style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: var(--bg-base); padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; vertical-align: middle;">Agent</span>`;
+      nameHtml = `<div class="msg-name" style="display: flex; align-items: center; margin-bottom: 6px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 600; color: var(--bg-base); opacity: 0.95; letter-spacing: 0.05em; text-transform: uppercase;">${displayName}${badgeHtml}</div>`;
+    }
+  }
+  
   // Format message content
   let displayContent = content;
   if (isInternal) {
     displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
-    div.innerHTML = escapeHtml(displayContent);
+    div.innerHTML = nameHtml + escapeHtml(displayContent);
   } else if (sender === "ai" || sender === "agent" || sender === "system") {
-    div.innerHTML = renderMarkdown(content);
+    div.innerHTML = nameHtml + renderMarkdown(content);
   } else {
     div.innerHTML = escapeHtml(content);
   }
@@ -907,6 +922,9 @@ function showOrderPopup(order) {
     ${order.tracking_url ? `<div class="order-popup__field" style="grid-column: span 2;"><span class="order-popup__label">Tracking</span><span class="order-popup__value"><a href="${escapeHtml(order.tracking_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(order.tracking_url)}</a></span></div>` : ''}
   `;
   popup.classList.remove('hidden');
+  body.classList.remove('hidden');
+  const toggleBtn = document.getElementById('order-popup-toggle');
+  if (toggleBtn) toggleBtn.style.transform = '';
 }
 
 function hideOrderPopup() {
@@ -914,10 +932,15 @@ function hideOrderPopup() {
   if (popup) popup.classList.add('hidden');
 }
 
-// Close button for order popup
+// Toggle button for order popup
 document.addEventListener('click', (e) => {
-  if (e.target.closest('#order-popup-close')) {
-    hideOrderPopup();
+  const toggleBtn = e.target.closest('#order-popup-toggle');
+  if (toggleBtn) {
+    const body = document.getElementById('order-popup-body');
+    if (body) {
+      body.classList.toggle('hidden');
+      toggleBtn.style.transform = body.classList.contains('hidden') ? 'rotate(180deg)' : '';
+    }
   }
 });
 

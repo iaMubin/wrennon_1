@@ -11,8 +11,11 @@ instead of creating a new one.
 from __future__ import annotations
 
 from app.graph.state import ConversationState
+from app.services.integrations import get_crm_provider
+
 from app.services.llm import generate_conversation_summary
-from app.services.mock_apis import create_support_ticket, reopen_support_ticket
+
+crm = get_crm_provider()
 
 
 async def handoff_node(state: ConversationState) -> ConversationState:
@@ -27,12 +30,12 @@ async def handoff_node(state: ConversationState) -> ConversationState:
     existing_ticket_id = state.get("existing_ticket_id")
 
     if existing_ticket_id:
-        ticket = reopen_support_ticket(
+        ticket = crm.reopen_support_ticket(
             ticket_id=existing_ticket_id,
             conversation_summary=conversation_summary,
         )
     else:
-        ticket = create_support_ticket(
+        ticket = crm.create_support_ticket(
             customer_email=state.get("customer_email") or "unknown@customer",
             conversation_summary=conversation_summary,
             order_id=state.get("order_id"),
@@ -44,7 +47,11 @@ async def handoff_node(state: ConversationState) -> ConversationState:
 
     if not state.get("resolution_logged"):
         from app.services.analytics import log_resolution
-        log_resolution(was_autonomous=False)
+        log_resolution(
+            was_autonomous=False,
+            intent=state.get("intent_category"),
+            sentiment=state.get("sentiment")
+        )
         state["resolution_logged"] = True
 
     return state

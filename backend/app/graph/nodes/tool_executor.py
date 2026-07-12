@@ -33,6 +33,11 @@ async def tool_executor_node(state: ConversationState) -> ConversationState:
 
         if tool_name in TOOL_EXECUTORS:
             logger.info(f"Executing tool: {tool_name} with args {tool_args}")
+            
+            # Extract order_id to keep conversation state updated
+            if "order_id" in tool_args:
+                state["last_order_id"] = str(tool_args["order_id"])
+                
             try:
                 result = await TOOL_EXECUTORS[tool_name](tool_args)
                 gathered_context.append(f"Result from {tool_name}:\n{result}")
