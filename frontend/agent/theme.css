@@ -1,0 +1,283 @@
+/* ============================================================
+   WRENNON — SHARED DESIGN TOKENS
+   Single source of truth for both the Agent Workspace and the
+   Admin Dashboard.
+
+   Calibrated for two things: (1) an agent looking at this for
+   an 8-hour shift — muted, low-glare surfaces, soft dark-mode
+   backgrounds (not pure black), gentle accent saturation instead
+   of neon; and (2) reading as an established, decent company
+   rather than a flashy new product — one quiet accent per
+   theme, no glow halos, no gradients, no display-font flourish.
+   ============================================================ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Type — a single quiet sans throughout; mono reserved for data */
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Shape — restrained, not pill-happy */
+  --radius-lg: 12px;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-pill: 999px;
+
+  /* Elevation — soft, used sparingly */
+  --shadow-sm: 0 1px 2px rgba(20, 16, 12, 0.04);
+  --shadow-md: 0 4px 12px rgba(20, 16, 12, 0.07);
+  --shadow-lg: 0 12px 28px rgba(20, 16, 12, 0.12);
+
+  --transition: all 0.15s ease;
+  --danger: #B3261E;
+}
+
+/* ── Default / System ── */
+:root[data-theme="light"] {
+  --ink: #3C312A; --ink-soft: #6B5F56;
+  --bg-base: #FAF8F5; --bg-surface: #FDFDFC; --bg-elevated: #FFFFFF;
+  --line: rgba(34, 27, 22, 0.11);
+  --accent: #994726; --accent-ink: #FFFFFF; --accent-glow: rgba(153, 71, 38, 0.10);
+  --accent-alert: #B3261E; --accent-warning: #92590A; --accent-success: #1E6B3C;
+}
+:root[data-theme="dark"] {
+  --ink: #D8DCE1; --ink-soft: #919AA7;
+  --bg-base: #131922; --bg-surface: #1B212B; --bg-elevated: #212832;
+  --line: rgba(255, 255, 255, 0.08);
+  --accent: #DBA03D; --accent-ink: #14110A; --accent-glow: rgba(219, 160, 61, 0.14);
+  --accent-alert: #D9776E; --accent-warning: #D2A03F; --accent-success: #4CAA80;
+  --danger: #D9776E;
+}
+
+/* ── Light Themes — muted, confident identity, easy on the eyes ── */
+
+/* Ivory & Champagne — quiet antique gold */
+:root[data-theme="ivory-champagne"] {
+  --ink: #463B2B; --ink-soft: #75695A;
+  --bg-base: #FBF8F2; --bg-surface: #FEFDFA; --bg-elevated: #FFFFFF;
+  --line: rgba(43, 35, 24, 0.11);
+  --accent: #6C5326; --accent-ink: #FFFFFF; --accent-glow: rgba(108, 83, 38, 0.10);
+  --accent-alert: #96322B; --accent-warning: #8A5A16; --accent-success: #2E6B41;
+}
+/* Cashmere & Sage — quiet forest green */
+:root[data-theme="cashmere-sage"] {
+  --ink: #394436; --ink-soft: #656F5C;
+  --bg-base: #F7F8F3; --bg-surface: #FCFDFB; --bg-elevated: #FFFFFF;
+  --line: rgba(35, 43, 33, 0.11);
+  --accent: #32553F; --accent-ink: #FFFFFF; --accent-glow: rgba(50, 85, 63, 0.10);
+  --accent-alert: #92590A; --accent-warning: #92590A; --accent-success: #32553F;
+}
+/* Pearl & Taupe — quiet indigo */
+:root[data-theme="pearl-taupe"] {
+  --ink: #3A3A42; --ink-soft: #68656F;
+  --bg-base: #F8F8F9; --bg-surface: #FDFDFD; --bg-elevated: #FFFFFF;
+  --line: rgba(36, 36, 42, 0.11);
+  --accent: #514AA9; --accent-ink: #FFFFFF; --accent-glow: rgba(81, 74, 169, 0.10);
+  --accent-alert: #972A45; --accent-warning: #92590A; --accent-success: #1E6B3C;
+}
+/* Alabaster & Rose — quiet crimson */
+:root[data-theme="alabaster-rose"] {
+  --ink: #433438; --ink-soft: #7A6266;
+  --bg-base: #FBF7F7; --bg-surface: #FEFCFC; --bg-elevated: #FFFFFF;
+  --line: rgba(42, 31, 34, 0.11);
+  --accent: #972A45; --accent-ink: #FFFFFF; --accent-glow: rgba(151, 42, 69, 0.10);
+  --accent-alert: #972A45; --accent-warning: #92590A; --accent-success: #1E6B3C;
+}
+/* Linen & Slate — quiet cobalt */
+:root[data-theme="linen-slate"] {
+  --ink: #313D4D; --ink-soft: #5C6B7D;
+  --bg-base: #F5F6F8; --bg-surface: #FCFCFD; --bg-elevated: #FFFFFF;
+  --line: rgba(30, 39, 51, 0.11);
+  --accent: #3756AE; --accent-ink: #FFFFFF; --accent-glow: rgba(55, 86, 174, 0.10);
+  --accent-alert: #96322B; --accent-warning: #92590A; --accent-success: #1E6B3C;
+}
+/* Vanilla & Cognac — quiet amber */
+:root[data-theme="vanilla-cognac"] {
+  --ink: #4B3724; --ink-soft: #7C6650;
+  --bg-base: #FCF9F1; --bg-surface: #FEFDFA; --bg-elevated: #FFFFFF;
+  --line: rgba(46, 32, 19, 0.11);
+  --accent: #8C5021; --accent-ink: #FFFFFF; --accent-glow: rgba(140, 80, 33, 0.10);
+  --accent-alert: #96322B; --accent-warning: #8C5021; --accent-success: #2E6B41;
+}
+/* Silk & Cerulean — quiet teal */
+:root[data-theme="silk-cerulean"] {
+  --ink: #2A4449; --ink-soft: #55707A;
+  --bg-base: #F3F8F9; --bg-surface: #FBFDFD; --bg-elevated: #FFFFFF;
+  --line: rgba(24, 42, 46, 0.11);
+  --accent: #1F5E6F; --accent-ink: #FFFFFF; --accent-glow: rgba(31, 94, 111, 0.10);
+  --accent-alert: #972A45; --accent-warning: #92590A; --accent-success: #1E6B3C;
+}
+/* Porcelain & Olive — quiet moss */
+:root[data-theme="porcelain-olive"] {
+  --ink: #3A442F; --ink-soft: #656F55;
+  --bg-base: #F9FAF6; --bg-surface: #FDFDFC; --bg-elevated: #FFFFFF;
+  --line: rgba(35, 42, 27, 0.11);
+  --accent: #425F1D; --accent-ink: #FFFFFF; --accent-glow: rgba(66, 95, 29, 0.10);
+  --accent-alert: #92590A; --accent-warning: #92590A; --accent-success: #425F1D;
+}
+/* Crepe & Truffle — quiet espresso */
+:root[data-theme="crepe-truffle"] {
+  --ink: #41352D; --ink-soft: #6E6154;
+  --bg-base: #F8F6F4; --bg-surface: #FDFCFB; --bg-elevated: #FFFFFF;
+  --line: rgba(39, 31, 25, 0.11);
+  --accent: #5C331C; --accent-ink: #FFFFFF; --accent-glow: rgba(92, 51, 28, 0.10);
+  --accent-alert: #96322B; --accent-warning: #92590A; --accent-success: #1E6B3C;
+}
+/* Chiffon & Mulberry — quiet plum */
+:root[data-theme="chiffon-mulberry"] {
+  --ink: #452F39; --ink-soft: #7A6068;
+  --bg-base: #FBF7F9; --bg-surface: #FEFCFD; --bg-elevated: #FFFFFF;
+  --line: rgba(43, 27, 34, 0.11);
+  --accent: #7C294A; --accent-ink: #FFFFFF; --accent-glow: rgba(124, 41, 74, 0.10);
+  --accent-alert: #7C294A; --accent-warning: #92590A; --accent-success: #1E6B3C;
+}
+
+/* ── Dark Themes — soft charcoal (never near-black), muted accents ── */
+
+/* Onyx & Amber */
+:root[data-theme="onyx-amber"] {
+  --ink: #E7DBC6; --ink-soft: #A59A87;
+  --bg-base: #1B1915; --bg-surface: #252018; --bg-elevated: #2A241C;
+  --line: rgba(219, 160, 61, 0.13);
+  --accent: #DBA03D; --accent-ink: #14110A; --accent-glow: rgba(219, 160, 61, 0.14);
+  --accent-alert: #D08167; --accent-warning: #D2A03F; --accent-success: #4CAA80;
+}
+/* Obsidian & Emerald */
+:root[data-theme="obsidian-emerald"] {
+  --ink: #CCE9DA; --ink-soft: #81A392;
+  --bg-base: #101E18; --bg-surface: #192920; --bg-elevated: #1E3026;
+  --line: rgba(37, 164, 122, 0.14);
+  --accent: #25A47A; --accent-ink: #06120D; --accent-glow: rgba(37, 164, 122, 0.16);
+  --accent-alert: #D9776E; --accent-warning: #D2A03F; --accent-success: #25A47A;
+}
+/* Carbon & Copper */
+:root[data-theme="carbon-copper"] {
+  --ink: #E9D6C9; --ink-soft: #A79389;
+  --bg-base: #1D1917; --bg-surface: #28221F; --bg-elevated: #2D2724;
+  --line: rgba(204, 127, 83, 0.14);
+  --accent: #CC7F53; --accent-ink: #180E08; --accent-glow: rgba(204, 127, 83, 0.16);
+  --accent-alert: #D9776E; --accent-warning: #D2A03F; --accent-success: #4CAA80;
+}
+/* Velvet Navy & Platinum */
+:root[data-theme="navy-platinum"] {
+  --ink: #D0D9E8; --ink-soft: #8492AA;
+  --bg-base: #0D1425; --bg-surface: #172238; --bg-elevated: #1C293F;
+  --line: rgba(115, 167, 231, 0.14);
+  --accent: #73A7E7; --accent-ink: #071324; --accent-glow: rgba(115, 167, 231, 0.16);
+  --accent-alert: #D9776E; --accent-warning: #D2A03F; --accent-success: #4CAA80;
+}
+/* Matte Black & Ruby */
+:root[data-theme="black-ruby"] {
+  --ink: #E8D0D3; --ink-soft: #A68C8F;
+  --bg-base: #181618; --bg-surface: #241D1F; --bg-elevated: #2A2224;
+  --line: rgba(174, 40, 71, 0.15);
+  --accent: #AE2847; --accent-ink: #FFFFFF; --accent-glow: rgba(174, 40, 71, 0.16);
+  --accent-alert: #AE2847; --accent-warning: #D2A03F; --accent-success: #4CAA80;
+}
+/* Graphite & Champagne */
+:root[data-theme="graphite-champagne"] {
+  --ink: #E5DBC5; --ink-soft: #A49B89;
+  --bg-base: #1D1B17; --bg-surface: #282520; --bg-elevated: #2D2A24;
+  --line: rgba(206, 164, 36, 0.14);
+  --accent: #CEA424; --accent-ink: #16130A; --accent-glow: rgba(206, 164, 36, 0.15);
+  --accent-alert: #D9776E; --accent-warning: #CEA424; --accent-success: #4CAA80;
+}
+/* Midnight & Indigo */
+:root[data-theme="midnight-indigo"] {
+  --ink: #D3D0E8; --ink-soft: #908CAC;
+  --bg-base: #110F22; --bg-surface: #1B182E; --bg-elevated: #201D35;
+  --line: rgba(97, 90, 209, 0.15);
+  --accent: #615AD1; --accent-ink: #FFFFFF; --accent-glow: rgba(97, 90, 209, 0.16);
+  --accent-alert: #D9776E; --accent-warning: #D2A03F; --accent-success: #4CAA80;
+}
+/* Charcoal & Terracotta */
+:root[data-theme="charcoal-terracotta"] {
+  --ink: #E7D6CE; --ink-soft: #A7948A;
+  --bg-base: #1D1917; --bg-surface: #292421; --bg-elevated: #2E2926;
+  --line: rgba(171, 74, 35, 0.14);
+  --accent: #AB4A23; --accent-ink: #FFFFFF; --accent-glow: rgba(171, 74, 35, 0.15);
+  --accent-alert: #D9776E; --accent-warning: #D2A03F; --accent-success: #4CAA80;
+}
+/* Gunmetal & Sapphire */
+:root[data-theme="gunmetal-sapphire"] {
+  --ink: #CCDBE9; --ink-soft: #8193A1;
+  --bg-base: #13181E; --bg-surface: #1C262E; --bg-elevated: #212C35;
+  --line: rgba(62, 108, 210, 0.15);
+  --accent: #3E6CD2; --accent-ink: #FFFFFF; --accent-glow: rgba(62, 108, 210, 0.16);
+  --accent-alert: #D9776E; --accent-warning: #D2A03F; --accent-success: #4CAA80;
+}
+/* Eclipse & Amethyst */
+:root[data-theme="eclipse-amethyst"] {
+  --ink: #DED0E8; --ink-soft: #9C8EA9;
+  --bg-base: #161023; --bg-surface: #221730; --bg-elevated: #271C36;
+  --line: rgba(146, 74, 211, 0.15);
+  --accent: #924AD3; --accent-ink: #FFFFFF; --accent-glow: rgba(146, 74, 211, 0.16);
+  --accent-alert: #D9776E; --accent-warning: #D2A03F; --accent-success: #4CAA80;
+}
+
+/* ── Shared primitives ── */
+.hidden { display: none !important; }
+
+@keyframes slideUpFade {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes popIn {
+  0% { opacity: 0; transform: scale(0.97); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+.loading-spinner {
+  border: 3px solid var(--line);
+  border-top: 3px solid var(--accent);
+  border-radius: 50%;
+  width: 22px; height: 22px;
+  animation: spin 0.9s linear infinite;
+  margin: auto;
+}
+
+/* Theme picker dropdown — shared by both dashboards */
+.theme-dropdown-container { position: relative; }
+.theme-toggle-btn {
+  background: transparent; border: 1px solid transparent; color: var(--ink-soft);
+  cursor: pointer; padding: 7px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center; transition: var(--transition);
+}
+.theme-toggle-btn:hover { color: var(--ink); background: var(--bg-elevated); border-color: var(--line); }
+.theme-toggle-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.theme-dropdown-menu {
+  position: absolute; top: 100%; right: 0; margin-top: 8px;
+  background: var(--bg-elevated); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 6px; display: flex; flex-direction: column; gap: 2px;
+  min-width: 210px; max-height: 320px; overflow-y: auto;
+  box-shadow: var(--shadow-lg); z-index: 1000;
+}
+.theme-dropdown-menu::-webkit-scrollbar { width: 6px; }
+.theme-dropdown-menu::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+.theme-dropdown-menu.hidden { display: none; }
+
+.theme-option {
+  background: transparent; border: none; color: var(--ink); padding: 9px 12px;
+  text-align: left; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px;
+  font-family: var(--font-body); display: flex; align-items: center; gap: 9px;
+}
+.theme-option::before {
+  content: ""; width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent); box-shadow: inset 0 0 0 1px var(--line);
+}
+.theme-option:hover, .theme-option:focus { background: var(--bg-surface); }
+.theme-option.active { font-weight: 600; color: var(--accent); background: var(--accent-glow); }
+
+.theme-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 6px; padding-bottom: 6px; }
+.theme-tab {
+  flex: 1; background: transparent; border: none; color: var(--ink-soft); padding: 8px 0;
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+  cursor: pointer; border-radius: var(--radius-sm); transition: var(--transition);
+}
+.theme-tab:hover { color: var(--ink); background: var(--bg-surface); }
+.theme-tab.active { color: var(--accent); background: var(--accent-glow); }
+.theme-tab-content.hidden { display: none; }

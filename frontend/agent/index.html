@@ -7,7 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/agent/agent.css?v=15">
+<link rel="stylesheet" href="/agent/theme.css?v=17">
+<link rel="stylesheet" href="/agent/agent.css?v=17">
 <script>
   (function() {
     function applyTheme(theme) {
@@ -71,7 +72,7 @@
           <span id="brand">Wrennon</span>
           <span id="connection-dot" class="dot dot--offline" title="Connection status"></span>
         </div>
-        <div style="display: flex; gap: 8px; align-items: center;">
+        <div class="icon-btn-group">
           <div class="theme-dropdown-container">
             <button id="theme-menu-btn" class="theme-toggle-btn" aria-label="Theme options" aria-haspopup="true" aria-expanded="false">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
@@ -110,7 +111,7 @@
               </div>
             </div>
           </div>
-          <button id="admin-dashboard-btn" class="hidden" style="font-size: 12px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; background: white; cursor: pointer; color: #334155;">Admin</button>
+          <button id="admin-dashboard-btn" class="hidden">Admin</button>
           <button id="logout-btn" class="theme-toggle-btn" aria-label="Logout" title="Logout">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
           </button>
@@ -146,9 +147,9 @@
             <h2 id="conversation-email">Unknown Customer</h2>
             <span id="conversation-session" class="short-id">CUST-XXXX</span>
           </div>
-          <div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 4px;">
+          <div class="conv-header-actions">
             <button id="resolve-btn">Mark resolved</button>
-            <span id="resolve-time" style="font-size: 11px; color: #64748b;" class="hidden"></span>
+            <span id="resolve-time" class="hidden"></span>
           </div>
         </header>
 
@@ -159,7 +160,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
               <span class="order-popup__title">Order Details</span>
             </div>
-            <button id="order-popup-toggle" aria-label="Toggle" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:4px;transition:transform 0.2s;">
+            <button id="order-popup-toggle" aria-label="Toggle" class="icon-action-btn">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </button>
           </div>
@@ -172,22 +173,22 @@
           <input type="file" id="agent-file-upload" style="display: none;" accept="image/*,audio/*,video/*,.pdf,.doc,.docx" />
           <input type="file" id="agent-photo-upload" style="display: none;" accept="image/*" />
           <input type="file" id="agent-voice-upload" style="display: none;" accept="audio/*" capture="user" />
-          
-          <button id="agent-upload-btn" aria-label="Upload file" style="background: none; border: none; cursor: pointer; color: #9CA3AF; padding: 4px;">
+
+          <button id="agent-upload-btn" class="icon-action-btn" aria-label="Upload file">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
           </button>
-          <button id="agent-photo-btn" aria-label="Upload photo" style="background: none; border: none; cursor: pointer; color: #9CA3AF; padding: 4px;">
+          <button id="agent-photo-btn" class="icon-action-btn" aria-label="Upload photo">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
           </button>
-          <button id="agent-voice-btn" aria-label="Record voice" style="background: none; border: none; cursor: pointer; color: #9CA3AF; padding: 4px;">
+          <button id="agent-voice-btn" class="icon-action-btn" aria-label="Record voice">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
           </button>
-          <button id="agent-copilot-btn" aria-label="Ask Copilot" title="Generate draft with AI" style="background: none; border: none; cursor: pointer; color: var(--accent); padding: 4px; margin-right: 4px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.2s; width: 28px; height: 28px; box-shadow: 0 0 10px var(--accent-glow); background: linear-gradient(135deg, var(--bg-surface), var(--bg-base));">
+          <button id="agent-copilot-btn" class="icon-action-btn" aria-label="Ask Copilot" title="Generate draft with AI">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
           </button>
-          
+
           <input id="agent-message-input" type="text" placeholder="Type a reply" autocomplete="off">
-          <select id="note-type-select" style="background: var(--bg-base); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 13px; font-family: 'JetBrains Mono', ui-monospace, monospace; padding: 0 10px; height: 100%; outline: none; cursor: pointer;">
+          <select id="note-type-select">
             <option value="public">Reply</option>
             <option value="internal">Internal Note</option>
           </select>
@@ -197,7 +198,6 @@
     </main>
   </div>
 
-  <script src="/agent/agent.js?v=15"></script>
+  <script src="/agent/agent.js?v=17"></script>
 </body>
 </html>
-
