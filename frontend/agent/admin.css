@@ -5,12 +5,11 @@
 
 body {
   font-family: var(--font-body);
-  background-color: var(--bg-base);
+  background-color: var(--bg-header, var(--bg-base));
   color: var(--ink);
   min-height: 100vh;
   padding: 48px 24px 80px;
   overflow-x: hidden;
-  background: var(--bg-base);
 }
 
 .admin-container {
@@ -51,14 +50,18 @@ body {
 
 /* Buttons */
 .btn {
-  background: var(--bg-base); color: var(--ink-soft); border: 1px solid var(--line);
-  padding: 9px 16px; border-radius: var(--radius-sm); font-size: 12.5px; font-weight: 600;
+  background: var(--bg-surface); color: var(--ink); border: 1px solid var(--line);
+  padding: 10px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
   cursor: pointer; transition: var(--transition); font-family: inherit;
   display: inline-flex; align-items: center; gap: 8px;
+  box-shadow: var(--shadow-sm);
 }
-.btn:hover { border-color: var(--accent); color: var(--ink); }
-.btn-primary { background: var(--accent); color: var(--accent-ink); border: none; }
-.btn-primary:hover { filter: brightness(1.06); }
+.btn:hover { border-color: var(--accent); color: var(--accent); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.btn-primary { 
+  background: linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 80%, black) 100%);
+  color: var(--accent-ink); border: none; 
+}
+.btn-primary:hover { filter: brightness(1.1); color: var(--accent-ink); border-color: transparent; }
 .btn-danger { background: var(--bg-base); color: var(--danger); border: 1px solid var(--danger); }
 .btn-danger:hover { background: var(--danger); color: #fff; }
 .btn-sm { padding: 6px 12px; font-size: 12px; }

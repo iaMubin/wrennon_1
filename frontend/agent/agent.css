@@ -104,11 +104,12 @@ body {
 #sidebar-header {
   padding: 20px 22px; display: flex; justify-content: space-between; align-items: center;
   border-bottom: 1px solid var(--line);
+  background: var(--bg-header, var(--bg-surface));
 }
 #sidebar-header > div:first-child { display: flex; align-items: center; gap: 10px; }
 
 #brand {
-  font-family: var(--font-display); font-size: 19px; font-weight: 700; color: var(--ink);
+  font-family: var(--font-display); font-size: 19px; font-weight: 700; color: var(--ink-header, var(--ink));
   letter-spacing: -0.02em; position: relative;
 }
 #brand::before {
@@ -125,10 +126,10 @@ body {
 /* Admin button — was inline-styled, now a real component */
 #admin-dashboard-btn {
   font-family: var(--font-body); font-size: 12px; font-weight: 600;
-  padding: 7px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
-  background: var(--bg-base); color: var(--ink-soft); cursor: pointer; transition: var(--transition);
+  padding: 7px 12px; border: 1px solid rgba(150, 150, 150, 0.2); border-radius: var(--radius-sm);
+  background: rgba(150, 150, 150, 0.1); color: var(--ink-header, var(--ink-soft)); cursor: pointer; transition: var(--transition);
 }
-#admin-dashboard-btn:hover { color: var(--ink); border-color: var(--accent); background: var(--accent-glow); }
+#admin-dashboard-btn:hover { color: var(--accent-ink); border-color: var(--accent); background: var(--accent); }
 
 /* Tabs */
 #section-tabs { display: flex; padding: 14px 16px; gap: 6px; border-bottom: 1px solid var(--line); }
@@ -204,11 +205,11 @@ body {
 
 #conversation-header {
   padding: 16px 24px; border-bottom: 1px solid var(--line); display: flex;
-  justify-content: space-between; align-items: center; background: var(--bg-surface); z-index: 10;
+  justify-content: space-between; align-items: center; background: var(--bg-header, var(--bg-surface)); z-index: 10;
 }
 .conv-header-actions { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 4px; }
 
-.conv-header-info h2 { font-family: var(--font-display); font-size: 17px; color: var(--ink); margin-bottom: 4px; font-weight: 600; letter-spacing: -0.01em; }
+.conv-header-info h2 { font-family: var(--font-display); font-size: 17px; color: var(--ink-header, var(--ink)); margin-bottom: 4px; font-weight: 600; letter-spacing: -0.01em; }
 
 .short-id {
   font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); background: var(--bg-base);

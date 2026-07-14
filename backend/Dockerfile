@@ -25,8 +25,8 @@ RUN useradd -m appuser && chown -R appuser:appuser /app
 # Switch to the non-root user
 USER appuser
 
-# Fix Windows CRLF line endings and make startup script executable
-RUN sed -i 's/\r$//' start.sh && chmod +x start.sh
+# Fix Windows CRLF line endings and make startup scripts executable
+RUN sed -i 's/\r$//' start.sh pre_deploy.sh && chmod +x start.sh pre_deploy.sh
 
 EXPOSE 8000
 
