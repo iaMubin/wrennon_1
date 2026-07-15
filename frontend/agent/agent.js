@@ -1,7 +1,12 @@
 // ── Backend URL detection ──────────────────────────────────────────
 const _RENDER_HOST = "wrennon-backend.onrender.com";
-const API_BASE = `${window.location.protocol}//${window.location.host}/api`;
-const WS_URL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws/agent`;
+const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const BACKEND_URL = IS_LOCAL ? `${window.location.protocol}//${window.location.host}` : `https://${_RENDER_HOST}`;
+
+const API_BASE = `${BACKEND_URL}/api`;
+const WS_URL = IS_LOCAL 
+  ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws/agent`
+  : `wss://${_RENDER_HOST}/ws/agent`;
 
 
 let socket = null;
@@ -183,7 +188,6 @@ loginForm.addEventListener("submit", async (e) => {
     const response = await fetch(`${API_BASE}/agent/login`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      credentials: "include",
       body,
     });
 
