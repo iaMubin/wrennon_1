@@ -29,7 +29,7 @@ import json
 import time
 
 from app.graph.state import ConversationState
-from app.services.llm import _safe_llm_call, mask_pii, parse_image_urls, _url_to_base64
+from app.services.llm import _safe_llm_call, mask_pii
 from app.logger import logger
 
 MAX_ITERATIONS = 2  # tool_executor rounds allowed per user turn — see builder.py
@@ -149,17 +149,7 @@ async def manager_node(state: ConversationState) -> ConversationState:
     for msg in recent_messages:
         role = "user" if msg.type == "human" else "assistant"
         content = mask_pii(msg.content) if role == "user" else msg.content
-        
-        image_urls = parse_image_urls(content)
-        if image_urls:
-            content_list = [{"type": "text", "text": content}]
-            for url in image_urls:
-                b64 = await _url_to_base64(url)
-                if b64:
-                    content_list.append({"type": "image_url", "image_url": {"url": b64}})
-            llm_messages.append({"role": role, "content": content_list})
-        else:
-            llm_messages.append({"role": role, "content": content})
+        llm_messages.append({"role": role, "content": content})
 
     decision = None
     last_error = None

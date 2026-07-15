@@ -198,42 +198,6 @@ async def auto_translate_if_needed(text: str) -> str:
         return text
 
 
-def parse_image_urls(text: str) -> list[str]:
-    """Finds all ![Image](url) and returns the URLs"""
-    return re.findall(r'!\[.*?\]\((https?://[^\)]+)\)', text)
-
-
-async def _url_to_base64(url: str) -> str:
-    """Reads an image from local uploads directory and converts to base64."""
-    try:
-        if "/uploads/" not in url:
-            return None
-
-        filename = os.path.basename(url.split("/uploads/")[-1])
-        file_path = os.path.join(UPLOAD_DIR, filename)
-
-        if not os.path.exists(file_path):
-            return None
-
-        with open(file_path, "rb") as f:
-            content = f.read()
-
-        b64 = base64.b64encode(content).decode("utf-8")
-
-        # Simple mime type guessing based on extension
-        ext = os.path.splitext(filename)[1].lower()
-        mime_type = "image/jpeg"
-        if ext == ".png":
-            mime_type = "image/png"
-        elif ext == ".gif":
-            mime_type = "image/gif"
-        elif ext == ".webp":
-            mime_type = "image/webp"
-
-        return f"data:{mime_type};base64,{b64}"
-    except Exception as e:
-        logger.error(f"Failed to fetch image: {e}")
-    return None
 
 
 MODEL = "openai/gpt-oss-120b"

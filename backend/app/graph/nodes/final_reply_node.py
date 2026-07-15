@@ -14,7 +14,7 @@ import time
 from langchain_core.messages import AIMessage
 
 from app.graph.state import ConversationState
-from app.services.llm import _safe_llm_call, mask_pii, parse_image_urls, _url_to_base64
+from app.services.llm import _safe_llm_call, mask_pii
 from app.logger import logger
 
 SYSTEM_INSTRUCTION = (
@@ -83,31 +83,11 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
     for msg in recent_messages[:-1]:
         role = "user" if msg.type == "human" else "assistant"
         content = mask_pii(msg.content) if role == "user" else msg.content
-        
-        image_urls = parse_image_urls(content)
-        if image_urls:
-            content_list = [{"type": "text", "text": content}]
-            for url in image_urls:
-                b64 = await _url_to_base64(url)
-                if b64:
-                    content_list.append({"type": "image_url", "image_url": {"url": b64}})
-            llm_messages.append({"role": role, "content": content_list})
-        else:
-            llm_messages.append({"role": role, "content": content})
+        llm_messages.append({"role": role, "content": content})
 
     last_user_msg = mask_pii(recent_messages[-1].content)
     final_prompt = f"Context:\n{context_text}\n\nCustomer's message: {last_user_msg}"
-    
-    last_image_urls = parse_image_urls(last_user_msg)
-    if last_image_urls:
-        content_list = [{"type": "text", "text": final_prompt}]
-        for url in last_image_urls:
-            b64 = await _url_to_base64(url)
-            if b64:
-                content_list.append({"type": "image_url", "image_url": {"url": b64}})
-        llm_messages.append({"role": "user", "content": content_list})
-    else:
-        llm_messages.append({"role": "user", "content": final_prompt})
+    llm_messages.append({"role": "user", "content": final_prompt})
 
     reply = await _safe_llm_call(llm_messages, temperature=0.3, max_tokens=400)
     if not reply:
