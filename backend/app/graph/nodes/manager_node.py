@@ -29,7 +29,7 @@ import json
 import time
 
 from app.graph.state import ConversationState
-from app.services.llm import _safe_llm_call, mask_pii
+from app.services.llm import _safe_llm_call, mask_pii, parse_image_urls, _url_to_base64
 from app.logger import logger
 
 MAX_ITERATIONS = 2  # tool_executor rounds allowed per user turn — see builder.py

@@ -87,12 +87,12 @@ async def _safe_groq_call(messages: list, temperature: float = 0.2, max_tokens: 
     wait=wait_exponential(multiplier=1, min=2, max=10),
     reraise=True
 )
-async def _safe_groq_json_call(messages: list, temperature: float = 0.2, max_tokens: int = 1000) -> str:
+async def _safe_groq_json_call(messages: list, temperature: float = 0.2, max_tokens: int = 1000, model_override: str = None) -> str:
     """Wrapper around Groq API calls specifically for JSON output."""
     import time
     start_time = time.time()
     response = await _client.chat.completions.create(
-        model=MODEL,
+        model=model_override or MODEL,
         messages=messages,
         temperature=temperature,
         max_tokens=max_tokens,
@@ -136,7 +136,7 @@ async def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: i
     """Calls Groq with retries, and falls back to OpenAI if it completely fails."""
     try:
         if is_json:
-            return await _safe_groq_json_call(messages, temperature, max_tokens)
+            return await _safe_groq_json_call(messages, temperature, max_tokens, model_override)
         return await _safe_groq_call(messages, temperature, max_tokens, model_override)
     except Exception as e:
         logger.error(f"Groq API completely failed after retries: {e}")
