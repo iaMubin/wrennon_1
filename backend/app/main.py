@@ -144,15 +144,7 @@ app.include_router(realtime_router)  # no /api prefix — /ws/... paths
 def health() -> dict:
     return {"status": "ok"}
 
-# Mount the frontend directory to serve the dashboard and the widget
-# The frontend agent files have been copied to backend/app/static/agent 
-# so they are guaranteed to be in the Docker image.
-frontend_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "agent")
 
-if os.path.exists(frontend_path):
-    app.mount("/agent", StaticFiles(directory=frontend_path, html=True), name="agent")
-else:
-    logger.warning(f"Frontend agent directory not found at {frontend_path}")
 
 upload_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
 os.makedirs(upload_path, exist_ok=True)
@@ -170,3 +162,14 @@ async def get_upload_file(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
         
     return FileResponse(file_path)
+
+# Mount the frontend directory to serve the dashboard and the widget
+# The frontend agent files have been copied to backend/app/static/agent 
+# so they are guaranteed to be in the Docker image.
+static_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+
+if os.path.exists(static_path):
+    # Mount the full static directory at / (which includes /agent and the widget files)
+    app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
+else:
+    logger.warning(f"Static directory not found at {static_path}")

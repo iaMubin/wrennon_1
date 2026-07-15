@@ -1,8 +1,7 @@
 // ── Backend URL detection ──────────────────────────────────────────
 const _RENDER_HOST = "wrennon-backend.onrender.com";
-const _IS_LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.protocol === "file:";
-const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/api`;
-const WS_URL  = `${_IS_LOCAL ? "ws"   : "wss"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/ws/agent`;
+const API_BASE = `${window.location.protocol}//${window.location.host}/api`;
+const WS_URL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws/agent`;
 
 
 let socket = null;
@@ -35,17 +34,24 @@ function setupThemeDropdown() {
   const options = document.querySelectorAll(".theme-option");
   if (!menuBtn || !dropdown) return;
 
+  const menuMainView = document.getElementById("menu-main-view");
+  const menuAppearanceView = document.getElementById("menu-appearance-view");
+  const btnShowAppearance = document.getElementById("btn-show-appearance");
+  const btnBackAppearance = document.getElementById("btn-back-appearance");
+
   function applyTheme(themeValue) {
     localStorage.setItem("wrennon_theme", themeValue);
     if (themeValue === "system") {
       const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", isDark ? "dark-matte" : "light-offwhite");
     } else {
       document.documentElement.setAttribute("data-theme", themeValue);
     }
     
     options.forEach(opt => {
-      opt.classList.toggle("active", opt.dataset.themeValue === themeValue);
+      if (opt.dataset.themeValue) {
+        opt.classList.toggle("active", opt.dataset.themeValue === themeValue);
+      }
     });
   }
 
@@ -54,13 +60,37 @@ function setupThemeDropdown() {
     const isExpanded = menuBtn.getAttribute("aria-expanded") === "true";
     menuBtn.setAttribute("aria-expanded", !isExpanded);
     dropdown.classList.toggle("hidden");
-    if (!isExpanded) {
+
+    if (!dropdown.classList.contains("hidden") && menuMainView && menuAppearanceView) {
+      menuMainView.classList.remove("hidden");
+      menuAppearanceView.classList.add("hidden");
+    }
+
+    if (!isExpanded && options.length > 0) {
       options[0].focus();
     }
   });
 
+  if (btnShowAppearance && menuMainView && menuAppearanceView) {
+    btnShowAppearance.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      menuMainView.classList.add("hidden");
+      menuAppearanceView.classList.remove("hidden");
+    });
+  }
+
+  if (btnBackAppearance && menuMainView && menuAppearanceView) {
+    btnBackAppearance.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      menuAppearanceView.classList.add("hidden");
+      menuMainView.classList.remove("hidden");
+    });
+  }
+
   document.addEventListener("click", (e) => {
-    if (!dropdown.contains(e.target) && e.target !== menuBtn) {
+    if (!e.target.closest("#theme-dropdown") && !e.target.closest("#theme-menu-btn")) {
       dropdown.classList.add("hidden");
       menuBtn.setAttribute("aria-expanded", "false");
     }
@@ -76,6 +106,7 @@ function setupThemeDropdown() {
 
   options.forEach(opt => {
     opt.addEventListener("click", () => {
+      if (!opt.dataset.themeValue) return; // Don't trigger theme change for submenu navigation buttons
       applyTheme(opt.dataset.themeValue);
       dropdown.classList.add("hidden");
       menuBtn.setAttribute("aria-expanded", "false");
@@ -297,6 +328,30 @@ sectionTabs.forEach((tab) => {
 });
 
 // --- Loading conversation lists ---
+function formatPreview(msg) {
+  if (!msg) return "No messages yet";
+  
+  // Remove transcript
+  let text = msg.replace(/\n\n\(Transcript:.*?\)/g, '');
+  
+  // Check for Audio/Video
+  if (/\[(?:Audio|Video)\]\((https?:\/\/[^\)]+)\)/.test(text)) {
+    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: text-bottom; margin-right: 4px;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>Voice message`;
+  }
+  
+  // Check for Image
+  if (/!\[.*?\]\((https?:\/\/[^\)]+)\)/.test(text)) {
+    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: text-bottom; margin-right: 4px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>Photo`;
+  }
+  
+  // Strip bold
+  text = text.replace(/\*\*(.+?)\*\*/g, "$1");
+  // Strip links
+  text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '$1');
+  
+  return escapeHtml(text);
+}
+
 async function loadConversations() {
   const endpoints = {
     "my_cases": "/agent/conversations/my-cases",
@@ -361,8 +416,12 @@ function renderConversationList(conversations) {
 
     let sentimentBadge = '';
     if (conv.sentiment) {
-      const color = conv.sentiment.toLowerCase() === 'angry' ? 'var(--accent-alert)' : 
-                   conv.sentiment.toLowerCase() === 'happy' ? 'var(--accent-success)' : 'var(--text-muted)';
+      const s = conv.sentiment.trim().toLowerCase();
+      let color = 'var(--ink-soft)';
+      if (s.includes('angry') || s.includes('upset') || s.includes('mad')) color = 'var(--accent-alert)';
+      else if (s.includes('frustrated') || s.includes('annoyed') || s.includes('sad')) color = 'var(--warning)';
+      else if (s.includes('happy') || s.includes('delighted') || s.includes('satisfied') || s.includes('glad')) color = 'var(--accent-success)';
+      else if (s.includes('neutral') || s.includes('mixed')) color = 'var(--ink-soft)';
       sentimentBadge = `<span class="badge" style="border-color:${color}; color:${color}">${escapeHtml(conv.sentiment)}</span>`;
     }
     
@@ -386,7 +445,7 @@ function renderConversationList(conversations) {
         </span>
         <span class="conv-item-time">${formatSidebarTime(conv.updated_at)}</span>
       </div>
-      <div class="conv-item-preview">${escapeHtml(conv.last_message || "No messages yet")}</div>
+      <div class="conv-item-preview">${formatPreview(conv.last_message)}</div>
       <div class="badge-row">
         <span class="badge ${badgeClass}">${stageText}</span>
         ${sentimentBadge}
@@ -612,10 +671,8 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
   if (isInternal) {
     displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
     div.innerHTML = nameHtml + escapeHtml(displayContent);
-  } else if (sender === "ai" || sender === "agent" || sender === "system") {
-    div.innerHTML = nameHtml + renderMarkdown(content);
   } else {
-    div.innerHTML = escapeHtml(content);
+    div.innerHTML = nameHtml + renderMarkdown(content);
   }
 
   if (msgId) {
@@ -696,7 +753,7 @@ async function handleAgentFileUpload(file, inputElement, uploadInputElement, aut
   formData.append("file", file);
   
   try {
-    const response = await fetch(`${API_BASE}/chat/upload/${activeSessionId}`, {
+    const response = await fetch(`${API_BASE}/chat/upload/${activeConversationId}`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${localStorage.getItem("agent_token")}` },
       body: formData
@@ -1043,11 +1100,11 @@ function inlineMarkdown(text) {
         Array.from({length: 20}, (_, i) => `<span class="voice-player__bar" style="animation-delay:${i * 0.05}s; height:${Math.floor(Math.random() * 60) + 20}%"></span>`).join('') +
       `</div>` +
       `<span class="voice-player__time">0:00</span>` +
-      `<audio preload="metadata" src="${url}"></audio>` +
+      `<audio preload="metadata" src="${url}" onloadedmetadata="const d = this.duration; if(d && d !== Infinity) { this.parentElement.querySelector('.voice-player__time').textContent = Math.floor(d/60) + ':' + Math.floor(d%60).toString().padStart(2, '0'); }"></audio>` +
     `</div>`;
   });
   escaped = escaped.replace(/\[Video\]\((https?:\/\/[^\)]+)\)/g, '<video controls src="$1" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;"></video>');
-  escaped = escaped.replace(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g, '<img src="$1" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;" />');
+  escaped = escaped.replace(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g, '<img src="$1" class="chat-lightbox-image" style="max-width: 250px; max-height: 250px; object-fit: cover; display: block; margin: 8px 0; border-radius: 8px; cursor: pointer;" onclick="openLightbox(this.src)" />');
   escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline;">$1</a>');
   escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   return escaped;
@@ -1074,7 +1131,10 @@ function toggleVoicePlayer(playerId) {
       const mins = Math.floor(audio.currentTime / 60);
       const secs = Math.floor(audio.currentTime % 60).toString().padStart(2, '0');
       timeEl.textContent = `${mins}:${secs}`;
-      const pct = audio.duration ? (audio.currentTime / audio.duration) : 0;
+      let pct = 0;
+      if (audio.duration && audio.duration !== Infinity) {
+        pct = audio.currentTime / audio.duration;
+      }
       bars.forEach((bar, i) => {
         bar.style.opacity = (i / bars.length) <= pct ? '1' : '0.4';
       });
@@ -1108,7 +1168,13 @@ function toggleVoicePlayer(playerId) {
   });
 
   if (audio.paused) {
-    audio.play();
+    audio.play().catch(err => {
+      console.error("Audio playback error:", err);
+      alert("Cannot play audio: " + err.message + "\nCheck if your browser supports playing this file.");
+      playIcon.style.display = '';
+      pauseIcon.style.display = 'none';
+      container.classList.remove('voice-player--playing');
+    });
     playIcon.style.display = 'none';
     pauseIcon.style.display = '';
     container.classList.add('voice-player--playing');
@@ -1223,3 +1289,95 @@ document.querySelectorAll('.theme-tab').forEach(tab => {
     if(targetContent) targetContent.classList.remove('hidden');
   });
 });
+
+// --- Lightbox Logic ---
+let lightboxImages = [];
+let currentLightboxIndex = 0;
+
+window.openLightbox = function(src) {
+  const imgs = Array.from(document.querySelectorAll('.chat-lightbox-image'));
+  if (imgs.length === 0) return;
+  
+  lightboxImages = imgs.map(img => img.src);
+  currentLightboxIndex = lightboxImages.indexOf(src);
+  if (currentLightboxIndex === -1) currentLightboxIndex = 0;
+  
+  let lightbox = document.getElementById('chat-lightbox-overlay');
+  if (!lightbox) {
+    lightbox = document.createElement('div');
+    lightbox.id = 'chat-lightbox-overlay';
+    lightbox.className = 'chat-lightbox-overlay';
+    lightbox.innerHTML = `
+      <div class="chat-lightbox-close" onclick="closeLightbox()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </div>
+      <div class="chat-lightbox-nav prev" onclick="lightboxPrev(event)">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </div>
+      <div class="chat-lightbox-img-wrapper">
+        <img id="chat-lightbox-img" src="" />
+      </div>
+      <div class="chat-lightbox-nav next" onclick="lightboxNext(event)">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </div>
+    `;
+    
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox || e.target.classList.contains('chat-lightbox-img-wrapper')) closeLightbox();
+    });
+    
+    const container = document.getElementById('conversation-view') || document.body;
+    container.appendChild(lightbox);
+    document.addEventListener('keydown', handleLightboxKeydown);
+  }
+  
+  updateLightbox();
+  lightbox.style.display = 'flex';
+  setTimeout(() => lightbox.style.opacity = '1', 10);
+};
+
+window.closeLightbox = function() {
+  const lightbox = document.getElementById('chat-lightbox-overlay');
+  if (lightbox) {
+    lightbox.style.opacity = '0';
+    setTimeout(() => {
+      lightbox.style.display = 'none';
+    }, 200);
+  }
+};
+
+window.lightboxNext = function(e) {
+  if (e) e.stopPropagation();
+  if (currentLightboxIndex < lightboxImages.length - 1) {
+    currentLightboxIndex++;
+    updateLightbox();
+  }
+};
+
+window.lightboxPrev = function(e) {
+  if (e) e.stopPropagation();
+  if (currentLightboxIndex > 0) {
+    currentLightboxIndex--;
+    updateLightbox();
+  }
+};
+
+function updateLightbox() {
+  const imgEl = document.getElementById('chat-lightbox-img');
+  if (!imgEl) return;
+  imgEl.src = lightboxImages[currentLightboxIndex];
+  
+  const prevBtn = document.querySelector('.chat-lightbox-nav.prev');
+  const nextBtn = document.querySelector('.chat-lightbox-nav.next');
+  if (prevBtn) prevBtn.style.visibility = (currentLightboxIndex > 0) ? 'visible' : 'hidden';
+  if (nextBtn) nextBtn.style.visibility = (currentLightboxIndex < lightboxImages.length - 1) ? 'visible' : 'hidden';
+}
+
+function handleLightboxKeydown(e) {
+  const lightbox = document.getElementById('chat-lightbox-overlay');
+  if (!lightbox || lightbox.style.display === 'none') return;
+  
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowRight') lightboxNext();
+  if (e.key === 'ArrowLeft') lightboxPrev();
+}

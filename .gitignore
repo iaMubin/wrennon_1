@@ -3,31 +3,41 @@ __pycache__/
 *.pyc
 .venv/
 venv/
-
-# Env secrets
+env/
 .env
 
 # ChromaDB persisted store
 backend/data/chroma_store/
 
-# SQLite database
+# SQLite database and logs
 backend/data/*.db
+backend/data/*.json
+*.log
+
+# Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Node
+node_modules/
 
 # OS
 .DS_Store
+Thumbs.db
 
 # Editors
 .vscode/
 .idea/
+*.swp
 
 # Vercel
 frontend/.vercel/
 
-# Docker (optional local builds)
-*.log
-
-# Cruft files
+# Cruft files and local test scripts
 temp_env/
 temp_reqs.txt
-
-backend/*.db
+backend/test_flow.py
+backend/test_graph_local.py
+backend/check.py
+*.tmp
+*.temp
