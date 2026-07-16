@@ -254,19 +254,20 @@ async def describe_image_if_present(text: str) -> str:
                 desc = await _safe_llm_call(
                     [{"role": "user", "content": content_list}], 
                     temperature=0.2, 
-                    max_tokens=300, 
+                    max_tokens=1024, 
                     model_override="qwen/qwen3.6-27b"
                 )
                 if desc:
-                    desc = re.sub(r'<think>.*?</think>', '', desc, flags=re.DOTALL).strip()
+                    # Strip <think> blocks even if unclosed
+                    desc = re.sub(r'<think>.*?(?:</think>|$)', '', desc, flags=re.DOTALL).strip()
                     if desc:
                         descriptions.append(desc)
             except Exception as e:
                 logger.error(f"Failed to describe image: {e}")
                 
     if descriptions:
-        desc_text = "\n\n".join([f"(Image Description: {d})" for d in descriptions])
-        return text + "\n\n" + desc_text
+        desc_text = "\n\n".join([f"\n\n[INTERNAL_IMAGE_DESC]\n{d}\n[/INTERNAL_IMAGE_DESC]\n\n" for d in descriptions])
+        return text + desc_text
     return text
 
 

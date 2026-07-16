@@ -631,6 +631,7 @@ document.addEventListener("visibilitychange", () => {
 function appendMessage(sender, content, isoString = new Date().toISOString(), isInternal = false, msgId = null) {
   if (!content) content = "";
   content = content.replace(/\n\n\(Image Description:[\s\S]*?\)/g, '');
+  content = content.replace(/\[INTERNAL_IMAGE_DESC\][\s\S]*?\[\/INTERNAL_IMAGE_DESC\]/g, '');
   
   if (document.hidden) {
     injectUnreadIndicator();
@@ -1095,6 +1096,7 @@ function inlineMarkdown(text) {
   
   // Hide Internal Image Descriptions from UI
   escaped = escaped.replace(/\n\n\(Image Description:[\s\S]*?\)/g, '');
+  escaped = escaped.replace(/\[INTERNAL_IMAGE_DESC\][\s\S]*?\[\/INTERNAL_IMAGE_DESC\]/g, '');
   
   escaped = escaped.replace(/\[Audio\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
     const playerId = 'vp_' + Math.random().toString(36).substr(2, 9);

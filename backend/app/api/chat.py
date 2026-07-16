@@ -115,7 +115,8 @@ def get_history(
     def clean_content(text):
         text = re.sub(r'\n\n\*\[Translated:.*?\]\*', '', text, flags=re.IGNORECASE | re.DOTALL)
         text = re.sub(r'\n\n\(Image Description:.*?\)', '', text, flags=re.DOTALL)
-        return text
+        text = re.sub(r'\[INTERNAL_IMAGE_DESC\].*?\[/INTERNAL_IMAGE_DESC\]', '', text, flags=re.DOTALL)
+        return text.strip()
 
     return [
         {
