@@ -19,15 +19,22 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    from sqlalchemy.engine.reflection import Inspector
+    inspector = Inspector.from_engine(conn)
     """Upgrade schema."""
     conn = op.get_bind()
     inspector = sa.inspect(conn)
     columns = [col['name'] for col in inspector.get_columns('conversations')]
     
     if 'sentiment' not in columns:
-        op.add_column('conversations', sa.Column('sentiment', sa.String(), nullable=True))
+        columns_conversations = [c['name'] for c in inspector.get_columns('conversations')]
+        if 'sentiment' not in columns_conversations:
+            op.add_column('conversations', sa.Column('sentiment', sa.String(), nullable=True))
     if 'language' not in columns:
-        op.add_column('conversations', sa.Column('language', sa.String(), nullable=True))
+        columns_conversations = [c['name'] for c in inspector.get_columns('conversations')]
+        if 'language' not in columns_conversations:
+            op.add_column('conversations', sa.Column('language', sa.String(), nullable=True))
     # ### end Alembic commands ###
 
 
