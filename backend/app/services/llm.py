@@ -236,6 +236,38 @@ async def _url_to_base64(url: str) -> str:
     return None
 
 
+async def describe_image_if_present(text: str) -> str:
+    """Checks for ![Image](url), describes it using the vision model, and appends to text."""
+    image_urls = parse_image_urls(text)
+    if not image_urls:
+        return text
+
+    descriptions = []
+    for url in image_urls:
+        b64 = await _url_to_base64(url)
+        if b64:
+            content_list = [
+                {"type": "text", "text": "Describe this image in detail. Be very specific about any products, brands, or text visible. Keep it concise."},
+                {"type": "image_url", "image_url": {"url": b64}}
+            ]
+            try:
+                desc = await _safe_llm_call(
+                    [{"role": "user", "content": content_list}], 
+                    temperature=0.2, 
+                    max_tokens=300, 
+                    model_override="qwen/qwen3.6-27b"
+                )
+                if desc:
+                    descriptions.append(desc.strip())
+            except Exception as e:
+                logger.error(f"Failed to describe image: {e}")
+                
+    if descriptions:
+        desc_text = "\n\n".join([f"(Image Description: {d})" for d in descriptions])
+        return text + "\n\n" + desc_text
+    return text
+
+
 MODEL = "openai/gpt-oss-120b"
 # Groq deprecated meta-llama/llama-4-scout-17b-16e-instruct on June 17,
 # 2026 (free/developer tier) and recommends this model as the direct

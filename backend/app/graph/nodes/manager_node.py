@@ -144,7 +144,6 @@ async def manager_node(state: ConversationState) -> ConversationState:
         system_content += f"\n\n## Context for this decision\n{context_block}"
 
     llm_messages = [{"role": "system", "content": system_content}]
-    model_override = None
 
     recent_messages = state["messages"][-10:] if len(state["messages"]) > 10 else state["messages"]
     for msg in recent_messages:
@@ -158,23 +157,13 @@ async def manager_node(state: ConversationState) -> ConversationState:
             role = "assistant"
             content = msg.content
 
-        image_urls = parse_image_urls(content)
-        if image_urls and role == "user":
-            content_list = [{"type": "text", "text": content}]
-            for url in image_urls:
-                b64 = await _url_to_base64(url)
-                if b64:
-                    content_list.append({"type": "image_url", "image_url": {"url": b64}})
-            llm_messages.append({"role": role, "content": content_list})
-            model_override = "qwen/qwen3.6-27b"
-        else:
-            llm_messages.append({"role": role, "content": content})
+        llm_messages.append({"role": role, "content": content})
 
     decision = None
     last_error = None
     for attempt in range(2):  # one retry on malformed JSON before falling back safely
         try:
-            result_str = await _safe_llm_call(llm_messages, temperature=0.1, max_tokens=500, is_json=True, model_override=model_override)
+            result_str = await _safe_llm_call(llm_messages, temperature=0.1, max_tokens=500, is_json=True)
             decision = json.loads(result_str)
             break
         except (json.JSONDecodeError, TypeError, ValueError) as e:

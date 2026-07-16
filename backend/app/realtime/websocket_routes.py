@@ -24,7 +24,7 @@ from app.graph.state import initial_state
 from app.logger import logger
 from app.realtime.connection_manager import manager
 from app.config import settings
-from app.services.llm import mask_pii, update_conversation_summary, transcribe_audio_if_present, auto_translate_if_needed
+from app.services.llm import mask_pii, update_conversation_summary, transcribe_audio_if_present, describe_image_if_present, auto_translate_if_needed
 from app.services.cache import get_cache, set_cache
 from app.api.agent import get_redis
 
@@ -394,6 +394,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
         asynchronously, off that critical path.
         """
         customer_text = await transcribe_audio_if_present(customer_text)
+        customer_text = await describe_image_if_present(customer_text)
         # Auto-translate is temporarily disabled to save LLM calls.
         # customer_text = await auto_translate_if_needed(customer_text)
 
