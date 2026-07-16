@@ -123,13 +123,25 @@ with SessionLocal() as db:
         db.execute(text("ALTER TABLE conversations ADD COLUMN sentiment VARCHAR"))
         db.commit()
     except Exception:
-        pass
+        db.rollback()
         
     try:
         db.execute(text("ALTER TABLE conversations ADD COLUMN language VARCHAR"))
         db.commit()
     except Exception:
-        pass
+        db.rollback()
+
+    try:
+        db.execute(text("ALTER TABLE conversations ADD COLUMN intent_category VARCHAR"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    try:
+        db.execute(text("ALTER TABLE messages ADD COLUMN author_username VARCHAR"))
+        db.commit()
+    except Exception:
+        db.rollback()
 
 app.include_router(chat_router, prefix="/api")
 app.include_router(agent_router, prefix="/api")
