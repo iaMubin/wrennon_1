@@ -148,9 +148,16 @@ async def manager_node(state: ConversationState) -> ConversationState:
 
     recent_messages = state["messages"][-10:] if len(state["messages"]) > 10 else state["messages"]
     for msg in recent_messages:
-        role = "user" if msg.type == "human" else "assistant"
-        content = mask_pii(msg.content) if role == "user" else msg.content
-        
+        if msg.type == "human":
+            role = "user"
+            content = mask_pii(msg.content)
+        elif msg.type == "tool":
+            role = "user"
+            content = f"[System: Tool Output] {msg.content}"
+        else:
+            role = "assistant"
+            content = msg.content
+
         image_urls = parse_image_urls(content)
         if image_urls and role == "user":
             content_list = [{"type": "text", "text": content}]

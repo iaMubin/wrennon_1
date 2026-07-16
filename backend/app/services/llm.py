@@ -23,7 +23,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from app.config import settings
 from app.logger import logger
 
-_client = AsyncGroq(api_key=settings.groq_api_key)
+_client = AsyncGroq(api_key=settings.groq_api_key, max_retries=0)
 _openai_client = openai.AsyncOpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
 
 
