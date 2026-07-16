@@ -59,4 +59,5 @@ async def test_flow():
                 print(f"   [BOT]: {safe_msg}")
                 break
 
-asyncio.run(test_flow())
+if __name__ == "__main__":
+    asyncio.run(test_flow())
