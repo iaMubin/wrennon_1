@@ -149,7 +149,8 @@
                         <label>Role</label>
                         <select id="agent-role">
                             <option value="agent">Agent</option>
-                            <option value="manager">Manager</option>
+                            <option value="manager" class="admin-only">Manager</option>
+                            <option value="admin" class="admin-only">Admin</option>
                         </select>
                     </div>
                     <button type="submit" class="btn btn-primary" style="height: 43px; margin-bottom: 2px;">Create Agent</button>
@@ -479,6 +480,11 @@
         }
 
         async function fetchAgents() {
+            const currentRole = localStorage.getItem('agent_role');
+            if (currentRole === 'manager') {
+                document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+            }
+
             try {
                 const res = await fetch(`${API_BASE}/admin/agents`, {
                     headers: authHeaders
@@ -508,6 +514,8 @@
                         actionCol = `<span class="cell-self">(You)</span>`;
                     } else if (isAi) {
                         actionCol = "";
+                    } else if (localStorage.getItem('agent_role') === 'manager' && agent.role !== 'agent') {
+                        actionCol = "";
                     }
 
                     const tr = document.createElement("tr");
@@ -527,7 +535,7 @@
             } catch (err) {
                 console.error("Failed to fetch agents:", err);
                 const tbody = document.getElementById("agents-list");
-                tbody.innerHTML = `<tr><td colspan="6" class="cell-danger-center">Server is currently offline or unreachable.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="cell-danger-center">${err.message || "Server is currently offline or unreachable."}</td></tr>`;
             }
         }
 

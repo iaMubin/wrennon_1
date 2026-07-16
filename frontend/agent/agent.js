@@ -202,7 +202,7 @@ loginForm.addEventListener("submit", async (e) => {
     localStorage.setItem("agent_username", username); // Save username to identify self
     localStorage.setItem("agent_role", data.role); // Save role to show admin btn
     
-    if (data.role === "manager") {
+    if (data.role === "manager" || data.role === "admin") {
       document.getElementById("admin-dashboard-btn").classList.remove("hidden");
       document.getElementById("admin-dashboard-btn").addEventListener("click", () => {
         window.location.href = "/agent/admin_dashboard.html";
@@ -429,6 +429,18 @@ function renderConversationList(conversations) {
       sentimentBadge = `<span class="badge" style="border-color:${color}; color:${color}">${escapeHtml(conv.sentiment)}</span>`;
     }
     
+    // Feature 6: SLA Warning
+    let slaBadge = "";
+    if (conv.handoff_active && !conv.resolved) {
+      const updatedTime = new Date(conv.updated_at).getTime();
+      const now = new Date().getTime();
+      const diffMins = (now - updatedTime) / 60000;
+      if (diffMins >= 5) {
+        let timeStr = diffMins >= 60 ? `${Math.floor(diffMins / 60)}hr` : `${Math.floor(diffMins)}min`;
+        slaBadge = `<span class="badge badge--sla-warning">⏳ ${timeStr} waiting</span>`;
+      }
+    }
+    
     let languageBadge = '';
     if (conv.language && conv.language.toUpperCase() !== 'ENGLISH') {
       languageBadge = `<span class="badge badge--agent">${escapeHtml(conv.language)}</span>`;
@@ -452,6 +464,7 @@ function renderConversationList(conversations) {
       <div class="conv-item-preview">${formatPreview(conv.last_message)}</div>
       <div class="badge-row">
         <span class="badge ${badgeClass}">${stageText}</span>
+        ${slaBadge}
         ${sentimentBadge}
         ${languageBadge}
         ${reopenBadge}
@@ -478,6 +491,8 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
 
   conversationEmail.textContent = customerEmail || "Unknown Customer";
   conversationSession.textContent = shortId || sessionId;
+
+
   
   const resolveTimeEl = document.getElementById("resolve-time");
   if (isResolved) {
@@ -495,6 +510,17 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
     resolveTimeEl.classList.add("hidden");
   }
 
+  // Clear sidebars immediately to prevent showing old data while loading
+  clearCustomerSidebar();
+  hideOrderPopup();
+  
+  // Reset input type to public (reply)
+  const noteTypeSelect = document.getElementById("note-type-select");
+  if (noteTypeSelect && noteTypeSelect.value !== "public") {
+    noteTypeSelect.value = "public";
+    noteTypeSelect.dispatchEvent(new Event('change'));
+  }
+  
   agentMessages.innerHTML = "<div class='loading-spinner'></div>";
   const responseData = await authedFetch(`/agent/conversations/${sessionId}/messages`);
   agentMessages.innerHTML = "";
@@ -633,6 +659,10 @@ document.addEventListener("visibilitychange", () => {
 });
 
 function appendMessage(sender, content, isoString = new Date().toISOString(), isInternal = false, msgId = null) {
+  if (!isInternal) {
+    extractAndShowCustomerDetails(content);
+  }
+  
   if (document.hidden) {
     injectUnreadIndicator();
   }
@@ -674,7 +704,10 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
   let displayContent = content;
   if (isInternal) {
     displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
-    div.innerHTML = nameHtml + escapeHtml(displayContent);
+    let escaped = escapeHtml(displayContent);
+    // Feature 7: Agent Mentions
+    escaped = escaped.replace(/@([a-zA-Z0-9_]+)/g, '<span class="agent-mention">@$1</span>');
+    div.innerHTML = nameHtml + escaped;
   } else {
     div.innerHTML = nameHtml + renderMarkdown(content);
   }
@@ -714,6 +747,8 @@ document.addEventListener("click", async (e) => {
     if (result) {
       const wrapper = document.querySelector(`[data-msg-id="${msgId}"]`);
       if (wrapper) wrapper.remove();
+    } else {
+      alert("Failed to delete note. You can only delete your own notes.");
     }
   }
   
@@ -741,9 +776,128 @@ document.addEventListener("click", async (e) => {
 });
 
 // --- Sending a reply ---
+// ── Feature 3: Slash Commands & Feature 7: Mentions Autocomplete ──
+const MACROS = [
+  { cmd: "/refund", desc: "Refund policy template", text: "Hi there! I can help you with your refund. According to our policy, we can process a full refund within 30 days of purchase. Would you like me to proceed with that?" },
+  { cmd: "/greeting", desc: "Standard welcome message", text: "Hello! Thank you for reaching out to Wrennon Support. How can I assist you today?" },
+  { cmd: "/delay", desc: "Apology for delay", text: "I sincerely apologize for the delay in my response. I'm looking into this for you right now." },
+  { cmd: "/escalate", desc: "Escalate to manager", text: "I understand your frustration. I am escalating this issue to my manager immediately, and they will reach out to you within the hour." }
+];
+
+const AGENTS = [
+  { cmd: "@Alex", desc: "Support Agent" },
+  { cmd: "@Sam", desc: "Support Agent" },
+  { cmd: "@Manager", desc: "Shift Manager" },
+  { cmd: "@SupportTeam", desc: "General Support" }
+];
+
+let slashSelectedIndex = 0;
+let currentPopupMode = null; // "macro" or "mention"
+
+function renderSlashPopup(matches, mode) {
+  const popup = document.getElementById("slash-command-popup");
+  if (!popup) return;
+  popup.innerHTML = "";
+  currentPopupMode = mode;
+  matches.forEach((m, idx) => {
+    const div = document.createElement("div");
+    div.className = `slash-item ${idx === slashSelectedIndex ? "selected" : ""}`;
+    div.innerHTML = `
+      <span class="slash-item__command">${m.cmd}</span>
+      <span class="slash-item__desc">${m.desc}</span>
+    `;
+    div.addEventListener("click", () => {
+      if (currentPopupMode === "mention") {
+        const val = agentInput.value;
+        const lastSpace = val.lastIndexOf(" ");
+        if (lastSpace === -1) {
+          agentInput.value = m.cmd + " ";
+        } else {
+          agentInput.value = val.substring(0, lastSpace + 1) + m.cmd + " ";
+        }
+      } else {
+        agentInput.value = m.text;
+      }
+      popup.classList.remove("active");
+      agentInput.focus();
+    });
+    popup.appendChild(div);
+  });
+}
+
+function updateSlashSelection(items) {
+  items.forEach((item, idx) => {
+    if (idx === slashSelectedIndex) item.classList.add("selected");
+    else item.classList.remove("selected");
+  });
+}
+
+agentInput.addEventListener("input", (e) => {
+  const val = agentInput.value;
+  const popup = document.getElementById("slash-command-popup");
+  if (!popup) return;
+  
+  // Look at the last word being typed
+  const lastSpace = val.lastIndexOf(" ");
+  const lastWord = lastSpace === -1 ? val : val.substring(lastSpace + 1);
+  
+  let matches = [];
+  let mode = null;
+
+  if (lastWord.startsWith("/")) {
+    const query = lastWord.toLowerCase();
+    matches = MACROS.filter(m => m.cmd.toLowerCase().startsWith(query));
+    mode = "macro";
+  } else if (lastWord.startsWith("@")) {
+    const noteTypeSelect = document.getElementById("note-type-select");
+    const isInternal = noteTypeSelect && noteTypeSelect.value === "internal";
+    if (isInternal) {
+      const query = lastWord.toLowerCase();
+      matches = AGENTS.filter(m => m.cmd.toLowerCase().startsWith(query));
+      mode = "mention";
+    }
+  }
+
+  if (matches.length > 0) {
+    slashSelectedIndex = 0;
+    renderSlashPopup(matches, mode);
+    popup.classList.add("active");
+  } else {
+    popup.classList.remove("active");
+  }
+});
+
 agentSendBtn.addEventListener("click", sendAgentReply);
 agentInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") sendAgentReply();
+  const popup = document.getElementById("slash-command-popup");
+  if (popup && popup.classList.contains("active")) {
+    const items = popup.querySelectorAll('.slash-item');
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      slashSelectedIndex = (slashSelectedIndex + 1) % items.length;
+      updateSlashSelection(items);
+      return;
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      slashSelectedIndex = (slashSelectedIndex - 1 + items.length) % items.length;
+      updateSlashSelection(items);
+      return;
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (items[slashSelectedIndex]) {
+        items[slashSelectedIndex].click();
+      }
+      return;
+    } else if (e.key === "Escape") {
+      popup.classList.remove("active");
+      return;
+    }
+  }
+
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendAgentReply();
+  }
 });
 
 async function handleAgentFileUpload(file, inputElement, uploadInputElement, autoSend = false, sendFunction = null) {
@@ -955,10 +1109,21 @@ function sendAgentReply() {
 // --- Order Context Popup ---
 async function fetchOrderContext(sessionId) {
   const result = await authedFetch(`/agent/conversations/${sessionId}/order-context`);
-  if (result && result.order) {
-    showOrderPopup(result.order);
+  if (result) {
+    if (result.order) {
+      showOrderPopup(result.order);
+    } else {
+      hideOrderPopup();
+    }
+    
+    if (result.customer) {
+      showCustomerSidebar(result.customer);
+    } else {
+      clearCustomerSidebar();
+    }
   } else {
     hideOrderPopup();
+    clearCustomerSidebar();
   }
 }
 
@@ -1228,7 +1393,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       loginScreen.classList.add("hidden");
       dashboard.classList.remove("hidden");
       
-      if (savedRole === "manager") {
+      if (savedRole === "manager" || savedRole === "admin") {
         const adminBtn = document.getElementById("admin-dashboard-btn");
         if (adminBtn) {
           adminBtn.classList.remove("hidden");
@@ -1385,3 +1550,103 @@ function handleLightboxKeydown(e) {
   if (e.key === 'ArrowRight') lightboxNext();
   if (e.key === 'ArrowLeft') lightboxPrev();
 }
+
+// ── Customer Details Logic ──
+
+let currentlyShowingCustomerId = null;
+
+function extractAndShowCustomerDetails(text) {
+  // Handled entirely by the backend now; UI auto-updates on fetchOrderContext.
+}
+
+function showCustomerSidebar(customer) {
+  currentlyShowingCustomerId = customer.id;
+  const sidebar = document.getElementById("customer-sidebar");
+  const content = document.getElementById("customer-sidebar-content");
+  
+  if (!sidebar || !content) return;
+  
+  const initials = customer.name.split(" ").map(n => n[0]).join("").toUpperCase();
+  
+  content.innerHTML = `
+    <div class="customer-profile">
+      <div class="customer-profile__avatar">${initials}</div>
+      <div class="customer-profile__name">${escapeHtml(customer.name)}</div>
+      <div class="customer-profile__id">${escapeHtml(customer.id)}</div>
+      <div class="customer-tags">
+        ${customer.tags.map(tag => `<span class="customer-tag">${escapeHtml(tag)}</span>`).join("")}
+      </div>
+    </div>
+    
+    <div class="customer-section">
+      <div class="customer-section__title">Contact Info</div>
+      <div class="customer-info-row">
+        <span class="label">Email</span>
+        <span class="value">${escapeHtml(customer.email)}</span>
+      </div>
+      <div class="customer-info-row">
+        <span class="label">Phone</span>
+        <span class="value">${escapeHtml(customer.phone)}</span>
+      </div>
+    </div>
+    
+    <div class="customer-section">
+      <div class="customer-section__title">Account Summary</div>
+      <div class="customer-info-row">
+        <span class="label">Tier</span>
+        <span class="value">${escapeHtml(customer.loyalty_tier)}</span>
+      </div>
+      <div class="customer-info-row">
+        <span class="label">LTV</span>
+        <span class="value">${escapeHtml(customer.lifetime_value)}</span>
+      </div>
+      <div class="customer-info-row">
+        <span class="label">Last Order</span>
+        <span class="value" style="color: var(--accent); cursor: pointer; text-decoration: underline;">${escapeHtml(customer.recent_order)}</span>
+      </div>
+    </div>
+  `;
+  
+  sidebar.classList.remove("hidden");
+}
+
+function hideCustomerSidebar() {
+  const sidebar = document.getElementById("customer-sidebar");
+  if (sidebar) {
+    sidebar.classList.add("hidden");
+  }
+}
+
+function clearCustomerSidebar() {
+  hideCustomerSidebar();
+  currentlyShowingCustomerId = null;
+}
+
+// Toggle Sidebar Buttons
+(function setupSidebarToggles() {
+  const toggleBtn = document.getElementById("customer-sidebar-toggle");
+  const closeBtn = document.getElementById("customer-sidebar-close");
+  const sidebar = document.getElementById("customer-sidebar");
+  
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", () => {
+      if (sidebar && sidebar.classList.contains("hidden")) {
+        // If no customer is detected yet, do nothing. Backend handles context auto-open.
+        if (!currentlyShowingCustomerId) {
+          // Do nothing
+        } else {
+          sidebar.classList.remove("hidden");
+        }
+      } else {
+        hideCustomerSidebar();
+      }
+    });
+  }
+  
+  if (closeBtn) {
+    closeBtn.addEventListener("click", hideCustomerSidebar);
+  }
+})();
+
+// Periodic SLA Check
+setInterval(loadConversations, 30000);

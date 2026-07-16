@@ -149,7 +149,8 @@
                         <label>Role</label>
                         <select id="agent-role">
                             <option value="agent">Agent</option>
-                            <option value="manager">Manager</option>
+                            <option value="manager" class="admin-only">Manager</option>
+                            <option value="admin" class="admin-only">Admin</option>
                         </select>
                     </div>
                     <button type="submit" class="btn btn-primary" style="height: 43px; margin-bottom: 2px;">Create Agent</button>
@@ -295,16 +296,8 @@
         const _IS_LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.protocol === "file:";
         const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/api`;
 
-        async function fetchWithAuth(url, options = {}) {
-            const token = localStorage.getItem("agent_token");
-            if (token) {
-                options.headers = options.headers || {};
-                options.headers["Authorization"] = `Bearer ${token}`;
-            }
-            return fetch(url, options);
-        }
-
-        // Toggle password logic
+        const agentToken = localStorage.getItem("agent_token");
+        const authHeaders = agentToken ? { "Authorization": `Bearer ${agentToken}` } : {};        // Toggle password logic
         const togglePwdBtn = document.getElementById("toggle-pwd");
         const pwdInput = document.getElementById("agent-password");
         const eyePaths = togglePwdBtn.querySelectorAll(".eye");
@@ -468,12 +461,12 @@
             }
             if (!confirm(`Are you sure you want to reset password for ${selectedAgentUsername}?`)) return;
 
-            const res = await fetchWithAuth(`${API_BASE}/admin/agents/${selectedAgentUsername}/reset-password`, {
+            const res = await fetch(`${API_BASE}/admin/agents/${selectedAgentUsername}/reset-password`, {
                 method: 'PUT',
                 headers: {
-                    "Content-Type": "application/json"
+                    'Content-Type': 'application/json',
+                    ...authHeaders
                 },
-                credentials: "include",
                 body: JSON.stringify({ new_password: newPassword })
             });
             if (res.ok) {
@@ -487,9 +480,14 @@
         }
 
         async function fetchAgents() {
+            const currentRole = localStorage.getItem('agent_role');
+            if (currentRole === 'manager') {
+                document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+            }
+
             try {
-                const res = await fetchWithAuth(`${API_BASE}/admin/agents`, {
-                    credentials: "include"
+                const res = await fetch(`${API_BASE}/admin/agents`, {
+                    headers: authHeaders
                 });
 
                 if (res.status === 401 || res.status === 403) {
@@ -516,6 +514,8 @@
                         actionCol = `<span class="cell-self">(You)</span>`;
                     } else if (isAi) {
                         actionCol = "";
+                    } else if (localStorage.getItem('agent_role') === 'manager' && agent.role !== 'agent') {
+                        actionCol = "";
                     }
 
                     const tr = document.createElement("tr");
@@ -535,7 +535,7 @@
             } catch (err) {
                 console.error("Failed to fetch agents:", err);
                 const tbody = document.getElementById("agents-list");
-                tbody.innerHTML = `<tr><td colspan="6" class="cell-danger-center">Server is currently offline or unreachable.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="cell-danger-center">${err.message || "Server is currently offline or unreachable."}</td></tr>`;
             }
         }
 
@@ -543,9 +543,9 @@
 
         async function deleteAgent(username) {
             if (!confirm(`Are you sure you want to remove agent '${username}'?`)) return;
-            const res = await fetchWithAuth(`${API_BASE}/admin/agents/${username}`, {
+            const res = await fetch(`${API_BASE}/admin/agents/${username}`, {
                 method: 'DELETE',
-                credentials: "include"
+                headers: authHeaders
             });
             if (res.ok) {
                 document.getElementById('agent-modal').style.display = 'none';
@@ -570,12 +570,12 @@
             const password = pwdInput.value;
             const role = document.getElementById("agent-role").value;
 
-            const res = await fetchWithAuth(`${API_BASE}/admin/agents`, {
+            const res = await fetch(`${API_BASE}/admin/agents`, {
                 method: 'POST',
                 headers: {
-                    "Content-Type": "application/json"
+                    'Content-Type': 'application/json',
+                    ...authHeaders
                 },
-                credentials: "include",
                 body: JSON.stringify({ username, full_name, employee_id, password, role })
             });
 
@@ -604,8 +604,8 @@
 
         async function fetchLogs() {
             try {
-                const res = await fetchWithAuth(`${API_BASE}/admin/logs`, {
-                    credentials: "include"
+                const res = await fetch(`${API_BASE}/admin/logs`, {
+                    headers: authHeaders
                 });
                 if (!res.ok) return;
 
@@ -753,7 +753,7 @@
 
         async function fetchAnalytics() {
             try {
-                const res = await fetchWithAuth(`${API_BASE}/analytics/stats`);
+                const res = await fetch(`${API_BASE}/analytics/stats`, { headers: authHeaders });
                 if (!res.ok) return;
                 const data = await res.json();
                 document.getElementById('analytics-total-tickets').innerText = data.total_tickets;
@@ -772,9 +772,9 @@
                     ticket_id: "TICKET-" + Math.floor(Math.random() * 10000),
                     conversation_summary: "Customer inquiring about product specs."
                 };
-                const res = await fetchWithAuth(`${API_BASE}/copilot/suggest`, {
+                const res = await fetch(`${API_BASE}/copilot/suggest`, {
                     method: 'POST',
-                    headers: { "Content-Type": "application/json" },
+                    headers: { 'Content-Type': 'application/json', ...authHeaders },
                     body: JSON.stringify(req)
                 });
                 if (!res.ok) return;
@@ -808,7 +808,7 @@
             btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg> Generating...`;
 
             try {
-                const res = await fetchWithAuth(`${API_BASE}/kb/suggest`, { method: 'POST' });
+                const res = await fetch(`${API_BASE}/kb/suggest`, { method: 'POST', headers: authHeaders });
                 if (res.ok) {
                     const data = await res.json();
                     results.innerHTML = `

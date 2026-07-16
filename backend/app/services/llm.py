@@ -264,6 +264,7 @@ async def describe_image_if_present(text: str) -> str:
                         descriptions.append(desc)
             except Exception as e:
                 logger.error(f"Failed to describe image: {e}")
+                descriptions.append(f"System Note: The customer uploaded an image, but the visual analysis system timed out or failed ({e}). You cannot see this image. You MUST escalate to a human to look at it.")
                 
     if descriptions:
         desc_text = "\n\n".join([f"\n\n[INTERNAL_IMAGE_DESC]\n{d}\n[/INTERNAL_IMAGE_DESC]\n\n" for d in descriptions])

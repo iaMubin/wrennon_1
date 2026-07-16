@@ -18,7 +18,7 @@ from app.auth.dependencies import get_current_agent
 from app.auth.security import create_access_token, verify_password
 from app.config import settings
 import re
-from app.services.mock_apis import get_order_status, get_order_by_email
+from app.services.mock_apis import get_order_status, get_order_by_email, get_customer_info
 from app.db.models import Agent, Conversation, Message, AuditLog
 from app.db.session import get_db
 from app.realtime.connection_manager import manager
@@ -231,6 +231,9 @@ def delete_internal_note(
     if msg.sender != "agent_internal":
         raise HTTPException(status_code=403, detail="Only internal notes can be deleted")
         
+    if msg.author_username and msg.author_username != agent.username and agent.role != "admin":
+        raise HTTPException(status_code=403, detail="You can only delete your own notes")
+        
     db.delete(msg)
     
     audit = AuditLog(
@@ -271,25 +274,29 @@ def get_order_context(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
 ) -> dict | None:
-    """Retrieve order context for the customer in a conversation.
-    Checks last_order_id first, then scans messages for order IDs or emails."""
+    """Retrieve order and customer context for a conversation.
+    Prioritizes order ID in messages, then stored customer email."""
     conversation = db.query(Conversation).filter_by(session_id=session_id).first()
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
     
-    # Strategy 1: Use stored last_order_id
-    if conversation.last_order_id:
-        order = get_order_status(conversation.last_order_id)
+    # helper
+    def build_response(order, source):
+        resp = {"source": source}
         if order:
-            return {"order": order, "source": "conversation_state"}
-    
-    # Strategy 2: Use customer email if available
-    if conversation.customer_email:
-        order = get_order_by_email(conversation.customer_email)
-        if order:
-            return {"order": order, "source": "customer_email"}
-    
-    # Strategy 3: Scan messages for order ID patterns or email
+            resp["order"] = order
+            # Always ensure the customer info matches the order's email if possible
+            cust = None
+            if "email" in order:
+                cust = get_customer_info(email=order["email"])
+            elif conversation.customer_email:
+                cust = get_customer_info(email=conversation.customer_email)
+            resp["customer"] = cust
+        else:
+            if conversation.customer_email:
+                resp["customer"] = get_customer_info(email=conversation.customer_email)
+        return resp
+        
     messages = (
         db.query(Message)
         .filter_by(conversation_id=conversation.id)
@@ -299,24 +306,38 @@ def get_order_context(
         .all()
     )
     
+    # 1. Scan for explicit Order ID first (highest priority)
     for msg in messages:
-        # Look for order ID patterns: #1001, order 1001, order #1001, order: 1001
         order_match = re.search(r'(?:order\s*[#:]?\s*|#)(\d{4,})', msg.content, re.IGNORECASE)
         if order_match:
             order = get_order_status(order_match.group(1))
             if order:
-                return {"order": order, "source": "message_scan"}
-        
-        # Look for email patterns
+                return build_response(order, "message_scan")
+    
+    # 2. Check for explicit email in messages
+    for msg in messages:
         email_match = re.search(r'[\w.+-]+@[\w-]+\.[\w.]+', msg.content)
         if email_match:
             order = get_order_by_email(email_match.group(0))
             if order:
-                return {"order": order, "source": "email_scan"}
-    
-    # No order context found
+                resp = build_response(order, "email_scan")
+                resp["customer"] = get_customer_info(email=email_match.group(0))
+                return resp
+                
+    # 3. Use logged-in customer_email (or fallback)
+    if conversation.customer_email:
+        order = get_order_by_email(conversation.customer_email)
+        return build_response(order, "customer_email")
+        
+    # 4. Use legacy stored last_order_id
+    if conversation.last_order_id:
+        order = get_order_status(conversation.last_order_id)
+        if order:
+            return build_response(order, "conversation_state")
+            
     from fastapi.responses import Response as FastAPIResponse
     return FastAPIResponse(status_code=204)
+
 
 
 def _conversation_summary(c: Conversation) -> dict:

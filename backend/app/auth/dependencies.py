@@ -56,6 +56,6 @@ def get_current_agent(request: Request, db: Session = Depends(get_db)) -> Agent:
 
 
 def get_current_manager(agent: Agent = Depends(get_current_agent)) -> Agent:
-    if agent.role != "manager":
-        raise HTTPException(status_code=403, detail="Manager access required")
+    if agent.role not in ["manager", "admin"]:
+        raise HTTPException(status_code=403, detail="Manager or Admin access required")
     return agent

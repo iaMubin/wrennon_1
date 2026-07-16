@@ -167,9 +167,13 @@ async def get_upload_file(filename: str):
 # The frontend agent files have been copied to backend/app/static/agent 
 # so they are guaranteed to be in the Docker image.
 static_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+frontend_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "frontend")
 
-if os.path.exists(static_path):
-    # Mount the full static directory at / (which includes /agent and the widget files)
+if os.path.exists(frontend_path):
+    # In development, serve directly from the frontend folder so changes reflect immediately
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+elif os.path.exists(static_path):
+    # In production, serve from the static folder
     app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
 else:
-    logger.warning(f"Static directory not found at {static_path}")
+    logger.warning(f"Static directory not found at {static_path} or {frontend_path}")

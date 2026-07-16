@@ -1,7 +1,12 @@
 // ── Backend URL detection ──────────────────────────────────────────
 const _RENDER_HOST = "wrennon-backend.onrender.com";
-const API_BASE = `${window.location.protocol}//${window.location.host}/api`;
-const WS_URL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws/customer`;
+const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const BACKEND_URL = IS_LOCAL ? `http://127.0.0.1:8000` : `https://${_RENDER_HOST}`;
+
+const API_BASE = `${BACKEND_URL}/api`;
+const WS_URL = IS_LOCAL 
+  ? `ws://127.0.0.1:8000/ws/customer`
+  : `wss://${_RENDER_HOST}/ws/customer`;
 
 const STORAGE_KEY = "wrennon_session_id";
 const TOKEN_KEY = "wrennon_session_token";

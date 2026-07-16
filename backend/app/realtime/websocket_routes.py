@@ -46,8 +46,13 @@ def _get_or_create_conversation(db: Session, session_id: str, customer_email: st
     return conversation
 
 
-def _save_message(db: Session, conversation_id: str, sender: str, content: str) -> Message:
-    message = Message(conversation_id=conversation_id, sender=sender, content=content)
+def _save_message(db: Session, conversation_id: str, sender: str, content: str, author_username: str = None) -> Message:
+    message = Message(
+        conversation_id=conversation_id, 
+        sender=sender, 
+        content=content,
+        author_username=author_username
+    )
     db.add(message)
     # Update the conversation's updated_at so sorting works
     conversation = db.query(Conversation).filter_by(id=conversation_id).first()
@@ -261,7 +266,7 @@ def _sync_agent_reply(session_id: str, username: str, reply_text: str, is_intern
             return None
 
         msg_sender = "agent_internal" if is_internal else "agent"
-        msg = _save_message(db, conversation.id, sender=msg_sender, content=reply_text)
+        msg = _save_message(db, conversation.id, sender=msg_sender, content=reply_text, author_username=username)
 
         if not is_internal and not conversation.handoff_active:
             conversation.handoff_active = True

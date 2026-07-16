@@ -1,25 +1,48 @@
 /* ==========================================================================
-   Design Tokens - Professional Matte & Soft Themes
+   Design Tokens — Professional Matte & Soft Themes
+   Premium Enterprise SaaS Design System v2
    ========================================================================== */
 
 :root {
   /* Typography */
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  --font-display: 'Big Shoulders Display', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+
+  /* Typography Scale */
+  --fs-2xs: 10px;
+  --fs-xs: 11.5px;
+  --fs-sm: 13px;
+  --fs-base: 14px;
+  --fs-md: 15px;
+  --fs-lg: 17px;
+  --fs-xl: 22px;
+  --fs-2xl: 28px;
 
   /* Spacing */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
   --radius-full: 9999px;
   --radius-pill: 9999px;
-  --radius: 8px;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --radius: 10px;
+
+  /* Layered Shadow System */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
 
   /* Animation */
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* ==========================================================================
@@ -40,6 +63,8 @@
   --bg-base: #f8f9fa;
   --bg-surface: #ffffff;
   --bg-header: #eff1f3;
+  --bg-hover: rgba(0, 0, 0, 0.03);
+  --bg-glass: rgba(255, 255, 255, 0.7);
   --ink: #212529;
   --ink-soft: #6c757d;
   --ink-header: #212529;
@@ -53,6 +78,7 @@
   --danger: #dc3545;
   --success: #28a745;
   --warning: #ffc107;
+  --shadow-glow: 0 0 0 3px rgba(92, 107, 115, 0.12);
 }
 
 /* ==========================================================================
@@ -64,6 +90,8 @@
   --bg-base: #FDFBF7;
   --bg-surface: #F2EBE1;
   --bg-header: #E8DAC6;
+  --bg-hover: rgba(139, 115, 85, 0.06);
+  --bg-glass: rgba(242, 235, 225, 0.75);
   
   --ink: #2C2722;
   --ink-soft: #635A51;
@@ -81,6 +109,7 @@
   --danger: #c74843;
   --success: #4d9c4d;
   --warning: #db9835;
+  --shadow-glow: 0 0 0 3px rgba(139, 115, 85, 0.12);
 }
 
 /* 2. Off-White (Clean & Professional) */
@@ -88,6 +117,8 @@
   --bg-base: #F8F9FA;
   --bg-surface: #E9ECEF;
   --bg-header: #DEE2E6;
+  --bg-hover: rgba(92, 107, 115, 0.05);
+  --bg-glass: rgba(233, 236, 239, 0.75);
   
   --ink: #1B2124;
   --ink-soft: #4A555C;
@@ -105,6 +136,7 @@
   --danger: #c42b3a;
   --success: #228f3b;
   --warning: #e6ab00;
+  --shadow-glow: 0 0 0 3px rgba(92, 107, 115, 0.12);
 }
 
 /* 3. Gray-White (Cool & Crisp) */
@@ -112,6 +144,8 @@
   --bg-base: #FFFFFF;
   --bg-surface: #F1F3F5;
   --bg-header: #E9ECEF;
+  --bg-hover: rgba(73, 80, 87, 0.05);
+  --bg-glass: rgba(241, 243, 245, 0.75);
   
   --ink: #212529;
   --ink-soft: #495057;
@@ -129,6 +163,7 @@
   --danger: #cc2929;
   --success: #288a3b;
   --warning: #d97f00;
+  --shadow-glow: 0 0 0 3px rgba(73, 80, 87, 0.12);
 }
 
 /* 4. Warm Gray (Custom 1) */
@@ -136,6 +171,8 @@
   --bg-base: #C9C8C7;
   --bg-surface: #949392;
   --bg-header: #949392;
+  --bg-hover: rgba(34, 34, 34, 0.08);
+  --bg-glass: rgba(148, 147, 146, 0.75);
   
   --ink: #111111;
   --ink-soft: #333333;
@@ -153,6 +190,7 @@
   --danger: #c42b3a;
   --success: #228f3b;
   --warning: #db9835;
+  --shadow-glow: 0 0 0 3px rgba(34, 34, 34, 0.15);
 }
 
 /* 5. Neutral Gray (Custom 2) */
@@ -160,6 +198,8 @@
   --bg-base: #D9D9D9;
   --bg-surface: #B5B5B5;
   --bg-header: #B5B5B5;
+  --bg-hover: rgba(34, 34, 34, 0.07);
+  --bg-glass: rgba(181, 181, 181, 0.75);
   
   --ink: #111111;
   --ink-soft: #444444;
@@ -177,6 +217,7 @@
   --danger: #c42b3a;
   --success: #228f3b;
   --warning: #e6ab00;
+  --shadow-glow: 0 0 0 3px rgba(34, 34, 34, 0.15);
 }
 
 /* 6. Cool Gray (Custom 3) */
@@ -184,6 +225,8 @@
   --bg-base: #CBCBCB;
   --bg-surface: #A8A8A8;
   --bg-header: #A8A8A8;
+  --bg-hover: rgba(34, 34, 34, 0.07);
+  --bg-glass: rgba(168, 168, 168, 0.75);
   
   --ink: #111111;
   --ink-soft: #333333;
@@ -201,6 +244,7 @@
   --danger: #cc2929;
   --success: #288a3b;
   --warning: #d97f00;
+  --shadow-glow: 0 0 0 3px rgba(34, 34, 34, 0.15);
 }
 
 
@@ -213,6 +257,8 @@
   --bg-base: #121212;
   --bg-surface: #1e1e1e;
   --bg-header: #0a0a0a;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-glass: rgba(30, 30, 30, 0.8);
   
   --ink: #e0e0e0;
   --ink-soft: #9e9e9e;
@@ -230,6 +276,13 @@
   --danger: #ff5252;
   --success: #69f0ae;
   --warning: #ffd740;
+  --shadow-glow: 0 0 0 3px rgba(85, 85, 85, 0.2);
+  
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.15);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.35), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
 }
 
 /* 2. Black Navy (Subtle Blue Undertones) */
@@ -237,6 +290,8 @@
   --bg-base: #0f172a;
   --bg-surface: #1e293b;
   --bg-header: #020617;
+  --bg-hover: rgba(148, 163, 184, 0.06);
+  --bg-glass: rgba(30, 41, 59, 0.8);
   
   --ink: #e2e8f0;
   --ink-soft: #94a3b8;
@@ -254,6 +309,13 @@
   --danger: #f87171;
   --success: #4ade80;
   --warning: #facc15;
+  --shadow-glow: 0 0 0 3px rgba(71, 85, 105, 0.25);
+  
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.35), 0 2px 4px -2px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.35), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.25);
 }
 
 /* 3. Charcoal (Soft Dark Gray) */
@@ -261,6 +323,8 @@
   --bg-base: #212529;
   --bg-surface: #343a40;
   --bg-header: #151719;
+  --bg-hover: rgba(173, 181, 189, 0.06);
+  --bg-glass: rgba(52, 58, 64, 0.8);
   
   --ink: #f8f9fa;
   --ink-soft: #adb5bd;
@@ -278,20 +342,74 @@
   --danger: #fa5252;
   --success: #51cf66;
   --warning: #fcc419;
+  --shadow-glow: 0 0 0 3px rgba(108, 117, 125, 0.25);
+  
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.15);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.35), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
 }
 
 /* Common Element Overrides to enforce consistency with the theme */
 body {
   background-color: var(--bg-base);
   color: var(--ink);
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Ensure inputs and scrollbars play nice with dark themes */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: var(--bg-base); }
-::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+/* Premium scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 10px; transition: background 0.2s; }
 ::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); }
+
+/* ==========================================================================
+   Animation Keyframes
+   ========================================================================== */
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes popIn {
+  0% { transform: scale(0.9); opacity: 0; }
+  70% { transform: scale(1.02); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50% { box-shadow: 0 0 0 6px transparent; }
+}
 
 /* ==========================================================================
    Theme Dropdown UI Styles
@@ -316,7 +434,7 @@ body {
 }
 
 .theme-toggle-btn:hover {
-  background: var(--bg-elevated);
+  background: var(--bg-hover);
   color: var(--ink);
 }
 
@@ -329,12 +447,14 @@ body {
   background: var(--bg-surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-xl);
   z-index: 1000;
   padding: 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  animation: scaleIn 0.15s var(--ease-out-expo) forwards;
+  transform-origin: top right;
 }
 
 .theme-option {
@@ -343,16 +463,16 @@ body {
   width: 100%;
   text-align: left;
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--ink);
   font-family: var(--font-body);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: var(--transition);
+  transition: var(--transition-fast);
 }
 
 .theme-option:hover {
-  background: var(--bg-base);
+  background: var(--bg-hover);
   color: var(--accent);
 }
 
@@ -380,11 +500,11 @@ body {
   color: var(--ink-soft);
   cursor: pointer;
   border-radius: var(--radius-sm);
-  transition: var(--transition);
+  transition: var(--transition-fast);
 }
 
 .theme-tab:hover {
-  background: var(--bg-base);
+  background: var(--bg-hover);
   color: var(--ink);
 }
 

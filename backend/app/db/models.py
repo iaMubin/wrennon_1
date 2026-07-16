@@ -86,6 +86,7 @@ class Message(Base):
     # "agent" = a human support agent typed this. Kept distinct in storage.
     sender: Mapped[str] = mapped_column(String)
     content: Mapped[str] = mapped_column(Text)
+    author_username: Mapped[str | None] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)

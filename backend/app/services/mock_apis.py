@@ -14,6 +14,92 @@ docstring's "Returns" shape untouched, or downstream nodes will break.
 from __future__ import annotations
 
 from typing import Optional
+import json
+
+MOCK_CUSTOMERS = [
+  {
+    "id": "CUST-089",
+    "name": "Alex Rivera",
+    "email": "customer1@example.com",
+    "phone": "555-0198",
+    "lifetime_value": "$1,240.50",
+    "loyalty_tier": "Gold",
+    "recent_order": "1001",
+    "tags": ["Frequent Buyer", "Tech Gadgets"]
+  },
+  {
+    "id": "CUST-102",
+    "name": "Sam Chen",
+    "email": "demo@example.com",
+    "phone": "555-0211",
+    "lifetime_value": "$450.00",
+    "loyalty_tier": "Silver",
+    "recent_order": "1002",
+    "tags": ["New Customer"]
+  },
+  {
+    "id": "CUST-103",
+    "name": "Jordan Lee",
+    "email": "customer3@example.com",
+    "phone": "555-0311",
+    "lifetime_value": "$890.00",
+    "loyalty_tier": "Silver",
+    "recent_order": "1003",
+    "tags": ["Apparel"]
+  },
+  {
+    "id": "CUST-106",
+    "name": "Casey Smith",
+    "email": "customer6@example.com",
+    "phone": "555-0611",
+    "lifetime_value": "$210.00",
+    "loyalty_tier": "Bronze",
+    "recent_order": "1006",
+    "tags": []
+  },
+  {
+    "id": "CUST-107",
+    "name": "Taylor Swift",
+    "email": "customer7@example.com",
+    "phone": "555-0711",
+    "lifetime_value": "$5,450.00",
+    "loyalty_tier": "Platinum",
+    "recent_order": "1007",
+    "tags": ["VIP"]
+  },
+  {
+    "id": "CUST-999",
+    "name": "Test User",
+    "email": "test@example.com",
+    "phone": "555-9999",
+    "lifetime_value": "$150.00",
+    "loyalty_tier": "Bronze",
+    "recent_order": "1005",
+    "tags": ["Test"]
+  }
+]
+
+def get_customer_info(email: str = None, phone: str = None, customer_id: str = None) -> Optional[dict]:
+    if email:
+        email_lower = email.lower().strip()
+        for c in MOCK_CUSTOMERS:
+            if c["email"].lower() == email_lower:
+                return c
+    
+    if phone:
+        for c in MOCK_CUSTOMERS:
+            if c["phone"] == phone:
+                return c
+                
+    if customer_id:
+        for c in MOCK_CUSTOMERS:
+            if c["id"].lower() == customer_id.lower().strip():
+                return c
+                
+    return None
+
+
+from typing import Optional
 
 
 def get_order_status(order_id: str) -> Optional[dict]:
@@ -91,8 +177,6 @@ def get_order_status(order_id: str) -> Optional[dict]:
     order = mock_orders.get(order_id)
     if order:
         result = order.copy()
-        if "email" in result:
-            del result["email"]
         return result
     return None
 
