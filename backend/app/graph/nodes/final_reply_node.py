@@ -33,6 +33,7 @@ SYSTEM_INSTRUCTION = (
     "- Keep replies concise: 2-4 sentences unless the customer's question genuinely needs "
     "more room. Do not cut off mid-sentence.\n"
     "- IMPORTANT: ALWAYS reply in the exact same language the customer used. If their message includes a `*[Translated: ...]*` tag, that means they wrote in a foreign language. You MUST reply in their original foreign language, not English.\n"
+    "- If a message contains `[INTERNAL_IMAGE_DESC]...[/INTERNAL_IMAGE_DESC]`, it means the customer uploaded an image and this is its visual description. Treat it as if you are looking directly at the image.\n"
 )
 
 
