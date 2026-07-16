@@ -629,6 +629,9 @@ document.addEventListener("visibilitychange", () => {
 });
 
 function appendMessage(sender, content, isoString = new Date().toISOString(), isInternal = false, msgId = null) {
+  if (!content) content = "";
+  content = content.replace(/\n\n\(Image Description:[\s\S]*?\)/g, '');
+  
   if (document.hidden) {
     injectUnreadIndicator();
   }
@@ -1089,6 +1092,10 @@ function renderMarkdown(text) {
 
 function inlineMarkdown(text) {
   let escaped = escapeHtml(text);
+  
+  // Hide Internal Image Descriptions from UI
+  escaped = escaped.replace(/\n\n\(Image Description:[\s\S]*?\)/g, '');
+  
   escaped = escaped.replace(/\[Audio\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
     const playerId = 'vp_' + Math.random().toString(36).substr(2, 9);
     return `<div class="voice-player" id="${playerId}" data-src="${url}">` +

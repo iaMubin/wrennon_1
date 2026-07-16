@@ -258,7 +258,9 @@ async def describe_image_if_present(text: str) -> str:
                     model_override="qwen/qwen3.6-27b"
                 )
                 if desc:
-                    descriptions.append(desc.strip())
+                    desc = re.sub(r'<think>.*?</think>', '', desc, flags=re.DOTALL).strip()
+                    if desc:
+                        descriptions.append(desc)
             except Exception as e:
                 logger.error(f"Failed to describe image: {e}")
                 

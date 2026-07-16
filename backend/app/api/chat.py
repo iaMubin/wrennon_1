@@ -113,7 +113,9 @@ def get_history(
     CUSTOMER_VISIBLE_SENDERS = frozenset({"human", "ai", "agent"})
     # Strip [Translated: ...] tags from customer history so they don't see their own translations
     def clean_content(text):
-        return re.sub(r'\n\n\*\[Translated:.*?\]\*', '', text, flags=re.IGNORECASE | re.DOTALL)
+        text = re.sub(r'\n\n\*\[Translated:.*?\]\*', '', text, flags=re.IGNORECASE | re.DOTALL)
+        text = re.sub(r'\n\n\(Image Description:.*?\)', '', text, flags=re.DOTALL)
+        return text
 
     return [
         {
