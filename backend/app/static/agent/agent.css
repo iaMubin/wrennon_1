@@ -431,8 +431,8 @@ body {
   overflow: hidden;
 }
 .chat-lightbox-img-wrapper {
-  max-width: 600px;
-  max-height: 80vh;
+  max-width: 500px;
+  max-height: 70vh;
   width: 100%;
   display: flex;
   justify-content: center;

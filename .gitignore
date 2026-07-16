@@ -41,3 +41,4 @@ backend/test_graph_local.py
 backend/check.py
 *.tmp
 *.temp
+scratch/
