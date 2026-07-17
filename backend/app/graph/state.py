@@ -74,6 +74,7 @@ class ConversationState(TypedDict):
     # triggered, to "human" once the ticket is confirmed created, and to
     # "resolved" when the manager decides the customer is done. Every
     # node should check this before generating a bot reply.
+    direct_reply: Optional[str]
 
     # --- L3: reserved, unused in this phase ---
     otp_verified: Optional[bool]
@@ -129,4 +130,5 @@ def initial_state(customer_email: Optional[str] = None) -> ConversationState:
         sentiment=None,
         intent_category=None,
         language="English",
+        direct_reply=None,
     )

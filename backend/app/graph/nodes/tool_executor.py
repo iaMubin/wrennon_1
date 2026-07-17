@@ -39,7 +39,11 @@ async def tool_executor_node(state: ConversationState) -> ConversationState:
                 state["last_order_id"] = str(tool_args["order_id"])
                 
             try:
-                result = await TOOL_EXECUTORS[tool_name](tool_args)
+                result = str(await TOOL_EXECUTORS[tool_name](tool_args))
+                if len(result) > 1500:
+                    from app.services.llm import _safe_llm_call
+                    summary_prompt = f"Summarize this tool output concisely, focusing on key facts and policy details. Do not omit important data. \n\nOutput:\n{result}"
+                    result = await _safe_llm_call([{"role": "user", "content": summary_prompt}], temperature=0.1, max_tokens=300, model_override="openai/gpt-oss-20b")
                 gathered_context.append(f"Result from {tool_name}:\n{result}")
             except Exception as e:
                 logger.error(f"Error executing {tool_name}: {e}")

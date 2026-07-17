@@ -290,7 +290,7 @@ function connectSocket() {
     } else if (data.type === "new_message") {
       if (data.session_id === activeSessionId) {
         hideCustomerTypingIndicator();
-        appendMessage(data.sender, data.content, new Date().toISOString(), data.sender === "agent_internal", data.message_id);
+        appendMessage(data.sender, data.content, new Date().toISOString(), data.sender === "agent_internal", data.message_id, data.author_username, data.author_role);
         // Refresh order context whenever a new message arrives (human or bot/ai may trigger order fetching)
         fetchOrderContext(data.session_id);
         if (data.is_resolved) {
@@ -414,6 +414,10 @@ function renderConversationList(conversations) {
       }
     }
 
+    const mentionedBadge = conv.is_mentioned 
+      ? `<span class="badge badge--human">Mentioned</span>`
+      : "";
+
     const reopenBadge = conv.reopen_count > 0
       ? `<span class="conv-item__reopen-badge">↩ Reopened${conv.reopen_count > 1 ? ` ×${conv.reopen_count}` : ""}</span>`
       : "";
@@ -464,6 +468,7 @@ function renderConversationList(conversations) {
       <div class="conv-item-preview">${formatPreview(conv.last_message)}</div>
       <div class="badge-row">
         <span class="badge ${badgeClass}">${stageText}</span>
+        ${mentionedBadge}
         ${slaBadge}
         ${sentimentBadge}
         ${languageBadge}
@@ -525,6 +530,12 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
   const responseData = await authedFetch(`/agent/conversations/${sessionId}/messages`);
   agentMessages.innerHTML = "";
   
+  lastMsgSender = null;
+  lastMsgTime = 0;
+  lastMsgAuthor = null;
+  hasUnreadIndicator = false;
+  agentInput.focus();
+  
   if (responseData) {
     const messages = responseData.messages || [];
     const pinnedId = responseData.pinned_message_id;
@@ -553,7 +564,7 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
         agentMessages.appendChild(dateDiv);
         lastDateStr = dateStr;
       }
-      appendMessage(msg.sender, msg.content, msg.created_at, msg.sender === "agent_internal", msg.id);
+      appendMessage(msg.sender, msg.content, msg.created_at, msg.sender === "agent_internal", msg.id, msg.author_username, msg.author_role);
     }
     
     updatePinnedMessageUI(pinnedId, pinnedContent);
@@ -565,6 +576,7 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
 
 let lastMsgSender = null;
 let lastMsgTime = 0;
+let lastMsgAuthor = null;
 
 let hasUnreadIndicator = false;
 
@@ -658,7 +670,7 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-function appendMessage(sender, content, isoString = new Date().toISOString(), isInternal = false, msgId = null) {
+function appendMessage(sender, content, isoString = new Date().toISOString(), isInternal = false, msgId = null, author_username = null, author_role = null) {
   if (!isInternal) {
     extractAndShowCustomerDetails(content);
   }
@@ -668,15 +680,22 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
   }
 
   const timestamp = new Date(isoString).getTime();
-  const isGrouped = (sender === lastMsgSender && (timestamp - lastMsgTime < 60000) && sender !== "system");
+  const actualSender = isInternal ? "agent" : sender;
+  const currentAuthor = (actualSender === "agent") ? (author_username || localStorage.getItem("agent_username") || "Agent").toLowerCase() : null;
+  
+  let isGrouped = (sender === lastMsgSender && currentAuthor === lastMsgAuthor && (timestamp - lastMsgTime < 60000) && sender !== "system");
+  
+  if (isInternal) {
+    isGrouped = false; // Never group internal notes
+  }
   
   if (!isGrouped) {
     lastMsgSender = sender;
+    lastMsgAuthor = currentAuthor;
   }
   lastMsgTime = timestamp;
 
   const contentWrapper = document.createElement("div");
-  const actualSender = isInternal ? "agent" : sender;
   contentWrapper.className = `msg-content msg-content--${actualSender}${isGrouped ? ' msg-content--grouped' : ''}${isInternal ? ' msg-content--internal' : ''}`;
   contentWrapper.style.display = "flex";
   contentWrapper.style.flexDirection = "column";
@@ -688,14 +707,17 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
   
   let nameHtml = "";
   if (actualSender === "agent" && !isGrouped) {
-    const storedName = localStorage.getItem("agent_username") || "Agent";
+    const storedName = author_username || "Agent";
     const displayName = storedName.toUpperCase();
     
+    const storedRole = author_role || "agent";
+    const displayRole = storedRole.toUpperCase();
+    
     if (isInternal) {
-      const badgeHtml = `<span style="background: var(--accent-alert); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; vertical-align: middle;">Agent</span>`;
+      const badgeHtml = `<span style="background: var(--accent-alert); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; vertical-align: middle;">${displayRole}</span>`;
       nameHtml = `<div class="msg-name" style="display: flex; align-items: center; margin-bottom: 6px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 600; color: var(--ink); opacity: 0.9; letter-spacing: 0.05em; text-transform: uppercase;"><span style="font-weight: 800; margin-right: 4px; color: var(--accent-alert);">Note:</span> ${displayName}${badgeHtml}</div>`;
     } else {
-      const badgeHtml = `<span style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: var(--bg-base); padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; vertical-align: middle;">Agent</span>`;
+      const badgeHtml = `<span style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: var(--bg-base); padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; vertical-align: middle;">${displayRole}</span>`;
       nameHtml = `<div class="msg-name" style="display: flex; align-items: center; margin-bottom: 6px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 600; color: var(--bg-base); opacity: 0.95; letter-spacing: 0.05em; text-transform: uppercase;">${displayName}${badgeHtml}</div>`;
     }
   }
@@ -784,12 +806,22 @@ const MACROS = [
   { cmd: "/escalate", desc: "Escalate to manager", text: "I understand your frustration. I am escalating this issue to my manager immediately, and they will reach out to you within the hour." }
 ];
 
-const AGENTS = [
-  { cmd: "@Alex", desc: "Support Agent" },
-  { cmd: "@Sam", desc: "Support Agent" },
-  { cmd: "@Manager", desc: "Shift Manager" },
-  { cmd: "@SupportTeam", desc: "General Support" }
-];
+const AGENTS = [];
+
+async function loadAgents() {
+  const data = await authedFetch("/agent/list");
+  if (data && Array.isArray(data)) {
+    AGENTS.length = 0;
+    for (const agent of data) {
+      if (agent.role === "agent" || agent.role === "manager" || agent.role === "admin") {
+        let title = agent.role.charAt(0).toUpperCase() + agent.role.slice(1);
+        let display = agent.full_name || agent.username;
+        AGENTS.push({ cmd: "@" + agent.username, desc: display + " (" + title + ")" });
+      }
+    }
+  }
+}
+loadAgents();
 
 let slashSelectedIndex = 0;
 let currentPopupMode = null; // "macro" or "mention"
@@ -1007,8 +1039,19 @@ if (noteTypeSelect) {
       agentInput.style.backgroundColor = "var(--bg-base)";
       agentInput.placeholder = "Type a reply";
     }
+    agentInput.focus();
   });
 }
+
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && e.key.toLowerCase() === "l") {
+    e.preventDefault();
+    if (noteTypeSelect) {
+      noteTypeSelect.value = noteTypeSelect.value === "internal" ? "public" : "internal";
+      noteTypeSelect.dispatchEvent(new Event("change"));
+    }
+  }
+});
 
 const agentCopilotBtn = document.getElementById("agent-copilot-btn");
 if (agentCopilotBtn) {

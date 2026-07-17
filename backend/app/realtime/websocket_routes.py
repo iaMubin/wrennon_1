@@ -256,7 +256,7 @@ def _sync_validate_agent(username: str, pwd_frag: str | None) -> dict | None:
         expected_frag = agent.password_hash[-10:] if agent.password_hash else ""
         if pwd_frag != expected_frag:
             return None
-        return {"full_name": agent.full_name}
+        return {"full_name": agent.full_name, "role": agent.role}
 
 
 def _sync_agent_reply(session_id: str, username: str, reply_text: str, is_internal: bool = False) -> dict | None:
@@ -271,7 +271,7 @@ def _sync_agent_reply(session_id: str, username: str, reply_text: str, is_intern
         if not is_internal and not conversation.handoff_active:
             conversation.handoff_active = True
             
-        if not is_internal:
+        if not is_internal or conversation.handled_by is None:
             conversation.handled_by = username
             
         db.commit()
@@ -862,7 +862,9 @@ async def agent_websocket(websocket: WebSocket, access_token: str | None = Cooki
                 "sender": "agent_internal" if is_internal else "agent",
                 "content": reply_text,
                 "is_resolved": reply_data["resolved"],
-                "message_id": reply_data["message_id"]
+                "message_id": reply_data["message_id"],
+                "author_username": username,
+                "author_role": agent_data["role"]
             })
 
     except WebSocketDisconnect:

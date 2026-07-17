@@ -91,45 +91,84 @@ async def _safe_groq_json_call(messages: list, temperature: float = 0.2, max_tok
     """Wrapper around Groq API calls specifically for JSON output."""
     import time
     start_time = time.time()
-    response = await _client.chat.completions.create(
-        model=model_override or MODEL,
-        messages=messages,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        response_format={"type": "json_object"}
-    )
-    logger.info(f"[TIMING] Groq JSON Completion took {time.time() - start_time:.3f}s")
-    result = response.choices[0].message.content
-    if result and result.strip():
-        return result.strip()
-    raise ValueError("Groq returned empty JSON response")
+    try:
+        response = await _client.chat.completions.create(
+            model=model_override or MODEL,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            response_format={"type": "json_object"}
+        )
+        logger.info(f"[TIMING] Groq JSON Completion took {time.time() - start_time:.3f}s")
+        result = response.choices[0].message.content
+        if result and result.strip():
+            return result.strip()
+        raise ValueError("Groq returned empty JSON response")
+    except Exception as e:
+        import json
+        if hasattr(e, "body") and isinstance(e.body, dict):
+            err_dict = e.body
+        else:
+            err_dict = {}
+            # Fallback parsing if stringified
+            err_str = str(e)
+            if "tool_use_failed" in err_str:
+                dict_str = err_str[err_str.find("{"):]
+                try:
+                    import ast
+                    err_dict = ast.literal_eval(dict_str)
+                except Exception:
+                    try:
+                        err_dict = json.loads(dict_str)
+                    except Exception:
+                        pass
+        
+        err_info = err_dict.get("error", {})
+        if err_info.get("code") == "tool_use_failed":
+            fg = err_info.get("failed_generation")
+            if fg:
+                try:
+                    tc = json.loads(fg)
+                    args = tc.get("arguments")
+                    if isinstance(args, str):
+                        return args
+                    elif isinstance(args, dict):
+                        return json.dumps(args)
+                except Exception:
+                    pass
+        raise e
 
 
+from tenacity import retry_if_not_exception_type
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+    retry=retry_if_not_exception_type(openai.RateLimitError)
+)
 async def _safe_openai_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, is_json: bool = False) -> str:
     """Fallback to OpenAI if Groq fails."""
     if not _openai_client:
         return ""
     logger.info("Falling back to OpenAI API...")
-    try:
-        kwargs = {
-            "model": "gpt-5.4-mini",
-            "messages": messages,
-            "temperature": temperature,
-            "max_completion_tokens": max_tokens,
-        }
-        if is_json:
-            kwargs["response_format"] = {"type": "json_object"}
+    kwargs = {
+        "model": "gpt-5.4-mini",
+        "messages": messages,
+        "temperature": temperature,
+        "max_completion_tokens": max_tokens,
+    }
+    if is_json:
+        kwargs["response_format"] = {"type": "json_object"}
 
-        import time
-        start_time = time.time()
-        response = await _openai_client.chat.completions.create(**kwargs)
-        logger.info(f"[TIMING] OpenAI Completion took {time.time() - start_time:.3f}s")
-        result = response.choices[0].message.content
-        if result and result.strip():
-            return result.strip()
-    except Exception as e:
-        logger.warning(f"OpenAI fallback failed: {e}")
-    return ""
+    import time
+    start_time = time.time()
+    response = await _openai_client.chat.completions.create(**kwargs)
+    logger.info(f"[TIMING] OpenAI Completion took {time.time() - start_time:.3f}s")
+    result = response.choices[0].message.content
+    if result and result.strip():
+        return result.strip()
+    raise ValueError("OpenAI returned empty response")
 
 
 async def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, is_json: bool = False, model_override: str = None) -> str:
@@ -141,7 +180,11 @@ async def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: i
     except Exception as e:
         logger.error(f"Groq API completely failed after retries: {e}")
         if _openai_client:
-            return await _safe_openai_call(messages, temperature, max_tokens, is_json)
+            try:
+                return await _safe_openai_call(messages, temperature, max_tokens, is_json)
+            except Exception as oe:
+                logger.error(f"OpenAI fallback completely failed after retries: {oe}")
+                return ""
         return ""
 
 
@@ -186,10 +229,13 @@ async def auto_translate_if_needed(text: str) -> str:
     if len(text.strip()) < 3:
         return text
         
-    prompt = f"Detect the language of the following text. If it is already in English, reply with exactly 'ENGLISH'. If it is NOT in English, reply with its English translation ONLY, wrapped in [Translated: ...]. Do not add any other text.\n\nText: {text}"
+    llm_messages = [
+        {"role": "system", "content": "Detect the language of the following text. If it is already in English, reply with exactly 'ENGLISH'. If it is NOT in English, reply with its English translation ONLY, wrapped in [Translated: ...]. Do not add any other text."},
+        {"role": "user", "content": f"Text: {text}"}
+    ]
     
     try:
-        result = await _safe_llm_call([{"role": "user", "content": prompt}], temperature=0.0, max_tokens=200)
+        result = await _safe_llm_call(llm_messages, temperature=0.0, max_tokens=200)
         if result and "ENGLISH" not in result.strip().upper():
             return f"{text}\n\n*{result.strip()}*"
         return text
@@ -296,25 +342,27 @@ async def generate_conversation_summary(messages: list, escalation_reason: str |
 
     transcript_text = "\n".join(transcript_lines)
 
-    prompt = (
+    system_prompt = (
         "You are an expert support supervisor summarizing a chat transcript for a human agent handoff.\n"
         "Read the transcript below and generate a structured summary. Do NOT reply to the customer. "
         "Do NOT act as the customer support bot.\n\n"
+        "Keep the summary extremely concise and short. Use a maximum of 3 short bullet points. Do not include fluff. Ensure the agent can understand the problem at a glance.\n"
         "Format your response as a list of key-value pairs (e.g., • **Issue**: ...). "
         "Do NOT include the word 'Summary' at the top. Only use headings that are contextually relevant (e.g., Issue, Status). "
-        "You MUST include a '**Macro Suggestion**' heading that provides a clear, draft response or action plan for the human agent to take. This acts as an Agent Copilot.\n\n"
+        "You MUST include a '**Macro Suggestion**' heading that provides a clear, very brief action plan for the human agent to take.\n\n"
     )
 
     if escalation_reason:
-        prompt += (
+        system_prompt += (
             f"The automated agent escalated this conversation for the following reason: "
             f"{escalation_reason}\nMake sure this reason is clearly reflected in the summary "
             "(e.g. under an 'Escalation Reason' heading).\n\n"
         )
 
-    prompt += f"Transcript:\n{transcript_text}"
-
-    llm_messages = [{"role": "user", "content": prompt}]
+    llm_messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"Transcript:\n{transcript_text}"}
+    ]
 
     result = await _safe_llm_call(messages=llm_messages, temperature=0.1, max_tokens=1024)
     return result or "Customer requested to speak with a human agent."
@@ -342,3 +390,23 @@ async def update_conversation_summary(messages: list, current_summary: str | Non
 
     result = await _safe_llm_call(messages=llm_messages, temperature=0.2, max_tokens=250)
     return result or current_summary or ""
+
+async def validate_security_intent(text: str) -> bool:
+    """Validates customer intent for abuse, policy violations, or unauthorized requests before sensitive tools (like refunds) are executed."""
+    llm_messages = [
+        {"role": "system", "content": (
+            "You are a security safeguard. Analyze the following customer message. "
+            "Reply with exactly 'SAFE' if the request is normal and non-abusive. "
+            "Reply with exactly 'UNSAFE' if it contains abuse, threats, severe profanity, or clear signs of fraud/unauthorized manipulation."
+        )},
+        {"role": "user", "content": f"Message: {text}"}
+    ]
+    try:
+        result = await _safe_llm_call(llm_messages, temperature=0.0, max_tokens=10, model_override="openai/gpt-oss-safeguard-20b")
+        if result and "UNSAFE" in result.strip().upper():
+            return False
+        return True
+    except Exception as e:
+        logger.error(f"Security validation failed: {e}")
+        return True
+

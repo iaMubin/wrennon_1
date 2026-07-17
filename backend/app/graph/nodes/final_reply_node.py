@@ -30,8 +30,7 @@ SYSTEM_INSTRUCTION = (
     "words — never say 'based on the context provided' or 'according to my data'.\n"
     "- If there is genuinely no information to answer a specific policy question, say so "
     "plainly and offer to have someone follow up — do not invent details.\n"
-    "- Keep replies concise: 2-4 sentences unless the customer's question genuinely needs "
-    "more room. Do not cut off mid-sentence.\n"
+    "- Keep replies very concise, polite, and to the point (1-3 sentences maximum). Never ramble, write huge paragraphs, or cut off mid-sentence. Focus only on the core issue.\n"
     "- If the customer is asking a query but they are not logged in (no customer_email in context) and have not provided an Order ID or account details, politely ask for their email, phone number, or customer ID so you can assist them better. However, do not force them if they decline or ignore the request.\n"
     "- IMPORTANT: ALWAYS reply in the exact same language the customer used. If their message includes a `*[Translated: ...]*` tag, that means they wrote in a foreign language. You MUST reply in their original foreign language, not English.\n"
     "- If a message contains `[INTERNAL_IMAGE_DESC]...[/INTERNAL_IMAGE_DESC]`, it means the customer uploaded an image and this is its visual description. Treat it as if you are looking directly at the image.\n"
@@ -82,7 +81,7 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
     llm_messages = [{"role": "system", "content": system_instruction}]
     model_override = None
 
-    recent_messages = state["messages"][-10:]
+    recent_messages = state["messages"][-6:]
     for msg in recent_messages[:-1]:
         if msg.type == "human":
             role = "user"
@@ -101,7 +100,7 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
     final_prompt = f"Context:\n{context_text}\n\nCustomer's message: {last_human_content}"
     llm_messages.append({"role": "user", "content": final_prompt})
 
-    reply = await _safe_llm_call(llm_messages, temperature=0.3, max_tokens=400)
+    reply = await _safe_llm_call(llm_messages, temperature=0.3, max_tokens=1000)
     if not reply:
         reply = "I'm sorry, I couldn't process that right now. Could you please try again?"
 

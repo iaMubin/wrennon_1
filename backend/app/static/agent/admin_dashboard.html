@@ -99,6 +99,12 @@
 
         <div class="section-block">
             <h3 style="display: flex; align-items: center; gap: 8px;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-ink-soft">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <line x1="19" y1="8" x2="19" y2="14"></line>
+                    <line x1="22" y1="11" x2="16" y2="11"></line>
+                </svg>
                 Create New Agent
                 <button class="btn btn-sm" id="toggle-create-agent-btn" onclick="toggleCreateAgent()" style="padding: 6px;">
                     <svg id="toggle-create-agent-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(0deg); transition: transform 0.3s ease;">
@@ -107,6 +113,14 @@
                 </button>
             </h3>
             <div id="create-agent-container" style="display: none;">
+                <style>
+                    @keyframes fadeInBounce {
+                        0% { opacity: 0; transform: scale(0.95); }
+                        50% { transform: scale(1.02); }
+                        100% { opacity: 1; transform: scale(1); }
+                    }
+                    .fade-in-bounce { animation: fadeInBounce 0.4s ease-out forwards; }
+                </style>
                 <!-- hidden inputs to trick browser password managers -->
                 <input style="display:none" type="text" name="fakeusernameremembered"/>
                 <input style="display:none" type="password" name="fakepasswordremembered"/>
@@ -156,6 +170,29 @@
                     <button type="submit" class="btn btn-primary" style="height: 43px; margin-bottom: 2px;">Create Agent</button>
                     <div id="error-msg"></div>
                 </form>
+                
+                <div id="create-agent-success" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 48px 16px; text-align: center;">
+                    <div class="success-icon" style="background: rgba(34,197,94,0.1); color: var(--accent-success); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                    </div>
+                    <h4 style="margin: 0 0 8px 0; font-size: 1.125rem; font-weight: 600;">Agent Created Successfully</h4>
+                    <p style="margin: 0 0 24px 0; color: var(--ink-soft); font-size: 0.875rem;">The new agent can now log in using their credentials.</p>
+                    <div style="display: flex; gap: 12px; width: 100%; justify-content: center;">
+                        <button type="button" class="btn btn-secondary" onclick="closeCreateAgentPanel()">Done</button>
+                        <button type="button" class="btn btn-primary" onclick="resetCreateAgentForm()" style="display: flex; align-items: center; gap: 8px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <line x1="19" y1="8" x2="19" y2="14"></line>
+                                <line x1="22" y1="11" x2="16" y2="11"></line>
+                            </svg>
+                            Add New Agent
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -583,16 +620,10 @@
             btn.innerText = "Create Agent";
 
             if (res.ok) {
-                document.getElementById("agent-username").value = "";
-                document.getElementById("agent-fullname").value = "";
-                document.getElementById("agent-employee-id").value = "";
-                pwdInput.value = "";
-                document.getElementById("error-msg").innerText = "";
-
-                // reset pwd toggle if visible
-                if (pwdInput.type === "text") {
-                    togglePwdBtn.click();
-                }
+                document.getElementById("create-agent-form").style.display = "none";
+                const successDiv = document.getElementById("create-agent-success");
+                successDiv.style.display = "flex";
+                successDiv.classList.add("fade-in-bounce");
 
                 fetchAgents();
                 fetchLogs();
@@ -601,6 +632,27 @@
                 document.getElementById("error-msg").innerText = data.detail;
             }
         });
+
+        function resetCreateAgentForm() {
+            const form = document.getElementById("create-agent-form");
+            form.reset();
+            document.getElementById("error-msg").innerText = "";
+            const pwdInputLocal = document.getElementById("agent-password");
+            if (pwdInputLocal && pwdInputLocal.type === "text") {
+                document.getElementById("toggle-pwd").click();
+            }
+            
+            document.getElementById("create-agent-success").style.display = "none";
+            document.getElementById("create-agent-success").classList.remove("fade-in-bounce");
+            
+            form.style.display = "block";
+            form.style.animation = "fadeInBounce 0.4s ease-out forwards";
+        }
+
+        function closeCreateAgentPanel() {
+            resetCreateAgentForm();
+            toggleCreateAgent();
+        }
 
         async function fetchLogs() {
             try {

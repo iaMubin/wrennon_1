@@ -26,6 +26,6 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 # File handler
-file_handler = logging.FileHandler(log_file)
+file_handler = logging.FileHandler(log_file, encoding="utf-8")
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)

@@ -57,7 +57,7 @@ SYSTEM_PROMPT = """You are the decision-making core of Wrennon's customer suppor
    - If it answers the question, you are done: set "tools_to_run" to [] and "ready_to_respond" to true.
    - Only plan another tool call if the previous result was genuinely incomplete AND a different tool call would add new information.
 6. If the customer is simply closing the conversation, set "resolved_required" to true.
-7. Greetings and small talk need no tools and no escalation.
+7. Greetings and small talk need no tools and no escalation. If the customer's message is a simple greeting, thank you, or can be answered directly without ANY tools or complex reasoning, populate the "direct_reply" field with a polite, concise response (in the same language the customer used) and set "ready_to_respond" to true. ONLY use this if NO tools are needed. If the user asks a question alongside a greeting, use the required tools and leave "direct_reply" empty.
 
 ## Output format
 Respond with ONLY a JSON object, no other text, shaped exactly exactly like this:
@@ -70,7 +70,8 @@ Respond with ONLY a JSON object, no other text, shaped exactly exactly like this
   "handoff_reason": "short reason, only if handoff_required is true, else empty string",
   "resolved_required": true or false,
   "sentiment": "Happy, Neutral, Frustrated, or Angry",
-  "language": "Detect the language the customer is using"
+  "language": "Detect the language the customer is using",
+  "direct_reply": "Your direct reply here, or null if tools/escalation are needed"
 }
 
 NOTE: If a user message contains `[INTERNAL_IMAGE_DESC]...[/INTERNAL_IMAGE_DESC]`, it means the customer uploaded an image and this is its visual description. Treat it as if you are looking directly at the image.
@@ -148,7 +149,7 @@ async def manager_node(state: ConversationState) -> ConversationState:
 
     llm_messages = [{"role": "system", "content": system_content}]
 
-    recent_messages = state["messages"][-10:] if len(state["messages"]) > 10 else state["messages"]
+    recent_messages = state["messages"][-6:] if len(state["messages"]) > 6 else state["messages"]
     for msg in recent_messages:
         if msg.type == "human":
             role = "user"
@@ -166,7 +167,7 @@ async def manager_node(state: ConversationState) -> ConversationState:
     last_error = None
     for attempt in range(2):  # one retry on malformed JSON before falling back safely
         try:
-            result_str = await _safe_llm_call(llm_messages, temperature=0.1, max_tokens=500, is_json=True)
+            result_str = await _safe_llm_call(llm_messages, temperature=0.1, max_tokens=1000, is_json=True)
             decision = json.loads(result_str)
             break
         except (json.JSONDecodeError, TypeError, ValueError) as e:
@@ -186,6 +187,11 @@ async def manager_node(state: ConversationState) -> ConversationState:
         return state
 
     logger.info(f"Manager reasoning: {decision.get('reasoning', '')}")
+
+    if "direct_reply" in decision and decision["direct_reply"]:
+        state["direct_reply"] = decision["direct_reply"]
+        from langchain_core.messages import AIMessage
+        state["messages"].append(AIMessage(content=decision["direct_reply"]))
 
     ready = bool(decision.get("ready_to_respond"))
     raw_tools = [] if ready else (decision.get("tools_to_run") or [])

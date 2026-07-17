@@ -60,6 +60,15 @@ async def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
     # Use search_query input_type for queries (Cohere v3 models
     # produce better results when document vs query is distinguished)
     start_time = time.time()
+    
+    # Mock for local testing if API key is not configured
+    if settings.pinecone_api_key == "YOUR_NEW_PINECONE_API_KEY":
+        logger.info("Using mocked knowledge base (Pinecone API key not set).")
+        query_lower = query.lower()
+        if "refund" in query_lower or "cancel" in query_lower:
+            return [{"text": "Orders can be self-cancelled within 24 hours of placement. Once an order has shipped, it cannot be self-cancelled. Customers must request a refund through a support agent, who will process it manually.", "relevance_score": 0.99}]
+        return [{"text": "We offer a 30-day return policy for most items. For other inquiries, please escalate to a human agent.", "relevance_score": 0.8}]
+    
     query_embedding = await asyncio.to_thread(_query_embedder.embed_query, query)
     logger.info(f"[TIMING] Cohere Embed Query took {time.time() - start_time:.3f}s")
 

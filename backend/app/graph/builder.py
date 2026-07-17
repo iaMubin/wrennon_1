@@ -29,6 +29,9 @@ def build_graph():
         if state.get("handoff_requested") and state["conversation_mode"] != "pending_human":
             return "handoff"
 
+        if state.get("direct_reply"):
+            return END
+
         if state.get("planned_tools"):
             return "tool_executor"
 
@@ -41,6 +44,7 @@ def build_graph():
             "tool_executor": "tool_executor",
             "handoff": "handoff",
             "final_reply": "final_reply",
+            END: END,
         },
     )
 

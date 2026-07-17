@@ -137,13 +137,32 @@ def get_my_cases(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
 ):
-    convs = db.query(Conversation).filter(
-        Conversation.handled_by == agent.username,
-        Conversation.resolved == False
-    ).order_by(Conversation.updated_at.desc()).all()
+    convs = db.query(Conversation).options(selectinload(Conversation.messages)).outerjoin(
+        Message, Conversation.id == Message.conversation_id
+    ).filter(
+        Conversation.resolved == False,
+        or_(
+            Conversation.handled_by == agent.username,
+            (Message.sender == "agent_internal") & (Message.content.like(f"%@{agent.username}%"))
+        )
+    ).distinct().order_by(Conversation.updated_at.desc()).all()
     
-    return [{"session_id": c.session_id, "created_at": c.created_at.isoformat(), "updated_at": c.updated_at.isoformat(), "handoff_active": c.handoff_active, "resolved": c.resolved, "handled_by": c.handled_by, "reopen_count": c.reopen_count} for c in convs]
+    results = []
+    for c in convs:
+        summary = _conversation_summary(c)
+        summary["is_mentioned"] = (c.handled_by != agent.username)
+        results.append(summary)
+        
+    return results
 
+
+@router.get("/agent/list")
+async def list_agents(
+    db: Session = Depends(get_db),
+    current_agent: Agent = Depends(get_current_agent)
+) -> list[dict]:
+    agents = db.query(Agent).all()
+    return [{"username": a.username, "full_name": a.full_name, "role": a.role} for a in agents]
 
 @router.get("/agent/conversations/active")
 def active_chats(
@@ -186,10 +205,19 @@ def conversation_messages(
     conversation = db.query(Conversation).filter_by(session_id=session_id).first()
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
+    agent_roles = {a.username: a.role for a in db.query(Agent).all()}
+    
     return {
         "pinned_message_id": conversation.pinned_message_id,
         "messages": [
-            {"id": m.id, "sender": m.sender, "content": m.content, "created_at": m.created_at.isoformat()}
+            {
+                "id": m.id, 
+                "sender": m.sender, 
+                "content": m.content, 
+                "created_at": m.created_at.isoformat(), 
+                "author_username": m.author_username,
+                "author_role": agent_roles.get(m.author_username, "agent") if m.author_username else "agent"
+            }
             for m in conversation.messages
         ]
     }
