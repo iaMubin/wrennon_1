@@ -198,4 +198,75 @@ def get_audit_logs(
         for log in logs
     ]
 
+from app.db.models import SystemSetting, KnowledgeGap, AnalyticsScorecard
+from app.api.kb import insert_into_pinecone
 
+class SettingUpdate(BaseModel):
+    value: str
+
+@router.get("/admin/settings/{key}")
+def get_setting(key: str, db: Session = Depends(get_db), manager: Agent = Depends(get_current_manager)):
+    setting = db.query(SystemSetting).filter_by(key=key).first()
+    return {"key": key, "value": setting.value if setting else ""}
+
+@router.put("/admin/settings/{key}")
+def update_setting(key: str, payload: SettingUpdate, db: Session = Depends(get_db), manager: Agent = Depends(get_current_manager)):
+    setting = db.query(SystemSetting).filter_by(key=key).first()
+    if not setting:
+        setting = SystemSetting(key=key, value=payload.value)
+        db.add(setting)
+    else:
+        setting.value = payload.value
+    db.commit()
+    return {"status": "success", "key": key, "value": payload.value}
+
+@router.get("/admin/knowledge-gaps")
+def list_knowledge_gaps(db: Session = Depends(get_db), manager: Agent = Depends(get_current_manager)):
+    gaps = db.query(KnowledgeGap).order_by(KnowledgeGap.created_at.desc()).limit(50).all()
+    return [{
+        "id": g.id,
+        "conversation_id": g.conversation_id,
+        "question": g.question,
+        "draft_article": g.draft_article,
+        "status": g.status,
+        "created_at": g.created_at.isoformat()
+    } for g in gaps]
+
+@router.post("/admin/knowledge-gaps/{gap_id}/approve")
+def approve_knowledge_gap(gap_id: str, db: Session = Depends(get_db), manager: Agent = Depends(get_current_manager)):
+    gap = db.query(KnowledgeGap).filter_by(id=gap_id).first()
+    if not gap:
+        raise HTTPException(status_code=404, detail="Gap not found")
+    if gap.status != "pending":
+        raise HTTPException(status_code=400, detail="Gap is already processed")
+    
+    # Sync to pinecone
+    title = gap.question[:50] + "..." if len(gap.question) > 50 else gap.question
+    insert_into_pinecone(title, gap.draft_article, f"KB_GAP_{gap.id}")
+    
+    gap.status = "approved"
+    db.commit()
+    return {"status": "success", "id": gap.id}
+
+@router.post("/admin/knowledge-gaps/{gap_id}/reject")
+def reject_knowledge_gap(gap_id: str, db: Session = Depends(get_db), manager: Agent = Depends(get_current_manager)):
+    gap = db.query(KnowledgeGap).filter_by(id=gap_id).first()
+    if not gap:
+        raise HTTPException(status_code=404, detail="Gap not found")
+    gap.status = "rejected"
+    db.commit()
+    return {"status": "success", "id": gap.id}
+
+@router.get("/admin/analytics/scorecards")
+def get_analytics_scorecards(db: Session = Depends(get_db), manager: Agent = Depends(get_current_manager)):
+    cards = db.query(AnalyticsScorecard).order_by(AnalyticsScorecard.created_at.desc()).limit(50).all()
+    return [{
+        "id": c.id,
+        "conversation_id": c.conversation_id,
+        "empathy_score": c.empathy_score,
+        "accuracy_score": c.accuracy_score,
+        "resolution_score": c.resolution_score,
+        "csat_prediction": c.csat_prediction,
+        "feedback_notes": c.feedback_notes,
+        "created_at": c.created_at.isoformat()
+    } for c in cards]

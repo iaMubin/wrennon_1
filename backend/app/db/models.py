@@ -124,3 +124,48 @@ class AuditLog(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None), index=True
     )
+
+
+class KnowledgeGap(Base):
+    __tablename__ = "knowledge_gaps"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id"), index=True)
+    question: Mapped[str] = mapped_column(Text)
+    draft_article: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String, default="pending")  # pending, approved, rejected
+
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    )
+
+
+class AnalyticsScorecard(Base):
+    __tablename__ = "analytics_scorecards"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id"), unique=True)
+    empathy_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    accuracy_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    resolution_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    csat_prediction: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    feedback_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    )
+
+
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
+    key: Mapped[str] = mapped_column(String, unique=True, index=True)
+    value: Mapped[str] = mapped_column(Text)
+
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    )

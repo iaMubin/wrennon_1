@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Body, status, Response, Form
+from fastapi import APIRouter, Depends, HTTPException, Body, status, Response, Form, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 import pyotp
+from app.services.qa import process_resolved_conversation_tasks
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_
@@ -275,6 +276,7 @@ def conversation_messages(
 @router.post("/agent/conversations/{session_id}/resolve")
 def resolve_conversation(
     session_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
 ) -> dict:
@@ -293,6 +295,8 @@ def resolve_conversation(
     )
     db.add(audit)
     db.commit()
+
+    background_tasks.add_task(process_resolved_conversation_tasks, conversation.id)
     return {"status": "resolved", "session_id": session_id}
 
 @router.delete("/agent/messages/{message_id}")

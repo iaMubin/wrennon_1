@@ -252,6 +252,15 @@
             </div>
         </div>
 
+        <div class="section-block">
+            <h3>AI Brand Persona</h3>
+            <p class="section-subtitle">Customize how the AI talks to customers (this dynamically updates the System Prompt).</p>
+            <div class="panel" style="display: flex; flex-direction: column; gap: 16px;">
+                <textarea id="brand-voice-textarea" style="width: 100%; height: 120px; padding: 12px; border-radius: 8px; border: 1px solid var(--border-light); background: var(--bg-body); color: var(--text-main); font-family: 'Inter', sans-serif; resize: vertical;" placeholder="e.g. You are a highly professional, polite, and formal support agent for a luxury brand. Never use emojis."></textarea>
+                <button class="btn btn-primary" onclick="saveBrandVoice()" style="align-self: flex-start;">Save Brand Persona</button>
+            </div>
+        </div>
+
         <div class="section-divider">
             <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent);">
@@ -818,81 +827,101 @@
             }
         }
 
-        async function fetchCopilot() {
+        async function fetchBrandVoice() {
             try {
-                const req = {
-                    ticket_id: "TICKET-" + Math.floor(Math.random() * 10000),
-                    conversation_summary: "Customer inquiring about product specs."
-                };
-                const res = await fetch(`${API_BASE}/copilot/suggest`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...authHeaders },
-                    body: JSON.stringify(req)
-                });
-                if (!res.ok) return;
-                const data = await res.json();
-
-                const list = document.getElementById('copilot-activity-list');
-                list.innerHTML = `
-                    <div class="result-card">
-                        <div class="result-card-header">
-                            <span class="result-eyebrow">RECOMMENDED ACTION</span>
-                            <span class="confidence-pill">High Confidence</span>
-                        </div>
-                        <div class="result-title">${data.next_best_action}</div>
-
-                        <div class="result-divider">
-                            <span class="result-eyebrow">SUGGESTED REPLY DRAFT</span>
-                            <p class="result-quote">"${data.suggested_reply}"</p>
-                        </div>
-                    </div>
-                `;
+                const res = await fetch(`${API_BASE}/admin/settings/brand_voice`, { headers: authHeaders });
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('brand-voice-textarea').value = data.value || "";
+                }
             } catch (err) {
-                console.error("Failed to fetch copilot:", err);
+                console.error("Failed to fetch brand voice:", err);
             }
         }
 
-        async function generateKBArticle() {
-            const btn = document.getElementById('generate-kb-btn');
-            const results = document.getElementById('kb-results');
-
-            btn.disabled = true;
-            btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg> Generating...`;
-
+        async function saveBrandVoice() {
+            const val = document.getElementById('brand-voice-textarea').value;
             try {
-                const res = await fetch(`${API_BASE}/kb/suggest`, { method: 'POST', headers: authHeaders });
+                const res = await fetch(`${API_BASE}/admin/settings/brand_voice`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', ...authHeaders },
+                    body: JSON.stringify({ value: val })
+                });
                 if (res.ok) {
-                    const data = await res.json();
-                    results.innerHTML = `
-                        <div class="result-card">
-                            <div class="result-card-header">
-                                <span class="result-eyebrow">NEW KB DRAFT</span>
-                                <span class="confidence-pill">${data.confidence} Confidence</span>
-                            </div>
-                            <div class="result-title result-title--lg">${data.title}</div>
-                            <p class="result-body">${data.content}</p>
-                            <div class="result-actions">
-                                <button class="btn btn-primary" onclick="alert('KB Article Published!')">Publish</button>
-                                <button class="btn">Edit Draft</button>
-                            </div>
-                        </div>
-                    `;
+                    alert('Brand Persona saved successfully! The AI will now use this persona.');
                 } else {
-                    results.innerHTML = `<div class="result-error">Failed to generate KB article.</div>`;
+                    alert('Failed to save Brand Persona.');
                 }
             } catch (err) {
-                console.error("Failed to generate KB article:", err);
-                results.innerHTML = `<div class="result-error">An error occurred.</div>`;
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg> Generate Draft`;
+                console.error("Failed to save brand voice:", err);
             }
+        }
+
+        async function fetchKnowledgeGaps() {
+            const results = document.getElementById('kb-results');
+            try {
+                const res = await fetch(`${API_BASE}/admin/knowledge-gaps`, { headers: authHeaders });
+                if (res.ok) {
+                    const data = await res.json();
+                    const pending = data.filter(g => g.status === 'pending');
+                    
+                    if (pending.length === 0) {
+                        results.innerHTML = `<div class="panel-placeholder">No pending knowledge gaps detected. The AI has everything it needs!</div>`;
+                        return;
+                    }
+                    
+                    results.innerHTML = '';
+                    pending.forEach(gap => {
+                        results.innerHTML += `
+                            <div class="result-card" id="gap-${gap.id}">
+                                <div class="result-card-header">
+                                    <span class="result-eyebrow">NEW KB DRAFT DETECTED</span>
+                                    <span class="confidence-pill" style="background: var(--accent); color: white;">Action Required</span>
+                                </div>
+                                <div class="result-title result-title--lg">${gap.question}</div>
+                                <p class="result-body">${gap.draft_article}</p>
+                                <div class="result-actions">
+                                    <button class="btn btn-primary" onclick="approveGap('${gap.id}')">Approve & Sync to Pinecone</button>
+                                    <button class="btn btn-danger" onclick="rejectGap('${gap.id}')">Reject</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+            } catch (err) {
+                console.error("Failed to fetch gaps:", err);
+            }
+        }
+        
+        async function approveGap(id) {
+            try {
+                const res = await fetch(`${API_BASE}/admin/knowledge-gaps/${id}/approve`, { method: 'POST', headers: authHeaders });
+                if (res.ok) {
+                    alert('Draft approved and synced to Pinecone vector database!');
+                    fetchKnowledgeGaps();
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        async function rejectGap(id) {
+            try {
+                const res = await fetch(`${API_BASE}/admin/knowledge-gaps/${id}/reject`, { method: 'POST', headers: authHeaders });
+                if (res.ok) {
+                    fetchKnowledgeGaps();
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        // We override the old generate button to just refresh the list
+        async function generateKBArticle() {
+            fetchKnowledgeGaps();
         }
 
         fetchAgents();
         fetchLogs();
         fetchAnalytics();
-        fetchCopilot();
+        fetchBrandVoice();
+        fetchKnowledgeGaps();
     </script>
     <script>
         // Tab switching logic for theme dropdown

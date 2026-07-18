@@ -233,6 +233,10 @@ def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None, m
                 target_username=session_id
             )
             db.add(audit)
+            
+            import asyncio
+            from app.services.qa import process_resolved_conversation_tasks
+            asyncio.create_task(process_resolved_conversation_tasks(conversation.id))
             db.commit()
             
             events.append({

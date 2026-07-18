@@ -42,6 +42,18 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
     logger.info("Final Reply Node: composing response...")
 
     system_instruction = SYSTEM_INSTRUCTION
+    
+    from app.db.session import SessionLocal
+    from app.db.models import SystemSetting
+    db = SessionLocal()
+    try:
+        brand_setting = db.query(SystemSetting).filter_by(key="brand_voice").first()
+        if brand_setting and brand_setting.value:
+            system_instruction += f"\n\n## Brand Persona\nYou must adopt the following persona for your reply:\n{brand_setting.value}"
+    except Exception as e:
+        logger.error(f"Failed to fetch brand voice: {e}")
+    finally:
+        db.close()
 
     if state.get("conversation_mode") == "resolved" and not state.get("resolution_logged"):
         # The AI successfully closed the conversation on its own.

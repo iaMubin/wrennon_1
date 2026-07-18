@@ -147,6 +147,19 @@ async def manager_node(state: ConversationState) -> ConversationState:
         return state
 
     system_content = SYSTEM_PROMPT
+    
+    from app.db.session import SessionLocal
+    from app.db.models import SystemSetting
+    db = SessionLocal()
+    try:
+        brand_setting = db.query(SystemSetting).filter_by(key="brand_voice").first()
+        if brand_setting and brand_setting.value:
+            system_content += f"\n\n## Brand Persona\n{brand_setting.value}"
+    except Exception as e:
+        logger.error(f"Failed to fetch brand voice: {e}")
+    finally:
+        db.close()
+
     context_block = _build_context_block(state)
     if context_block:
         system_content += f"\n\n## Context for this decision\n{context_block}"
