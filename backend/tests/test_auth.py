@@ -78,7 +78,7 @@ def test_session_token_creation_and_decoding():
 
 def test_expired_session_token_fails():
     import datetime
-    from jose import jwt
+    import jwt
     from app.config import settings
     from app.auth.security import decode_session_token
 
@@ -95,3 +95,74 @@ def test_invalid_session_token_fails():
     
     result = decode_session_token("invalid.token.here")
     assert result is None
+
+def test_2fa_setup_and_verify(setup_test_agent):
+    import pyotp
+    
+    # 1. Login to get token
+    response = client.post(
+        "/api/agent/login",
+        data={"username": "test_admin", "password": "SecureAdmin!123"}
+    )
+    assert response.status_code == 200
+    token = response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # 2. Setup 2FA
+    setup_resp = client.post("/api/agent/2fa/setup", headers=headers)
+    assert setup_resp.status_code == 200
+    assert "uri" in setup_resp.json()
+    
+    # Need to extract the secret from the DB to generate a code
+    db = SessionLocal()
+    agent = db.query(Agent).filter_by(username="test_admin").first()
+    secret = agent.totp_secret
+    assert not agent.totp_enabled
+    db.close()
+    
+    # 3. Verify 2FA
+    totp = pyotp.TOTP(secret)
+    code = totp.now()
+    verify_resp = client.post("/api/agent/2fa/verify", json={"code": code}, headers=headers)
+    assert verify_resp.status_code == 200
+    
+    # Check if enabled in DB
+    db = SessionLocal()
+    agent = db.query(Agent).filter_by(username="test_admin").first()
+    assert agent.totp_enabled
+    db.close()
+
+def test_login_with_2fa_required(setup_test_agent):
+    import pyotp
+    
+    # First login attempt without TOTP code should fail with 401 and "2FA_REQUIRED"
+    response = client.post(
+        "/api/agent/login",
+        data={"username": "test_admin", "password": "SecureAdmin!123"}
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "2FA_REQUIRED"
+    
+    # Second login attempt with wrong TOTP
+    response_invalid = client.post(
+        "/api/agent/login",
+        data={"username": "test_admin", "password": "SecureAdmin!123", "totp_code": "000000"}
+    )
+    assert response_invalid.status_code == 401
+    assert response_invalid.json()["detail"] == "Invalid 2FA code"
+
+    # Third login attempt with valid TOTP
+    db = SessionLocal()
+    agent = db.query(Agent).filter_by(username="test_admin").first()
+    secret = agent.totp_secret
+    db.close()
+    
+    totp = pyotp.TOTP(secret)
+    code = totp.now()
+    
+    response_valid = client.post(
+        "/api/agent/login",
+        data={"username": "test_admin", "password": "SecureAdmin!123", "totp_code": code}
+    )
+    assert response_valid.status_code == 200
+    assert "access_token" in response_valid.json()

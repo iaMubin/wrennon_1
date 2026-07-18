@@ -105,8 +105,12 @@ Customer: "Thanks so much, that's all I needed!"
 """
 
 
-def _tool_signature(tool_call: dict) -> str:
-    return f"{tool_call.get('name')}:{json.dumps(tool_call.get('args', {}), sort_keys=True)}"
+def _tool_signature(tool_call: dict | str) -> str:
+    if isinstance(tool_call, str):
+        return f"{tool_call}:{{}}"
+    if not isinstance(tool_call, dict):
+        return str(tool_call)
+    return f"{tool_call.get('name', 'unknown')}:{json.dumps(tool_call.get('args', {}), sort_keys=True)}"
 
 
 def _build_context_block(state: ConversationState) -> str:
@@ -195,12 +199,24 @@ async def manager_node(state: ConversationState) -> ConversationState:
 
     ready = bool(decision.get("ready_to_respond"))
     raw_tools = [] if ready else (decision.get("tools_to_run") or [])
+    
+    if isinstance(raw_tools, dict) or isinstance(raw_tools, str):
+        raw_tools = [raw_tools]
+    elif not isinstance(raw_tools, list):
+        raw_tools = []
 
     # Don't let the model re-run a tool call it already made this turn —
     # cheap safety net on top of the prompt's own guidance.
     history = set(state.get("tool_call_history", []))
     deduped_tools = []
     for tool_call in raw_tools:
+        if not isinstance(tool_call, dict):
+            logger.warning(f"Unexpected tool_call format: {tool_call}")
+            if isinstance(tool_call, str):
+                tool_call = {"name": tool_call, "args": {}}
+            else:
+                continue
+
         sig = _tool_signature(tool_call)
         if sig in history:
             logger.info(f"Skipping repeated tool call this turn: {sig}")

@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Body, status, Response
+from fastapi import APIRouter, Depends, HTTPException, Body, status, Response, Form
 from fastapi.security import OAuth2PasswordRequestForm
+import pyotp
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_
 
@@ -54,6 +56,7 @@ router = APIRouter()
 async def login(
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
+    totp_code: str | None = Form(None),
     db: Session = Depends(get_db)
 ) -> dict:
     # Rate Limiting
@@ -87,6 +90,19 @@ async def login(
             detail="Incorrect username or password",
         )
         
+    if agent.totp_enabled:
+        if not totp_code:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="2FA_REQUIRED"
+            )
+        totp = pyotp.TOTP(agent.totp_secret)
+        if not totp.verify(totp_code):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid 2FA code"
+            )
+
     # Reset rate limit on success
     try:
         r = get_redis()
@@ -116,6 +132,39 @@ async def login(
     
     return {"access_token": token, "token_type": "bearer", "role": agent.role}
 
+
+class VerifyTOTPRequest(BaseModel):
+    code: str
+
+@router.post("/agent/2fa/setup")
+def setup_2fa(
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent),
+) -> dict:
+    secret = pyotp.random_base32()
+    agent.totp_secret = secret
+    agent.totp_enabled = False
+    db.commit()
+    uri = pyotp.totp.TOTP(secret).provisioning_uri(name=agent.username, issuer_name="Wrennon")
+    return {"uri": uri}
+
+@router.post("/agent/2fa/verify")
+def verify_2fa(
+    payload: VerifyTOTPRequest,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent),
+) -> dict:
+    if not agent.totp_secret:
+        raise HTTPException(status_code=400, detail="2FA setup not initiated")
+    totp = pyotp.TOTP(agent.totp_secret)
+    if not totp.verify(payload.code):
+        raise HTTPException(status_code=400, detail="Invalid 2FA code")
+    agent.totp_enabled = True
+    
+    audit = AuditLog(actor_username=agent.username, action="enable_2fa")
+    db.add(audit)
+    db.commit()
+    return {"status": "success"}
 
 @router.get("/agent/conversations/needs-attention")
 def needs_attention(

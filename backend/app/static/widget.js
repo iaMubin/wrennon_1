@@ -767,10 +767,15 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
       nameHtml = `<div class="msg-name" style="display: flex; align-items: center;">${displayName}${badgeHtml}</div>`;
   }
   
+  let displayText = text || "";
+  // Hide internal system annotations from the customer
+  displayText = displayText.replace(/\[INTERNAL_IMAGE_DESC\][\s\S]*?\[\/INTERNAL_IMAGE_DESC\]/g, '');
+  displayText = displayText.replace(/\(Transcript:\s*([\s\S]*?)\)/g, '');
+
   if (uiRole === "bot" || uiRole === "agent") {
-    div.innerHTML = nameHtml + renderMarkdown(text);
+    div.innerHTML = nameHtml + renderMarkdown(displayText);
   } else {
-    div.innerHTML = renderMarkdown(text);
+    div.innerHTML = renderMarkdown(displayText);
   }
   
   contentWrapper.appendChild(div);

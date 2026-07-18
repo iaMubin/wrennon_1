@@ -133,7 +133,8 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_CONTENT_TYPES = {
     "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
-    "audio/webm", "audio/mp3", "audio/wav", "audio/mpeg", "audio/ogg", "audio/m4a"
+    "audio/webm", "audio/mp3", "audio/wav", "audio/mpeg", "audio/ogg", "audio/m4a",
+    "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 }
 MAX_FILE_SIZE = 2 * 1024 * 1024  # 2 MB
 

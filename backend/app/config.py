@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     # LLM
+    openrouter_api_key: str | None = None
     groq_api_key: str
     openai_api_key: str | None = None
     cohere_api_key: str

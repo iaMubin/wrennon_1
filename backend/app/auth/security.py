@@ -56,7 +56,8 @@ from __future__ import annotations
 
 import datetime
 import bcrypt
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError as JWTError
 
 from app.config import settings
 

@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.db.models import Conversation
+from app.db.models import Conversation, Agent
+from app.auth.dependencies import get_current_agent
 from app.services.llm import _safe_llm_call
 import json
 
@@ -12,7 +13,7 @@ class CopilotRequest(BaseModel):
     ticket_id: str
 
 @router.post("/suggest")
-async def copilot_suggest(request: CopilotRequest, db: Session = Depends(get_db)):
+async def copilot_suggest(request: CopilotRequest, db: Session = Depends(get_db), agent: Agent = Depends(get_current_agent)):
     """
     Copilot endpoint to suggest replies and actions to a human agent.
     """

@@ -25,6 +25,15 @@ from app.logger import logger
 
 _client = AsyncGroq(api_key=settings.groq_api_key, max_retries=0)
 _openai_client = openai.AsyncOpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
+_openrouter_client = openai.AsyncOpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=settings.openrouter_api_key,
+    default_headers={
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "Wrennon Showcase",
+    }
+) if settings.openrouter_api_key else None
+OPENROUTER_MODEL = "google/gemini-2.5-flash-free"
 
 
 def mask_pii(text: str) -> str:
@@ -171,21 +180,87 @@ async def _safe_openai_call(messages: list, temperature: float = 0.2, max_tokens
     raise ValueError("OpenAI returned empty response")
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+    retry=retry_if_not_exception_type(openai.RateLimitError)
+)
+async def _safe_openrouter_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, model_override: str = None) -> str:
+    import time
+    start_time = time.time()
+    response = await _openrouter_client.chat.completions.create(
+        model=model_override or OPENROUTER_MODEL,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+    logger.info(f"[TIMING] OpenRouter Chat Completion took {time.time() - start_time:.3f}s")
+    result = response.choices[0].message.content
+    if result and result.strip():
+        return result.strip()
+    raise ValueError("OpenRouter returned empty response")
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+    retry=retry_if_not_exception_type(openai.RateLimitError)
+)
+async def _safe_openrouter_json_call(messages: list, temperature: float = 0.2, max_tokens: int = 1000, model_override: str = None) -> str:
+    import time
+    start_time = time.time()
+    response = await _openrouter_client.chat.completions.create(
+        model=model_override or OPENROUTER_MODEL,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        response_format={"type": "json_object"}
+    )
+    logger.info(f"[TIMING] OpenRouter JSON Completion took {time.time() - start_time:.3f}s")
+    result = response.choices[0].message.content
+    if result and result.strip():
+        result = result.strip()
+        
+        # Strip <think> blocks if present
+        import re
+        result = re.sub(r'<think>.*?(?:</think>|$)', '', result, flags=re.DOTALL).strip()
+        
+        # Extract json object using brackets
+        start_idx = result.find('{')
+        end_idx = result.rfind('}')
+        if start_idx != -1 and end_idx != -1 and end_idx >= start_idx:
+            result = result[start_idx:end_idx+1]
+            
+        return result.strip()
+    raise ValueError("OpenRouter returned empty JSON response")
+
+
 async def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, is_json: bool = False, model_override: str = None) -> str:
-    """Calls Groq with retries, and falls back to OpenAI if it completely fails."""
+    """Calls Groq, falls back to OpenAI, and then falls back to OpenRouter if both fail."""
     try:
         if is_json:
             return await _safe_groq_json_call(messages, temperature, max_tokens, model_override)
         return await _safe_groq_call(messages, temperature, max_tokens, model_override)
     except Exception as e:
-        logger.error(f"Groq API completely failed after retries: {e}")
-        if _openai_client:
-            try:
-                return await _safe_openai_call(messages, temperature, max_tokens, is_json)
-            except Exception as oe:
-                logger.error(f"OpenAI fallback completely failed after retries: {oe}")
-                return ""
-        return ""
+        logger.error(f"Groq API completely failed after retries: {e}. Falling back to OpenAI...")
+        
+    if _openai_client:
+        try:
+            return await _safe_openai_call(messages, temperature, max_tokens, is_json)
+        except Exception as oe:
+            logger.error(f"OpenAI fallback completely failed after retries: {oe}. Falling back to OpenRouter...")
+            
+    if _openrouter_client:
+        try:
+            if is_json:
+                return await _safe_openrouter_json_call(messages, temperature, max_tokens, model_override)
+            return await _safe_openrouter_call(messages, temperature, max_tokens, model_override)
+        except Exception as or_e:
+            logger.error(f"OpenRouter fallback completely failed: {or_e}")
+            
+    return ""
 
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads")
