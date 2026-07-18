@@ -33,7 +33,7 @@ _openrouter_client = openai.AsyncOpenAI(
         "X-Title": "Wrennon Showcase",
     }
 ) if settings.openrouter_api_key else None
-OPENROUTER_MODEL = "google/gemini-2.5-flash-free"
+OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
 
 
 def mask_pii(text: str) -> str:
