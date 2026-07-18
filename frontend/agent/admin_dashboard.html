@@ -60,11 +60,17 @@
                                 <button class="theme-option" data-theme-value="light-warm-gray" role="menuitem">Warm Gray</button>
                                 <button class="theme-option" data-theme-value="light-neutral-gray" role="menuitem">Neutral Gray</button>
                                 <button class="theme-option" data-theme-value="light-cool-gray" role="menuitem">Cool Gray</button>
+                                <button class="theme-option" data-theme-value="light-corporate-blue" role="menuitem">Corporate Blue</button>
+                                <button class="theme-option" data-theme-value="light-slate-teal" role="menuitem">Slate Teal</button>
+                                <button class="theme-option" data-theme-value="light-graphite" role="menuitem">Graphite</button>
                             </div>
                             <div id="admin-dark-themes" class="theme-tab-content hidden">
                                 <button class="theme-option" data-theme-value="dark-matte" role="menuitem">Matte Black</button>
                                 <button class="theme-option" data-theme-value="dark-navy" role="menuitem">Black Navy</button>
                                 <button class="theme-option" data-theme-value="dark-charcoal" role="menuitem">Charcoal</button>
+                                <button class="theme-option" data-theme-value="dark-corporate-blue" role="menuitem">Corporate Blue</button>
+                                <button class="theme-option" data-theme-value="dark-slate-teal" role="menuitem">Slate Teal</button>
+                                <button class="theme-option" data-theme-value="dark-graphite" role="menuitem">Graphite</button>
                             </div>
                         </div>
                     </div>
@@ -97,7 +103,7 @@
             </table>
         </div>
 
-        <div class="section-block">
+        <div class="section-block" style="background: color-mix(in srgb, var(--bg-surface) 95%, var(--accent)); padding: 24px; border-radius: var(--radius-lg); border: 1px solid var(--line); box-shadow: var(--shadow-sm);">
             <h3 style="display: flex; align-items: center; gap: 8px;">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-ink-soft">
                     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
@@ -249,6 +255,29 @@
                     <!-- Populated by JS -->
                     <div class="panel-placeholder" style="text-align: center; padding: 20px;">Fetching latest copilot actions...</div>
                 </div>
+            </div>
+        </div>
+
+        <div class="section-block">
+            <h3>Automated QA & CSAT Scorecards</h3>
+            <p class="section-subtitle">AI-generated evaluations of recent human-handled and AI-handled conversations.</p>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--line);">Time</th>
+                            <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--line);">Conv ID</th>
+                            <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line);">Empathy</th>
+                            <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line);">Accuracy</th>
+                            <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line);">Resolution</th>
+                            <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line);">Pred. CSAT</th>
+                            <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--line);">AI Feedback Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="qa-scorecards-list">
+                        <tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--ink-soft);">No scorecards yet. Resolve a conversation to generate one.</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -876,7 +905,7 @@
                             <div class="result-card" id="gap-${gap.id}">
                                 <div class="result-card-header">
                                     <span class="result-eyebrow">NEW KB DRAFT DETECTED</span>
-                                    <span class="confidence-pill" style="background: var(--accent); color: white;">Action Required</span>
+                                    <span class="confidence-pill" style="background: var(--accent); color: var(--accent-ink);">Action Required</span>
                                 </div>
                                 <div class="result-title result-title--lg">${gap.question}</div>
                                 <p class="result-body">${gap.draft_article}</p>
@@ -917,11 +946,42 @@
             fetchKnowledgeGaps();
         }
 
+        async function fetchScorecards() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/analytics/scorecards`, { headers: authHeaders });
+                if (res.ok) {
+                    const data = await res.json();
+                    const tbody = document.getElementById('qa-scorecards-list');
+                    if (data.length === 0) {
+                        return;
+                    }
+                    tbody.innerHTML = '';
+                    data.forEach(card => {
+                        const date = new Date(card.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                        tbody.innerHTML += `
+                            <tr>
+                                <td style="padding: 12px; border-bottom: 1px solid var(--line); color: var(--ink-soft);">${date}</td>
+                                <td style="padding: 12px; border-bottom: 1px solid var(--line); font-family: 'JetBrains Mono', monospace; font-size: 13px;">${card.conversation_id.substring(0, 8)}...</td>
+                                <td style="padding: 12px; border-bottom: 1px solid var(--line); text-align: center;">${card.empathy_score}/10</td>
+                                <td style="padding: 12px; border-bottom: 1px solid var(--line); text-align: center;">${card.accuracy_score}/10</td>
+                                <td style="padding: 12px; border-bottom: 1px solid var(--line); text-align: center;">${card.resolution_score}/10</td>
+                                <td style="padding: 12px; border-bottom: 1px solid var(--line); text-align: center; color: var(--accent); font-weight: 600;">${card.csat_prediction}/5</td>
+                                <td style="padding: 12px; border-bottom: 1px solid var(--line); font-size: 13px;">${card.feedback_notes}</td>
+                            </tr>
+                        `;
+                    });
+                }
+            } catch (err) {
+                console.error("Failed to fetch scorecards:", err);
+            }
+        }
+
         fetchAgents();
         fetchLogs();
         fetchAnalytics();
         fetchBrandVoice();
         fetchKnowledgeGaps();
+        fetchScorecards();
     </script>
     <script>
         // Tab switching logic for theme dropdown

@@ -737,10 +737,7 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
 
   if (isInternal) {
     displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
-    let escaped = escapeHtml(displayContent);
-    // Feature 7: Agent Mentions
-    escaped = escaped.replace(/@([a-zA-Z0-9_]+)/g, '<span class="agent-mention">@$1</span>');
-    div.innerHTML = nameHtml + escaped + transcriptHtml;
+    div.innerHTML = nameHtml + renderMarkdown(displayContent) + transcriptHtml;
   } else {
     div.innerHTML = nameHtml + renderMarkdown(displayContent) + transcriptHtml;
   }
@@ -1330,6 +1327,7 @@ function inlineMarkdown(text) {
   escaped = escaped.replace(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g, '<img src="$1" class="chat-lightbox-image" style="max-width: 250px; max-height: 250px; object-fit: cover; display: block; margin: 8px 0; border-radius: 8px; cursor: pointer;" onclick="openLightbox(this.src)" />');
   escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline;">$1</a>');
   escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  escaped = escaped.replace(/@([a-zA-Z0-9_]+)/g, '<span class="agent-mention" style="color: var(--accent); font-weight: 600; background: var(--accent-glow); padding: 0 4px; border-radius: 4px;">@$1</span>');
   return escaped;
 }
 
@@ -1480,7 +1478,7 @@ if (resizer && sidebar) {
   document.addEventListener("mousemove", (e) => {
     if (!isResizing) return;
     const newWidth = e.clientX - sidebar.getBoundingClientRect().left;
-    if (newWidth >= 450 && newWidth <= 1000) {
+    if (newWidth >= 200 && newWidth <= window.innerWidth * 0.7) {
       sidebar.style.width = `${newWidth}px`;
     }
   });

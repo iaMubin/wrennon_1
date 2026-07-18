@@ -161,10 +161,10 @@
             <h2 id="conversation-email">Unknown Customer</h2>
             <span id="conversation-session" class="short-id">CUST-XXXX</span>
           </div>
-          <div class="conv-header-actions" style="flex-direction: row; align-items: center; gap: 12px;">
-            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+          <div class="conv-header-actions" style="flex-direction: row; align-items: center; gap: 12px; position: relative;">
+            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; position:relative;">
               <button id="resolve-btn">Mark resolved</button>
-              <span id="resolve-time" class="hidden"></span>
+              <span id="resolve-time" class="hidden" style="position: absolute; top: 100%; right: 0; white-space: nowrap; margin-top: 4px;"></span>
             </div>
             <button id="customer-sidebar-toggle" class="icon-action-btn" aria-label="Customer Details" title="Customer Details" style="border: 1px solid var(--line); background: var(--bg-surface);">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
