@@ -199,7 +199,7 @@ def get_audit_logs(
     ]
 
 from app.db.models import SystemSetting, KnowledgeGap, AnalyticsScorecard
-from app.api.kb import insert_into_pinecone
+from app.services.vectorstore import insert_into_pinecone
 
 class SettingUpdate(BaseModel):
     value: str

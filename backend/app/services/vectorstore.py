@@ -107,3 +107,28 @@ async def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
         {"text": candidates[result.index], "relevance_score": result.relevance_score}
         for result in reranked.results
     ]
+
+def insert_into_pinecone(title: str, text: str, gap_id: str):
+    """Embeds and inserts a new KB article into Pinecone."""
+    if settings.pinecone_api_key == "YOUR_NEW_PINECONE_API_KEY":
+        logger.info(f"Mocked insert into pinecone for: {title}")
+        return
+
+    # Use document embedding type for indexing
+    embedding = _doc_embedder.embed_documents([text])[0]
+    
+    index = _get_index()
+    index.upsert(
+        vectors=[
+            {
+                "id": f"kb_{gap_id}",
+                "values": embedding,
+                "metadata": {
+                    "title": title,
+                    "text": text,
+                    "source": "auto_generated_gap"
+                }
+            }
+        ]
+    )
+    logger.info(f"Inserted new KB article into Pinecone: {title}")
