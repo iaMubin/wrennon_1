@@ -112,7 +112,7 @@
                     </svg>
                 </button>
             </h3>
-            <div id="create-agent-container" style="display: none;">
+            <div id="create-agent-container" style="display: none; background: var(--bg-surface); padding: 24px; border-radius: 12px; border: 1px solid var(--border-light); box-shadow: var(--shadow-sm); margin-top: 16px;">
                 <style>
                     @keyframes fadeInBounce {
                         0% { opacity: 0; transform: scale(0.95); }
@@ -329,7 +329,7 @@
     </div>
 
     <script>
-        const _RENDER_HOST = "wrennon-backend.onrender.com";
+        const _RENDER_HOST = "wrennon-1.onrender.com";
         const _IS_LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.protocol === "file:";
         const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/api`;
 

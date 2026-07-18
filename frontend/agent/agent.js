@@ -1,5 +1,5 @@
 // ── Backend URL detection ──────────────────────────────────────────
-const _RENDER_HOST = "wrennon-backend.onrender.com";
+const _RENDER_HOST = "wrennon-1.onrender.com";
 const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const BACKEND_URL = IS_LOCAL ? `${window.location.protocol}//${window.location.host}` : `https://${_RENDER_HOST}`;
 
@@ -723,15 +723,26 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
   }
   
   // Format message content
-  let displayContent = content;
+  let displayContent = content || "";
+    
+  // Feature: Hide internal image descriptions from agent UI
+  displayContent = displayContent.replace(/\[INTERNAL_IMAGE_DESC\][\s\S]*?\[\/INTERNAL_IMAGE_DESC\]/g, '');
+  
+  // Feature: Extract audio transcriptions to display as collapsible blocks
+  let transcriptHtml = '';
+  displayContent = displayContent.replace(/\(Transcript:\s*([\s\S]*?)\)/g, (match, p1) => {
+    transcriptHtml += `<details style="margin-top: 8px; font-size: 0.85em; opacity: 0.8; background: rgba(0,0,0,0.05); padding: 6px; border-radius: 6px; cursor: pointer;"><summary style="font-weight: 500; opacity: 0.8; padding: 2px;">View Transcript</summary><div style="margin-top: 6px; font-family: ui-monospace, monospace; white-space: pre-wrap; padding: 4px; border-top: 1px solid rgba(0,0,0,0.1);">${escapeHtml(p1.trim())}</div></details>`;
+    return '';
+  });
+
   if (isInternal) {
     displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
     let escaped = escapeHtml(displayContent);
     // Feature 7: Agent Mentions
     escaped = escaped.replace(/@([a-zA-Z0-9_]+)/g, '<span class="agent-mention">@$1</span>');
-    div.innerHTML = nameHtml + escaped;
+    div.innerHTML = nameHtml + escaped + transcriptHtml;
   } else {
-    div.innerHTML = nameHtml + renderMarkdown(content);
+    div.innerHTML = nameHtml + renderMarkdown(displayContent) + transcriptHtml;
   }
 
   if (msgId) {
@@ -943,7 +954,7 @@ async function handleAgentFileUpload(file, inputElement, uploadInputElement, aut
   formData.append("file", file);
   
   try {
-    const response = await fetch(`${API_BASE}/chat/upload/${activeConversationId}`, {
+    const response = await fetch(`${API_BASE}/chat/upload/${activeSessionId}`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${localStorage.getItem("agent_token")}` },
       body: formData
@@ -1029,12 +1040,12 @@ if (agentVoiceBtn) {
   });
 }
 
-  const noteTypeSelect = document.getElementById("note-type-select");
+const noteTypeSelect = document.getElementById("note-type-select");
 if (noteTypeSelect) {
   noteTypeSelect.addEventListener("change", () => {
     if (noteTypeSelect.value === "internal") {
       agentInput.style.backgroundColor = "rgba(217, 119, 6, 0.1)"; // accent-alert tint
-      agentInput.placeholder = "Type an internal note (only visible to agents)";
+      agentInput.placeholder = "Type internal note... (Use @ to tag, / for cmds)";
     } else {
       agentInput.style.backgroundColor = "var(--bg-base)";
       agentInput.placeholder = "Type a reply";
@@ -1400,13 +1411,13 @@ function toggleVoicePlayer(playerId) {
 
 function formatTime(isoString) {
   const date = new Date(isoString);
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString('en-US', { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dhaka" });
 }
 
 function formatSidebarTime(isoString) {
   const date = new Date(isoString);
-  const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: "Asia/Dhaka" });
+  const timeStr = date.toLocaleTimeString('en-US', { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dhaka" });
   return `${dateStr}, ${timeStr}`;
 }
 
