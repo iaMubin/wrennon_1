@@ -3,6 +3,9 @@ set -x
 
 export WEB_CONCURRENCY=${WEB_CONCURRENCY:-2}
 
+echo "==> Running database migrations..."
+alembic upgrade head
+
 echo "==> Verifying app.main loads without errors..."
 if ! python -c "import app.main"; then
     echo "ERROR: app.main failed to import! The traceback above is the root cause."
