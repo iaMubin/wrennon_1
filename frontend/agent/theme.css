@@ -247,6 +247,86 @@
   --shadow-glow: 0 0 0 3px rgba(34, 34, 34, 0.15);
 }
 
+/* 7. Corporate Blue (Salesforce-style) */
+[data-theme="light-corporate-blue"] {
+  --bg-base: #f3f4f6;
+  --bg-surface: #ffffff;
+  --bg-header: #111827;
+  --bg-hover: rgba(0, 0, 0, 0.05);
+  --bg-glass: rgba(255, 255, 255, 0.75);
+  
+  --ink: #1f2937;
+  --ink-soft: #4b5563;
+  --ink-header: #f9fafb;
+  
+  --line: #e5e7eb;
+  
+  --accent: #2563eb;
+  --accent-ink: #ffffff;
+  --accent-glow: rgba(37, 99, 235, 0.15);
+  --accent-success: #16a34a;
+  --accent-alert: #dc2626;
+  --bg-elevated: #f3f4f6;
+  
+  --danger: #dc2626;
+  --success: #16a34a;
+  --warning: #d97706;
+  --shadow-glow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+/* 8. Slate Teal (Zendesk-style) */
+[data-theme="light-slate-teal"] {
+  --bg-base: #f7f9f9;
+  --bg-surface: #ffffff;
+  --bg-header: #17494D;
+  --bg-hover: rgba(23, 73, 77, 0.06);
+  --bg-glass: rgba(255, 255, 255, 0.8);
+  
+  --ink: #2f3941;
+  --ink-soft: #68737d;
+  --ink-header: #ffffff;
+  
+  --line: #d8dcde;
+  
+  --accent: #03363D;
+  --accent-ink: #ffffff;
+  --accent-glow: rgba(3, 54, 61, 0.15);
+  --accent-success: #038153;
+  --accent-alert: #cc3340;
+  --bg-elevated: #f7f9f9;
+  
+  --danger: #cc3340;
+  --success: #038153;
+  --warning: #ad5f00;
+  --shadow-glow: 0 0 0 3px rgba(3, 54, 61, 0.15);
+}
+
+/* 9. Graphite Monochrome (Linear-style) */
+[data-theme="light-graphite"] {
+  --bg-base: #f6f6f6;
+  --bg-surface: #ffffff;
+  --bg-header: #ffffff;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-glass: rgba(255, 255, 255, 0.8);
+  
+  --ink: #111111;
+  --ink-soft: #888888;
+  --ink-header: #111111;
+  
+  --line: #eaeaea;
+  
+  --accent: #222222;
+  --accent-ink: #ffffff;
+  --accent-glow: rgba(0, 0, 0, 0.08);
+  --accent-success: #111111;
+  --accent-alert: #111111;
+  --bg-elevated: #f6f6f6;
+  
+  --danger: #e03131;
+  --success: #0ca678;
+  --warning: #f08c00;
+  --shadow-glow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+}
 
 /* ==========================================================================
    Dark Themes
@@ -349,6 +429,105 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.15);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.35), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+}
+
+/* 4. Corporate Blue (Salesforce-style) */
+[data-theme="dark-corporate-blue"] {
+  --bg-base: #0D1117;
+  --bg-surface: #161B22;
+  --bg-header: #010409;
+  --bg-hover: rgba(255, 255, 255, 0.08);
+  --bg-glass: rgba(22, 27, 34, 0.8);
+  
+  --ink: #e6edf3;
+  --ink-soft: #7d8590;
+  --ink-header: #ffffff;
+  
+  --line: #30363d;
+  
+  --accent: #3B82F6;
+  --accent-ink: #ffffff;
+  --accent-glow: rgba(59, 130, 246, 0.2);
+  --accent-success: #238636;
+  --accent-alert: #da3633;
+  --bg-elevated: #21262d;
+  
+  --danger: #da3633;
+  --success: #238636;
+  --warning: #d29922;
+  --shadow-glow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+  
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+}
+
+/* 5. Slate Teal (Zendesk-style) */
+[data-theme="dark-slate-teal"] {
+  --bg-base: #101c1d;
+  --bg-surface: #192a2b;
+  --bg-header: #0a1213;
+  --bg-hover: rgba(255, 255, 255, 0.08);
+  --bg-glass: rgba(25, 42, 43, 0.8);
+  
+  --ink: #d8dcde;
+  --ink-soft: #87929d;
+  --ink-header: #ffffff;
+  
+  --line: #2f3941;
+  
+  --accent: #2e8c95;
+  --accent-ink: #ffffff;
+  --accent-glow: rgba(46, 140, 149, 0.2);
+  --accent-success: #179e65;
+  --accent-alert: #e85966;
+  --bg-elevated: #223536;
+  
+  --danger: #e85966;
+  --success: #179e65;
+  --warning: #cc7800;
+  --shadow-glow: 0 0 0 3px rgba(46, 140, 149, 0.25);
+  
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.45), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.55), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+}
+
+/* 6. Graphite Monochrome (Linear-style) */
+[data-theme="dark-graphite"] {
+  --bg-base: #000000;
+  --bg-surface: #0a0a0a;
+  --bg-header: #000000;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-glass: rgba(10, 10, 10, 0.8);
+  
+  --ink: #eeeeee;
+  --ink-soft: #888888;
+  --ink-header: #ffffff;
+  
+  --line: #222222;
+  
+  --accent: #eeeeee;
+  --accent-ink: #000000;
+  --accent-glow: rgba(255, 255, 255, 0.1);
+  --accent-success: #eeeeee;
+  --accent-alert: #eeeeee;
+  --bg-elevated: #111111;
+  
+  --danger: #ff6b6b;
+  --success: #20c997;
+  --warning: #ffc933;
+  --shadow-glow: 0 0 0 3px rgba(255, 255, 255, 0.15);
+  
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.6), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.7), 0 2px 4px -2px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.8), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.8), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
 }
 
 /* Common Element Overrides to enforce consistency with the theme */
