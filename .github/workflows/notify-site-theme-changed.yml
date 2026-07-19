@@ -1,0 +1,41 @@
+# Add this file to: <main-app-repo>/.github/workflows/notify-site-theme-changed.yml
+#
+# Fires a repository_dispatch event at the marketing site repo whenever
+# main is pushed (i.e. whenever a production deploy goes out), so the
+# mock demo picks up the new theme within seconds instead of waiting
+# for the 12h scheduled fallback.
+#
+# Setup required (one-time):
+#   1. Create a GitHub Personal Access Token (fine-grained, scoped to
+#      just the wrennon-site repo, "Contents: read/write" permission).
+#   2. In THIS (main app) repo: Settings -> Secrets and variables ->
+#      Actions -> New repository secret -> name it SITE_REPO_PAT ->
+#      paste the token.
+
+name: Notify marketing site of theme change
+
+on:
+  push:
+    branches: [main]
+    # Only fires when frontend/theme files actually change — since this
+    # repo also has backend code, this stops backend-only commits from
+    # triggering a pointless notify + site rebuild.
+    # Confirmed against iaMubin/wrennon_1: frontend code lives under
+    # the `frontend/` folder at repo root.
+    paths:
+      - "frontend/agent/theme.css"
+      - "frontend/agent/agent.css"
+      - "frontend/agent/admin.css"
+      - "frontend/widget.css"
+
+jobs:
+  notify-site:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch theme-updated event to site repo
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SITE_REPO_PAT }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/iaMubin/wrennon_website/dispatches \
+            -d '{"event_type":"theme-updated"}'
