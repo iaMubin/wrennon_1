@@ -332,8 +332,16 @@ sectionTabs.forEach((tab) => {
 });
 
 // --- Loading conversation lists ---
-function formatPreview(msg) {
+function formatPreview(conv) {
+  let msg = conv.last_message;
   if (!msg) return "No messages yet";
+  
+  // Handle internal notes specially
+  if (conv.last_message_is_internal || msg.startsWith("*Internal Note:*")) {
+    let noteText = msg.replace(/^\*Internal Note:\*\s*/, '');
+    let cleanText = noteText.replace(/\n\n\(Transcript:.*?\)/g, '').replace(/\*\*(.+?)\*\*/g, "$1").replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '$1');
+    return `<span style="color: var(--warning); font-weight: 600; font-size: 11px; text-transform: uppercase; margin-right: 4px;">Note:</span>${escapeHtml(cleanText)}`;
+  }
   
   // Remove transcript
   let text = msg.replace(/\n\n\(Transcript:.*?\)/g, '');
@@ -465,7 +473,7 @@ function renderConversationList(conversations) {
         </span>
         <span class="conv-item-time">${formatSidebarTime(conv.updated_at)}</span>
       </div>
-      <div class="conv-item-preview">${formatPreview(conv.last_message)}</div>
+      <div class="conv-item-preview">${formatPreview(conv)}</div>
       <div class="badge-row">
         <span class="badge ${badgeClass}">${stageText}</span>
         ${mentionedBadge}
@@ -1041,10 +1049,12 @@ const noteTypeSelect = document.getElementById("note-type-select");
 if (noteTypeSelect) {
   noteTypeSelect.addEventListener("change", () => {
     if (noteTypeSelect.value === "internal") {
-      agentInput.style.backgroundColor = "rgba(217, 119, 6, 0.1)"; // accent-alert tint
+      agentInput.style.backgroundColor = "color-mix(in srgb, var(--accent) 10%, transparent)";
+      agentInput.style.borderColor = "var(--accent)";
       agentInput.placeholder = "Type internal note... (Use @ to tag, / for cmds)";
     } else {
       agentInput.style.backgroundColor = "var(--bg-base)";
+      agentInput.style.borderColor = "var(--line)";
       agentInput.placeholder = "Type a reply";
     }
     agentInput.focus();
@@ -1702,3 +1712,28 @@ function clearCustomerSidebar() {
 
 // Periodic SLA Check
 setInterval(loadConversations, 30000);
+
+// Mobile Sidebar Toggle
+document.addEventListener("DOMContentLoaded", () => {
+  const mobileToggle = document.getElementById("mobile-sidebar-toggle");
+  const sidebar = document.getElementById("sidebar");
+  if (mobileToggle && sidebar) {
+    mobileToggle.addEventListener("click", () => {
+      if (window.innerWidth <= 800) {
+        sidebar.classList.toggle("sidebar-open");
+      } else {
+        sidebar.classList.toggle("sidebar-hidden");
+      }
+    });
+    
+    // Auto-close sidebar on mobile when a conversation is selected
+    const originalOpenConv = openConversation;
+    window.openConversation = async function(...args) {
+      if (window.innerWidth <= 800) {
+        sidebar.classList.remove("sidebar-open");
+      }
+      return originalOpenConv.apply(this, args);
+    };
+  }
+});
+

@@ -1,5 +1,5 @@
 // ── Backend URL detection ──────────────────────────────────────────
-const _RENDER_HOST = "wrennon-backend.onrender.com";
+const _RENDER_HOST = "wrennon-1.onrender.com";
 const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const BACKEND_URL = IS_LOCAL ? `${window.location.protocol}//${window.location.host}` : `https://${_RENDER_HOST}`;
 
@@ -332,8 +332,16 @@ sectionTabs.forEach((tab) => {
 });
 
 // --- Loading conversation lists ---
-function formatPreview(msg) {
+function formatPreview(conv) {
+  let msg = conv.last_message;
   if (!msg) return "No messages yet";
+  
+  // Handle internal notes specially
+  if (conv.last_message_is_internal || msg.startsWith("*Internal Note:*")) {
+    let noteText = msg.replace(/^\*Internal Note:\*\s*/, '');
+    let cleanText = noteText.replace(/\n\n\(Transcript:.*?\)/g, '').replace(/\*\*(.+?)\*\*/g, "$1").replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '$1');
+    return `<span style="color: var(--warning); font-weight: 600; font-size: 11px; text-transform: uppercase; margin-right: 4px;">Note:</span>${escapeHtml(cleanText)}`;
+  }
   
   // Remove transcript
   let text = msg.replace(/\n\n\(Transcript:.*?\)/g, '');
@@ -465,7 +473,7 @@ function renderConversationList(conversations) {
         </span>
         <span class="conv-item-time">${formatSidebarTime(conv.updated_at)}</span>
       </div>
-      <div class="conv-item-preview">${formatPreview(conv.last_message)}</div>
+      <div class="conv-item-preview">${formatPreview(conv)}</div>
       <div class="badge-row">
         <span class="badge ${badgeClass}">${stageText}</span>
         ${mentionedBadge}
@@ -737,10 +745,7 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
 
   if (isInternal) {
     displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
-    let escaped = escapeHtml(displayContent);
-    // Feature 7: Agent Mentions
-    escaped = escaped.replace(/@([a-zA-Z0-9_]+)/g, '<span class="agent-mention">@$1</span>');
-    div.innerHTML = nameHtml + escaped + transcriptHtml;
+    div.innerHTML = nameHtml + renderMarkdown(displayContent) + transcriptHtml;
   } else {
     div.innerHTML = nameHtml + renderMarkdown(displayContent) + transcriptHtml;
   }
@@ -1044,10 +1049,12 @@ const noteTypeSelect = document.getElementById("note-type-select");
 if (noteTypeSelect) {
   noteTypeSelect.addEventListener("change", () => {
     if (noteTypeSelect.value === "internal") {
-      agentInput.style.backgroundColor = "rgba(217, 119, 6, 0.1)"; // accent-alert tint
+      agentInput.style.backgroundColor = "color-mix(in srgb, var(--accent) 10%, transparent)";
+      agentInput.style.borderColor = "var(--accent)";
       agentInput.placeholder = "Type internal note... (Use @ to tag, / for cmds)";
     } else {
       agentInput.style.backgroundColor = "var(--bg-base)";
+      agentInput.style.borderColor = "var(--line)";
       agentInput.placeholder = "Type a reply";
     }
     agentInput.focus();
@@ -1330,6 +1337,7 @@ function inlineMarkdown(text) {
   escaped = escaped.replace(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g, '<img src="$1" class="chat-lightbox-image" style="max-width: 250px; max-height: 250px; object-fit: cover; display: block; margin: 8px 0; border-radius: 8px; cursor: pointer;" onclick="openLightbox(this.src)" />');
   escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline;">$1</a>');
   escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  escaped = escaped.replace(/@([a-zA-Z0-9_]+)/g, '<span class="agent-mention" style="color: var(--accent); font-weight: 600; background: var(--accent-glow); padding: 0 4px; border-radius: 4px;">@$1</span>');
   return escaped;
 }
 
@@ -1480,7 +1488,7 @@ if (resizer && sidebar) {
   document.addEventListener("mousemove", (e) => {
     if (!isResizing) return;
     const newWidth = e.clientX - sidebar.getBoundingClientRect().left;
-    if (newWidth >= 450 && newWidth <= 1000) {
+    if (newWidth >= 200 && newWidth <= window.innerWidth * 0.7) {
       sidebar.style.width = `${newWidth}px`;
     }
   });
@@ -1704,3 +1712,28 @@ function clearCustomerSidebar() {
 
 // Periodic SLA Check
 setInterval(loadConversations, 30000);
+
+// Mobile Sidebar Toggle
+document.addEventListener("DOMContentLoaded", () => {
+  const mobileToggle = document.getElementById("mobile-sidebar-toggle");
+  const sidebar = document.getElementById("sidebar");
+  if (mobileToggle && sidebar) {
+    mobileToggle.addEventListener("click", () => {
+      if (window.innerWidth <= 800) {
+        sidebar.classList.toggle("sidebar-open");
+      } else {
+        sidebar.classList.toggle("sidebar-hidden");
+      }
+    });
+    
+    // Auto-close sidebar on mobile when a conversation is selected
+    const originalOpenConv = openConversation;
+    window.openConversation = async function(...args) {
+      if (window.innerWidth <= 800) {
+        sidebar.classList.remove("sidebar-open");
+      }
+      return originalOpenConv.apply(this, args);
+    };
+  }
+});
+

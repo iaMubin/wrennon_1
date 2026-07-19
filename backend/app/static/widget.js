@@ -1,5 +1,5 @@
 // ── Backend URL detection ──────────────────────────────────────────
-const _RENDER_HOST = "wrennon-backend.onrender.com";
+const _RENDER_HOST = "wrennon-1.onrender.com";
 const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const BACKEND_URL = IS_LOCAL ? `http://127.0.0.1:8000` : `https://${_RENDER_HOST}`;
 
@@ -65,15 +65,19 @@ function setupThemeDropdown() {
   if (!menuBtn || !dropdown) return;
 
   function applyTheme(themeValue) {
-    localStorage.setItem("wrennon_theme", themeValue);
+    localStorage.setItem("wrennon_widget_theme", themeValue);
     const widget = document.getElementById("wrennon-widget");
     if (!widget) return;
     
+    // Also apply to documentElement for full-page backdrop preview
     if (themeValue === "system") {
       const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      widget.setAttribute("data-theme", isDark ? "dark" : "light");
+      const resolved = isDark ? "dark-matte" : "light-brownish";
+      widget.setAttribute("data-theme", resolved);
+      document.documentElement.setAttribute('data-theme', resolved);
     } else {
       widget.setAttribute("data-theme", themeValue);
+      document.documentElement.setAttribute('data-theme', themeValue);
     }
     
     options.forEach(opt => {
@@ -83,10 +87,37 @@ function setupThemeDropdown() {
     });
   }
 
+  // Set initial active state based on local storage
+  const currentTheme = localStorage.getItem('wrennon_widget_theme') || 'system';
+  applyTheme(currentTheme);
+
   const menuMainView = document.getElementById("menu-main-view");
   const menuAppearanceView = document.getElementById("menu-appearance-view");
   const btnShowAppearance = document.getElementById("btn-show-appearance");
   const btnBackAppearance = document.getElementById("btn-back-appearance");
+
+  // Handle theme tabs (Light vs Dark)
+  const themeTabs = document.querySelectorAll(".theme-tab");
+  const themeTabContents = document.querySelectorAll(".theme-tab-content");
+  
+  themeTabs.forEach(tab => {
+    tab.addEventListener("click", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      
+      themeTabs.forEach(t => t.classList.remove("active"));
+      themeTabContents.forEach(c => c.classList.add("hidden"));
+      themeTabContents.forEach(c => c.classList.remove("active"));
+      
+      tab.classList.add("active");
+      const targetId = tab.getAttribute("data-target");
+      const targetContent = document.getElementById(targetId);
+      if (targetContent) {
+        targetContent.classList.remove("hidden");
+        targetContent.classList.add("active");
+      }
+    });
+  });
 
   menuBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -113,6 +144,8 @@ function setupThemeDropdown() {
       menuAppearanceView.classList.remove("hidden");
     });
   }
+
+
 
   if (btnBackAppearance && menuMainView && menuAppearanceView) {
     btnBackAppearance.addEventListener("click", (e) => {
@@ -147,14 +180,13 @@ function setupThemeDropdown() {
     });
   });
 
-  const currentTheme = localStorage.getItem("wrennon_theme") || "system";
-  applyTheme(currentTheme);
-
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-    if (localStorage.getItem("wrennon_theme") === "system") {
+    if (localStorage.getItem("wrennon_widget_theme") === "system") {
       const widget = document.getElementById("wrennon-widget");
       if (widget) {
-        widget.setAttribute("data-theme", e.matches ? "dark" : "light");
+        const resolved = e.matches ? "dark-matte" : "light-brownish";
+        widget.setAttribute("data-theme", resolved);
+        document.documentElement.setAttribute('data-theme', resolved);
       }
     }
   });
@@ -412,7 +444,6 @@ async function loadHistory() {
   const history = getLocalHistory();
   
   if (history.length === 0) {
-    appendMessage("system", "Connected. Try: \"what's your return policy?\" or \"where is order #1001?\"", false);
     return;
   }
   
@@ -455,10 +486,8 @@ function connectSocket() {
       clearTimeout(widgetReconnectTimeout);
       widgetReconnectTimeout = null;
     }
-    // Only show restored message if we were previously disconnected and trying to reconnect
-    if (messagesEl.lastElementChild && messagesEl.lastElementChild.textContent.includes("Reconnecting")) {
-        appendMessage("system", "Connection restored.", false);
-    }
+    // Silently restore connection without system message
+    // if (messagesEl.lastElementChild && messagesEl.lastElementChild.textContent.includes("Reconnecting")) {}
     
     // Send queued offline messages
     const queue = getOfflineQueue();
@@ -526,7 +555,6 @@ function connectSocket() {
 
     widgetReconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, widgetReconnectAttempts), 30000); // max 30s
-    appendMessage("system", `Connection lost. Reconnecting in ${delay/1000}s...`, false);
     widgetReconnectTimeout = setTimeout(connectSocket, delay);
   };
 

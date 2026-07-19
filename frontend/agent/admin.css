@@ -23,9 +23,7 @@ body {
   width: 96%;
   max-width: 1440px;
   margin: 0 auto;
-  background: var(--bg-glass);
-  backdrop-filter: blur(20px) saturate(1.3);
-  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  background: var(--bg-admin-base);
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
   padding: 44px 48px;
@@ -37,6 +35,20 @@ body {
   margin-bottom: 28px;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
+  background: var(--bg-admin-brand);
+  padding: 32px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  border: 1px solid color-mix(in srgb, var(--line) 80%, var(--accent));
+}
+.admin-brand-header .logo-text {
+  font-size: 32px;
+  color: color-mix(in srgb, var(--ink) 80%, var(--accent));
+}
+.admin-brand-header .logo-img {
+  width: 34px;
+  height: 34px;
 }
 
 .admin-header {
@@ -81,7 +93,12 @@ body {
 }
 
 .section-block {
-  margin-top: 48px;
+  margin-top: 24px;
+  background: var(--bg-surface);
+  padding: 32px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
 }
 .section-block:first-of-type {
   margin-top: 0;
@@ -252,16 +269,21 @@ form#create-agent-form {
 .input-wrapper input:focus, .form-group select:focus {
   border-color: var(--accent);
   box-shadow: var(--shadow-glow);
+  outline: none;
 }
 .input-wrapper input::placeholder {
   color: var(--ink-soft);
   opacity: 0.5;
 }
+.form-group select {
+  outline: none;
+  cursor: pointer;
+}
 .form-group select option {
   background: var(--bg-surface);
   color: var(--ink);
 }
-.form-group select option:checked {
+.form-group select option:checked, .form-group select option:hover {
   background: var(--accent) !important;
   color: var(--accent-ink) !important;
 }
@@ -418,8 +440,8 @@ tbody tr:nth-child(even):hover {
   font-family: var(--font-display);
   letter-spacing: -0.02em;
 }
-.stat-value--accent { color: var(--accent); }
-.stat-value--success { color: var(--accent-success); }
+.stat-value--accent { color: var(--success); }
+.stat-value--success { color: color-mix(in srgb, var(--success) 75%, var(--ink)); }
 .stat-row {
   display: flex;
   align-items: baseline;
@@ -615,3 +637,169 @@ tbody tr:nth-child(even):hover {
 }
 
 .hidden { display: none !important; }
+
+/* ======================================================================
+   WRENNON 3.0 — Admin control center refresh
+   ====================================================================== */
+body {
+  padding: 28px 24px 56px;
+  background: var(--bg-admin-base);
+}
+
+.admin-container {
+  width: min(100%, 1500px);
+  padding: 0 34px 38px;
+  overflow: hidden;
+  border-radius: 20px;
+  border-color: var(--line);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.admin-brand-header {
+  margin: 0 -34px;
+  padding: 19px 34px;
+  min-height: 70px;
+  border: 0;
+  border-radius: 0;
+  background: var(--bg-admin-brand);
+  box-shadow: none;
+}
+
+.admin-brand-header .logo-text {
+  color: var(--ink);
+  font-size: 28px;
+  text-transform: none;
+  letter-spacing: -0.025em;
+}
+
+.admin-brand-header .logo-img {
+  width: 36px;
+  height: 36px;
+  /* Removed filter to support all themes naturally */
+}
+
+.admin-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  margin: 0 -34px 26px;
+  padding: 16px 34px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-header h2 {
+  font-size: 24px;
+  letter-spacing: -0.04em;
+}
+
+.admin-header h2::before { border-radius: 50%; }
+
+.admin-header-actions { gap: 8px; }
+
+.section-block {
+  margin-top: 18px;
+  padding: 28px;
+  border-radius: 16px;
+  border-color: var(--line);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12), 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+
+.section-block:hover { border-color: color-mix(in srgb, var(--accent) 20%, var(--line)); }
+
+h3, .section-title {
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  margin-bottom: 6px;
+}
+
+.section-subtitle { margin-bottom: 22px; }
+
+.btn {
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+form#create-agent-form {
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--bg-base);
+}
+
+table {
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+th, td { padding: 14px 16px; }
+th { background: var(--bg-base); }
+
+.stat-grid { gap: 14px; margin-bottom: 22px; }
+
+.stat-card {
+  padding: 20px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--bg-surface) 95%, var(--accent)), var(--bg-surface));
+}
+
+.stat-card::before { height: 4px; }
+.stat-value { font-size: 30px; letter-spacing: -0.04em; }
+
+.panel {
+  border-radius: 12px;
+  background: var(--bg-base);
+  box-shadow: none;
+}
+
+.result-card { border-radius: 12px; }
+
+textarea#brand-voice-textarea {
+  border-color: var(--line) !important;
+  background: var(--bg-elevated) !important;
+  color: var(--ink) !important;
+  border-radius: 10px !important;
+}
+
+.section-divider {
+  margin-top: 34px;
+  padding: 22px 28px;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 16px 16px 0 0;
+  background: var(--bg-surface);
+}
+
+#logs-container {
+  padding: 0 28px 24px;
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 16px 16px;
+  background: var(--bg-surface);
+}
+
+@media (max-width: 900px) {
+  body { padding: 0; }
+  .admin-container { border-radius: 0; padding: 0 18px 32px; }
+  .admin-brand-header { margin: 0 -18px; padding: 18px; }
+  .admin-header { align-items: flex-start; gap: 16px; }
+  .admin-header-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .section-block { padding: 20px; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .admin-header { flex-direction: column; }
+  .admin-header-actions { justify-content: flex-start; }
+  .stat-grid { grid-template-columns: 1fr; }
+  form#create-agent-form { grid-template-columns: 1fr; }
+}

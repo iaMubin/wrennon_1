@@ -43,6 +43,11 @@
   --transition-slow: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --bg-panel-header: #e9ecef;
+  --bg-brand: #dee2e6;
+  --bg-admin-brand: color-mix(in srgb, var(--bg-base) 94%, var(--ink));
+  --bg-admin-base: color-mix(in srgb, var(--bg-base) 94%, var(--ink));
+  --input-outline: var(--accent);
 }
 
 /* ==========================================================================
@@ -79,6 +84,11 @@
   --success: #28a745;
   --warning: #ffc107;
   --shadow-glow: 0 0 0 3px rgba(92, 107, 115, 0.12);
+  --bg-panel-header: #e9ecef;
+  --bg-brand: #dee2e6;
+  --bg-admin-brand: color-mix(in srgb, var(--bg-base) 94%, var(--ink));
+  --bg-admin-base: color-mix(in srgb, var(--bg-base) 94%, var(--ink));
+  --input-outline: var(--accent);
 }
 
 /* ==========================================================================
@@ -110,88 +120,15 @@
   --success: #4d9c4d;
   --warning: #db9835;
   --shadow-glow: 0 0 0 3px rgba(139, 115, 85, 0.12);
+  --bg-panel-header: #E8DAC6;
+  --bg-brand: #D9CBB8;
+  --bg-admin-brand: color-mix(in srgb, var(--bg-base) 94%, var(--ink));
+  --bg-admin-base: color-mix(in srgb, var(--bg-base) 94%, var(--ink));
+  --input-outline: var(--accent);
 }
 
-/* 2. Off-White (Clean & Professional) */
-[data-theme="light-offwhite"] {
-  --bg-base: #F8F9FA;
-  --bg-surface: #E9ECEF;
-  --bg-header: #DEE2E6;
-  --bg-hover: rgba(92, 107, 115, 0.05);
-  --bg-glass: rgba(233, 236, 239, 0.75);
-  
-  --ink: #1B2124;
-  --ink-soft: #4A555C;
-  --ink-header: #1B2124;
-  
-  --line: #CED4DA;
-  
-  --accent: #5C6B73;
-  --accent-ink: #ffffff;
-  --accent-glow: rgba(92, 107, 115, 0.15);
-  --accent-success: #228f3b;
-  --accent-alert: #c42b3a;
-  --bg-elevated: #E9ECEF;
-  
-  --danger: #c42b3a;
-  --success: #228f3b;
-  --warning: #e6ab00;
-  --shadow-glow: 0 0 0 3px rgba(92, 107, 115, 0.12);
-}
 
-/* 3. Gray-White (Cool & Crisp) */
-[data-theme="light-gray"] {
-  --bg-base: #FFFFFF;
-  --bg-surface: #F1F3F5;
-  --bg-header: #E9ECEF;
-  --bg-hover: rgba(73, 80, 87, 0.05);
-  --bg-glass: rgba(241, 243, 245, 0.75);
-  
-  --ink: #212529;
-  --ink-soft: #495057;
-  --ink-header: #212529;
-  
-  --line: #DEE2E6;
-  
-  --accent: #495057;
-  --accent-ink: #ffffff;
-  --accent-glow: rgba(73, 80, 87, 0.15);
-  --accent-success: #288a3b;
-  --accent-alert: #cc2929;
-  --bg-elevated: #F1F3F5;
-  
-  --danger: #cc2929;
-  --success: #288a3b;
-  --warning: #d97f00;
-  --shadow-glow: 0 0 0 3px rgba(73, 80, 87, 0.12);
-}
 
-/* 4. Warm Gray (Custom 1) */
-[data-theme="light-warm-gray"] {
-  --bg-base: #C9C8C7;
-  --bg-surface: #949392;
-  --bg-header: #949392;
-  --bg-hover: rgba(34, 34, 34, 0.08);
-  --bg-glass: rgba(148, 147, 146, 0.75);
-  
-  --ink: #111111;
-  --ink-soft: #333333;
-  --ink-header: #000000;
-  
-  --line: #7A7978;
-  
-  --accent: #222222;
-  --accent-ink: #ffffff;
-  --accent-glow: rgba(34, 34, 34, 0.15);
-  --accent-success: #228f3b;
-  --accent-alert: #c42b3a;
-  --bg-elevated: #8A8988;
-  
-  --danger: #c42b3a;
-  --success: #228f3b;
-  --warning: #db9835;
-  --shadow-glow: 0 0 0 3px rgba(34, 34, 34, 0.15);
-}
 
 /* 5. Neutral Gray (Custom 2) */
 [data-theme="light-neutral-gray"] {
@@ -214,38 +151,17 @@
   --accent-alert: #c42b3a;
   --bg-elevated: #A6A6A6;
   
-  --danger: #c42b3a;
-  --success: #228f3b;
-  --warning: #e6ab00;
+  --danger: #9c1c28;
+  --success: #176527;
+  --warning: #a87b00;
   --shadow-glow: 0 0 0 3px rgba(34, 34, 34, 0.15);
+  --bg-panel-header: #C2C2C2;
+  --bg-brand: #A6A6A6;
+  --bg-admin-brand: color-mix(in srgb, var(--bg-base) 94%, var(--ink));
+  --bg-admin-base: color-mix(in srgb, var(--bg-base) 94%, var(--ink));
+  --input-outline: var(--accent);
 }
 
-/* 6. Cool Gray (Custom 3) */
-[data-theme="light-cool-gray"] {
-  --bg-base: #CBCBCB;
-  --bg-surface: #A8A8A8;
-  --bg-header: #A8A8A8;
-  --bg-hover: rgba(34, 34, 34, 0.07);
-  --bg-glass: rgba(168, 168, 168, 0.75);
-  
-  --ink: #111111;
-  --ink-soft: #333333;
-  --ink-header: #000000;
-  
-  --line: #8F8F8F;
-  
-  --accent: #222222;
-  --accent-ink: #ffffff;
-  --accent-glow: rgba(34, 34, 34, 0.2);
-  --accent-success: #288a3b;
-  --accent-alert: #cc2929;
-  --bg-elevated: #9C9C9C;
-  
-  --danger: #cc2929;
-  --success: #288a3b;
-  --warning: #d97f00;
-  --shadow-glow: 0 0 0 3px rgba(34, 34, 34, 0.15);
-}
 
 /* 7. Corporate Blue (Salesforce-style) */
 [data-theme="light-corporate-blue"] {
@@ -272,6 +188,11 @@
   --success: #10b981;
   --warning: #f59e0b;
   --shadow-glow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  --bg-panel-header: #e2e8f0;
+  --bg-brand: #cbd5e1;
+  --bg-admin-brand: color-mix(in srgb, var(--bg-base) 94%, var(--ink));
+  --bg-admin-base: color-mix(in srgb, var(--bg-base) 94%, var(--ink));
+  --input-outline: var(--accent);
 }
 
 /* 8. Slate Teal (Zendesk-style) */
@@ -299,6 +220,11 @@
   --success: #038153;
   --warning: #ad5f00;
   --shadow-glow: 0 0 0 3px rgba(3, 54, 61, 0.15);
+  --bg-panel-header: #d8dcde;
+  --bg-brand: #b3c0c4;
+  --bg-admin-brand: color-mix(in srgb, var(--bg-base) 94%, var(--ink));
+  --bg-admin-base: color-mix(in srgb, var(--bg-base) 94%, var(--ink));
+  --input-outline: var(--accent);
 }
 
 /* 9. Graphite Monochrome (Linear-style) */
@@ -326,6 +252,11 @@
   --success: #0ca678;
   --warning: #f08c00;
   --shadow-glow: 0 0 0 3px rgba(0, 0, 0, 0.15);
+  --bg-panel-header: #e5e5e5;
+  --bg-brand: #cccccc;
+  --bg-admin-brand: color-mix(in srgb, var(--bg-base) 94%, var(--ink));
+  --bg-admin-base: color-mix(in srgb, var(--bg-base) 94%, var(--ink));
+  --input-outline: var(--accent);
 }
 
 /* ==========================================================================
@@ -363,6 +294,11 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.15);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.35), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+  --bg-panel-header: #2c2c2c;
+  --bg-brand: #1a1a1a;
+  --bg-admin-brand: #000000;
+  --bg-admin-base: #0a0a0a;
+  --input-outline: var(--accent);
 }
 
 /* 2. Black Navy (Subtle Blue Undertones) */
@@ -396,6 +332,11 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.35), 0 2px 4px -2px rgba(0, 0, 0, 0.25);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.35), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.25);
+  --bg-panel-header: #334155;
+  --bg-brand: #1e293b;
+  --bg-admin-brand: #020617;
+  --bg-admin-base: #0f172a;
+  --input-outline: var(--accent);
 }
 
 /* 3. Charcoal (Soft Dark Gray) */
@@ -429,6 +370,11 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.15);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.35), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+  --bg-panel-header: #495057;
+  --bg-brand: #212529;
+  --bg-admin-brand: #000000;
+  --bg-admin-base: #151719;
+  --input-outline: var(--accent);
 }
 
 /* 4. Corporate Blue (Salesforce-style) */
@@ -462,6 +408,11 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+  --bg-panel-header: #1e293b;
+  --bg-brand: #0f172a;
+  --bg-admin-brand: #020617;
+  --bg-admin-base: #0a0f1c;
+  --input-outline: var(--accent);
 }
 
 /* 5. Slate Teal (Zendesk-style) */
@@ -495,6 +446,11 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.45), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.55), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  --bg-panel-header: #213536;
+  --bg-brand: #111a1b;
+  --bg-admin-brand: #050a0b;
+  --bg-admin-base: #0b1112;
+  --input-outline: var(--accent);
 }
 
 /* 6. Graphite Monochrome (Linear-style) */
@@ -528,6 +484,11 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.7), 0 2px 4px -2px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.8), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.8), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+  --bg-panel-header: #1e1e1e;
+  --bg-brand: #141414;
+  --bg-admin-brand: #000000;
+  --bg-admin-base: #050505;
+  --input-outline: var(--accent);
 }
 
 /* Common Element Overrides to enforce consistency with the theme */
@@ -696,4 +657,18 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+
+
+body {
+  font-family: var(--font-body);
+}
+
+.section-title,
+.customer-sidebar__title,
+.conv-header-info h2,
+.stat-value,
+h3 {
+  font-family: var(--font-body);
 }

@@ -422,7 +422,9 @@ def get_order_context(
 
 
 def _conversation_summary(c: Conversation) -> dict:
-    last_message = c.messages[-1].content if c.messages else None
+    last_msg_obj = c.messages[-1] if c.messages else None
+    last_message = last_msg_obj.content if last_msg_obj else None
+    last_message_is_internal = (last_msg_obj.sender == 'agent_internal') if last_msg_obj else False
     
     stage = "AI"
     if c.resolved:
@@ -440,6 +442,7 @@ def _conversation_summary(c: Conversation) -> dict:
         "stage": stage,
         "handled_by": getattr(c, "handled_by", None),
         "last_message": last_message,
+        "last_message_is_internal": last_message_is_internal,
         "updated_at": c.updated_at.isoformat(),
         "sentiment": getattr(c, "sentiment", None),
         "language": getattr(c, "language", None),
