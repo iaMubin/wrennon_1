@@ -25,9 +25,9 @@ async def suggest_kb():
         "For international shipping, ensure that customs forms are accurately filled out. Delivery times vary by region, typically taking 7-14 business days. Expedited options are available..."
     ]
     
-    idx = random.randint(0, len(titles) - 1)
+    idx = random.randint(0, len(titles) - 1)  # nosec B311
     return KBResponse(
         title=titles[idx],
         content=contents[idx],
-        confidence=f"{random.randint(85, 99)}%"
+        confidence=f"{random.randint(85, 99)}%"  # nosec B311
     )

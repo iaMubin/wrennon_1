@@ -57,7 +57,7 @@ class Settings(BaseSettings):
             raise ValueError("app_env must be one of: development, staging, production")
 
         if self.app_env == "production":
-            if self.jwt_secret_key == "dev-only-change-this-in-production":
+            if self.jwt_secret_key == "dev-only-change-this-in-production":  # nosec B105
                 import warnings
                 warnings.warn("JWT_SECRET_KEY is using the insecure default in production! Please change it.")
         return self

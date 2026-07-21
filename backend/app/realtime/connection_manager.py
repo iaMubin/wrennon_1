@@ -63,8 +63,8 @@ class ConnectionManager:
                 old_listen_task.cancel()
             try:
                 await old_ws.close(code=4409)  # 4409: replaced by a newer connection
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Error closing old websocket for session {session_id}: {e}")
 
         # NOTE: accept() is NOT called here — the caller (customer_websocket
         # in websocket_routes.py) must accept() the connection itself,
@@ -83,8 +83,8 @@ class ConnectionManager:
                             payload = json.loads(event.message)
                             try:
                                 await self._customer_connections[session_id].send_json(payload)
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logger.debug(f"Failed to send message to customer {session_id}: {e}")
             except Exception as e:
                 logger.warning(f"Redis subscribe failed for customer {session_id}: {e}")
 

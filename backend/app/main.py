@@ -58,8 +58,8 @@ async def lifespan(app: FastAPI):
     logger.info("Disconnecting from Redis Pub/Sub...")
     try:
         await broadcast.disconnect()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Error disconnecting from Redis Pub/Sub: {e}")
 
 logger.info("Starting Wrennon Showcase Agent...")
 app = FastAPI(title="Wrennon Showcase Agent", version="0.2.0", lifespan=lifespan)
@@ -113,7 +113,7 @@ with SessionLocal() as db:
     for i, a in enumerate(agents_without_id):
         # Generate a unique ID (we use their ID hash or just EMP- + random string, but simpler: EMP-100X)
         import random
-        a.employee_id = f"EMP-{random.randint(1000, 9999)}"
+        a.employee_id = f"EMP-{random.randint(1000, 9999)}"  # nosec B311
     if agents_without_id:
         db.commit()
 

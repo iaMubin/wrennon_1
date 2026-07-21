@@ -20,6 +20,7 @@ from sqlalchemy import or_
 from app.auth.dependencies import get_current_agent
 from app.auth.security import create_access_token, verify_password
 from app.config import settings
+from app.logger import logger
 import re
 from app.services.mock_apis import get_order_status, get_order_by_email, get_customer_info
 from app.db.models import Agent, Conversation, Message, AuditLog
@@ -72,7 +73,7 @@ async def login(
             )
     except Exception as e:
         # Fallback if Redis is down or times out
-        pass
+        logger.debug(f"Redis fallback during login for {form_data.username}: {e}")
 
     agent = db.query(Agent).filter(
         or_(Agent.username == form_data.username, Agent.employee_id == form_data.username)
@@ -83,8 +84,8 @@ async def login(
             r = get_redis()
             await r.incr(rate_key)
             await r.expire(rate_key, 60)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Redis fallback during rate limit increment: {e}")
             
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -108,8 +109,8 @@ async def login(
     try:
         r = get_redis()
         await r.delete(rate_key)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Redis fallback during rate limit reset: {e}")
         
     token = create_access_token(subject=agent.username, pwd_hash=agent.password_hash)
     
@@ -131,7 +132,7 @@ async def login(
         max_age=60 * 60 * 24 * 7 # 7 days
     )
     
-    return {"access_token": token, "token_type": "bearer", "role": agent.role}
+    return {"access_token": token, "token_type": "bearer", "role": agent.role}  # nosec B105
 
 
 class VerifyTOTPRequest(BaseModel):
