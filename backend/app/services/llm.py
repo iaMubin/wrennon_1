@@ -129,8 +129,8 @@ async def _safe_groq_json_call(messages: list, temperature: float = 0.2, max_tok
                 except Exception:
                     try:
                         err_dict = json.loads(dict_str)
-                    except Exception:
-                        pass
+                    except Exception as json_err:
+                        logger.debug(f"Fallback parsing also failed: {json_err}")
         
         err_info = err_dict.get("error", {})
         if err_info.get("code") == "tool_use_failed":
@@ -143,8 +143,8 @@ async def _safe_groq_json_call(messages: list, temperature: float = 0.2, max_tok
                         return args
                     elif isinstance(args, dict):
                         return json.dumps(args)
-                except Exception:
-                    pass
+                except Exception as parse_err:
+                    logger.debug(f"Failed to extract tool arguments from failed_generation: {parse_err}")
         raise e
 
 
