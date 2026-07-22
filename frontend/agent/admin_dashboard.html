@@ -21,8 +21,29 @@
 </head>
 <body>
     <div class="admin-container">
-        <div class="admin-brand-header">
+        <div class="admin-brand-header" style="justify-content: space-between;">
             <span class="logo-text"><img src="/agent/images/wren-mark.svg" alt="Wrennon Logo" class="logo-img">Wrennon</span>
+
+            <div class="profile-container" style="position: relative;">
+                <button id="profile-menu-btn" aria-label="Profile options" aria-haspopup="true" aria-expanded="false" style="background: none; border: none; cursor: pointer; display: flex; align-items: center; padding: 0;">
+                    <div id="profile-avatar" style="width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; box-shadow: var(--shadow-sm); transition: transform 0.2s ease;">
+                        U
+                    </div>
+                </button>
+
+                <div id="profile-dropdown" class="hidden" style="position: absolute; right: 0; top: 52px; background: var(--bg-surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-lg); width: 260px; z-index: 1000; overflow: hidden; padding: 0;">
+                    <div style="padding: 16px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; background: color-mix(in srgb, var(--bg-base) 40%, transparent);">
+                        <div id="profile-name" style="font-weight: 600; font-size: 15px; color: var(--ink);">Agent User</div>
+                        <div id="profile-role" style="font-size: 13px; color: var(--ink-soft); text-transform: capitalize;">Role</div>
+                    </div>
+                    <div style="padding: 8px;">
+                        <button onclick="logout()" class="theme-option" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border: none; background: transparent; cursor: pointer; border-radius: 6px; color: var(--danger);">
+                            <span style="font-weight: 500;">Sign out</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="admin-header">
             <h2>Admin Panel</h2>
@@ -38,11 +59,6 @@
                             <button id="btn-show-appearance" class="theme-option" style="display:flex; justify-content:space-between; align-items:center;" role="menuitem">
                                 <span>Appearance</span>
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                            </button>
-                            <div style="height: 1px; background: var(--line); margin: 4px 0;"></div>
-                            <button class="theme-option" onclick="logout()" style="display:flex; justify-content:space-between; align-items:center;" role="menuitem">
-                                <span>Logout</span>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
                             </button>
                         </div>
 
@@ -61,14 +77,10 @@
                             </div>
                             <div id="admin-light-themes" class="theme-tab-content active">
                                 <button class="theme-option" data-theme-value="light-brownish" role="menuitem">Brownish White</button>
-                                <button class="theme-option" data-theme-value="light-offwhite" role="menuitem">Off-White</button>
-                                <button class="theme-option" data-theme-value="light-gray" role="menuitem">Gray White</button>
-                                <button class="theme-option" data-theme-value="light-warm-gray" role="menuitem">Warm Gray</button>
                                 <button class="theme-option" data-theme-value="light-neutral-gray" role="menuitem">Neutral Gray</button>
-                                <button class="theme-option" data-theme-value="light-cool-gray" role="menuitem">Cool Gray</button>
                                 <button class="theme-option" data-theme-value="light-corporate-blue" role="menuitem">Corporate Blue</button>
                                 <button class="theme-option" data-theme-value="light-slate-teal" role="menuitem">Slate Teal</button>
-                                <button class="theme-option" data-theme-value="light-graphite" role="menuitem">Graphite</button>
+                                <button class="theme-option" data-theme-value="light-graphite" role="menuitem">Graphite Monochrome</button>
                             </div>
                             <div id="admin-dark-themes" class="theme-tab-content hidden">
                                 <button class="theme-option" data-theme-value="dark-matte" role="menuitem">Matte Black</button>
@@ -76,7 +88,7 @@
                                 <button class="theme-option" data-theme-value="dark-charcoal" role="menuitem">Charcoal</button>
                                 <button class="theme-option" data-theme-value="dark-corporate-blue" role="menuitem">Corporate Blue</button>
                                 <button class="theme-option" data-theme-value="dark-slate-teal" role="menuitem">Slate Teal</button>
-                                <button class="theme-option" data-theme-value="dark-graphite" role="menuitem">Graphite</button>
+                                <button class="theme-option" data-theme-value="dark-graphite" role="menuitem">Graphite Monochrome</button>
                             </div>
                         </div>
                     </div>
@@ -85,14 +97,17 @@
         </div>
 
         <div class="section-block">
-            <h3>Team Directory</h3>
+            <h3>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                Team Directory
+            </h3>
             <p class="section-subtitle">Click on any agent to view their details.</p>
             <table>
                 <thead>
                     <tr>
                         <th>Username</th>
                         <th>Employee ID</th>
-                        <th>Access Level</th>
+                        <th>Status</th>
                         <th>Chats Resolved</th>
                         <th>Joined</th>
                         <th class="align-right">Action</th>
@@ -225,7 +240,10 @@
 
         <!-- Analytics & Copilot Section -->
         <div class="section-block">
-            <h3>System Analytics & Copilot Insights</h3>
+            <h3>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                System Analytics & Copilot Insights
+            </h3>
             <p class="section-subtitle">Real-time performance metrics and recent AI assistant actions.</p>
 
             <div class="stat-grid">
@@ -254,13 +272,16 @@
                 <h4 class="panel-heading">Recent Copilot Activity</h4>
                 <div id="copilot-activity-list" style="display: flex; flex-direction: column; gap: 16px;">
                     <!-- Populated by JS -->
-                    <div class="panel-placeholder" style="text-align: center; padding: 20px;">Fetching latest copilot actions...</div>
+                    <textarea readonly class="panel-placeholder" style="width: 100%; height: 80px; padding: 12px; border-radius: 8px; border: 1px solid var(--border-light); background: transparent; color: var(--ink-soft); font-family: 'Inter', sans-serif; resize: vertical; text-align: center;">Fetching latest copilot actions...</textarea>
                 </div>
             </div>
         </div>
 
         <div class="section-block">
-            <h3>Automated QA & CSAT Scorecards</h3>
+            <h3>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M9 15l2 2 4-4"></path></svg>
+                Automated QA & CSAT Scorecards
+            </h3>
             <p class="section-subtitle">AI-generated evaluations of recent human-handled and AI-handled conversations.</p>
             <div style="overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse;">
@@ -272,7 +293,7 @@
                             <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line);">Accuracy</th>
                             <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line);">Resolution</th>
                             <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line);">Pred. CSAT</th>
-                            <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--line);">AI Feedback Notes</th>
+                            <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--line); min-width: 250px;">AI Feedback</th>
                         </tr>
                     </thead>
                     <tbody id="qa-scorecards-list">
@@ -283,7 +304,17 @@
         </div>
 
         <div class="section-block">
-            <h3>AI Brand Persona</h3>
+            <h3>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent);">
+                    <path d="M12 8V4H8"/>
+                    <rect width="16" height="12" x="4" y="8" rx="2"/>
+                    <path d="M2 14h2"/>
+                    <path d="M20 14h2"/>
+                    <path d="M15 13v2"/>
+                    <path d="M9 13v2"/>
+                </svg>
+                AI Brand Persona
+            </h3>
             <p class="section-subtitle">Customize how the AI talks to customers (this dynamically updates the System Prompt).</p>
             <div class="panel" style="display: flex; flex-direction: column; gap: 16px;">
                 <textarea id="brand-voice-textarea" style="width: 100%; height: 120px; padding: 12px; border-radius: 8px; border: 1px solid var(--border-light); background: var(--bg-body); color: var(--text-main); font-family: 'Inter', sans-serif; resize: vertical;" placeholder="e.g. You are a highly professional, polite, and formal support agent for a luxury brand. Never use emojis."></textarea>
@@ -311,7 +342,6 @@
                             <th>Timestamp</th>
                             <th>Actor</th>
                             <th>Action</th>
-                            <th>Target</th>
                             <th>Details</th>
                         </tr>
                     </thead>
@@ -326,7 +356,10 @@
     <!-- Agent Details Modal -->
     <div id="agent-modal" class="modal-overlay" onclick="if(event.target === this) this.style.display='none'" style="display: none;">
         <div class="modal-panel">
-            <h3>Agent Details</h3>
+            <h3>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                Agent Details
+            </h3>
             <div class="modal-field">
                 <label>Full Name</label>
                 <div id="modal-fullname" class="modal-field-value"></div>
@@ -510,9 +543,13 @@
             document.getElementById("modal-fullname").innerText = agent.full_name;
             document.getElementById("modal-username").innerText = agent.username;
             document.getElementById("modal-employee-id").innerText = agent.employee_id;
-            document.getElementById("modal-role").innerText = agent.role;
+            const roleFormatted = agent.role === 'ai' ? 'AI Agent' : agent.role.charAt(0).toUpperCase() + agent.role.slice(1);
+            document.getElementById("modal-role").innerText = roleFormatted;
 
-            if (agent.role === 'ai') {
+            const currentRole = localStorage.getItem('agent_role');
+            const isManagerViewingSenior = currentRole === 'manager' && agent.role !== 'agent';
+
+            if (agent.role === 'ai' || isManagerViewingSenior) {
                 document.getElementById('password-reset-section').style.display = 'none';
                 document.getElementById('modal-remove-btn').style.display = 'none';
             } else {
@@ -575,47 +612,92 @@
 
                 const agents = await res.json();
                 currentAgentsData = agents;
-                const tbody = document.getElementById("agents-list");
-                tbody.innerHTML = "";
-
-                agents.forEach((agent, index) => {
-                    const roleClass = agent.role === 'manager' ? 'role-manager' : (agent.role === 'ai' ? 'role-ai' : 'role-agent');
-                    const date = agent.created_at ? new Date(agent.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
-
-                    const isSelf = agent.username === currentUser;
-                    const isAi = agent.role === 'ai';
-
-                    let actionCol = `<button class="btn btn-sm" onclick="event.stopPropagation(); showAgentDetails(${index})">Manage</button>`;
-                    if (isSelf) {
-                        actionCol = `<span class="cell-self">(You)</span>`;
-                    } else if (isAi) {
-                        actionCol = "";
-                    } else if (localStorage.getItem('agent_role') === 'manager' && agent.role !== 'agent') {
-                        actionCol = "";
-                    }
-
-                    const tr = document.createElement("tr");
-                    tr.onclick = () => showAgentDetails(index);
-                    tr.innerHTML = `
-                        <td class="cell-strong">${agent.username}</td>
-                        <td class="cell-mono">${agent.employee_id}</td>
-                        <td><span class="role-badge ${roleClass}">${agent.role}</span></td>
-                        <td class="cell-accent">${agent.resolved_count}</td>
-                        <td class="cell-muted">${date}</td>
-                        <td class="align-right">
-                            ${actionCol}
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+                renderAgents();
             } catch (err) {
                 console.error("Failed to fetch agents:", err);
-                const tbody = document.getElementById("agents-list");
-                tbody.innerHTML = `<tr><td colspan="6" class="cell-danger-center">${err.message || "Server is currently offline or unreachable."}</td></tr>`;
             }
         }
 
+        let onlineAgents = [];
+        let presenceWs = null;
 
+        function connectPresenceWebSocket() {
+            const token = localStorage.getItem('agent_token');
+            if (!token) return;
+            
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            const wsUrl = `${wsProtocol}://${window.location.host}/ws/agent?token=${encodeURIComponent(token)}`;
+            
+            presenceWs = new WebSocket(wsUrl);
+            
+            presenceWs.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === "presence" && Array.isArray(data.online_agents)) {
+                        onlineAgents = data.online_agents;
+                        if (currentAgentsData.length > 0) {
+                            renderAgents();
+                        }
+                    }
+                } catch(e) {
+                    // Ignore non-JSON or other broadcasted agent dashboard events
+                }
+            };
+            
+            presenceWs.onclose = () => {
+                setTimeout(connectPresenceWebSocket, 5000);
+            };
+        }
+
+        function renderAgents() {
+            const tbody = document.getElementById("agents-list");
+            tbody.innerHTML = "";
+
+            currentAgentsData.forEach((agent, index) => {
+                const roleClass = agent.role === 'manager' ? 'role-manager' : (agent.role === 'ai' ? 'role-ai' : 'role-agent');
+                const date = agent.created_at ? new Date(agent.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
+
+                const isSelf = agent.username === currentUser;
+                const isAi = agent.role === 'ai';
+                const isOnline = onlineAgents.includes(agent.username);
+                
+                // Agent is active if they are AI, or currently connected to WebSockets, or it's the current user (fallback)
+                const isActive = isAi || isOnline || isSelf;
+
+                let actionCol = `<button class="btn btn-sm" onclick="event.stopPropagation(); showAgentDetails(${index})">Manage</button>`;
+                if (isSelf) {
+                    actionCol = `<span class="cell-self">(You)</span>`;
+                } else if (isAi) {
+                    actionCol = "";
+                } else if (localStorage.getItem('agent_role') === 'manager' && agent.role !== 'agent') {
+                    actionCol = "";
+                }
+
+                const statusText = isActive ? 'Active' : 'Offline';
+                const statusStyle = isActive 
+                    ? 'background: rgba(34,197,94,0.1); color: #16a34a; border: 1px solid rgba(34,197,94,0.2);' 
+                    : 'background: rgba(107,114,128,0.1); color: #6b7280; border: 1px solid rgba(107,114,128,0.2);';
+
+                const tr = document.createElement("tr");
+                tr.onclick = () => showAgentDetails(index);
+                tr.innerHTML = `
+                    <td class="cell-strong">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            ${agent.username}
+                            <span class="role-badge ${roleClass}">${agent.role}</span>
+                        </div>
+                    </td>
+                    <td class="cell-mono">${agent.employee_id}</td>
+                    <td><span class="role-badge" style="${statusStyle}">${statusText}</span></td>
+                    <td class="cell-accent">${agent.resolved_count}</td>
+                    <td class="cell-muted">${date}</td>
+                    <td class="align-right">
+                        ${actionCol}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
 
         async function deleteAgent(username) {
             if (!confirm(`Are you sure you want to remove agent '${username}'?`)) return;
@@ -711,7 +793,6 @@
                         <td class="cell-muted" style="font-size: 13px;">${date}</td>
                         <td class="cell-strong">${log.actor}</td>
                         <td class="cell-mono" style="color: var(--accent);">${log.action}</td>
-                        <td>${log.target || "-"}</td>
                         <td class="cell-muted" style="font-size: 13px;">${log.details || "-"}</td>
                     `;
                     tbody.appendChild(tr);
@@ -835,6 +916,42 @@
         }
         setupThemeDropdown();
 
+        function setupProfileDropdown() {
+            const profileBtn = document.getElementById("profile-menu-btn");
+            const profileDropdown = document.getElementById("profile-dropdown");
+            const profileAvatar = document.getElementById("profile-avatar");
+            const profileName = document.getElementById("profile-name");
+            const profileRole = document.getElementById("profile-role");
+            
+            const uname = localStorage.getItem("agent_username") || "Agent";
+            const role = localStorage.getItem("agent_role") || "Staff";
+            
+            profileName.innerText = uname;
+            profileRole.innerText = role;
+            profileAvatar.innerText = uname.charAt(0).toUpperCase();
+
+            profileBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const isHidden = profileDropdown.classList.contains("hidden");
+                profileDropdown.classList.toggle("hidden", !isHidden);
+                profileBtn.setAttribute("aria-expanded", isHidden ? "true" : "false");
+                if (isHidden) {
+                    profileAvatar.style.transform = "scale(1.05)";
+                } else {
+                    profileAvatar.style.transform = "scale(1)";
+                }
+            });
+
+            document.addEventListener("click", (e) => {
+                if (!e.target.closest("#profile-dropdown") && !e.target.closest("#profile-menu-btn")) {
+                    profileDropdown.classList.add("hidden");
+                    profileBtn.setAttribute("aria-expanded", "false");
+                    profileAvatar.style.transform = "scale(1)";
+                }
+            });
+        }
+        setupProfileDropdown();
+
         function logout() {
             localStorage.removeItem("agent_token");
             localStorage.removeItem("agent_username");
@@ -909,7 +1026,7 @@
                                     <span class="confidence-pill" style="background: var(--accent); color: var(--accent-ink);">Action Required</span>
                                 </div>
                                 <div class="result-title result-title--lg">${gap.question}</div>
-                                <p class="result-body">${gap.draft_article}</p>
+                                <textarea class="result-body" style="width: 100%; height: 120px; padding: 12px; border-radius: 8px; border: 1px solid var(--border-light); background: var(--bg-body); color: var(--text-main); font-family: 'Inter', sans-serif; resize: vertical;">${gap.draft_article}</textarea>
                                 <div class="result-actions">
                                     <button class="btn btn-primary" onclick="approveGap('${gap.id}')">Approve & Sync to Pinecone</button>
                                     <button class="btn btn-danger" onclick="rejectGap('${gap.id}')">Reject</button>
@@ -967,7 +1084,9 @@
                                 <td style="padding: 12px; border-bottom: 1px solid var(--line); text-align: center;">${card.accuracy_score}/10</td>
                                 <td style="padding: 12px; border-bottom: 1px solid var(--line); text-align: center;">${card.resolution_score}/10</td>
                                 <td style="padding: 12px; border-bottom: 1px solid var(--line); text-align: center; color: var(--accent); font-weight: 600;">${card.csat_prediction}/5</td>
-                                <td style="padding: 12px; border-bottom: 1px solid var(--line); font-size: 13px;">${card.feedback_notes}</td>
+                                <td style="padding: 12px; border-bottom: 1px solid var(--line);">
+                                    <textarea readonly style="width: 100%; height: 60px; padding: 8px; border-radius: 4px; border: 1px solid var(--border-light); background: transparent; color: inherit; font-family: 'Inter', sans-serif; resize: vertical; font-size: 13px;">${card.feedback_notes}</textarea>
+                                </td>
                             </tr>
                         `;
                     });
@@ -983,6 +1102,7 @@
         fetchBrandVoice();
         fetchKnowledgeGaps();
         fetchScorecards();
+        connectPresenceWebSocket();
     </script>
     <script>
         // Tab switching logic for theme dropdown

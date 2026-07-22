@@ -175,7 +175,8 @@ def needs_attention(
 ) -> list[dict]:
     conversations = (
         db.query(Conversation)
-        .filter_by(handoff_active=True, resolved=False, handled_by=None)
+        .filter(Conversation.handoff_active == True, Conversation.resolved == False, Conversation.handled_by == None)
+        .filter(Conversation.messages.any())
         .options(selectinload(Conversation.messages))
         .order_by(Conversation.updated_at.desc())
         .all()
@@ -222,7 +223,8 @@ def active_chats(
 ) -> list[dict]:
     conversations = (
         db.query(Conversation)
-        .filter_by(resolved=False)
+        .filter(Conversation.resolved == False)
+        .filter(Conversation.messages.any())
         .options(selectinload(Conversation.messages))
         .order_by(Conversation.updated_at.desc())
         .all()
@@ -237,6 +239,7 @@ def all_conversations(
 ) -> list[dict]:
     conversations = (
         db.query(Conversation)
+        .filter(Conversation.messages.any())
         .options(selectinload(Conversation.messages))
         .order_by(Conversation.updated_at.desc())
         .limit(50)

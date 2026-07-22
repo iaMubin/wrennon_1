@@ -221,7 +221,7 @@ body {
 }
 .msg--bot { background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
 .msg--agent { background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
-.msg--user { background: var(--accent); color: #fff; border: none; border-bottom-right-radius: 4px; }
+.msg--user { background: var(--accent); color: #fff; border: 1px solid rgba(255, 255, 255, 0.2); border-bottom-right-radius: 4px; }
 .msg--system { align-self: center; background: transparent; color: var(--ink-soft); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; text-align: center; max-width: 100%; font-weight: 500; margin: 12px 0; border: none; box-shadow: none; padding: 0; }
 
 .msg-name { font-size: 11px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; font-family: ui-monospace, monospace; }
@@ -243,8 +243,13 @@ body {
   display: none;
 }
 
-.msg--bot, .msg--agent { border-left: none; }
-.msg--user { border-right: none; }
+/* Make grouped messages boxy (attached to the previous message) */
+.msg-wrapper--grouped.msg-wrapper--user .msg--user { border-top-right-radius: 4px; }
+.msg-wrapper--grouped.msg-wrapper--bot .msg--bot,
+.msg-wrapper--grouped.msg-wrapper--agent .msg--agent { border-top-left-radius: 4px; }
+
+.msg--bot, .msg--agent { border-left: 2px solid var(--accent); }
+.msg--user { border-right: 2px solid color-mix(in srgb, var(--accent) 60%, white); }
 
 .date-separator {
   align-self: center;

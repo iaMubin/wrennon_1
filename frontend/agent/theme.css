@@ -63,7 +63,7 @@
   display: none !important;
 }
 
-/* Fallback (Default to light-offwhite if not set) */
+/* Fallback (Default to standard light theme if not set) */
 :root {
   --bg-base: #f8f9fa;
   --bg-surface: #ffffff;

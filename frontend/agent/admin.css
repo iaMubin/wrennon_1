@@ -207,13 +207,19 @@ body {
   box-shadow: none !important;
 }
 
-h3 {
+h3, .section-title {
   font-family: var(--font-display);
-  font-size: 24px; /* Slightly larger heading */
+  font-size: 28px;
   margin-bottom: 20px;
   color: var(--ink);
   font-weight: 800;
   letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+h3 svg {
+  color: var(--accent);
 }
 
 /* ── Create Agent Form ── */
@@ -363,28 +369,22 @@ tbody tr:nth-child(even):hover {
 
 .role-badge {
   font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  padding: 3px 10px;
-  border-radius: var(--radius-pill);
-  font-weight: 700;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  display: inline-block;
+  letter-spacing: 0.08em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 80%, black);
 }
-.role-manager {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--ink-soft);
-  border: 1px solid var(--line);
-}
-.role-agent {
-  background: transparent;
-  color: var(--ink);
-  border: 1px solid var(--line);
-}
-.role-ai {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+.role-manager, .role-agent, .role-ai {
+  /* Inherit all styles from .role-badge, keeping these classes in case they are used elsewhere */
 }
 
 /* ── Stats Cards ── */
@@ -780,11 +780,7 @@ textarea#brand-voice-textarea {
 }
 
 #logs-container {
-  padding: 0 28px 24px;
-  border: 1px solid var(--line);
-  border-top: 0;
-  border-radius: 0 0 16px 16px;
-  background: var(--bg-surface);
+  /* Removed borders and padding to fix incomplete box issue */
 }
 
 @media (max-width: 900px) {

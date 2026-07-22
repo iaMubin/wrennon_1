@@ -817,7 +817,7 @@ async def agent_websocket(websocket: WebSocket, access_token: str | None = Cooki
             return
 
         logger.info(f"Agent connected: {username}")
-        await manager.connect_agent(websocket)
+        await manager.connect_agent(websocket, username)
         
         while True:
             data = await websocket.receive_json()

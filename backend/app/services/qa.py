@@ -46,7 +46,7 @@ async def _generate_scorecard(conversation_id: str, transcript: str, db):
             "  \"accuracy_score\": 1-10,\n"
             "  \"resolution_score\": 1-10,\n"
             "  \"csat_prediction\": 1-5,\n"
-            "  \"feedback_notes\": \"Short summary of what went well or poorly\"\n"
+            "  \"feedback_notes\": \"Very short (max 10 words) on-point feedback\"\n"
             "}"
         )},
         {"role": "user", "content": f"Transcript:\n{transcript}"}
