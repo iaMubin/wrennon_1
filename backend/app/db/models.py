@@ -87,6 +87,7 @@ class Message(Base):
     sender: Mapped[str] = mapped_column(String)
     content: Mapped[str] = mapped_column(Text)
     author_username: Mapped[str | None] = mapped_column(String, nullable=True)
+    is_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
 
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
@@ -106,6 +107,15 @@ class Agent(Base):
     role: Mapped[str] = mapped_column(String, default="agent")
     totp_secret: Mapped[str | None] = mapped_column(String, nullable=True)
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    token_version: Mapped[int] = mapped_column(Integer, default=1)
+    # Bumped whenever the password changes (or the account needs its
+    # sessions force-revoked). The JWT carries the token_version that was
+    # current when it was issued ("tv" claim); get_current_agent rejects
+    # any token whose "tv" doesn't match the current value. Replaces an
+    # earlier approach that embedded a fragment of the password hash
+    # itself into the JWT payload — JWTs are signed, not encrypted, so
+    # that fragment was readable by anyone holding the token. A plain
+    # counter carries no information about the password at all.
 
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)

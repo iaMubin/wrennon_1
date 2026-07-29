@@ -168,6 +168,7 @@ def reset_password(
     validate_password(payload.new_password)
         
     agent.password_hash = hash_password(payload.new_password)
+    agent.token_version = (agent.token_version or 1) + 1
     
     # Audit log
     audit = AuditLog(
@@ -198,7 +199,7 @@ def get_audit_logs(
         for log in logs
     ]
 
-from app.db.models import SystemSetting, KnowledgeGap, AnalyticsScorecard
+from app.db.models import SystemSetting, KnowledgeGap, AnalyticsScorecard, Message
 from app.services.vectorstore import insert_into_pinecone
 
 class SettingUpdate(BaseModel):
@@ -270,3 +271,96 @@ def get_analytics_scorecards(db: Session = Depends(get_db), manager: Agent = Dep
         "feedback_notes": c.feedback_notes,
         "created_at": c.created_at.isoformat()
     } for c in cards]
+
+
+@router.get("/admin/customer-data")
+def export_customer_data(
+    email: str,
+    db: Session = Depends(get_db),
+    manager: Agent = Depends(get_current_manager),
+) -> dict:
+    """Supports GDPR Art. 15/20 (right of access / data portability) and
+    the CCPA right to know: returns every conversation and message tied
+    to a customer's email in one payload, for an agent to hand over when
+    a customer asks what data is held on them. Case-insensitive match,
+    since the email is stored exactly as the customer typed it and
+    wasn't normalized at capture time."""
+    conversations = (
+        db.query(Conversation)
+        .filter(func.lower(Conversation.customer_email) == email.lower().strip())
+        .all()
+    )
+    if not conversations:
+        raise HTTPException(status_code=404, detail="No data found for this email")
+
+    export = [
+        {
+            "conversation_id": conv.id,
+            "session_id": conv.session_id,
+            "created_at": conv.created_at.isoformat(),
+            "resolved": conv.resolved,
+            "sentiment": conv.sentiment,
+            "intent_category": conv.intent_category,
+            "messages": [
+                {
+                    "sender": m.sender,
+                    "content": m.content,
+                    "created_at": m.created_at.isoformat(),
+                }
+                for m in conv.messages
+            ],
+        }
+        for conv in conversations
+    ]
+
+    audit = AuditLog(
+        actor_username=manager.username,
+        action="export_customer_data",
+        target_username=email,
+        details=f"{len(conversations)} conversation(s) exported",
+    )
+    db.add(audit)
+    db.commit()
+
+    return {"email": email, "conversations": export}
+
+
+@router.delete("/admin/customer-data")
+def delete_customer_data(
+    email: str,
+    db: Session = Depends(get_db),
+    manager: Agent = Depends(get_current_manager),
+) -> dict:
+    """Supports GDPR Art. 17 (right to erasure) and the CCPA right to
+    delete: permanently removes every conversation, message, scorecard,
+    and knowledge-gap record tied to a customer's email. There is no
+    undo — the audit log entry this leaves behind (which intentionally
+    does not include message content) is the only record this happened."""
+    conversations = (
+        db.query(Conversation)
+        .filter(func.lower(Conversation.customer_email) == email.lower().strip())
+        .all()
+    )
+    if not conversations:
+        raise HTTPException(status_code=404, detail="No data found for this email")
+
+    conversation_ids = [c.id for c in conversations]
+
+    # Child rows first — Conversation.messages has no delete cascade
+    # configured, so deleting the parent directly would either leave
+    # these orphaned or fail on the FK, depending on the database.
+    db.query(Message).filter(Message.conversation_id.in_(conversation_ids)).delete(synchronize_session=False)
+    db.query(AnalyticsScorecard).filter(AnalyticsScorecard.conversation_id.in_(conversation_ids)).delete(synchronize_session=False)
+    db.query(KnowledgeGap).filter(KnowledgeGap.conversation_id.in_(conversation_ids)).delete(synchronize_session=False)
+    db.query(Conversation).filter(Conversation.id.in_(conversation_ids)).delete(synchronize_session=False)
+
+    audit = AuditLog(
+        actor_username=manager.username,
+        action="delete_customer_data",
+        target_username=email,
+        details=f"{len(conversation_ids)} conversation(s) permanently erased",
+    )
+    db.add(audit)
+    db.commit()
+
+    return {"status": "deleted", "email": email, "conversations_removed": len(conversation_ids)}

@@ -58,8 +58,20 @@ class Settings(BaseSettings):
 
         if self.app_env == "production":
             if self.jwt_secret_key == "dev-only-change-this-in-production":  # nosec B105
-                import warnings
-                warnings.warn("JWT_SECRET_KEY is using the insecure default in production! Please change it.")
+                raise ValueError(
+                    "JWT_SECRET_KEY is using the insecure development default in "
+                    "production. Set a real, random JWT_SECRET_KEY before starting "
+                    "the app in production — a warning here isn't enough, since "
+                    "this key signs every agent session token."
+                )
+            if self.cors_allowed_origins.strip() == "*":
+                raise ValueError(
+                    "CORS_ALLOWED_ORIGINS is still the wildcard default in "
+                    "production. Set it to your actual frontend origin(s) — "
+                    "wildcard CORS in production also silently disables "
+                    "credentialed requests (see main.py), which would break "
+                    "cookie-based agent auth rather than just being insecure."
+                )
         return self
 
 

@@ -1,5 +1,5 @@
 #wrennon-widget {
-  --paper: var(--bg-surface);
+  --paper: #ffffff;
   --paper-dim: var(--bg-base);
   --accent-subtle: color-mix(in srgb, var(--accent) 15%, transparent);
   --accent-glow: color-mix(in srgb, var(--accent) 30%, transparent);
@@ -234,7 +234,7 @@ body {
 .msg strong { font-weight: 600; color: var(--ink); }
 
 .msg-meta { display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 10px; opacity: 0.8; margin-top: 6px; font-family: ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); }
-.msg-ticks { color: var(--accent); font-weight: bold; letter-spacing: -2px; margin-left: 2px; }
+.msg-ticks { display: inline-flex; align-items: center; }
 .msg--user .msg-ticks { color: var(--accent); }
 
 .msg-wrapper--user:has(+ .msg-wrapper--user.msg-wrapper--grouped) .msg-meta,
@@ -325,6 +325,9 @@ body {
 .theme-toggle-btn:focus-visible { outline: 2px solid #fff; }
 
 .theme-dropdown-menu {
+    background-color: var(--paper, #ffffff) !important;
+    opacity: 1 !important;
+    backdrop-filter: none !important;
   position: absolute;
   top: 100%;
   right: 0;
@@ -344,6 +347,8 @@ body {
   display: none;
 }
 .theme-option {
+    background-color: var(--paper, #ffffff) !important;
+    opacity: 1 !important;
   background: transparent;
   border: none;
   color: var(--ink);
@@ -570,3 +575,35 @@ body {
 .chat-lightbox-nav.next {
   right: 20px;
 }
+/* WhatsApp Style Reply Bubble */
+.msg-reply-bubble {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  border-left: 4px solid currentColor;
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+.msg-reply-bubble:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.msg-reply-author {
+  font-weight: bold;
+  color: currentColor;
+  opacity: 0.9;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+.msg-reply-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.85;
+}
+
+

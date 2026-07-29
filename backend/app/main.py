@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 
 from app.api.agent import router as agent_router
 from app.api.admin import router as admin_router
-from app.api.chat import router as chat_router
+from app.api.chat import router as chat_router, ALLOWED_EXTENSIONS
 from app.api.analytics import router as analytics_router
 from app.api.copilot import router as copilot_router
 from app.api.kb import router as kb_router
@@ -79,6 +79,45 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    """Baseline security headers on every response.
+
+    NOTE on Content-Security-Policy: this app is sometimes deployed
+    cross-origin (a static frontend on Vercel/Netlify calling this API on
+    a separate Render domain via fetch()/WebSocket — see BACKEND_URL in
+    frontend/widget.js), and widget.js/agent.js both rely on inline
+    onclick="..." handlers and inline style="..." throughout. A strict
+    CSP (no 'unsafe-inline', connect-src 'self') would break both of
+    those today. This is a deliberately pragmatic baseline — it still
+    blocks plugins/objects, restricts embedding, and stops the page from
+    loading resources off arbitrary origins — not the end state.
+    Tightening script-src/style-src further means migrating inline
+    handlers to addEventListener() plus a nonce or hash; connect-src
+    should be pinned to the actual deployed domains once those are fixed
+    in your hosting setup, rather than left this broad.
+    """
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), geolocation=(), microphone=(self)"
+    if settings.app_env == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; "
+        "media-src 'self' https:; "
+        "connect-src 'self' https: wss:; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "frame-ancestors 'self';"
+    )
+    return response
+
 # Auto-create default admin agent if none exist
 with SessionLocal() as db:
     if db.query(Agent).count() == 0:
@@ -99,6 +138,7 @@ with SessionLocal() as db:
         if admin_agent and settings.agent_password_hash and admin_agent.password_hash != settings.agent_password_hash:
             logger.info(f"Updating password hash for admin agent: {settings.agent_username}")
             admin_agent.password_hash = settings.agent_password_hash
+            admin_agent.token_version = (admin_agent.token_version or 1) + 1
             db.commit()
 
     # Backfill full_name for existing agents
@@ -143,6 +183,12 @@ with SessionLocal() as db:
     except Exception:
         db.rollback()
 
+    try:
+        db.execute(text("ALTER TABLE agents ADD COLUMN token_version INTEGER DEFAULT 1"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
 app.include_router(chat_router, prefix="/api")
 app.include_router(agent_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
@@ -164,7 +210,7 @@ os.makedirs(upload_path, exist_ok=True)
 @app.get("/uploads/{filename}")
 async def get_upload_file(filename: str):
     ext = os.path.splitext(filename)[1].lower()
-    if ext in [".html", ".js", ".svg", ".php", ".sh", ".exe", ".bat"]:
+    if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=403, detail="Forbidden file type")
         
     safe_filename = os.path.basename(filename)

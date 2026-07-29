@@ -546,14 +546,10 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
   
   if (responseData) {
     const messages = responseData.messages || [];
-    const pinnedId = responseData.pinned_message_id;
-    let pinnedContent = null;
+    const pinnedMessages = messages.filter(m => m.is_pinned);
     
     let lastDateStr = null;
     for (const msg of messages) {
-      if (msg.id === pinnedId) {
-        pinnedContent = msg.content;
-      }
       const dateObj = new Date(msg.created_at);
       const dateStr = dateObj.toLocaleDateString();
       if (dateStr !== lastDateStr) {
@@ -575,7 +571,7 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
       appendMessage(msg.sender, msg.content, msg.created_at, msg.sender === "agent_internal", msg.id, msg.author_username, msg.author_role);
     }
     
-    updatePinnedMessageUI(pinnedId, pinnedContent);
+    updatePinnedMessageUI(pinnedMessages);
   }
   
   fetchOrderContext(sessionId);
@@ -636,40 +632,49 @@ function scrollToBottom(force = false) {
   }, 50);
 }
 
-function updatePinnedMessageUI(msgId, content) {
-  let pinnedContainer = document.getElementById("pinned-message-container");
+function updatePinnedMessageUI(pinnedMessages) {
+  let pinnedContainer = document.getElementById("pinned-messages-wrapper");
   
-  if (!msgId) {
+  if (!pinnedMessages || pinnedMessages.length === 0) {
     if (pinnedContainer) pinnedContainer.remove();
     return;
   }
   
   if (!pinnedContainer) {
     pinnedContainer = document.createElement("div");
-    pinnedContainer.id = "pinned-message-container";
-    pinnedContainer.className = "pinned-message";
+    pinnedContainer.id = "pinned-messages-wrapper";
+    pinnedContainer.className = "pinned-messages-wrapper";
     
-    // Insert after chat-header
-    const header = document.querySelector(".chat-header");
-    header.parentNode.insertBefore(pinnedContainer, header.nextSibling);
+    // Insert before messages container (below order popup)
+    const messagesContainer = document.getElementById("agent-messages");
+    if (messagesContainer) {
+      messagesContainer.parentNode.insertBefore(pinnedContainer, messagesContainer);
+    }
   }
   
-  let displayContent = content;
-  if (displayContent.startsWith("*Internal Note:*")) {
-    displayContent = displayContent.replace(/^\*Internal Note:\* /, "[Internal] ");
-  }
-  
-  pinnedContainer.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <div style="display:flex; align-items:center; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">
-        <svg style="margin-right:8px; color:var(--primary); flex-shrink:0;" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg>
-        <span style="font-weight:500; font-size:13px; text-overflow:ellipsis; overflow:hidden;">${escapeHtml(displayContent)}</span>
+  let html = '';
+  pinnedMessages.forEach((msg) => {
+    let displayContent = msg.content || "";
+    displayContent = displayContent.replace(/\[INTERNAL_IMAGE_DESC\][\s\S]*?\[\/INTERNAL_IMAGE_DESC\]/g, '');
+    const isInternal = msg.sender === 'agent_internal' || displayContent.includes("INTERNAL NOTE");
+    
+    html += `
+      <div class="pinned-message ${isInternal ? 'pinned-message--internal' : ''}" data-id="${msg.id}" onclick="const el = document.querySelector('.msg-content[data-msg-id=\\'${msg.id}\\']'); if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});">
+        <div class="pinned-message-content">
+          <div class="pinned-message-header">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+            ${isInternal ? '<span class="pinned-badge">Internal Note</span>' : 'Pinned Message'}
+          </div>
+          <div class="pinned-message-text">${escapeHtml(displayContent)}</div>
+        </div>
+        <button class="unpin-btn" data-id="${msg.id}" title="Unpin" onclick="event.stopPropagation();">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
       </div>
-      <button class="unpin-btn" data-id="${msgId}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;flex-shrink:0;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-      </button>
-    </div>
-  `;
+    `;
+  });
+  
+  pinnedContainer.innerHTML = html;
 }
 
 document.addEventListener("visibilitychange", () => {
@@ -736,6 +741,21 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
   // Feature: Hide internal image descriptions from agent UI
   displayContent = displayContent.replace(/\[INTERNAL_IMAGE_DESC\][\s\S]*?\[\/INTERNAL_IMAGE_DESC\]/g, '');
   
+  // Feature: WhatsApp style replies
+  let replyHtml = '';
+  const replyMatch = displayContent.match(/^> \*\*Replying to:\*\*\n((?:> .*\n?)+)\n\n([\s\S]*)$/);
+  if (replyMatch) {
+    const quotedLines = replyMatch[1].split('\n').map(line => line.replace(/^> /, '')).join('\n').trim();
+    displayContent = replyMatch[2];
+    
+    replyHtml = `
+      <div class="msg-reply-bubble">
+        <div class="msg-reply-author">Replied to</div>
+        <div class="msg-reply-text">${escapeHtml(quotedLines)}</div>
+      </div>
+    `;
+  }
+
   // Feature: Extract audio transcriptions to display as collapsible blocks
   let transcriptHtml = '';
   displayContent = displayContent.replace(/\(Transcript:\s*([\s\S]*?)\)/g, (match, p1) => {
@@ -745,25 +765,42 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
 
   if (isInternal) {
     displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
-    div.innerHTML = nameHtml + renderMarkdown(displayContent) + transcriptHtml;
+    div.innerHTML = nameHtml + replyHtml + renderMarkdown(displayContent) + transcriptHtml;
   } else {
-    div.innerHTML = nameHtml + renderMarkdown(displayContent) + transcriptHtml;
+    div.innerHTML = nameHtml + replyHtml + renderMarkdown(displayContent) + transcriptHtml;
   }
 
   if (msgId) {
-    let actionsHtml = `<div class="msg-actions" style="position:absolute; bottom:4px; ${actualSender === 'agent' ? 'left:-28px;' : 'right:-28px;'} display:flex; flex-direction:column; gap:4px;">`;
-    actionsHtml += `<button class="pin-note-btn" data-id="${msgId}" data-content="${escapeHtml(displayContent)}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Pin message"><svg style="transform: rotate(45deg);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 0 0-8 0v4L6 14v2h5v5l1 2 1-2v-5h5v-2l-2-3z"></path></svg></button>`;
+    let actionsHtml = `<div class="msg-dropdown-container">
+      <button class="msg-dropdown-btn" title="Message options">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="msg-dropdown-menu">
+        <div class="msg-dropdown-item msg-action-reply" data-content="${escapeHtml(displayContent)}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg> Reply
+        </div>
+        <div class="msg-dropdown-item msg-action-copy" data-content="${escapeHtml(displayContent)}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy
+        </div>
+        <div class="msg-dropdown-item msg-action-pin" data-id="${msgId}" data-content="${escapeHtml(displayContent)}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg> Pin
+        </div>
+        <div class="msg-dropdown-item msg-action-copilot" data-content="${escapeHtml(displayContent)}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg> Ask Copilot
+          </div>`;
     if (isInternal) {
-      actionsHtml += `<button class="delete-note-btn" data-id="${msgId}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Delete note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
+      actionsHtml += `<div class="msg-dropdown-item msg-action-delete" data-id="${msgId}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Delete note
+        </div>`;
     }
-    actionsHtml += `</div>`;
+    actionsHtml += `</div></div>`;
     div.innerHTML += actionsHtml;
   }
   contentWrapper.appendChild(div);
 
   if (sender !== "system") {
     const timeStr = formatTime(isoString);
-    const ticks = (sender === "ai" || sender === "agent" || isInternal) ? `<span class="msg-ticks">✓✓</span>` : "";
+    const ticks = (sender === "ai" || sender === "agent" || isInternal) ? `<span class="msg-ticks"><svg viewBox="0 0 512 512" width="16" height="16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="44"><path d="M464 128L240 384l-96-96M144 384l-96-96M368 128L232 284"/></svg></span>` : "";
     const metaDiv = document.createElement("div");
     metaDiv.className = `msg-meta msg-meta--${actualSender}`;
     metaDiv.innerHTML = `<span>${timeStr}</span>${ticks}`;
@@ -775,7 +812,135 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
 }
 
 document.addEventListener("click", async (e) => {
-  const deleteBtn = e.target.closest(".delete-note-btn");
+  // Dropdown toggle logic
+  if (!e.target.closest('.msg-dropdown-container')) {
+    document.querySelectorAll('.msg-dropdown-menu.show').forEach(el => {
+      el.classList.remove('show');
+      const msg = el.closest('.msg');
+      if (msg) msg.style.zIndex = "";
+      const content = el.closest('.msg-content');
+      if (content) content.style.zIndex = "";
+    });
+  }
+  const dropdownBtn = e.target.closest('.msg-dropdown-btn');
+  if (dropdownBtn) {
+    const menu = dropdownBtn.nextElementSibling;
+    const isShowing = menu.classList.contains('show');
+    document.querySelectorAll('.msg-dropdown-menu.show').forEach(el => {
+      el.classList.remove('show');
+      const msg = el.closest('.msg');
+      if (msg) msg.style.zIndex = "";
+      const content = el.closest('.msg-content');
+      if (content) content.style.zIndex = "";
+    });
+    if (!isShowing) {
+      menu.classList.add('show');
+      
+      const msg = menu.closest('.msg');
+      if (msg) msg.style.zIndex = "999999";
+      
+      const content = menu.closest('.msg-content');
+      if (content) content.style.zIndex = "999999";
+      
+      const rect = menu.getBoundingClientRect();
+      
+      // Prevent going off right edge
+      if (rect.right > window.innerWidth) {
+        menu.style.right = '0';
+        menu.style.left = 'auto';
+      }
+      
+      // Prevent going off bottom edge
+      if (rect.bottom > window.innerHeight - 80) {
+        menu.style.top = 'auto';
+        menu.style.bottom = '100%';
+      } else {
+        menu.style.top = '100%';
+        menu.style.bottom = 'auto';
+      }
+    }
+    return;
+  }
+
+  // Handle Dropdown Actions
+  const copyBtn = e.target.closest(".msg-action-copy");
+  if (copyBtn) {
+    const content = copyBtn.dataset.content;
+    navigator.clipboard.writeText(content);
+    
+    // Toast notification style update
+    const originalHtml = copyBtn.innerHTML;
+    copyBtn.innerHTML = `<svg viewBox="0 0 512 512" width="16" height="16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="44"><path d="M464 128L240 384l-96-96M144 384l-96-96M368 128L232 284"/></svg> Copied!`;
+    setTimeout(() => {
+      copyBtn.innerHTML = originalHtml;
+      document.querySelectorAll('.msg-dropdown-menu.show').forEach(el => el.classList.remove('show'));
+    }, 1500);
+    return;
+  }
+
+  const replyBtn = e.target.closest(".msg-action-reply");
+  if (replyBtn) {
+    const content = replyBtn.dataset.content;
+    
+    // Show preview container
+    const previewContainer = document.getElementById("reply-preview-container");
+    const previewText = document.getElementById("reply-preview-text");
+    if (previewContainer && previewText) {
+       previewText.textContent = content;
+       previewContainer.classList.remove("hidden");
+       // Store the replied content so it can be used during send
+       previewContainer.dataset.replyContent = content;
+    }
+    
+    const input = document.getElementById("agent-message-input");
+    if (input) {
+      input.focus();
+    }
+    document.querySelectorAll('.msg-dropdown-menu.show').forEach(el => el.classList.remove('show'));
+    return;
+  }
+
+  const closeReplyBtn = e.target.closest("#close-reply-preview");
+  if (closeReplyBtn) {
+     const previewContainer = document.getElementById("reply-preview-container");
+     if (previewContainer) {
+         previewContainer.classList.add("hidden");
+         previewContainer.removeAttribute("data-reply-content");
+     }
+     return;
+  }
+
+  const copilotBtn = e.target.closest(".msg-action-copilot");
+  if (copilotBtn) {
+    const content = copilotBtn.dataset.content;
+    const input = document.getElementById("agent-message-input");
+    
+    const originalText = copilotBtn.innerHTML;
+    copilotBtn.innerHTML = "Drafting...";
+    
+    if (input && activeSessionId) {
+       input.disabled = true;
+       // We cannot use await directly if the surrounding function isn't async.
+       // The click listener is async? Let's check: document.addEventListener("click", async (e) => { ... })
+       // Wait, the global click listener is async?
+       authedFetch(`/copilot/suggest`, "POST", { ticket_id: activeSessionId, context_message: content })
+         .then(res => {
+           if (res && res.suggested_reply) {
+              input.value = res.suggested_reply;
+              input.focus();
+           }
+         })
+         .catch(err => console.error("Copilot fail", err))
+         .finally(() => {
+           input.disabled = false;
+           copilotBtn.innerHTML = originalText;
+           document.querySelectorAll('.msg-dropdown-menu.show').forEach(el => el.classList.remove('show'));
+         });
+    }
+    return;
+  }
+
+  const deleteBtn = e.target.closest(".msg-action-delete");
   if (deleteBtn) {
     const msgId = deleteBtn.dataset.id;
     if (!msgId) return;
@@ -788,27 +953,31 @@ document.addEventListener("click", async (e) => {
     } else {
       alert("Failed to delete note. You can only delete your own notes.");
     }
+    document.querySelectorAll('.msg-dropdown-menu.show').forEach(el => el.classList.remove('show'));
+    return;
   }
   
-  const pinBtn = e.target.closest(".pin-note-btn");
+  const pinBtn = e.target.closest(".msg-action-pin");
   if (pinBtn) {
     const msgId = pinBtn.dataset.id;
-    const content = pinBtn.dataset.content;
     if (!msgId || !activeSessionId) return;
     
-    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: parseInt(msgId, 10) });
+    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: msgId, is_pinned: true });
     if (result) {
-      updatePinnedMessageUI(msgId, content);
+      loadConversations();
     }
+    document.querySelectorAll('.msg-dropdown-menu.show').forEach(el => el.classList.remove('show'));
+    return;
   }
 
   const unpinBtn = e.target.closest(".unpin-btn");
   if (unpinBtn) {
-    if (!activeSessionId) return;
+    const msgId = unpinBtn.dataset.id;
+    if (!msgId || !activeSessionId) return;
     
-    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: null });
+    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: msgId, is_pinned: false });
     if (result) {
-      updatePinnedMessageUI(null, null);
+      loadConversations();
     }
   }
 });
@@ -1155,12 +1324,23 @@ function renderCopilotActions(actions) {
 }
 
 function sendAgentReply() {
-  const text = agentInput.value.trim();
-  if (!text || !activeSessionId || !socket || socket.readyState !== WebSocket.OPEN) return;
+  let text = agentInput.value.trim();
+  const previewContainer = document.getElementById("reply-preview-container");
+  const isReplying = previewContainer && !previewContainer.classList.contains("hidden") && previewContainer.dataset.replyContent;
+  
+  if (!text && !isReplying) return;
+  if (!activeSessionId || !socket || socket.readyState !== WebSocket.OPEN) return;
 
   const isInternal = noteTypeSelect && noteTypeSelect.value === "internal";
   
-  socket.send(JSON.stringify({ session_id: activeSessionId, message: text, is_internal: isInternal }));
+  if (isReplying) {
+    const quotedText = previewContainer.dataset.replyContent.split('\n').map(line => `> ${line}`).join('\n');
+    text = `> **Replying to:**\n${quotedText}\n\n` + text;
+    previewContainer.classList.add("hidden");
+    previewContainer.removeAttribute("data-reply-content");
+  }
+  
+  socket.send(JSON.stringify({ type: "new_message", session_id: activeSessionId, message: text.trim(), is_internal: isInternal }));
   
   agentInput.value = "";
   drafts[activeSessionId] = ""; 
@@ -1320,8 +1500,9 @@ function renderMarkdown(text) {
 function inlineMarkdown(text) {
   let escaped = escapeHtml(text);
   escaped = escaped.replace(/\[Audio\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
+    const safeUrl = escapeAttr(url);
     const playerId = 'vp_' + Math.random().toString(36).substr(2, 9);
-    return `<div class="voice-player" id="${playerId}" data-src="${url}">` +
+    return `<div class="voice-player" id="${playerId}" data-src="${safeUrl}">` +
       `<button class="voice-player__btn" aria-label="Play voice message" onclick="toggleVoicePlayer('${playerId}')">` +
         `<svg class="voice-player__icon-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>` +
         `<svg class="voice-player__icon-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>` +
@@ -1330,15 +1511,34 @@ function inlineMarkdown(text) {
         Array.from({length: 20}, (_, i) => `<span class="voice-player__bar" style="animation-delay:${i * 0.05}s; height:${Math.floor(Math.random() * 60) + 20}%"></span>`).join('') +
       `</div>` +
       `<span class="voice-player__time">0:00</span>` +
-      `<audio preload="metadata" src="${url}" onloadedmetadata="const d = this.duration; if(d && d !== Infinity) { this.parentElement.querySelector('.voice-player__time').textContent = Math.floor(d/60) + ':' + Math.floor(d%60).toString().padStart(2, '0'); }"></audio>` +
+      `<audio preload="metadata" src="${safeUrl}" onloadedmetadata="const d = this.duration; if(d && d !== Infinity) { this.parentElement.querySelector('.voice-player__time').textContent = Math.floor(d/60) + ':' + Math.floor(d%60).toString().padStart(2, '0'); }"></audio>` +
     `</div>`;
   });
-  escaped = escaped.replace(/\[Video\]\((https?:\/\/[^\)]+)\)/g, '<video controls src="$1" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;"></video>');
-  escaped = escaped.replace(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g, '<img src="$1" class="chat-lightbox-image" style="max-width: 250px; max-height: 250px; object-fit: cover; display: block; margin: 8px 0; border-radius: 8px; cursor: pointer;" onclick="openLightbox(this.src)" />');
-  escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline;">$1</a>');
+  escaped = escaped.replace(/\[Video\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
+    return `<video controls src="${escapeAttr(url)}" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;"></video>`;
+  });
+  escaped = escaped.replace(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
+    return `<img src="${escapeAttr(url)}" class="chat-lightbox-image" style="max-width: 250px; max-height: 250px; object-fit: cover; display: block; margin: 8px 0; border-radius: 8px; cursor: pointer;" onclick="openLightbox(this.src)" />`;
+  });
+  escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, (match, linkText, url) => {
+    return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline;">${linkText}</a>`;
+  });
   escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   escaped = escaped.replace(/@([a-zA-Z0-9_]+)/g, '<span class="agent-mention" style="color: var(--accent); font-weight: 600; background: var(--accent-glow); padding: 0 4px; border-radius: 4px;">@$1</span>');
   return escaped;
+}
+
+function escapeAttr(text) {
+  // escapeHtml() (below) already neutralized & < > in the whole message
+  // before these URL groups were captured out of it, but it does NOT
+  // escape quote characters. These captured URLs get interpolated
+  // straight into double-quoted HTML attributes (href/src/data-src), so
+  // a URL containing a literal " could otherwise break out of the
+  // attribute and inject arbitrary attributes/event handlers — this was
+  // the actual exploit path (a crafted customer message could steal an
+  // agent's JWT out of localStorage the moment the agent opened the
+  // conversation). Closes that gap.
+  return text.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function escapeHtml(text) {
@@ -1736,4 +1936,18 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 });
+
+
+document.addEventListener("contextmenu", (e) => {
+  const msgWrapper = e.target.closest(".msg-wrapper");
+  if (msgWrapper) {
+    const dropdownBtn = msgWrapper.querySelector(".msg-dropdown-btn");
+    if (dropdownBtn) {
+      e.preventDefault();
+      dropdownBtn.click();
+    }
+  }
+});
+
+
 

@@ -112,7 +112,7 @@ async def login(
     except Exception as e:
         logger.debug(f"Redis fallback during rate limit reset: {e}")
         
-    token = create_access_token(subject=agent.username, pwd_hash=agent.password_hash)
+    token = create_access_token(subject=agent.username, token_version=agent.token_version)
     
     # Audit log
     audit = AuditLog(
@@ -262,7 +262,6 @@ def conversation_messages(
     agent_roles = {a.username: a.role for a in db.query(Agent).all()}
     
     return {
-        "pinned_message_id": conversation.pinned_message_id,
         "messages": [
             {
                 "id": m.id, 
@@ -270,7 +269,8 @@ def conversation_messages(
                 "content": m.content, 
                 "created_at": m.created_at.isoformat(), 
                 "author_username": m.author_username,
-                "author_role": agent_roles.get(m.author_username, "agent") if m.author_username else "agent"
+                "author_role": agent_roles.get(m.author_username, "agent") if m.author_username else "agent",
+                "is_pinned": getattr(m, 'is_pinned', False)
             }
             for m in conversation.messages
         ]
@@ -334,7 +334,8 @@ def delete_internal_note(
 @router.post("/agent/conversations/{session_id}/pin")
 def pin_message(
     session_id: str,
-    message_id: int | None = Body(None, embed=True),
+    message_id: str = Body(..., embed=True),
+    is_pinned: bool = Body(..., embed=True),
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent)
 ) -> dict:
@@ -342,15 +343,13 @@ def pin_message(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
         
-    # If message_id is empty/null, we unpin.
-    if message_id:
-        msg = db.query(Message).filter_by(id=message_id, conversation_id=conversation.id).first()
-        if not msg:
-            raise HTTPException(status_code=404, detail="Message not found in this conversation")
-            
-    conversation.pinned_message_id = message_id or None
+    msg = db.query(Message).filter_by(id=message_id, conversation_id=conversation.id).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found in this conversation")
+        
+    msg.is_pinned = is_pinned
     db.commit()
-    return {"status": "success", "pinned_message_id": conversation.pinned_message_id}
+    return {"status": "success", "message_id": msg.id, "is_pinned": msg.is_pinned}
 
 
 @router.get("/agent/conversations/{session_id}/order-context")

@@ -47,9 +47,9 @@ def get_current_agent(request: Request, db: Session = Depends(get_db)) -> Agent:
     if agent is None:
         raise HTTPException(status_code=401, detail="Agent not found")
         
-    # Check for token revocation via password change
-    expected_frag = agent.password_hash[-10:] if agent.password_hash else ""
-    if token_data.get("pwd_frag") != expected_frag:
+    # Check for token revocation (password change, or an explicit
+    # revoke-all-sessions bump) via the token_version counter.
+    if token_data.get("tv") != agent.token_version:
         raise HTTPException(status_code=401, detail="Token revoked (password was changed)")
         
     return agent

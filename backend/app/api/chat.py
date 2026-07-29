@@ -132,9 +132,14 @@ UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.pat
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_CONTENT_TYPES = {
-    "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
+    "image/jpeg", "image/png", "image/gif", "image/webp",
     "audio/webm", "audio/mp3", "audio/wav", "audio/mpeg", "audio/ogg", "audio/m4a",
     "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+}
+ALLOWED_EXTENSIONS = {
+    ".jpg", ".jpeg", ".png", ".gif", ".webp",
+    ".webm", ".mp3", ".wav", ".mpeg", ".m4a", ".ogg",
+    ".pdf", ".doc", ".docx"
 }
 MAX_FILE_SIZE = 2 * 1024 * 1024  # 2 MB
 
@@ -147,7 +152,7 @@ async def upload_file(
     _=Depends(verify_upload_token)
 ):
     """Upload a file for the chat (audio, image)."""
-    if file.content_type not in ALLOWED_CONTENT_TYPES and not file.content_type.startswith("image/"):
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=415, detail="Unsupported file type")
         
     # Read file and check size
@@ -158,8 +163,9 @@ async def upload_file(
     file_id = str(uuid.uuid4())
     ext = os.path.splitext(file.filename)[1].lower()
     
-    # Extra layer of defense on extension
-    if ext in [".html", ".js", ".svg", ".php", ".sh", ".exe", ".bat"]:
+    # Extension must also be on the allowlist — content_type is a
+    # client-supplied header and trivially spoofable on its own.
+    if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=415, detail="Unsupported file extension")
         
     safe_filename = f"{file_id}{ext}"

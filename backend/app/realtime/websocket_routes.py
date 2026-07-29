@@ -252,14 +252,15 @@ def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None, m
         }
 
 
-def _sync_validate_agent(username: str, pwd_frag: str | None) -> dict | None:
+def _sync_validate_agent(username: str, token_version: int | None) -> dict | None:
     with SessionLocal() as db:
         agent = db.query(Agent).filter_by(username=username).first()
         if not agent:
             return None
-        expected_frag = agent.password_hash[-10:] if agent.password_hash else ""
-        if pwd_frag != expected_frag:
+        
+        if token_version != agent.token_version:
             return None
+            
         return {"full_name": agent.full_name, "role": agent.role}
 
 
@@ -810,7 +811,7 @@ async def agent_websocket(websocket: WebSocket, access_token: str | None = Cooki
 
     try:
         # Validate agent once (non-blocking)
-        agent_data = await asyncio.to_thread(_sync_validate_agent, username, token_data.get("pwd_frag"))
+        agent_data = await asyncio.to_thread(_sync_validate_agent, username, token_data.get("tv"))
         if not agent_data:
             logger.warning("Agent connection rejected: invalid/revoked token or missing agent")
             await websocket.close(code=4401)

@@ -1,56 +1,12 @@
-# """
-# Password hashing and JWT token handling for agent login.
+"""
+Password hashing and JWT token handling for agent login.
 
-# Why hash the password at all, for a single hardcoded account: the hash
-# (not the plain password) lives in .env and in this codebase. If the
-# .env file ever leaks (committed by accident, server compromised), a
-# hash can't be reversed into the original password — the plain password
-# sitting in a config file could be, trivially, by anyone who reads it.
-# """
-
-# from __future__ import annotations
-
-# import datetime
-
-# from jose import JWTError, jwt
-# from passlib.context import CryptContext
-
-# from app.config import settings
-
-# _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-# def hash_password(plain_password: str) -> str:
-#     """Used once, offline, to generate the value that goes into
-#     AGENT_PASSWORD_HASH in .env — see scripts/generate_agent_password.py."""
-#     return _pwd_context.hash(plain_password)
-
-
-# def verify_password(plain_password: str, hashed_password: str) -> bool:
-#     return _pwd_context.verify(plain_password, hashed_password)
-
-
-# def create_access_token(subject: str) -> str:
-#     """subject is the agent's username. Encoded into a signed JWT that
-#     proves, without hitting the database again, who this is and that
-#     they logged in successfully within the last jwt_expire_minutes."""
-#     expire = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) + datetime.timedelta(
-#         minutes=settings.jwt_expire_minutes
-#     )
-#     payload = {"sub": subject, "exp": expire}
-#     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
-
-
-# def decode_access_token(token: str) -> str | None:
-#     """Returns the username if the token is valid and not expired,
-#     otherwise None. Never raises — callers just treat None as
-#     'not authenticated'."""
-#     try:
-#         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
-#         return payload.get("sub")
-#     except JWTError:
-#         return None
-
+Why hash the password at all, for a small set of accounts: the hash
+(not the plain password) lives in .env / the database. If either ever
+leaks (committed by accident, server compromised), a hash can't be
+reversed into the original password — a plaintext password sitting in
+a config file could be, trivially, by anyone who reads it.
+"""
 
 from __future__ import annotations
 
@@ -70,27 +26,31 @@ def hash_password(plain_password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     password_bytes = plain_password.encode('utf-8')
-    hashed_bytes = hashed_password.encode('utf-8')
     try:
+        hashed_bytes = hashed_password.encode('utf-8')
         return bcrypt.checkpw(password_bytes, hashed_bytes)
-    except ValueError:
-        # If the stored 'hash' is invalid (e.g. user put plaintext in AGENT_PASSWORD_HASH by mistake)
-        return plain_password == hashed_password
+    except (ValueError, TypeError):
+        # Stored value isn't a valid bcrypt hash (e.g. AGENT_PASSWORD_HASH
+        # was misconfigured with a plaintext value). Fail closed instead
+        # of falling back to a plaintext `==` comparison — that fallback
+        # would silently accept a misconfigured plaintext secret as a
+        # valid password check, which is exactly the failure mode
+        # hashing exists to prevent.
+        return False
 
 
-def create_access_token(subject: str, pwd_hash: str) -> str:
+def create_access_token(subject: str, token_version: int) -> str:
     expire = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) + datetime.timedelta(
         minutes=settings.jwt_expire_minutes
     )
-    pwd_frag = pwd_hash[-10:] if pwd_hash else ""
-    payload = {"sub": subject, "exp": expire, "pwd_frag": pwd_frag}
+    payload = {"sub": subject, "exp": expire, "tv": token_version}
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
 def decode_access_token(token: str) -> dict | None:
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
-        return {"sub": payload.get("sub"), "pwd_frag": payload.get("pwd_frag")}
+        return {"sub": payload.get("sub"), "tv": payload.get("tv")}
     except JWTError:
         return None
 

@@ -220,45 +220,6 @@ def get_order_by_email(email: str) -> Optional[dict]:
     return result
 
 
-def get_order_by_email(email: str) -> Optional[dict]:
-    """Look up the most recent order by customer email.
-    Simulates:
-    GET /admin/api/2024-01/orders.json?email={email}&limit=1
-    
-    Args:
-        email: The customer's email address
-        
-    Returns:
-        A dictionary containing order status, or None if no match.
-    """
-    # --- MOCK BODY ---
-    mock_orders = {
-        "1001": {"order_id": "1001", "email": "customer1@example.com", "status": "shipped", "carrier": "Pathao Courier", "eta": "2026-06-27", "tracking_url": "https://example.com/track/1001"},
-        "1002": {"order_id": "1002", "email": "test@example.com", "status": "processing", "carrier": None, "eta": "2026-06-30", "tracking_url": None},
-        "1003": {"order_id": "1003", "email": "customer3@example.com", "status": "delivered", "carrier": "Sundarban Courier", "eta": "2026-06-20", "tracking_url": "https://example.com/track/1003"},
-        "1004": {"order_id": "1004", "email": "test@example.com", "status": "cancelled", "carrier": None, "eta": None, "tracking_url": None},
-        "1005": {"order_id": "1005", "email": "test@example.com", "status": "processing", "carrier": None, "eta": "2026-07-15", "tracking_url": None},
-        "1006": {"order_id": "1006", "email": "customer6@example.com", "status": "shipped", "carrier": "DHL", "eta": "2026-07-08", "tracking_url": "https://dhl.com/track/1006"},
-        "1007": {"order_id": "1007", "email": "customer7@example.com", "status": "delivered", "carrier": "FedEx", "eta": "2026-06-05", "tracking_url": "https://fedex.com/track/1007"},
-    }
-    
-    if not email:
-        return None
-    email_lower = email.lower().strip()
-    matches = [
-        order for order in mock_orders.values()
-        if order.get("email", "").lower() == email_lower
-    ]
-    if not matches:
-        return None
-    # Return the latest (highest order_id)
-    latest = max(matches, key=lambda x: x["order_id"])
-    result = latest.copy()
-    if "email" in result:
-        del result["email"]
-    return result
-
-
 def create_support_ticket(
     customer_email: str,
     conversation_summary: str,
@@ -315,90 +276,10 @@ def reopen_support_ticket(
     }
 
 
-def process_refund(order_id: str, amount: float) -> dict:
-    """Process a refund for a given order (L4 Pipeline).
-    
-    Returns:
-        dict: Refund status
-    """
-    # --- MOCK BODY ---
-    import datetime
-    import uuid
-    return {
-        "refund_id": f"REF-{uuid.uuid4().hex[:6].upper()}",
-        "order_id": order_id,
-        "amount_refunded": amount,
-        "status": "approved",
-        "processed_at": datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat()
-    }
-
-
-def update_subscription(customer_email: str, action: str) -> dict:
-    """Update a customer's subscription (L3 Pipeline).
-    
-    Args:
-        action: 'skip', 'cancel', or 'resume'
-        
-    Returns:
-        dict: New subscription status
-    """
-    # --- MOCK BODY ---
-    import datetime
-    
-    status_map = {
-        "skip": "skipped_next_delivery",
-        "cancel": "cancelled",
-        "resume": "active"
-    }
-    
-    return {
-        "email": customer_email,
-        "subscription_status": status_map.get(action, "unknown"),
-        "updated_at": datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat()
-    }
-
-
-def recommend_product(context_keywords: str) -> list[dict]:
-    """Act as a shopping assistant and recommend a product.
-    
-    Args:
-        context_keywords: Search terms or context
-        
-    Returns:
-        List of recommended products.
-    """
-    # --- MOCK BODY ---
-    return [
-        {
-            "product_id": "PROD-X2",
-            "name": "Premium Plan Upgrade",
-            "price": 29.99,
-            "description": "Upgrade to our premium tier for faster shipping and exclusive content.",
-            "link": "https://example.com/upgrade/PROD-X2"
-        },
-        {
-            "product_id": "PROD-Y1",
-            "name": "Limited Edition Merch",
-            "price": 15.00,
-            "description": "Show your support with our limited edition merch.",
-            "link": "https://example.com/merch/PROD-Y1"
-        }
-    ]
-
-
-def track_purchase(product_id: str) -> dict:
-    """Simulate the customer buying a recommended product to track revenue.
-    
-    Returns:
-        dict: Revenue details
-    """
-    # --- MOCK BODY ---
-    price_map = {
-        "PROD-X2": 29.99,
-        "PROD-Y1": 15.00
-    }
-    return {
-        "success": True,
-        "product_id": product_id,
-        "revenue_generated": price_map.get(product_id, 10.00)
-    }
+# NOTE: process_refund / update_subscription / recommend_product /
+# track_purchase used to be defined here too, but nothing ever imported
+# them from this module (grepped to confirm) — the graph's tool_executor
+# calls the equivalent methods on MockEcommerceProvider in
+# app/services/integrations/mock_provider.py instead, which is the real,
+# actively-maintained catalog. Removed the dead duplicates here rather
+# than let two divergent copies of "the product catalog" rot out of sync.

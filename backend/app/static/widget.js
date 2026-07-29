@@ -610,8 +610,9 @@ function renderMarkdown(text) {
 function inlineMarkdown(text) {
   let escaped = escapeHtml(text);
   escaped = escaped.replace(/\[Audio\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
+    const safeUrl = escapeAttr(url);
     const playerId = 'vp_' + Math.random().toString(36).substr(2, 9);
-    return `<div class="voice-player" id="${playerId}" data-src="${url}">` +
+    return `<div class="voice-player" id="${playerId}" data-src="${safeUrl}">` +
       `<button class="voice-player__btn" aria-label="Play voice message" onclick="toggleVoicePlayer('${playerId}')">` +
         `<svg class="voice-player__icon-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>` +
         `<svg class="voice-player__icon-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>` +
@@ -620,14 +621,31 @@ function inlineMarkdown(text) {
         Array.from({length: 20}, (_, i) => `<span class="voice-player__bar" style="animation-delay:${i * 0.05}s; height:${Math.floor(Math.random() * 60) + 20}%"></span>`).join('') +
       `</div>` +
       `<span class="voice-player__time">0:00</span>` +
-      `<audio preload="metadata" src="${url}"></audio>` +
+      `<audio preload="metadata" src="${safeUrl}"></audio>` +
     `</div>`;
   });
-  escaped = escaped.replace(/\[Video\]\((https?:\/\/[^\)]+)\)/g, '<video controls src="$1" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;"></video>');
-  escaped = escaped.replace(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g, '<img src="$1" class="chat-lightbox-image" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px; cursor: pointer;" onclick="openLightbox(this.src)" />');
-  escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline;">$1</a>');
+  escaped = escaped.replace(/\[Video\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
+    return `<video controls src="${escapeAttr(url)}" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;"></video>`;
+  });
+  escaped = escaped.replace(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
+    return `<img src="${escapeAttr(url)}" class="chat-lightbox-image" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px; cursor: pointer;" onclick="openLightbox(this.src)" />`;
+  });
+  escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, (match, linkText, url) => {
+    return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline;">${linkText}</a>`;
+  });
   escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   return escaped;
+}
+
+function escapeAttr(text) {
+  // escapeHtml() (below) already neutralized & < > in the whole message
+  // before these URL groups were captured out of it, but it does NOT
+  // escape quote characters (browsers don't require that for plain text
+  // node content). These captured URLs get interpolated straight into
+  // double-quoted HTML attributes (href/src/data-src), so a URL
+  // containing a literal " could otherwise break out of the attribute
+  // and inject arbitrary attributes/event handlers — this closes that gap.
+  return text.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function escapeHtml(text) {
@@ -800,17 +818,32 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   displayText = displayText.replace(/\[INTERNAL_IMAGE_DESC\][\s\S]*?\[\/INTERNAL_IMAGE_DESC\]/g, '');
   displayText = displayText.replace(/\(Transcript:\s*([\s\S]*?)\)/g, '');
 
+  // Feature: WhatsApp style replies
+  let replyHtml = '';
+  const replyMatch = displayText.match(/^> \*\*Replying to:\*\*\n((?:> .*\n?)+)\n\n([\s\S]*)$/);
+  if (replyMatch) {
+    const quotedLines = replyMatch[1].split('\n').map(line => line.replace(/^> /, '')).join('\n').trim();
+    displayText = replyMatch[2];
+    
+    replyHtml = `
+      <div class="msg-reply-bubble">
+        <div class="msg-reply-author">Replied to</div>
+        <div class="msg-reply-text">${escapeHtml(quotedLines)}</div>
+      </div>
+    `;
+  }
+
   if (uiRole === "bot" || uiRole === "agent") {
-    div.innerHTML = nameHtml + renderMarkdown(displayText);
+    div.innerHTML = nameHtml + replyHtml + renderMarkdown(displayText);
   } else {
-    div.innerHTML = renderMarkdown(displayText);
+    div.innerHTML = replyHtml + renderMarkdown(displayText);
   }
   
   contentWrapper.appendChild(div);
   
   if (uiRole !== "system") {
       const timeStr = formatTime(timestamp);
-      const ticks = (uiRole === "user") ? `<span class="msg-ticks">✓✓</span>` : "";
+      const ticks = (uiRole === "user") ? `<span class="msg-ticks"><svg viewBox="0 0 512 512" width="16" height="16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="44"><path d="M464 128L240 384l-96-96M144 384l-96-96M368 128L232 284"/></svg></span>` : "";
       const metaDiv = document.createElement("div");
       metaDiv.className = `msg-meta msg-meta--${uiRole}`;
       metaDiv.innerHTML = `<span>${timeStr}</span>${ticks}`;

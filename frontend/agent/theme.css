@@ -584,7 +584,7 @@ body {
   top: 100%;
   margin-top: 8px;
   width: 220px;
-  background: var(--bg-surface);
+  background: var(--bg-surface, #ffffff); opacity: 1 !important;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-xl);
@@ -672,3 +672,10 @@ body {
 h3 {
   font-family: var(--font-body);
 }
+
+/* Appearance Dropdown Z-index Fix */
+.theme-dropdown-menu {
+  z-index: 9999999 !important;
+  background: var(--bg-surface, #ffffff) !important; opacity: 1 !important;
+}
+

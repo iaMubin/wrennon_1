@@ -19,20 +19,20 @@ def test_development_defaults_are_valid():
     assert settings.cors_allowed_origins == "*"
 
 def test_production_rejects_insecure_jwt_key():
-    settings = Settings(
-        groq_api_key="test",
-        cohere_api_key="test",
-        pinecone_api_key="test",
-        pinecone_host="test",
-        app_env="production",
-        _env_file=None,
-        agent_password_hash="testhash",
-        database_url="postgresql://user:pass@host/db",
-        redis_url="redis://localhost:6379",
-        cors_allowed_origins="https://example.com",
-        jwt_secret_key="dev-only-change-this-in-production"
-    )
-    assert settings.jwt_secret_key == "dev-only-change-this-in-production"
+    with pytest.raises(ValidationError):
+        Settings(
+            groq_api_key="test",
+            cohere_api_key="test",
+            pinecone_api_key="test",
+            pinecone_host="test",
+            app_env="production",
+            _env_file=None,
+            agent_password_hash="testhash",
+            database_url="postgresql://user:pass@host/db",
+            redis_url="redis://localhost:6379",
+            cors_allowed_origins="https://example.com",
+            jwt_secret_key="dev-only-change-this-in-production"
+        )
 
 def test_production_valid_config_passes():
     settings = Settings(

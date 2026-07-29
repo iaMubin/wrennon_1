@@ -1,6 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 import random
+
+from app.auth.dependencies import get_current_agent
+from app.db.models import Agent
 
 router = APIRouter()
 
@@ -10,7 +13,7 @@ class KBResponse(BaseModel):
     confidence: str
 
 @router.post("/suggest", response_model=KBResponse)
-async def suggest_kb():
+async def suggest_kb(agent: Agent = Depends(get_current_agent)):
     # Mock generation based on recent queries
     titles = [
         "How to Handle Order Delays",

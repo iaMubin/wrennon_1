@@ -291,7 +291,7 @@ async def transcribe_audio_if_present(text: str) -> str:
             filename += ".mp3"
         transcription = await _client.audio.transcriptions.create(
             file=(filename, content),
-            model="whisper-large-v3"
+            model="whisper-large-v3-turbo"
         )
         return text + f"\n\n(Transcript: {transcription.text})"
     except Exception as e:

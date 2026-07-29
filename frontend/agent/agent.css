@@ -211,7 +211,7 @@ body {
   width: 440px;
   min-width: 380px;
   max-width: 900px;
-  background: var(--bg-surface);
+  background: var(--bg-surface, #ffffff); opacity: 1 !important;
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
@@ -307,7 +307,7 @@ body {
   padding: 12px 14px;
   gap: 6px;
   border-bottom: 1px solid var(--line);
-  background: var(--bg-surface);
+  background: var(--bg-surface, #ffffff); opacity: 1 !important;
 }
 
 .tab {
@@ -497,7 +497,7 @@ body {
   width: 5px;
   background-color: transparent;
   cursor: col-resize;
-  z-index: 10;
+  
   transition: background-color 0.2s;
   flex-shrink: 0;
   position: relative;
@@ -556,7 +556,7 @@ body {
   justify-content: space-between;
   align-items: center;
   background: var(--bg-brand);
-  z-index: 10;
+  
 }
 .conv-header-actions {
   display: flex;
@@ -645,6 +645,7 @@ body {
   font-size: var(--fs-base);
   line-height: 1.6;
   position: relative;
+  
   word-wrap: break-word;
   animation: slideUpFade 0.25s var(--ease-out-expo) forwards;
 }
@@ -664,7 +665,7 @@ body {
 }
 
 .msg--human, .msg--user {
-  background: var(--bg-surface);
+  background: var(--bg-surface, #ffffff); opacity: 1 !important;
   color: var(--ink);
   border: 1px solid var(--line);
   border-left: 3px solid var(--accent);
@@ -695,7 +696,7 @@ body {
 }
 
 .msg--ai, .msg--bot {
-  background: var(--bg-surface);
+  background: var(--bg-surface, #ffffff); opacity: 1 !important;
   color: var(--ink);
   border: 1px solid var(--line);
   border-right: 3px solid var(--accent);
@@ -782,9 +783,9 @@ body {
 .msg-content--ai:has(+ .msg-content--ai.msg-content--grouped) .msg-meta { display: none; }
 
 .msg-ticks {
-  font-weight: bold;
-  letter-spacing: -2px;
   margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .date-separator {
@@ -803,12 +804,95 @@ body {
   opacity: 0.65;
 }
 
-.msg-actions {
-  opacity: 0 !important;
-  transition: opacity 0.2s ease;
+/* WhatsApp style message dropdown */
+.msg-dropdown-container {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  
 }
-.msg-content:hover .msg-actions {
-  opacity: 0.85 !important;
+
+.msg-dropdown-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 4px;
+  color: inherit;
+  opacity: 0;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.msg--agent .msg-dropdown-btn,
+.msg--ai .msg-dropdown-btn,
+.msg--bot .msg-dropdown-btn {
+  color: var(--text-muted);
+}
+
+.msg--human .msg-dropdown-btn,
+.msg--user .msg-dropdown-btn {
+  color: var(--ink-soft);
+}
+
+.msg-content:hover .msg-dropdown-btn,
+.msg-dropdown-container:has(.msg-dropdown-menu.show) .msg-dropdown-btn {
+  opacity: 1;
+}
+
+.msg-dropdown-btn:hover {
+  background: rgba(128, 128, 128, 0.2);
+}
+
+.msg-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  background: var(--bg-surface, #ffffff) !important; opacity: 1 !important;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.15) !important;
+  min-width: 180px;
+  z-index: 999999 !important;
+  padding: 6px 0;
+  animation: popIn 0.15s var(--ease-out-expo);
+}
+.msg--user .msg-dropdown-menu {
+  left: 0;
+  right: auto;
+}
+.msg--agent .msg-dropdown-menu {
+  right: 0;
+  left: auto;
+}
+
+.msg-dropdown-menu.show {
+  display: block;
+}
+
+.msg-dropdown-item {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.msg-dropdown-item:hover {
+  background: var(--bg-surface, #ffffff); opacity: 1 !important;
+}
+
+.msg-dropdown-item svg {
+  color: var(--text-muted);
+  width: 16px;
+  height: 16px;
 }
 
 /* ── Order Context Popup ── */
@@ -884,7 +968,7 @@ body {
 /* ── Input Row ── */
 #agent-input-row {
   padding: 16px 24px;
-  background: var(--bg-surface);
+  background: var(--bg-surface, #ffffff); opacity: 1 !important;
   display: flex;
   gap: 8px;
   border-top: 1px solid var(--line);
@@ -998,7 +1082,7 @@ body {
   gap: 10px;
   padding: 10px 14px;
   border-radius: var(--radius-pill);
-  background: var(--bg-surface);
+  background: var(--bg-surface, #ffffff); opacity: 1 !important;
   border: 1px solid var(--line);
   max-width: 320px;
   margin: 8px 0;
@@ -1170,12 +1254,12 @@ body {
 .customer-sidebar {
   width: 340px;
   min-width: 340px;
-  background: var(--bg-surface);
+  background: var(--bg-surface, #ffffff); opacity: 1 !important;
   border-left: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   transition: margin-right 0.35s var(--ease-out-expo), transform 0.35s var(--ease-out-expo), opacity 0.3s ease;
-  z-index: 10;
+  
   box-shadow: -4px 0 16px rgba(0, 0, 0, 0.02);
   margin-right: 0;
   transform: translateX(0);
@@ -1358,7 +1442,7 @@ body {
   bottom: 100%;
   left: 24px;
   margin-bottom: 8px;
-  background: var(--bg-surface);
+  background: var(--bg-surface, #ffffff); opacity: 1 !important;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(0,0,0,0.1);
@@ -1469,7 +1553,7 @@ body {
 #section-tabs {
   padding: 14px 12px 12px;
   gap: 4px;
-  background: var(--bg-surface);
+  background: var(--bg-surface, #ffffff); opacity: 1 !important;
 }
 
 .tab {
@@ -1485,7 +1569,7 @@ body {
 
 #conversation-list {
   padding: 10px 12px 18px;
-  background: var(--bg-surface);
+  background: var(--bg-surface, #ffffff); opacity: 1 !important;
 }
 
 .conv-item {
@@ -1627,7 +1711,7 @@ body {
   z-index: 110;
   width: 34px;
   height: 34px;
-  background: var(--bg-surface);
+  background: var(--bg-surface, #ffffff); opacity: 1 !important;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   color: var(--ink-soft);
@@ -1713,5 +1797,135 @@ body {
   #resizer {
     display: none;
   }
+}
+
+/* WhatsApp Style Reply Bubble */
+.msg-reply-bubble {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  border-left: 4px solid currentColor;
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+.msg-reply-bubble:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.msg-reply-author {
+  font-weight: bold;
+  color: currentColor;
+  opacity: 0.9;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+.msg-reply-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.85;
+}
+
+
+
+/* Stacking context fix for dropdown menus */
+
+
+
+
+/* WhatsApp-style Pinned Messages */
+.pinned-messages-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 16px;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.pinned-message {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-surface, #ffffff); opacity: 1 !important;
+  border-left: 4px solid var(--accent);
+  padding: 8px 12px;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.pinned-message:hover {
+  background: color-mix(in srgb, var(--bg-surface) 95%, var(--ink));
+}
+
+.pinned-message--internal {
+  border-left: 4px solid #ef4444; /* Alert Red */
+  background: color-mix(in srgb, #ef4444 8%, var(--bg-surface));
+}
+
+.pinned-message-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin-right: 12px;
+  flex: 1;
+}
+
+.pinned-message-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.pinned-message--internal .pinned-message-header {
+  color: #ef4444;
+}
+
+.pinned-badge {
+  background: #ef4444;
+  color: white;
+  padding: 1.5px 5px;
+  border-radius: 4px;
+  font-size: 9px;
+}
+
+.pinned-message-text {
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.85;
+}
+
+.unpin-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.unpin-btn:hover {
+  background: rgba(0,0,0,0.08);
+  color: var(--ink);
 }
 
