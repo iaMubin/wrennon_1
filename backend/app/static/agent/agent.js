@@ -236,10 +236,24 @@ function connectSocket() {
   socket = new WebSocket(`${WS_URL}?token=${token}`);
 
   socket.onopen = () => {
+    const wasReconnecting = reconnectAttempts > 0;
     reconnectAttempts = 0;
     connectionDot.classList.remove("dot--offline");
     connectionDot.classList.add("dot--online");
     connectionDot.title = "Connected";
+
+    // A WebSocket reconnect has no way to redeliver whatever happened
+    // while we were disconnected (network blip, server restart, Render
+    // free-tier idling, etc.) — without this, a message sent during that
+    // gap would just be silently missing until the agent happened to
+    // reopen the conversation (which is effectively what refreshing the
+    // page did as a workaround). Resync here instead of waiting for that.
+    if (wasReconnecting) {
+      if (activeSessionId) {
+        fetchAndRenderMessages(activeSessionId);
+      }
+      loadConversations();
+    }
   };
 
   socket.onclose = (event) => {
@@ -491,6 +505,47 @@ function renderConversationList(conversations) {
 }
 
 // --- Opening and viewing a conversation ---
+async function fetchAndRenderMessages(sessionId) {
+  const responseData = await authedFetch(`/agent/conversations/${sessionId}/messages`);
+  if (sessionId !== activeSessionId) return null; // agent switched conversations while this was in flight
+
+  agentMessages.innerHTML = "";
+  lastMsgSender = null;
+  lastMsgTime = 0;
+  lastMsgAuthor = null;
+
+  if (responseData) {
+    const messages = responseData.messages || [];
+    const pinnedMessages = messages.filter(m => m.is_pinned);
+
+    let lastDateStr = null;
+    for (const msg of messages) {
+      const dateObj = new Date(msg.created_at);
+      const dateStr = dateObj.toLocaleDateString();
+      if (dateStr !== lastDateStr) {
+        const dateDiv = document.createElement("div");
+        dateDiv.className = "date-separator";
+
+        const todayStr = new Date().toLocaleDateString();
+        const yesterdayDate = new Date();
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        const yesterdayStr = yesterdayDate.toLocaleDateString();
+
+        if (dateStr === todayStr) dateDiv.textContent = "Today";
+        else if (dateStr === yesterdayStr) dateDiv.textContent = "Yesterday";
+        else dateDiv.textContent = dateObj.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
+
+        agentMessages.appendChild(dateDiv);
+        lastDateStr = dateStr;
+      }
+      appendMessage(msg.sender, msg.content, msg.created_at, msg.sender === "agent_internal", msg.id, msg.author_username, msg.author_role);
+    }
+
+    updatePinnedMessageUI(pinnedMessages);
+  }
+  return responseData;
+}
+
 async function openConversation(sessionId, customerEmail, shortId, isResolved, updatedAt) {
   if (activeSessionId && activeSessionId !== sessionId) {
     drafts[activeSessionId] = agentInput.value;
@@ -535,45 +590,11 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
   }
   
   agentMessages.innerHTML = "<div class='loading-spinner'></div>";
-  const responseData = await authedFetch(`/agent/conversations/${sessionId}/messages`);
-  agentMessages.innerHTML = "";
-  
-  lastMsgSender = null;
-  lastMsgTime = 0;
-  lastMsgAuthor = null;
   hasUnreadIndicator = false;
   agentInput.focus();
-  
-  if (responseData) {
-    const messages = responseData.messages || [];
-    const pinnedMessages = messages.filter(m => m.is_pinned);
-    
-    let lastDateStr = null;
-    for (const msg of messages) {
-      const dateObj = new Date(msg.created_at);
-      const dateStr = dateObj.toLocaleDateString();
-      if (dateStr !== lastDateStr) {
-        const dateDiv = document.createElement("div");
-        dateDiv.className = "date-separator";
-        
-        const todayStr = new Date().toLocaleDateString();
-        const yesterdayDate = new Date();
-        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-        const yesterdayStr = yesterdayDate.toLocaleDateString();
-        
-        if (dateStr === todayStr) dateDiv.textContent = "Today";
-        else if (dateStr === yesterdayStr) dateDiv.textContent = "Yesterday";
-        else dateDiv.textContent = dateObj.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
-        
-        agentMessages.appendChild(dateDiv);
-        lastDateStr = dateStr;
-      }
-      appendMessage(msg.sender, msg.content, msg.created_at, msg.sender === "agent_internal", msg.id, msg.author_username, msg.author_role);
-    }
-    
-    updatePinnedMessageUI(pinnedMessages);
-  }
-  
+
+  await fetchAndRenderMessages(sessionId);
+
   fetchOrderContext(sessionId);
   loadConversations();
 }

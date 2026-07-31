@@ -8,8 +8,6 @@ services:
     envVars:
       - key: GROQ_API_KEY
         sync: false
-      - key: CORS_ALLOWED_ORIGINS
-        value: "*"
       - key: COHERE_API_KEY
         sync: false
       - key: JWT_SECRET_KEY

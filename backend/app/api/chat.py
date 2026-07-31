@@ -122,6 +122,7 @@ def get_history(
         {
             "sender": "user" if m.sender == "human" else "bot",
             "content": clean_content(m.content),
+            "created_at": m.created_at.isoformat(),
         }
         for m in conversation.messages
         if m.sender in CUSTOMER_VISIBLE_SENDERS

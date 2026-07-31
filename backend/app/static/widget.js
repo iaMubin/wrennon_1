@@ -473,6 +473,33 @@ async function loadHistory() {
   }
 }
 
+async function resyncMissedMessages() {
+  try {
+    const response = await fetch(`${API_BASE}/chat/${SESSION_ID}/history`, {
+      headers: { "Authorization": `Bearer ${SESSION_TOKEN}` }
+    });
+    if (!response.ok) return;
+    const serverHistory = await response.json();
+
+    // Local history mixes in client-only entries (role "system") that
+    // the server never stores, so count only the customer/bot turns —
+    // that's the same set the server endpoint returns.
+    const localVisibleCount = getLocalHistory().filter(
+      (m) => m.role !== "system"
+    ).length;
+
+    if (serverHistory.length <= localVisibleCount) return; // nothing missing
+
+    const missing = serverHistory.slice(localVisibleCount);
+    for (const msg of missing) {
+      const ts = msg.created_at ? new Date(msg.created_at).getTime() : Date.now();
+      appendMessage(msg.sender, msg.content, true, ts);
+    }
+  } catch (err) {
+    console.error("Failed to resync missed messages:", err);
+  }
+}
+
 let widgetReconnectAttempts = 0;
 let widgetReconnectTimeout = null;
 
@@ -481,6 +508,7 @@ function connectSocket() {
   socket = new WebSocket(`${WS_URL}/${SESSION_ID}?token=${SESSION_TOKEN}`);
 
   socket.onopen = () => {
+    const wasReconnecting = widgetReconnectAttempts > 0;
     widgetReconnectAttempts = 0;
     if (widgetReconnectTimeout) {
       clearTimeout(widgetReconnectTimeout);
@@ -495,6 +523,15 @@ function connectSocket() {
       const combinedMessage = queue.join("\n\n");
       socket.send(JSON.stringify({ message: combinedMessage }));
       clearOfflineQueue();
+    }
+
+    // A reconnect has no way to redeliver anything sent while we were
+    // disconnected (e.g. an agent reply). loadHistory() only reads
+    // localStorage, which never received it either — so without this,
+    // the customer would just be missing that message with no way to
+    // see it short of manually clearing storage. Fill the gap instead.
+    if (wasReconnecting) {
+      resyncMissedMessages();
     }
   };
 

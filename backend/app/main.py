@@ -97,6 +97,13 @@ async def add_security_headers(request, call_next):
     handlers to addEventListener() plus a nonce or hash; connect-src
     should be pinned to the actual deployed domains once those are fixed
     in your hosting setup, rather than left this broad.
+
+    style-src/font-src explicitly allow fonts.googleapis.com/fonts.gstatic.com
+    because the app's branded fonts (Big Shoulders Display, Inter, JetBrains
+    Mono) load from there — the first version of this CSP omitted both and
+    silently broke every custom font across the app (visible as headings/
+    logo text rendering in a generic fallback font) without throwing any
+    visible error, just a CSP violation in the browser console.
     """
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -108,7 +115,8 @@ async def add_security_headers(request, call_next):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
         "img-src 'self' data: https:; "
         "media-src 'self' https:; "
         "connect-src 'self' https: wss:; "
