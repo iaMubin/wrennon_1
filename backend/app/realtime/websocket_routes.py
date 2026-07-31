@@ -737,20 +737,59 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             # grace period in _wait_until_quiet() still applies from here.
             is_typing = False
 
-            # Rate Limiting (max 15 msgs / minute) — unchanged, still applies
-            # per raw message regardless of debouncing, to guard against
-            # socket flooding.
+            # Rate Limiting — three layers, each catching what the one
+            # before it can't:
+            #
+            # 1. Per-session (15/min): stops a single tab/session from
+            #    flooding.
+            # 2. Per-IP (60/min): stops one source from bypassing #1 by
+            #    just opening many sessions (session_id is client-supplied
+            #    via /chat/init).
+            # 3. Global circuit breaker (default 300/min, see config.py):
+            #    stops a DISTRIBUTED flood (many IPs, many sessions) that
+            #    bypasses both #1 and #2. This layer can't identify or
+            #    block the attacker — it's a blunt system-wide ceiling,
+            #    not attribution — but it caps worst-case paid-LLM-call
+            #    volume/cost regardless of how the load is spread. When
+            #    it trips, that's a signal worth alerting on (logged at
+            #    ERROR, not WARNING), since it means the first two layers
+            #    were already bypassed.
             try:
                 r = get_redis()
+                client_ip = websocket.client.host if websocket.client else "unknown"
+
                 rate_key = f"rate_limit:{session_id}"
                 _t0 = time.time()
                 count = await r.incr(rate_key)
                 logger.info(f"[TIMING] redis_incr took {time.time() - _t0:.3f}s")
                 if count == 1:
                     await r.expire(rate_key, 60)
+
+                ip_rate_key = f"rate_limit_ip:{client_ip}"
+                ip_count = await r.incr(ip_rate_key)
+                if ip_count == 1:
+                    await r.expire(ip_rate_key, 60)
+
+                global_rate_key = "rate_limit_global:customer_ws"
+                global_count = await r.incr(global_rate_key)
+                if global_count == 1:
+                    await r.expire(global_rate_key, 60)
+
                 if count > 15:
                     logger.warning(f"Rate limit exceeded for {session_id}")
                     await websocket.send_json({"reply": "You are sending messages too quickly. Please wait a minute."})
+                    continue
+                if ip_count > 60:
+                    logger.warning(f"Per-IP rate limit exceeded for {client_ip} (session {session_id})")
+                    await websocket.send_json({"reply": "You are sending messages too quickly. Please wait a minute."})
+                    continue
+                if global_count > settings.global_ws_message_limit_per_minute:
+                    logger.error(
+                        f"GLOBAL WS rate limit tripped ({global_count}/min) — "
+                        f"per-session and per-IP limits were already bypassed. "
+                        f"Possible distributed flood. Latest source: {client_ip} / {session_id}"
+                    )
+                    await websocket.send_json({"reply": "We're experiencing high demand right now. Please try again in a minute."})
                     continue
             except Exception as e:
                 logger.error(f"Rate limiting error: {e}")

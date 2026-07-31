@@ -34,20 +34,36 @@ def verify_session_token(session_id: str, authorization: str | None = Header(Non
     if not decoded_session or decoded_session != session_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token for this session")
 
-def verify_upload_token(session_id: str, authorization: str | None = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing or invalid token")
-    
-    token = authorization.split(" ")[1]
-    
-    decoded_session = decode_session_token(token)
-    if decoded_session and decoded_session == session_id:
-        return
-        
-    agent_data = decode_access_token(token)
-    if agent_data and agent_data.get("sub"):
-        return
-        
+def verify_upload_token(session_id: str, request: Request, authorization: str | None = Header(None)):
+    # Customer widget always sends its session token via the Authorization
+    # header (it has no cookie). Agent uploads can arrive either way.
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+
+        decoded_session = decode_session_token(token)
+        if decoded_session and decoded_session == session_id:
+            return
+
+        agent_data = decode_access_token(token)
+        if agent_data and agent_data.get("sub"):
+            return
+
+    # Cookie fallback (agent dashboard, which no longer keeps the JWT in
+    # localStorage): same CSRF mitigation as get_current_agent — this is a
+    # state-changing request, so a cookie-only credential must also carry
+    # the custom header a cross-site request can't add.
+    cookie_token = request.cookies.get("access_token")
+    if cookie_token:
+        cookie_token = cookie_token.replace("Bearer ", "")
+        agent_data = decode_access_token(cookie_token)
+        if agent_data and agent_data.get("sub"):
+            if request.headers.get("X-Wrennon-Client") == "agent-dashboard":
+                return
+            raise HTTPException(
+                status_code=403,
+                detail="Missing required client header for cookie-authenticated request.",
+            )
+
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid upload token")
 
 

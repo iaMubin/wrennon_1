@@ -1,0 +1,1346 @@
+diff --git a/backend/.env.example b/backend/.env.example
+index 13a994a..a26820b 100644
+--- a/backend/.env.example
++++ b/backend/.env.example
+@@ -1,21 +1,55 @@
+-# LLM
+-GROQ_API_KEY=your_groq_api_key_here
++# This file lists every environment variable app/config.py's Settings
++# class actually reads today. Settings uses pydantic-settings with
++# extra="forbid" (the default) — an env var here that Settings doesn't
++# define, or a required one missing, crashes the app at import time
++# with a ValidationError. Keep this file in sync with config.py when
++# either changes; a stale example here caused a same-day onboarding
++# crash before (leftover ChromaDB-era keys that no longer exist).
+ 
+-# Reranking
++# --- LLM ---
++GROQ_API_KEY=your_groq_api_key_here
+ COHERE_API_KEY=your_cohere_api_key_here
++# Optional — only used if you route some calls through OpenRouter/OpenAI
++# directly instead of Groq.
++OPENROUTER_API_KEY=
++OPENAI_API_KEY=
++
++# --- Vector store (Pinecone; embeddings via Cohere) ---
++PINECONE_API_KEY=your_pinecone_api_key_here
++PINECONE_HOST=your_pinecone_index_host_here
++# Local/offline dev without a real Pinecone index: set this literal
++# value and vectorstore.py falls back to a small mocked knowledge base
++# instead of calling Pinecone/Cohere.
++#   PINECONE_API_KEY=YOUR_NEW_PINECONE_API_KEY
+ 
+-# Vector store (local persistent ChromaDB, embeddings via Cohere API)
+-CHROMA_PERSIST_DIR=./data/chroma_store
+-CHROMA_COLLECTION_NAME=policy_docs
++# --- Optional: LangSmith tracing ---
++LANGCHAIN_TRACING_V2=false
++LANGCHAIN_API_KEY=
++LANGCHAIN_PROJECT=
+ 
+-# App
++# --- App ---
+ APP_ENV=development
+ CORS_ALLOWED_ORIGINS=http://localhost:5500,http://127.0.0.1:5500,http://localhost:5600,http://127.0.0.1:5600
++# In production, APP_ENV=production additionally requires:
++#  - JWT_SECRET_KEY to not be the dev default
++#  - CORS_ALLOWED_ORIGINS to not be "*"
++#  - DATABASE_URL to not be sqlite (Render/most PaaS filesystems are
++#    ephemeral — sqlite in prod silently loses all data on redeploy)
++# See config.py's validate_production_secrets for the exact checks.
+ 
+-# Database (SQLite — single file, no separate server needed)
++# --- Database ---
++# SQLite is fine for local dev only. Use a real Postgres URL for
++# staging/production.
+ DATABASE_URL=sqlite:///./data/wrennon.db
+ 
+-# Agent auth
++# --- Redis (WebSocket pub/sub across workers, rate limiting) ---
++REDIS_URL=redis://localhost:6379
++# Local dev without a Redis instance running: this literal value makes
++# the app run in single-instance mode without cross-worker broadcast or
++# distributed rate limiting (see connection_manager.py / agent.py).
++#   REDIS_URL=memory://local
++
++# --- Agent auth ---
+ # JWT_SECRET_KEY: any long random string. Generate one with:
+ #   python -c "import secrets; print(secrets.token_hex(32))"
+ JWT_SECRET_KEY=
+@@ -26,4 +60,3 @@ AGENT_USERNAME=mubin
+ # AGENT_PASSWORD_HASH: run scripts/generate_agent_password.py and paste
+ # the output here. Never put the plain password in this file.
+ AGENT_PASSWORD_HASH=
+-
+diff --git a/backend/app/api/agent.py b/backend/app/api/agent.py
+index a6fd855..a243c96 100644
+--- a/backend/app/api/agent.py
++++ b/backend/app/api/agent.py
+@@ -72,8 +72,13 @@ async def login(
+                 detail="Too many failed login attempts. Please try again later.",
+             )
+     except Exception as e:
+-        # Fallback if Redis is down or times out
+-        logger.debug(f"Redis fallback during login for {form_data.username}: {e}")
++        # If Redis is down, brute-force lockout silently fails OPEN — an
++        # attacker can hammer this endpoint unthrottled until Redis comes
++        # back. That's an operationally important signal, not routine
++        # noise, so it's logged at WARNING (visible in production/Sentry)
++        # rather than DEBUG (which would make this failure mode invisible
++        # exactly when it matters most).
++        logger.warning(f"Redis unavailable during login rate-limit check for {form_data.username}: {e}")
+ 
+     agent = db.query(Agent).filter(
+         or_(Agent.username == form_data.username, Agent.employee_id == form_data.username)
+@@ -85,7 +90,7 @@ async def login(
+             await r.incr(rate_key)
+             await r.expire(rate_key, 60)
+         except Exception as e:
+-            logger.debug(f"Redis fallback during rate limit increment: {e}")
++            logger.warning(f"Redis unavailable while recording a failed login attempt for {form_data.username}: {e}")
+             
+         raise HTTPException(
+             status_code=status.HTTP_401_UNAUTHORIZED,
+@@ -110,7 +115,10 @@ async def login(
+         r = get_redis()
+         await r.delete(rate_key)
+     except Exception as e:
+-        logger.debug(f"Redis fallback during rate limit reset: {e}")
++        # Non-critical (a stale lockout counter just lingers an extra
++        # ~60s), but still worth a WARNING for consistency with the two
++        # login-path Redis fallbacks above.
++        logger.warning(f"Redis unavailable while clearing rate-limit counter for {agent.username}: {e}")
+         
+     token = create_access_token(subject=agent.username, token_version=agent.token_version)
+     
+@@ -135,6 +143,25 @@ async def login(
+     return {"access_token": token, "token_type": "bearer", "role": agent.role}  # nosec B105
+ 
+ 
++@router.post("/agent/logout")
++def logout(
++    response: Response,
++    db: Session = Depends(get_db),
++    agent: Agent = Depends(get_current_agent),
++) -> dict:
++    """Clears the auth cookie and revokes the token that was used to call
++    this endpoint (via token_version bump), so it can't be replayed even
++    if it leaked before logout. Now that agent.js relies on the cookie
++    rather than a client-held copy of the JWT, "logging out" has to be a
++    real server round-trip — deleting client-side state alone would leave
++    the cookie (and the token inside it) valid until it expires on its own.
++    """
++    agent.token_version = (agent.token_version or 1) + 1
++    db.commit()
++    response.delete_cookie(key="access_token", samesite="none", secure=True)
++    return {"status": "logged_out"}
++
++
+ class VerifyTOTPRequest(BaseModel):
+     code: str
+ 
+diff --git a/backend/app/api/chat.py b/backend/app/api/chat.py
+index efa3e0c..61f223c 100644
+--- a/backend/app/api/chat.py
++++ b/backend/app/api/chat.py
+@@ -34,20 +34,36 @@ def verify_session_token(session_id: str, authorization: str | None = Header(Non
+     if not decoded_session or decoded_session != session_id:
+         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token for this session")
+ 
+-def verify_upload_token(session_id: str, authorization: str | None = Header(None)):
+-    if not authorization or not authorization.startswith("Bearer "):
+-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing or invalid token")
+-    
+-    token = authorization.split(" ")[1]
+-    
+-    decoded_session = decode_session_token(token)
+-    if decoded_session and decoded_session == session_id:
+-        return
+-        
+-    agent_data = decode_access_token(token)
+-    if agent_data and agent_data.get("sub"):
+-        return
+-        
++def verify_upload_token(session_id: str, request: Request, authorization: str | None = Header(None)):
++    # Customer widget always sends its session token via the Authorization
++    # header (it has no cookie). Agent uploads can arrive either way.
++    if authorization and authorization.startswith("Bearer "):
++        token = authorization.split(" ")[1]
++
++        decoded_session = decode_session_token(token)
++        if decoded_session and decoded_session == session_id:
++            return
++
++        agent_data = decode_access_token(token)
++        if agent_data and agent_data.get("sub"):
++            return
++
++    # Cookie fallback (agent dashboard, which no longer keeps the JWT in
++    # localStorage): same CSRF mitigation as get_current_agent — this is a
++    # state-changing request, so a cookie-only credential must also carry
++    # the custom header a cross-site request can't add.
++    cookie_token = request.cookies.get("access_token")
++    if cookie_token:
++        cookie_token = cookie_token.replace("Bearer ", "")
++        agent_data = decode_access_token(cookie_token)
++        if agent_data and agent_data.get("sub"):
++            if request.headers.get("X-Wrennon-Client") == "agent-dashboard":
++                return
++            raise HTTPException(
++                status_code=403,
++                detail="Missing required client header for cookie-authenticated request.",
++            )
++
+     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid upload token")
+ 
+ 
+diff --git a/backend/app/auth/dependencies.py b/backend/app/auth/dependencies.py
+index 438bd98..17b5db1 100644
+--- a/backend/app/auth/dependencies.py
++++ b/backend/app/auth/dependencies.py
+@@ -22,18 +22,39 @@ from app.db.models import Agent
+ _oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/agent/login")
+ 
+ 
++_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
++
++
+ def get_current_agent(request: Request, db: Session = Depends(get_db)) -> Agent:
+     # First try Authorization header, then fallback to cookie
+     token = request.headers.get("Authorization")
++    used_cookie_fallback = False
+     if token and token.startswith("Bearer "):
+         token = token.replace("Bearer ", "")
+     else:
+         token = request.cookies.get("access_token")
+         if token and token.startswith("Bearer "):
+             token = token.replace("Bearer ", "")
+-            
++            used_cookie_fallback = True
++
+     if not token:
+         raise HTTPException(status_code=401, detail="Not authenticated")
++
++    # CSRF mitigation: a browser attaches cookies to cross-site requests
++    # automatically (that's the whole problem CSRF exploits), but it will
++    # NOT attach an Authorization header, and it cannot add an arbitrary
++    # custom header to a cross-site request without the target's CORS
++    # policy explicitly allowing that origin first. So for any
++    # state-changing request authenticated purely via the cookie (no
++    # Authorization header present), require this custom header — a
++    # same-site JS client can always set it, a cross-site <form> submit
++    # or plain cross-site fetch cannot.
++    if used_cookie_fallback and request.method.upper() not in _SAFE_METHODS:
++        if request.headers.get("X-Wrennon-Client") != "agent-dashboard":
++            raise HTTPException(
++                status_code=403,
++                detail="Missing required client header for cookie-authenticated request.",
++            )
+     token_data = decode_access_token(token)
+     if token_data is None or not token_data.get("sub"):
+         raise HTTPException(
+diff --git a/backend/app/config.py b/backend/app/config.py
+index e2b3224..8d912a0 100644
+--- a/backend/app/config.py
++++ b/backend/app/config.py
+@@ -33,6 +33,17 @@ class Settings(BaseSettings):
+     database_url: str = "sqlite:///./data/wrennon.db"
+     redis_url: str = "redis://localhost:6379"
+ 
++    # Global circuit breaker: total customer WS messages/minute across
++    # ALL sessions and IPs combined. This exists specifically because the
++    # per-session (15/min) and per-IP (60/min) limits below it are both
++    # bypassable by a distributed attacker (many IPs, many sessions) —
++    # no single-key Redis counter can stop that. This one can't identify
++    # or block the attacker either, but it puts a hard ceiling on total
++    # paid-LLM-call volume (cost/quota exposure) the app will ever allow
++    # in a given minute, regardless of how the load is distributed.
++    # Tune this to your actual Groq/Cohere/Pinecone paid-tier throughput.
++    global_ws_message_limit_per_minute: int = 300
++
+     # JWT settings for agent login. jwt_secret_key MUST be overridden in
+     # .env for any real deployment — this default is fine for local dev
+     # only, since anyone reading this source file could forge a token
+@@ -72,6 +83,14 @@ class Settings(BaseSettings):
+                     "credentialed requests (see main.py), which would break "
+                     "cookie-based agent auth rather than just being insecure."
+                 )
++            if self.database_url.startswith("sqlite"):
++                raise ValueError(
++                    "DATABASE_URL is still SQLite in production. Render's (and "
++                    "most PaaS) filesystem is ephemeral, so every deploy/restart "
++                    "would silently wipe all conversations/agents/audit logs with "
++                    "no error at all. Set DATABASE_URL to your Postgres instance "
++                    "before starting the app in production."
++                )
+         return self
+ 
+ 
+diff --git a/backend/app/main.py b/backend/app/main.py
+index 67f6c53..cd8ea71 100644
+--- a/backend/app/main.py
++++ b/backend/app/main.py
+@@ -126,7 +126,17 @@ async def add_security_headers(request, call_next):
+     )
+     return response
+ 
+-# Auto-create default admin agent if none exist
++# Auto-create default admin agent if none exist.
++#
++# This whole module executes once per worker process (WEB_CONCURRENCY
++# workers all import app.main independently), so two workers can race
++# here: both see count() == 0 and both try to insert the same username.
++# Agent.username has a unique constraint, so the loser of that race would
++# previously crash the whole worker on an uncaught IntegrityError. Catch
++# it specifically (not a blanket Exception) and just re-read what the
++# winning worker inserted — that's the correct outcome, not an error.
++from sqlalchemy.exc import IntegrityError
++
+ with SessionLocal() as db:
+     if db.query(Agent).count() == 0:
+         logger.info(f"No agents found. Creating initial manager: {settings.agent_username}")
+@@ -140,7 +150,14 @@ with SessionLocal() as db:
+                 role="manager", 
+                 employee_id="EMP-1001"
+             ))
+-            db.commit()
++            try:
++                db.commit()
++            except IntegrityError:
++                logger.info(
++                    f"Agent '{settings.agent_username}' was already created by "
++                    "another worker process (race on startup) — continuing."
++                )
++                db.rollback()
+     else:
+         admin_agent = db.query(Agent).filter_by(username=settings.agent_username).first()
+         if admin_agent and settings.agent_password_hash and admin_agent.password_hash != settings.agent_password_hash:
+@@ -165,37 +182,17 @@ with SessionLocal() as db:
+     if agents_without_id:
+         db.commit()
+ 
+-    # Manual migrations for SQLite (to add new columns to existing tables)
+-    from sqlalchemy import text
+-    try:
+-        db.execute(text("ALTER TABLE conversations ADD COLUMN sentiment VARCHAR"))
+-        db.commit()
+-    except Exception:
+-        db.rollback()
+-        
+-    try:
+-        db.execute(text("ALTER TABLE conversations ADD COLUMN language VARCHAR"))
+-        db.commit()
+-    except Exception:
+-        db.rollback()
+-
+-    try:
+-        db.execute(text("ALTER TABLE conversations ADD COLUMN intent_category VARCHAR"))
+-        db.commit()
+-    except Exception:
+-        db.rollback()
+-
+-    try:
+-        db.execute(text("ALTER TABLE messages ADD COLUMN author_username VARCHAR"))
+-        db.commit()
+-    except Exception:
+-        db.rollback()
+-
+-    try:
+-        db.execute(text("ALTER TABLE agents ADD COLUMN token_version INTEGER DEFAULT 1"))
+-        db.commit()
+-    except Exception:
+-        db.rollback()
++    # NOTE: the manual "ALTER TABLE ... " fallback migrations that used to
++    # live here have been removed. Every column they added (sentiment,
++    # language, intent_category, author_username, token_version) is now
++    # covered by a proper Alembic migration, and start.sh already runs
++    # `alembic upgrade head` once, sequentially, before any uvicorn worker
++    # is started — so this block was fully redundant. Keeping it was also
++    # a latent bug: this whole module executes at *import* time, once per
++    # worker process, so with WEB_CONCURRENCY > 1 several workers could run
++    # overlapping ALTER TABLE statements against the same database at once.
++    # If you ever need an ad-hoc column backfill again, put it in a real
++    # Alembic migration (see backend/alembic/versions/) instead of here.
+ 
+ app.include_router(chat_router, prefix="/api")
+ app.include_router(agent_router, prefix="/api")
+diff --git a/backend/app/realtime/websocket_routes.py b/backend/app/realtime/websocket_routes.py
+index ac7ee19..3a563e8 100644
+--- a/backend/app/realtime/websocket_routes.py
++++ b/backend/app/realtime/websocket_routes.py
+@@ -737,21 +737,60 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
+             # grace period in _wait_until_quiet() still applies from here.
+             is_typing = False
+ 
+-            # Rate Limiting (max 15 msgs / minute) — unchanged, still applies
+-            # per raw message regardless of debouncing, to guard against
+-            # socket flooding.
++            # Rate Limiting — three layers, each catching what the one
++            # before it can't:
++            #
++            # 1. Per-session (15/min): stops a single tab/session from
++            #    flooding.
++            # 2. Per-IP (60/min): stops one source from bypassing #1 by
++            #    just opening many sessions (session_id is client-supplied
++            #    via /chat/init).
++            # 3. Global circuit breaker (default 300/min, see config.py):
++            #    stops a DISTRIBUTED flood (many IPs, many sessions) that
++            #    bypasses both #1 and #2. This layer can't identify or
++            #    block the attacker — it's a blunt system-wide ceiling,
++            #    not attribution — but it caps worst-case paid-LLM-call
++            #    volume/cost regardless of how the load is spread. When
++            #    it trips, that's a signal worth alerting on (logged at
++            #    ERROR, not WARNING), since it means the first two layers
++            #    were already bypassed.
+             try:
+                 r = get_redis()
++                client_ip = websocket.client.host if websocket.client else "unknown"
++
+                 rate_key = f"rate_limit:{session_id}"
+                 _t0 = time.time()
+                 count = await r.incr(rate_key)
+                 logger.info(f"[TIMING] redis_incr took {time.time() - _t0:.3f}s")
+                 if count == 1:
+                     await r.expire(rate_key, 60)
++
++                ip_rate_key = f"rate_limit_ip:{client_ip}"
++                ip_count = await r.incr(ip_rate_key)
++                if ip_count == 1:
++                    await r.expire(ip_rate_key, 60)
++
++                global_rate_key = "rate_limit_global:customer_ws"
++                global_count = await r.incr(global_rate_key)
++                if global_count == 1:
++                    await r.expire(global_rate_key, 60)
++
+                 if count > 15:
+                     logger.warning(f"Rate limit exceeded for {session_id}")
+                     await websocket.send_json({"reply": "You are sending messages too quickly. Please wait a minute."})
+                     continue
++                if ip_count > 60:
++                    logger.warning(f"Per-IP rate limit exceeded for {client_ip} (session {session_id})")
++                    await websocket.send_json({"reply": "You are sending messages too quickly. Please wait a minute."})
++                    continue
++                if global_count > settings.global_ws_message_limit_per_minute:
++                    logger.error(
++                        f"GLOBAL WS rate limit tripped ({global_count}/min) — "
++                        f"per-session and per-IP limits were already bypassed. "
++                        f"Possible distributed flood. Latest source: {client_ip} / {session_id}"
++                    )
++                    await websocket.send_json({"reply": "We're experiencing high demand right now. Please try again in a minute."})
++                    continue
+             except Exception as e:
+                 logger.error(f"Rate limiting error: {e}")
+ 
+diff --git a/backend/app/static/agent/admin_dashboard.html b/backend/app/static/agent/admin_dashboard.html
+index 08d654c..aad88aa 100644
+--- a/backend/app/static/agent/admin_dashboard.html
++++ b/backend/app/static/agent/admin_dashboard.html
+@@ -423,8 +423,13 @@
+         const _IS_LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.protocol === "file:";
+         const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/api`;
+ 
+-        const agentToken = localStorage.getItem("agent_token");
+-        const authHeaders = agentToken ? { "Authorization": `Bearer ${agentToken}` } : {};        // Toggle password logic
++        // The httpOnly access_token cookie set by /agent/login is the
++        // credential now (see agent.js) — every fetch below must pass
++        // credentials:'include' to actually send it cross-origin, and
++        // mutating (non-GET) requests need this header too, since the
++        // backend requires it as CSRF protection for cookie-only auth.
++        const authHeaders = { "X-Wrennon-Client": "agent-dashboard" };
++        // Toggle password logic
+         const togglePwdBtn = document.getElementById("toggle-pwd");
+         const pwdInput = document.getElementById("agent-password");
+         const eyePaths = togglePwdBtn.querySelectorAll(".eye");
+@@ -594,6 +599,7 @@
+ 
+             const res = await fetch(`${API_BASE}/admin/agents/${selectedAgentUsername}/reset-password`, {
+                 method: 'PUT',
++                credentials: 'include',
+                 headers: {
+                     'Content-Type': 'application/json',
+                     ...authHeaders
+@@ -618,6 +624,7 @@
+ 
+             try {
+                 const res = await fetch(`${API_BASE}/admin/agents`, {
++                    credentials: 'include',
+                     headers: authHeaders
+                 });
+ 
+@@ -640,11 +647,16 @@
+         let presenceWs = null;
+ 
+         function connectPresenceWebSocket() {
+-            const token = localStorage.getItem('agent_token');
+-            if (!token) return;
+-            
+-            const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+-            const wsUrl = `${wsProtocol}://${window.location.host}/ws/agent?token=${encodeURIComponent(token)}`;
++            // No token in the URL: relies on the httpOnly access_token
++            // cookie, same as agent.js's connectSocket() and for the same
++            // reason (URL-embedded JWTs leak into logs/history/Referer).
++            // Also fixed: this used to build the URL from
++            // window.location.host, which is wrong in a cross-origin
++            // deployment (dashboard on Vercel, API on Render) — it now
++            // mirrors the same host logic API_BASE uses above.
++            const wsProtocol = _IS_LOCAL ? 'ws' : 'wss';
++            const wsHost = _IS_LOCAL ? 'localhost:8000' : _RENDER_HOST;
++            const wsUrl = `${wsProtocol}://${wsHost}/ws/agent`;
+             
+             presenceWs = new WebSocket(wsUrl);
+             
+@@ -721,6 +733,7 @@
+             if (!confirm(`Are you sure you want to remove agent '${username}'?`)) return;
+             const res = await fetch(`${API_BASE}/admin/agents/${username}`, {
+                 method: 'DELETE',
++                credentials: 'include',
+                 headers: authHeaders
+             });
+             if (res.ok) {
+@@ -748,6 +761,7 @@
+ 
+             const res = await fetch(`${API_BASE}/admin/agents`, {
+                 method: 'POST',
++                credentials: 'include',
+                 headers: {
+                     'Content-Type': 'application/json',
+                     ...authHeaders
+@@ -796,6 +810,7 @@
+         async function fetchLogs() {
+             try {
+                 const res = await fetch(`${API_BASE}/admin/logs`, {
++                    credentials: 'include',
+                     headers: authHeaders
+                 });
+                 if (!res.ok) return;
+@@ -971,15 +986,20 @@
+         setupProfileDropdown();
+ 
+         function logout() {
+-            localStorage.removeItem("agent_token");
+-            localStorage.removeItem("agent_username");
+-            localStorage.removeItem("agent_role");
+-            window.location.href = "index.html";
++            fetch(`${API_BASE}/agent/logout`, {
++                method: "POST",
++                credentials: "include",
++                headers: { "X-Wrennon-Client": "agent-dashboard" },
++            }).catch(() => {}).finally(() => {
++                localStorage.removeItem("agent_username");
++                localStorage.removeItem("agent_role");
++                window.location.href = "index.html";
++            });
+         }
+ 
+         async function fetchAnalytics() {
+             try {
+-                const res = await fetch(`${API_BASE}/analytics/stats`, { headers: authHeaders });
++                const res = await fetch(`${API_BASE}/analytics/stats`, { headers: authHeaders, credentials: 'include' });
+                 if (!res.ok) return;
+                 const data = await res.json();
+                 document.getElementById('analytics-total-tickets').innerText = data.total_tickets;
+@@ -994,7 +1014,7 @@
+ 
+         async function fetchBrandVoice() {
+             try {
+-                const res = await fetch(`${API_BASE}/admin/settings/brand_voice`, { headers: authHeaders });
++                const res = await fetch(`${API_BASE}/admin/settings/brand_voice`, { headers: authHeaders, credentials: 'include' });
+                 if (res.ok) {
+                     const data = await res.json();
+                     document.getElementById('brand-voice-textarea').value = data.value || "";
+@@ -1009,6 +1029,7 @@
+             try {
+                 const res = await fetch(`${API_BASE}/admin/settings/brand_voice`, {
+                     method: 'PUT',
++                    credentials: 'include',
+                     headers: { 'Content-Type': 'application/json', ...authHeaders },
+                     body: JSON.stringify({ value: val })
+                 });
+@@ -1025,7 +1046,7 @@
+         async function fetchKnowledgeGaps() {
+             const results = document.getElementById('kb-results');
+             try {
+-                const res = await fetch(`${API_BASE}/admin/knowledge-gaps`, { headers: authHeaders });
++                const res = await fetch(`${API_BASE}/admin/knowledge-gaps`, { headers: authHeaders, credentials: 'include' });
+                 if (res.ok) {
+                     const data = await res.json();
+                     const pending = data.filter(g => g.status === 'pending');
+@@ -1060,7 +1081,7 @@
+         
+         async function approveGap(id) {
+             try {
+-                const res = await fetch(`${API_BASE}/admin/knowledge-gaps/${id}/approve`, { method: 'POST', headers: authHeaders });
++                const res = await fetch(`${API_BASE}/admin/knowledge-gaps/${id}/approve`, { method: 'POST', headers: authHeaders, credentials: 'include' });
+                 if (res.ok) {
+                     alert('Draft approved and synced to Pinecone vector database!');
+                     fetchKnowledgeGaps();
+@@ -1070,7 +1091,7 @@
+ 
+         async function rejectGap(id) {
+             try {
+-                const res = await fetch(`${API_BASE}/admin/knowledge-gaps/${id}/reject`, { method: 'POST', headers: authHeaders });
++                const res = await fetch(`${API_BASE}/admin/knowledge-gaps/${id}/reject`, { method: 'POST', headers: authHeaders, credentials: 'include' });
+                 if (res.ok) {
+                     fetchKnowledgeGaps();
+                 }
+@@ -1084,7 +1105,7 @@
+ 
+         async function fetchScorecards() {
+             try {
+-                const res = await fetch(`${API_BASE}/admin/analytics/scorecards`, { headers: authHeaders });
++                const res = await fetch(`${API_BASE}/admin/analytics/scorecards`, { headers: authHeaders, credentials: 'include' });
+                 if (res.ok) {
+                     const data = await res.json();
+                     const tbody = document.getElementById('qa-scorecards-list');
+diff --git a/backend/app/static/agent/agent.js b/backend/app/static/agent/agent.js
+index eefce3a..0477f91 100644
+--- a/backend/app/static/agent/agent.js
++++ b/backend/app/static/agent/agent.js
+@@ -197,8 +197,12 @@ loginForm.addEventListener("submit", async (e) => {
+     }
+ 
+     const data = await response.json();
+-    // Token is stored in localStorage to avoid cross-origin cookie blocking
+-    localStorage.setItem("agent_token", data.access_token);
++    // The httpOnly, SameSite=None, Secure cookie set by the login response
++    // (see agent.py) is the real credential from here on — it isn't
++    // readable from JS, which is the point: an XSS bug elsewhere in this
++    // file can no longer just read a live session token out of storage.
++    // Only non-secret UI state (username/role, for display and the admin
++    // button) is kept client-side.
+     localStorage.setItem("agent_username", username); // Save username to identify self
+     localStorage.setItem("agent_role", data.role); // Save role to show admin btn
+     
+@@ -226,14 +230,17 @@ let reconnectTimeout = null;
+ 
+ function connectSocket() {
+   if (reconnectTimeout) clearTimeout(reconnectTimeout);
+-  const token = localStorage.getItem("agent_token");
+-  
+-  if (!token || token === "null" || token === "undefined") {
+-    console.warn("No agent token found, aborting WebSocket connection.");
+-    return;
+-  }
+ 
+-  socket = new WebSocket(`${WS_URL}?token=${token}`);
++  // No token query param: the backend already accepts the httpOnly
++  // access_token cookie for /ws/agent (see Cookie(None) in
++  // websocket_routes.py), and the browser attaches it to the WS
++  // handshake automatically. Putting the raw JWT in the URL used to mean
++  // it would show up in server access logs, browser history, and any
++  // Referer header — a plain credential leak with no upside now that the
++  // cookie path works. If the cookie is missing/expired/invalid, the
++  // server closes with 4401 and onclose() below sends the agent back to
++  // login — no client-side pre-check needed.
++  socket = new WebSocket(WS_URL);
+ 
+   socket.onopen = () => {
+     const wasReconnecting = reconnectAttempts > 0;
+@@ -1151,7 +1158,8 @@ async function handleAgentFileUpload(file, inputElement, uploadInputElement, aut
+   try {
+     const response = await fetch(`${API_BASE}/chat/upload/${activeSessionId}`, {
+       method: "POST",
+-      headers: { "Authorization": `Bearer ${localStorage.getItem("agent_token")}` },
++      credentials: "include",
++      headers: { "X-Wrennon-Client": "agent-dashboard" },
+       body: formData
+     });
+     const data = await response.json();
+@@ -1277,7 +1285,11 @@ if (agentCopilotBtn) {
+       };
+       const res = await fetch(`${API_BASE}/copilot/suggest`, {
+           method: 'POST',
+-          headers: { "Content-Type": "application/json" },
++          credentials: "include",
++          headers: {
++            "Content-Type": "application/json",
++            "X-Wrennon-Client": "agent-dashboard",
++          },
+           body: JSON.stringify(req)
+       });
+       if (res.ok) {
+@@ -1452,12 +1464,16 @@ resolveBtn.addEventListener("click", async () => {
+ // --- Helpers ---
+ async function authedFetch(path, method = "GET", body = null) {
+   try {
+-    const token = localStorage.getItem("agent_token");
+     const options = {
+       method,
++      credentials: "include", // send the httpOnly access_token cookie
+       headers: {
+-        "Authorization": `Bearer ${token}`
+-      }
++        // Required by the backend's CSRF check for cookie-authenticated
++        // non-GET requests (see get_current_agent) — a cross-site form or
++        // fetch can't add this header, so its presence proves the request
++        // actually came from this app's own JS.
++        "X-Wrennon-Client": "agent-dashboard",
++      },
+     };
+     if (body) {
+       options.headers["Content-Type"] = "application/json";
+@@ -1651,7 +1667,15 @@ function formatSidebarTime(isoString) {
+ }
+ 
+ function logout() {
+-  localStorage.removeItem("agent_token");
++  // Best-effort: if this was triggered by an already-expired/invalid
++  // session (e.g. the 4401 handler above), this call will itself 401 —
++  // that's fine, the cookie will just expire on its own in that case.
++  fetch(`${API_BASE}/agent/logout`, {
++    method: "POST",
++    credentials: "include",
++    headers: { "X-Wrennon-Client": "agent-dashboard" },
++  }).catch(() => {});
++
+   localStorage.removeItem("agent_username");
+   localStorage.removeItem("agent_role");
+   
+diff --git a/backend/test_graph_local.py b/backend/dev_check_graph_local.py
+similarity index 88%
+rename from backend/test_graph_local.py
+rename to backend/dev_check_graph_local.py
+index af3d5f2..62cafba 100644
+--- a/backend/test_graph_local.py
++++ b/backend/dev_check_graph_local.py
+@@ -1,3 +1,11 @@
++"""
++Manual dev script — NOT part of the automated test suite (see tests/).
++
++Exercises the LangGraph pipeline directly with real LLM calls (no mocks),
++so it needs real API keys configured. Run directly:
++`python dev_check_graph_local.py`.
++"""
++
+ import asyncio
+ from app.graph.builder import build_graph
+ from app.graph.state import initial_state
+diff --git a/backend/test_flow.py b/backend/dev_check_live_flow.py
+similarity index 87%
+rename from backend/test_flow.py
+rename to backend/dev_check_live_flow.py
+index 7d207a9..18eacff 100644
+--- a/backend/test_flow.py
++++ b/backend/dev_check_live_flow.py
+@@ -1,3 +1,12 @@
++"""
++Manual dev script — NOT part of the automated test suite (see tests/).
++
++Needs a live backend running locally (`uvicorn app.main:app`) and real
++LLM/Pinecone/Cohere API keys configured, since it exercises the full
++WebSocket -> LangGraph -> LLM round-trip against real services. Run
++directly: `python dev_check_live_flow.py`.
++"""
++
+ import asyncio
+ import websockets
+ import json
+diff --git a/backend/load_test/locustfile.py b/backend/load_test/locustfile.py
+index 5bc8408..e0d0510 100644
+--- a/backend/load_test/locustfile.py
++++ b/backend/load_test/locustfile.py
+@@ -1,18 +1,170 @@
++"""
++Load test for the real bottleneck: chat/init -> WS connect -> send a
++message -> wait for the AI reply. This is the actual expensive path
++(triggers Groq + Pinecone + Cohere calls per message) — the previous
++version of this file only hit GET /status and /history, which are cheap
++DB reads and say nothing about how the app behaves under real chat load.
++
++Requires: pip install locust websocket-client
++
++Usage:
++    locust -f load_test/locustfile.py --host https://your-backend-url
++
++CustomerChatUser is the primary, realistic load generator. LightUser is
++kept for a cheap sanity check of the read-only endpoints alongside it.
++"""
++
++import json
+ import time
+ import uuid
+-import json
+-from locust import HttpUser, task, between
+ 
+-class CustomerUser(HttpUser):
++import websocket
++from locust import HttpUser, User, task, between, events
++
++
++class CustomerChatUser(User):
++    """Simulates one customer: opens a session, connects the WebSocket,
++    sends a message, waits for the bot's reply. Times and reports each
++    stage to Locust's stats separately, so a slow LLM call is visible
++    distinctly from a slow WS handshake or a dead connection.
++    """
++
++    wait_time = between(2, 8)
++    abstract = False
++
++    def on_start(self):
++        self.ws = None
++        self._init_session()
++        self._connect_ws()
++
++    def on_stop(self):
++        if self.ws:
++            try:
++                self.ws.close()
++            except Exception:
++                pass
++
++    def _init_session(self):
++        start = time.time()
++        try:
++            import requests
++
++            resp = requests.post(f"{self.host}/api/chat/init", timeout=10)
++            resp.raise_for_status()
++            data = resp.json()
++            self.session_id = data["session_id"]
++            self.token = data["token"]
++            events.request.fire(
++                request_type="POST",
++                name="/api/chat/init",
++                response_time=(time.time() - start) * 1000,
++                response_length=len(resp.content),
++                exception=None,
++            )
++        except Exception as e:
++            events.request.fire(
++                request_type="POST",
++                name="/api/chat/init",
++                response_time=(time.time() - start) * 1000,
++                response_length=0,
++                exception=e,
++            )
++            raise
++
++    def _connect_ws(self):
++        ws_host = self.host.replace("https://", "wss://").replace("http://", "ws://")
++        url = f"{ws_host}/ws/customer/{self.session_id}?token={self.token}"
++        start = time.time()
++        try:
++            self.ws = websocket.create_connection(url, timeout=10)
++            events.request.fire(
++                request_type="WS",
++                name="connect",
++                response_time=(time.time() - start) * 1000,
++                response_length=0,
++                exception=None,
++            )
++        except Exception as e:
++            events.request.fire(
++                request_type="WS",
++                name="connect",
++                response_time=(time.time() - start) * 1000,
++                response_length=0,
++                exception=e,
++            )
++            self.ws = None
++
++    @task
++    def send_message_and_await_reply(self):
++        """The actual expensive path: one customer message, through the
++        full LangGraph -> Groq/Pinecone/Cohere pipeline, back over the
++        WebSocket. This is what real capacity planning needs numbers on
++        — not the cheap REST reads the old version of this file tested.
++        """
++        if self.ws is None:
++            self._connect_ws()
++            if self.ws is None:
++                return
++
++        message = "Can you check the status of my order?"
++        start = time.time()
++        try:
++            self.ws.send(json.dumps({"type": "message", "message": message}))
++
++            # Drain frames until we see an actual bot reply, or time out.
++            # (typing indicators / other event frames can arrive first)
++            deadline = start + 30
++            while time.time() < deadline:
++                self.ws.settimeout(max(deadline - time.time(), 0.1))
++                raw = self.ws.recv()
++                data = json.loads(raw)
++                if data.get("sender") == "bot" and (
++                    data.get("reply") or data.get("content") or data.get("message")
++                ):
++                    events.request.fire(
++                        request_type="WS",
++                        name="send_message_and_await_reply",
++                        response_time=(time.time() - start) * 1000,
++                        response_length=len(raw),
++                        exception=None,
++                    )
++                    return
++
++            raise TimeoutError("No bot reply within 30s")
++        except Exception as e:
++            events.request.fire(
++                request_type="WS",
++                name="send_message_and_await_reply",
++                response_time=(time.time() - start) * 1000,
++                response_length=0,
++                exception=e,
++            )
++            # Connection is likely dead after an error — reconnect next task.
++            try:
++                self.ws.close()
++            except Exception:
++                pass
++            self.ws = None
++
++
++class LightUser(HttpUser):
++    """Cheap read-only sanity check, run alongside CustomerChatUser at a
++    lower default weight — not a substitute for it. Kept from the
++    original version of this file."""
++
++    weight = 1
+     wait_time = between(1, 5)
+ 
+     def on_start(self):
+         self.session_id = str(uuid.uuid4())
+-        
++
+     @task
+     def check_status(self):
+         self.client.get(f"/chat/{self.session_id}/status")
+-        
++
+     @task
+     def load_history(self):
+         self.client.get(f"/chat/{self.session_id}/history")
++
++
++CustomerChatUser.weight = 5
+diff --git a/backend/load_test/requirements.txt b/backend/load_test/requirements.txt
+new file mode 100644
+index 0000000..52a9181
+--- /dev/null
++++ b/backend/load_test/requirements.txt
+@@ -0,0 +1,4 @@
++# Dependencies for load_test/locustfile.py only — not needed to run the
++# app itself, so kept separate from backend/requirements.txt.
++locust==2.46.2
++websocket-client==1.9.0
+diff --git a/backend/pytest.ini b/backend/pytest.ini
+index a635c5c..c7b23ec 100644
+--- a/backend/pytest.ini
++++ b/backend/pytest.ini
+@@ -1,2 +1,3 @@
+ [pytest]
+ pythonpath = .
++testpaths = tests
+diff --git a/backend/tests/test_auth.py b/backend/tests/test_auth.py
+index fb626c2..bfd0d00 100644
+--- a/backend/tests/test_auth.py
++++ b/backend/tests/test_auth.py
+@@ -166,3 +166,109 @@ def test_login_with_2fa_required(setup_test_agent):
+     )
+     assert response_valid.status_code == 200
+     assert "access_token" in response_valid.json()
++
++# --- Cookie-based auth + CSRF mitigation ---
++#
++# Uses its own agent (no 2FA enabled) and its own https-scheme TestClient,
++# since the login cookie is Secure-flagged (required for SameSite=None) —
++# httpx's cookie jar, like a real browser, won't attach a Secure cookie
++# over a plain http connection, so these specifically need base_url set
++# to https to exercise the cookie path at all.
++
++@pytest.fixture(scope="module")
++def setup_csrf_test_agent():
++    db = SessionLocal()
++    agent = db.query(Agent).filter_by(username="csrf_test_agent").first()
++    if agent:
++        db.delete(agent)
++        db.commit()
++
++    new_agent = Agent(
++        username="csrf_test_agent",
++        full_name="CSRF Test Agent",
++        employee_id="TEST-CSRF1",
++        role="agent",
++        password_hash=hash_password("CsrfTest!123"),
++    )
++    db.add(new_agent)
++    db.commit()
++    yield
++    db.delete(new_agent)
++    db.commit()
++    db.close()
++
++
++@pytest.fixture
++def https_client():
++    return TestClient(app, base_url="https://testserver")
++
++
++def test_login_sets_httponly_cookie(setup_csrf_test_agent, https_client):
++    response = https_client.post(
++        "/api/agent/login",
++        data={"username": "csrf_test_agent", "password": "CsrfTest!123"},
++    )
++    assert response.status_code == 200
++    assert "access_token" in https_client.cookies
++
++
++def test_cookie_auth_on_mutating_request_without_csrf_header_is_blocked(
++    setup_csrf_test_agent, https_client
++):
++    login = https_client.post(
++        "/api/agent/login",
++        data={"username": "csrf_test_agent", "password": "CsrfTest!123"},
++    )
++    assert login.status_code == 200
++
++    # A GET works via cookie alone (safe method — no CSRF risk to mitigate).
++    get_resp = https_client.get("/api/agent/conversations/active")
++    assert get_resp.status_code == 200
++
++    # But a mutating request via cookie-only auth, without the app's
++    # custom header, must be rejected — this is exactly the shape of a
++    # cross-site CSRF request (browser attaches the cookie automatically,
++    # but can't add this header).
++    logout_resp = https_client.post("/api/agent/logout")
++    assert logout_resp.status_code == 403
++
++
++def test_cookie_auth_on_mutating_request_with_csrf_header_succeeds(
++    setup_csrf_test_agent, https_client
++):
++    login = https_client.post(
++        "/api/agent/login",
++        data={"username": "csrf_test_agent", "password": "CsrfTest!123"},
++    )
++    assert login.status_code == 200
++
++    logout_resp = https_client.post(
++        "/api/agent/logout", headers={"X-Wrennon-Client": "agent-dashboard"}
++    )
++    assert logout_resp.status_code == 200
++    assert logout_resp.json()["status"] == "logged_out"
++
++
++def test_logout_revokes_the_cookie_token(setup_csrf_test_agent, https_client):
++    """After /agent/logout bumps token_version, the JWT that was live at
++    logout time must be rejected even if a cookie sender tried to replay
++    it — this is what actually distinguishes a real logout from just
++    discarding client-side state."""
++    login = https_client.post(
++        "/api/agent/login",
++        data={"username": "csrf_test_agent", "password": "CsrfTest!123"},
++    )
++    old_token = login.json()["access_token"]
++
++    logout_resp = https_client.post(
++        "/api/agent/logout", headers={"X-Wrennon-Client": "agent-dashboard"}
++    )
++    assert logout_resp.status_code == 200
++
++    # The old (pre-logout) token must now be rejected everywhere,
++    # including via the Authorization header path.
++    replay_resp = client.get(
++        "/api/agent/conversations/active",
++        headers={"Authorization": f"Bearer {old_token}"},
++    )
++    assert replay_resp.status_code == 401
+diff --git a/backend/tests/test_config.py b/backend/tests/test_config.py
+index c50af39..3fb3f91 100644
+--- a/backend/tests/test_config.py
++++ b/backend/tests/test_config.py
+@@ -34,6 +34,26 @@ def test_production_rejects_insecure_jwt_key():
+             jwt_secret_key="dev-only-change-this-in-production"
+         )
+ 
++def test_production_rejects_sqlite_database_url():
++    # Render's (and most PaaS) filesystem is ephemeral — SQLite in
++    # production would silently lose all data on every deploy/restart,
++    # with no error anywhere. This must fail startup, the same way the
++    # insecure-JWT-key and wildcard-CORS cases already do.
++    with pytest.raises(ValidationError):
++        Settings(
++            groq_api_key="test",
++            cohere_api_key="test",
++            pinecone_api_key="test",
++            pinecone_host="test",
++            app_env="production",
++            _env_file=None,
++            agent_password_hash="testhash",
++            database_url="sqlite:///./data/wrennon.db",
++            redis_url="redis://localhost:6379",
++            cors_allowed_origins="https://example.com",
++            jwt_secret_key="secure_key",
++        )
++
+ def test_production_valid_config_passes():
+     settings = Settings(
+         groq_api_key="test",
+diff --git a/frontend/agent/admin_dashboard.html b/frontend/agent/admin_dashboard.html
+index 08d654c..aad88aa 100644
+--- a/frontend/agent/admin_dashboard.html
++++ b/frontend/agent/admin_dashboard.html
+@@ -423,8 +423,13 @@
+         const _IS_LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.protocol === "file:";
+         const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/api`;
+ 
+-        const agentToken = localStorage.getItem("agent_token");
+-        const authHeaders = agentToken ? { "Authorization": `Bearer ${agentToken}` } : {};        // Toggle password logic
++        // The httpOnly access_token cookie set by /agent/login is the
++        // credential now (see agent.js) — every fetch below must pass
++        // credentials:'include' to actually send it cross-origin, and
++        // mutating (non-GET) requests need this header too, since the
++        // backend requires it as CSRF protection for cookie-only auth.
++        const authHeaders = { "X-Wrennon-Client": "agent-dashboard" };
++        // Toggle password logic
+         const togglePwdBtn = document.getElementById("toggle-pwd");
+         const pwdInput = document.getElementById("agent-password");
+         const eyePaths = togglePwdBtn.querySelectorAll(".eye");
+@@ -594,6 +599,7 @@
+ 
+             const res = await fetch(`${API_BASE}/admin/agents/${selectedAgentUsername}/reset-password`, {
+                 method: 'PUT',
++                credentials: 'include',
+                 headers: {
+                     'Content-Type': 'application/json',
+                     ...authHeaders
+@@ -618,6 +624,7 @@
+ 
+             try {
+                 const res = await fetch(`${API_BASE}/admin/agents`, {
++                    credentials: 'include',
+                     headers: authHeaders
+                 });
+ 
+@@ -640,11 +647,16 @@
+         let presenceWs = null;
+ 
+         function connectPresenceWebSocket() {
+-            const token = localStorage.getItem('agent_token');
+-            if (!token) return;
+-            
+-            const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+-            const wsUrl = `${wsProtocol}://${window.location.host}/ws/agent?token=${encodeURIComponent(token)}`;
++            // No token in the URL: relies on the httpOnly access_token
++            // cookie, same as agent.js's connectSocket() and for the same
++            // reason (URL-embedded JWTs leak into logs/history/Referer).
++            // Also fixed: this used to build the URL from
++            // window.location.host, which is wrong in a cross-origin
++            // deployment (dashboard on Vercel, API on Render) — it now
++            // mirrors the same host logic API_BASE uses above.
++            const wsProtocol = _IS_LOCAL ? 'ws' : 'wss';
++            const wsHost = _IS_LOCAL ? 'localhost:8000' : _RENDER_HOST;
++            const wsUrl = `${wsProtocol}://${wsHost}/ws/agent`;
+             
+             presenceWs = new WebSocket(wsUrl);
+             
+@@ -721,6 +733,7 @@
+             if (!confirm(`Are you sure you want to remove agent '${username}'?`)) return;
+             const res = await fetch(`${API_BASE}/admin/agents/${username}`, {
+                 method: 'DELETE',
++                credentials: 'include',
+                 headers: authHeaders
+             });
+             if (res.ok) {
+@@ -748,6 +761,7 @@
+ 
+             const res = await fetch(`${API_BASE}/admin/agents`, {
+                 method: 'POST',
++                credentials: 'include',
+                 headers: {
+                     'Content-Type': 'application/json',
+                     ...authHeaders
+@@ -796,6 +810,7 @@
+         async function fetchLogs() {
+             try {
+                 const res = await fetch(`${API_BASE}/admin/logs`, {
++                    credentials: 'include',
+                     headers: authHeaders
+                 });
+                 if (!res.ok) return;
+@@ -971,15 +986,20 @@
+         setupProfileDropdown();
+ 
+         function logout() {
+-            localStorage.removeItem("agent_token");
+-            localStorage.removeItem("agent_username");
+-            localStorage.removeItem("agent_role");
+-            window.location.href = "index.html";
++            fetch(`${API_BASE}/agent/logout`, {
++                method: "POST",
++                credentials: "include",
++                headers: { "X-Wrennon-Client": "agent-dashboard" },
++            }).catch(() => {}).finally(() => {
++                localStorage.removeItem("agent_username");
++                localStorage.removeItem("agent_role");
++                window.location.href = "index.html";
++            });
+         }
+ 
+         async function fetchAnalytics() {
+             try {
+-                const res = await fetch(`${API_BASE}/analytics/stats`, { headers: authHeaders });
++                const res = await fetch(`${API_BASE}/analytics/stats`, { headers: authHeaders, credentials: 'include' });
+                 if (!res.ok) return;
+                 const data = await res.json();
+                 document.getElementById('analytics-total-tickets').innerText = data.total_tickets;
+@@ -994,7 +1014,7 @@
+ 
+         async function fetchBrandVoice() {
+             try {
+-                const res = await fetch(`${API_BASE}/admin/settings/brand_voice`, { headers: authHeaders });
++                const res = await fetch(`${API_BASE}/admin/settings/brand_voice`, { headers: authHeaders, credentials: 'include' });
+                 if (res.ok) {
+                     const data = await res.json();
+                     document.getElementById('brand-voice-textarea').value = data.value || "";
+@@ -1009,6 +1029,7 @@
+             try {
+                 const res = await fetch(`${API_BASE}/admin/settings/brand_voice`, {
+                     method: 'PUT',
++                    credentials: 'include',
+                     headers: { 'Content-Type': 'application/json', ...authHeaders },
+                     body: JSON.stringify({ value: val })
+                 });
+@@ -1025,7 +1046,7 @@
+         async function fetchKnowledgeGaps() {
+             const results = document.getElementById('kb-results');
+             try {
+-                const res = await fetch(`${API_BASE}/admin/knowledge-gaps`, { headers: authHeaders });
++                const res = await fetch(`${API_BASE}/admin/knowledge-gaps`, { headers: authHeaders, credentials: 'include' });
+                 if (res.ok) {
+                     const data = await res.json();
+                     const pending = data.filter(g => g.status === 'pending');
+@@ -1060,7 +1081,7 @@
+         
+         async function approveGap(id) {
+             try {
+-                const res = await fetch(`${API_BASE}/admin/knowledge-gaps/${id}/approve`, { method: 'POST', headers: authHeaders });
++                const res = await fetch(`${API_BASE}/admin/knowledge-gaps/${id}/approve`, { method: 'POST', headers: authHeaders, credentials: 'include' });
+                 if (res.ok) {
+                     alert('Draft approved and synced to Pinecone vector database!');
+                     fetchKnowledgeGaps();
+@@ -1070,7 +1091,7 @@
+ 
+         async function rejectGap(id) {
+             try {
+-                const res = await fetch(`${API_BASE}/admin/knowledge-gaps/${id}/reject`, { method: 'POST', headers: authHeaders });
++                const res = await fetch(`${API_BASE}/admin/knowledge-gaps/${id}/reject`, { method: 'POST', headers: authHeaders, credentials: 'include' });
+                 if (res.ok) {
+                     fetchKnowledgeGaps();
+                 }
+@@ -1084,7 +1105,7 @@
+ 
+         async function fetchScorecards() {
+             try {
+-                const res = await fetch(`${API_BASE}/admin/analytics/scorecards`, { headers: authHeaders });
++                const res = await fetch(`${API_BASE}/admin/analytics/scorecards`, { headers: authHeaders, credentials: 'include' });
+                 if (res.ok) {
+                     const data = await res.json();
+                     const tbody = document.getElementById('qa-scorecards-list');
+diff --git a/frontend/agent/agent.js b/frontend/agent/agent.js
+index eefce3a..0477f91 100644
+--- a/frontend/agent/agent.js
++++ b/frontend/agent/agent.js
+@@ -197,8 +197,12 @@ loginForm.addEventListener("submit", async (e) => {
+     }
+ 
+     const data = await response.json();
+-    // Token is stored in localStorage to avoid cross-origin cookie blocking
+-    localStorage.setItem("agent_token", data.access_token);
++    // The httpOnly, SameSite=None, Secure cookie set by the login response
++    // (see agent.py) is the real credential from here on — it isn't
++    // readable from JS, which is the point: an XSS bug elsewhere in this
++    // file can no longer just read a live session token out of storage.
++    // Only non-secret UI state (username/role, for display and the admin
++    // button) is kept client-side.
+     localStorage.setItem("agent_username", username); // Save username to identify self
+     localStorage.setItem("agent_role", data.role); // Save role to show admin btn
+     
+@@ -226,14 +230,17 @@ let reconnectTimeout = null;
+ 
+ function connectSocket() {
+   if (reconnectTimeout) clearTimeout(reconnectTimeout);
+-  const token = localStorage.getItem("agent_token");
+-  
+-  if (!token || token === "null" || token === "undefined") {
+-    console.warn("No agent token found, aborting WebSocket connection.");
+-    return;
+-  }
+ 
+-  socket = new WebSocket(`${WS_URL}?token=${token}`);
++  // No token query param: the backend already accepts the httpOnly
++  // access_token cookie for /ws/agent (see Cookie(None) in
++  // websocket_routes.py), and the browser attaches it to the WS
++  // handshake automatically. Putting the raw JWT in the URL used to mean
++  // it would show up in server access logs, browser history, and any
++  // Referer header — a plain credential leak with no upside now that the
++  // cookie path works. If the cookie is missing/expired/invalid, the
++  // server closes with 4401 and onclose() below sends the agent back to
++  // login — no client-side pre-check needed.
++  socket = new WebSocket(WS_URL);
+ 
+   socket.onopen = () => {
+     const wasReconnecting = reconnectAttempts > 0;
+@@ -1151,7 +1158,8 @@ async function handleAgentFileUpload(file, inputElement, uploadInputElement, aut
+   try {
+     const response = await fetch(`${API_BASE}/chat/upload/${activeSessionId}`, {
+       method: "POST",
+-      headers: { "Authorization": `Bearer ${localStorage.getItem("agent_token")}` },
++      credentials: "include",
++      headers: { "X-Wrennon-Client": "agent-dashboard" },
+       body: formData
+     });
+     const data = await response.json();
+@@ -1277,7 +1285,11 @@ if (agentCopilotBtn) {
+       };
+       const res = await fetch(`${API_BASE}/copilot/suggest`, {
+           method: 'POST',
+-          headers: { "Content-Type": "application/json" },
++          credentials: "include",
++          headers: {
++            "Content-Type": "application/json",
++            "X-Wrennon-Client": "agent-dashboard",
++          },
+           body: JSON.stringify(req)
+       });
+       if (res.ok) {
+@@ -1452,12 +1464,16 @@ resolveBtn.addEventListener("click", async () => {
+ // --- Helpers ---
+ async function authedFetch(path, method = "GET", body = null) {
+   try {
+-    const token = localStorage.getItem("agent_token");
+     const options = {
+       method,
++      credentials: "include", // send the httpOnly access_token cookie
+       headers: {
+-        "Authorization": `Bearer ${token}`
+-      }
++        // Required by the backend's CSRF check for cookie-authenticated
++        // non-GET requests (see get_current_agent) — a cross-site form or
++        // fetch can't add this header, so its presence proves the request
++        // actually came from this app's own JS.
++        "X-Wrennon-Client": "agent-dashboard",
++      },
+     };
+     if (body) {
+       options.headers["Content-Type"] = "application/json";
+@@ -1651,7 +1667,15 @@ function formatSidebarTime(isoString) {
+ }
+ 
+ function logout() {
+-  localStorage.removeItem("agent_token");
++  // Best-effort: if this was triggered by an already-expired/invalid
++  // session (e.g. the 4401 handler above), this call will itself 401 —
++  // that's fine, the cookie will just expire on its own in that case.
++  fetch(`${API_BASE}/agent/logout`, {
++    method: "POST",
++    credentials: "include",
++    headers: { "X-Wrennon-Client": "agent-dashboard" },
++  }).catch(() => {});
++
+   localStorage.removeItem("agent_username");
+   localStorage.removeItem("agent_role");
+   

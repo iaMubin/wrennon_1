@@ -1,0 +1,4 @@
+# Dependencies for load_test/locustfile.py only — not needed to run the
+# app itself, so kept separate from backend/requirements.txt.
+locust==2.46.2
+websocket-client==1.9.0

@@ -33,6 +33,17 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/wrennon.db"
     redis_url: str = "redis://localhost:6379"
 
+    # Global circuit breaker: total customer WS messages/minute across
+    # ALL sessions and IPs combined. This exists specifically because the
+    # per-session (15/min) and per-IP (60/min) limits below it are both
+    # bypassable by a distributed attacker (many IPs, many sessions) —
+    # no single-key Redis counter can stop that. This one can't identify
+    # or block the attacker either, but it puts a hard ceiling on total
+    # paid-LLM-call volume (cost/quota exposure) the app will ever allow
+    # in a given minute, regardless of how the load is distributed.
+    # Tune this to your actual Groq/Cohere/Pinecone paid-tier throughput.
+    global_ws_message_limit_per_minute: int = 300
+
     # JWT settings for agent login. jwt_secret_key MUST be overridden in
     # .env for any real deployment — this default is fine for local dev
     # only, since anyone reading this source file could forge a token
@@ -71,6 +82,14 @@ class Settings(BaseSettings):
                     "wildcard CORS in production also silently disables "
                     "credentialed requests (see main.py), which would break "
                     "cookie-based agent auth rather than just being insecure."
+                )
+            if self.database_url.startswith("sqlite"):
+                raise ValueError(
+                    "DATABASE_URL is still SQLite in production. Render's (and "
+                    "most PaaS) filesystem is ephemeral, so every deploy/restart "
+                    "would silently wipe all conversations/agents/audit logs with "
+                    "no error at all. Set DATABASE_URL to your Postgres instance "
+                    "before starting the app in production."
                 )
         return self
 

@@ -72,8 +72,13 @@ async def login(
                 detail="Too many failed login attempts. Please try again later.",
             )
     except Exception as e:
-        # Fallback if Redis is down or times out
-        logger.debug(f"Redis fallback during login for {form_data.username}: {e}")
+        # If Redis is down, brute-force lockout silently fails OPEN — an
+        # attacker can hammer this endpoint unthrottled until Redis comes
+        # back. That's an operationally important signal, not routine
+        # noise, so it's logged at WARNING (visible in production/Sentry)
+        # rather than DEBUG (which would make this failure mode invisible
+        # exactly when it matters most).
+        logger.warning(f"Redis unavailable during login rate-limit check for {form_data.username}: {e}")
 
     agent = db.query(Agent).filter(
         or_(Agent.username == form_data.username, Agent.employee_id == form_data.username)
@@ -85,7 +90,7 @@ async def login(
             await r.incr(rate_key)
             await r.expire(rate_key, 60)
         except Exception as e:
-            logger.debug(f"Redis fallback during rate limit increment: {e}")
+            logger.warning(f"Redis unavailable while recording a failed login attempt for {form_data.username}: {e}")
             
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -110,7 +115,10 @@ async def login(
         r = get_redis()
         await r.delete(rate_key)
     except Exception as e:
-        logger.debug(f"Redis fallback during rate limit reset: {e}")
+        # Non-critical (a stale lockout counter just lingers an extra
+        # ~60s), but still worth a WARNING for consistency with the two
+        # login-path Redis fallbacks above.
+        logger.warning(f"Redis unavailable while clearing rate-limit counter for {agent.username}: {e}")
         
     token = create_access_token(subject=agent.username, token_version=agent.token_version)
     
@@ -133,6 +141,25 @@ async def login(
     )
     
     return {"access_token": token, "token_type": "bearer", "role": agent.role}  # nosec B105
+
+
+@router.post("/agent/logout")
+def logout(
+    response: Response,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent),
+) -> dict:
+    """Clears the auth cookie and revokes the token that was used to call
+    this endpoint (via token_version bump), so it can't be replayed even
+    if it leaked before logout. Now that agent.js relies on the cookie
+    rather than a client-held copy of the JWT, "logging out" has to be a
+    real server round-trip — deleting client-side state alone would leave
+    the cookie (and the token inside it) valid until it expires on its own.
+    """
+    agent.token_version = (agent.token_version or 1) + 1
+    db.commit()
+    response.delete_cookie(key="access_token", samesite="none", secure=True)
+    return {"status": "logged_out"}
 
 
 class VerifyTOTPRequest(BaseModel):

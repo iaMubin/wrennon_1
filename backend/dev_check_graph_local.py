@@ -1,3 +1,11 @@
+"""
+Manual dev script — NOT part of the automated test suite (see tests/).
+
+Exercises the LangGraph pipeline directly with real LLM calls (no mocks),
+so it needs real API keys configured. Run directly:
+`python dev_check_graph_local.py`.
+"""
+
 import asyncio
 from app.graph.builder import build_graph
 from app.graph.state import initial_state

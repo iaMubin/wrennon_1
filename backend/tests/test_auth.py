@@ -166,3 +166,109 @@ def test_login_with_2fa_required(setup_test_agent):
     )
     assert response_valid.status_code == 200
     assert "access_token" in response_valid.json()
+
+# --- Cookie-based auth + CSRF mitigation ---
+#
+# Uses its own agent (no 2FA enabled) and its own https-scheme TestClient,
+# since the login cookie is Secure-flagged (required for SameSite=None) —
+# httpx's cookie jar, like a real browser, won't attach a Secure cookie
+# over a plain http connection, so these specifically need base_url set
+# to https to exercise the cookie path at all.
+
+@pytest.fixture(scope="module")
+def setup_csrf_test_agent():
+    db = SessionLocal()
+    agent = db.query(Agent).filter_by(username="csrf_test_agent").first()
+    if agent:
+        db.delete(agent)
+        db.commit()
+
+    new_agent = Agent(
+        username="csrf_test_agent",
+        full_name="CSRF Test Agent",
+        employee_id="TEST-CSRF1",
+        role="agent",
+        password_hash=hash_password("CsrfTest!123"),
+    )
+    db.add(new_agent)
+    db.commit()
+    yield
+    db.delete(new_agent)
+    db.commit()
+    db.close()
+
+
+@pytest.fixture
+def https_client():
+    return TestClient(app, base_url="https://testserver")
+
+
+def test_login_sets_httponly_cookie(setup_csrf_test_agent, https_client):
+    response = https_client.post(
+        "/api/agent/login",
+        data={"username": "csrf_test_agent", "password": "CsrfTest!123"},
+    )
+    assert response.status_code == 200
+    assert "access_token" in https_client.cookies
+
+
+def test_cookie_auth_on_mutating_request_without_csrf_header_is_blocked(
+    setup_csrf_test_agent, https_client
+):
+    login = https_client.post(
+        "/api/agent/login",
+        data={"username": "csrf_test_agent", "password": "CsrfTest!123"},
+    )
+    assert login.status_code == 200
+
+    # A GET works via cookie alone (safe method — no CSRF risk to mitigate).
+    get_resp = https_client.get("/api/agent/conversations/active")
+    assert get_resp.status_code == 200
+
+    # But a mutating request via cookie-only auth, without the app's
+    # custom header, must be rejected — this is exactly the shape of a
+    # cross-site CSRF request (browser attaches the cookie automatically,
+    # but can't add this header).
+    logout_resp = https_client.post("/api/agent/logout")
+    assert logout_resp.status_code == 403
+
+
+def test_cookie_auth_on_mutating_request_with_csrf_header_succeeds(
+    setup_csrf_test_agent, https_client
+):
+    login = https_client.post(
+        "/api/agent/login",
+        data={"username": "csrf_test_agent", "password": "CsrfTest!123"},
+    )
+    assert login.status_code == 200
+
+    logout_resp = https_client.post(
+        "/api/agent/logout", headers={"X-Wrennon-Client": "agent-dashboard"}
+    )
+    assert logout_resp.status_code == 200
+    assert logout_resp.json()["status"] == "logged_out"
+
+
+def test_logout_revokes_the_cookie_token(setup_csrf_test_agent, https_client):
+    """After /agent/logout bumps token_version, the JWT that was live at
+    logout time must be rejected even if a cookie sender tried to replay
+    it — this is what actually distinguishes a real logout from just
+    discarding client-side state."""
+    login = https_client.post(
+        "/api/agent/login",
+        data={"username": "csrf_test_agent", "password": "CsrfTest!123"},
+    )
+    old_token = login.json()["access_token"]
+
+    logout_resp = https_client.post(
+        "/api/agent/logout", headers={"X-Wrennon-Client": "agent-dashboard"}
+    )
+    assert logout_resp.status_code == 200
+
+    # The old (pre-logout) token must now be rejected everywhere,
+    # including via the Authorization header path.
+    replay_resp = client.get(
+        "/api/agent/conversations/active",
+        headers={"Authorization": f"Bearer {old_token}"},
+    )
+    assert replay_resp.status_code == 401

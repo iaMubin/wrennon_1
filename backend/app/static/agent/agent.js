@@ -197,8 +197,12 @@ loginForm.addEventListener("submit", async (e) => {
     }
 
     const data = await response.json();
-    // Token is stored in localStorage to avoid cross-origin cookie blocking
-    localStorage.setItem("agent_token", data.access_token);
+    // The httpOnly, SameSite=None, Secure cookie set by the login response
+    // (see agent.py) is the real credential from here on — it isn't
+    // readable from JS, which is the point: an XSS bug elsewhere in this
+    // file can no longer just read a live session token out of storage.
+    // Only non-secret UI state (username/role, for display and the admin
+    // button) is kept client-side.
     localStorage.setItem("agent_username", username); // Save username to identify self
     localStorage.setItem("agent_role", data.role); // Save role to show admin btn
     
@@ -226,14 +230,17 @@ let reconnectTimeout = null;
 
 function connectSocket() {
   if (reconnectTimeout) clearTimeout(reconnectTimeout);
-  const token = localStorage.getItem("agent_token");
-  
-  if (!token || token === "null" || token === "undefined") {
-    console.warn("No agent token found, aborting WebSocket connection.");
-    return;
-  }
 
-  socket = new WebSocket(`${WS_URL}?token=${token}`);
+  // No token query param: the backend already accepts the httpOnly
+  // access_token cookie for /ws/agent (see Cookie(None) in
+  // websocket_routes.py), and the browser attaches it to the WS
+  // handshake automatically. Putting the raw JWT in the URL used to mean
+  // it would show up in server access logs, browser history, and any
+  // Referer header — a plain credential leak with no upside now that the
+  // cookie path works. If the cookie is missing/expired/invalid, the
+  // server closes with 4401 and onclose() below sends the agent back to
+  // login — no client-side pre-check needed.
+  socket = new WebSocket(WS_URL);
 
   socket.onopen = () => {
     const wasReconnecting = reconnectAttempts > 0;
@@ -1151,7 +1158,8 @@ async function handleAgentFileUpload(file, inputElement, uploadInputElement, aut
   try {
     const response = await fetch(`${API_BASE}/chat/upload/${activeSessionId}`, {
       method: "POST",
-      headers: { "Authorization": `Bearer ${localStorage.getItem("agent_token")}` },
+      credentials: "include",
+      headers: { "X-Wrennon-Client": "agent-dashboard" },
       body: formData
     });
     const data = await response.json();
@@ -1277,7 +1285,11 @@ if (agentCopilotBtn) {
       };
       const res = await fetch(`${API_BASE}/copilot/suggest`, {
           method: 'POST',
-          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Wrennon-Client": "agent-dashboard",
+          },
           body: JSON.stringify(req)
       });
       if (res.ok) {
@@ -1452,12 +1464,16 @@ resolveBtn.addEventListener("click", async () => {
 // --- Helpers ---
 async function authedFetch(path, method = "GET", body = null) {
   try {
-    const token = localStorage.getItem("agent_token");
     const options = {
       method,
+      credentials: "include", // send the httpOnly access_token cookie
       headers: {
-        "Authorization": `Bearer ${token}`
-      }
+        // Required by the backend's CSRF check for cookie-authenticated
+        // non-GET requests (see get_current_agent) — a cross-site form or
+        // fetch can't add this header, so its presence proves the request
+        // actually came from this app's own JS.
+        "X-Wrennon-Client": "agent-dashboard",
+      },
     };
     if (body) {
       options.headers["Content-Type"] = "application/json";
@@ -1651,7 +1667,15 @@ function formatSidebarTime(isoString) {
 }
 
 function logout() {
-  localStorage.removeItem("agent_token");
+  // Best-effort: if this was triggered by an already-expired/invalid
+  // session (e.g. the 4401 handler above), this call will itself 401 —
+  // that's fine, the cookie will just expire on its own in that case.
+  fetch(`${API_BASE}/agent/logout`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "X-Wrennon-Client": "agent-dashboard" },
+  }).catch(() => {});
+
   localStorage.removeItem("agent_username");
   localStorage.removeItem("agent_role");
   

@@ -423,8 +423,13 @@
         const _IS_LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.protocol === "file:";
         const API_BASE = `${_IS_LOCAL ? "http" : "https"}://${_IS_LOCAL ? "localhost:8000" : _RENDER_HOST}/api`;
 
-        const agentToken = localStorage.getItem("agent_token");
-        const authHeaders = agentToken ? { "Authorization": `Bearer ${agentToken}` } : {};        // Toggle password logic
+        // The httpOnly access_token cookie set by /agent/login is the
+        // credential now (see agent.js) — every fetch below must pass
+        // credentials:'include' to actually send it cross-origin, and
+        // mutating (non-GET) requests need this header too, since the
+        // backend requires it as CSRF protection for cookie-only auth.
+        const authHeaders = { "X-Wrennon-Client": "agent-dashboard" };
+        // Toggle password logic
         const togglePwdBtn = document.getElementById("toggle-pwd");
         const pwdInput = document.getElementById("agent-password");
         const eyePaths = togglePwdBtn.querySelectorAll(".eye");
@@ -594,6 +599,7 @@
 
             const res = await fetch(`${API_BASE}/admin/agents/${selectedAgentUsername}/reset-password`, {
                 method: 'PUT',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                     ...authHeaders
@@ -618,6 +624,7 @@
 
             try {
                 const res = await fetch(`${API_BASE}/admin/agents`, {
+                    credentials: 'include',
                     headers: authHeaders
                 });
 
@@ -640,11 +647,16 @@
         let presenceWs = null;
 
         function connectPresenceWebSocket() {
-            const token = localStorage.getItem('agent_token');
-            if (!token) return;
-            
-            const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-            const wsUrl = `${wsProtocol}://${window.location.host}/ws/agent?token=${encodeURIComponent(token)}`;
+            // No token in the URL: relies on the httpOnly access_token
+            // cookie, same as agent.js's connectSocket() and for the same
+            // reason (URL-embedded JWTs leak into logs/history/Referer).
+            // Also fixed: this used to build the URL from
+            // window.location.host, which is wrong in a cross-origin
+            // deployment (dashboard on Vercel, API on Render) — it now
+            // mirrors the same host logic API_BASE uses above.
+            const wsProtocol = _IS_LOCAL ? 'ws' : 'wss';
+            const wsHost = _IS_LOCAL ? 'localhost:8000' : _RENDER_HOST;
+            const wsUrl = `${wsProtocol}://${wsHost}/ws/agent`;
             
             presenceWs = new WebSocket(wsUrl);
             
@@ -721,6 +733,7 @@
             if (!confirm(`Are you sure you want to remove agent '${username}'?`)) return;
             const res = await fetch(`${API_BASE}/admin/agents/${username}`, {
                 method: 'DELETE',
+                credentials: 'include',
                 headers: authHeaders
             });
             if (res.ok) {
@@ -748,6 +761,7 @@
 
             const res = await fetch(`${API_BASE}/admin/agents`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                     ...authHeaders
@@ -796,6 +810,7 @@
         async function fetchLogs() {
             try {
                 const res = await fetch(`${API_BASE}/admin/logs`, {
+                    credentials: 'include',
                     headers: authHeaders
                 });
                 if (!res.ok) return;
@@ -971,15 +986,20 @@
         setupProfileDropdown();
 
         function logout() {
-            localStorage.removeItem("agent_token");
-            localStorage.removeItem("agent_username");
-            localStorage.removeItem("agent_role");
-            window.location.href = "index.html";
+            fetch(`${API_BASE}/agent/logout`, {
+                method: "POST",
+                credentials: "include",
+                headers: { "X-Wrennon-Client": "agent-dashboard" },
+            }).catch(() => {}).finally(() => {
+                localStorage.removeItem("agent_username");
+                localStorage.removeItem("agent_role");
+                window.location.href = "index.html";
+            });
         }
 
         async function fetchAnalytics() {
             try {
-                const res = await fetch(`${API_BASE}/analytics/stats`, { headers: authHeaders });
+                const res = await fetch(`${API_BASE}/analytics/stats`, { headers: authHeaders, credentials: 'include' });
                 if (!res.ok) return;
                 const data = await res.json();
                 document.getElementById('analytics-total-tickets').innerText = data.total_tickets;
@@ -994,7 +1014,7 @@
 
         async function fetchBrandVoice() {
             try {
-                const res = await fetch(`${API_BASE}/admin/settings/brand_voice`, { headers: authHeaders });
+                const res = await fetch(`${API_BASE}/admin/settings/brand_voice`, { headers: authHeaders, credentials: 'include' });
                 if (res.ok) {
                     const data = await res.json();
                     document.getElementById('brand-voice-textarea').value = data.value || "";
@@ -1009,6 +1029,7 @@
             try {
                 const res = await fetch(`${API_BASE}/admin/settings/brand_voice`, {
                     method: 'PUT',
+                    credentials: 'include',
                     headers: { 'Content-Type': 'application/json', ...authHeaders },
                     body: JSON.stringify({ value: val })
                 });
@@ -1025,7 +1046,7 @@
         async function fetchKnowledgeGaps() {
             const results = document.getElementById('kb-results');
             try {
-                const res = await fetch(`${API_BASE}/admin/knowledge-gaps`, { headers: authHeaders });
+                const res = await fetch(`${API_BASE}/admin/knowledge-gaps`, { headers: authHeaders, credentials: 'include' });
                 if (res.ok) {
                     const data = await res.json();
                     const pending = data.filter(g => g.status === 'pending');
@@ -1060,7 +1081,7 @@
         
         async function approveGap(id) {
             try {
-                const res = await fetch(`${API_BASE}/admin/knowledge-gaps/${id}/approve`, { method: 'POST', headers: authHeaders });
+                const res = await fetch(`${API_BASE}/admin/knowledge-gaps/${id}/approve`, { method: 'POST', headers: authHeaders, credentials: 'include' });
                 if (res.ok) {
                     alert('Draft approved and synced to Pinecone vector database!');
                     fetchKnowledgeGaps();
@@ -1070,7 +1091,7 @@
 
         async function rejectGap(id) {
             try {
-                const res = await fetch(`${API_BASE}/admin/knowledge-gaps/${id}/reject`, { method: 'POST', headers: authHeaders });
+                const res = await fetch(`${API_BASE}/admin/knowledge-gaps/${id}/reject`, { method: 'POST', headers: authHeaders, credentials: 'include' });
                 if (res.ok) {
                     fetchKnowledgeGaps();
                 }
@@ -1084,7 +1105,7 @@
 
         async function fetchScorecards() {
             try {
-                const res = await fetch(`${API_BASE}/admin/analytics/scorecards`, { headers: authHeaders });
+                const res = await fetch(`${API_BASE}/admin/analytics/scorecards`, { headers: authHeaders, credentials: 'include' });
                 if (res.ok) {
                     const data = await res.json();
                     const tbody = document.getElementById('qa-scorecards-list');

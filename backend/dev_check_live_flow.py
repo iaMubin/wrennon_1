@@ -1,3 +1,12 @@
+"""
+Manual dev script — NOT part of the automated test suite (see tests/).
+
+Needs a live backend running locally (`uvicorn app.main:app`) and real
+LLM/Pinecone/Cohere API keys configured, since it exercises the full
+WebSocket -> LangGraph -> LLM round-trip against real services. Run
+directly: `python dev_check_live_flow.py`.
+"""
+
 import asyncio
 import websockets
 import json

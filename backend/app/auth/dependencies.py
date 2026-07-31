@@ -22,18 +22,39 @@ from app.db.models import Agent
 _oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/agent/login")
 
 
+_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
 def get_current_agent(request: Request, db: Session = Depends(get_db)) -> Agent:
     # First try Authorization header, then fallback to cookie
     token = request.headers.get("Authorization")
+    used_cookie_fallback = False
     if token and token.startswith("Bearer "):
         token = token.replace("Bearer ", "")
     else:
         token = request.cookies.get("access_token")
         if token and token.startswith("Bearer "):
             token = token.replace("Bearer ", "")
-            
+            used_cookie_fallback = True
+
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
+
+    # CSRF mitigation: a browser attaches cookies to cross-site requests
+    # automatically (that's the whole problem CSRF exploits), but it will
+    # NOT attach an Authorization header, and it cannot add an arbitrary
+    # custom header to a cross-site request without the target's CORS
+    # policy explicitly allowing that origin first. So for any
+    # state-changing request authenticated purely via the cookie (no
+    # Authorization header present), require this custom header — a
+    # same-site JS client can always set it, a cross-site <form> submit
+    # or plain cross-site fetch cannot.
+    if used_cookie_fallback and request.method.upper() not in _SAFE_METHODS:
+        if request.headers.get("X-Wrennon-Client") != "agent-dashboard":
+            raise HTTPException(
+                status_code=403,
+                detail="Missing required client header for cookie-authenticated request.",
+            )
     token_data = decode_access_token(token)
     if token_data is None or not token_data.get("sub"):
         raise HTTPException(

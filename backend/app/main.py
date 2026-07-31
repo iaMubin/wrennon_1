@@ -126,7 +126,17 @@ async def add_security_headers(request, call_next):
     )
     return response
 
-# Auto-create default admin agent if none exist
+# Auto-create default admin agent if none exist.
+#
+# This whole module executes once per worker process (WEB_CONCURRENCY
+# workers all import app.main independently), so two workers can race
+# here: both see count() == 0 and both try to insert the same username.
+# Agent.username has a unique constraint, so the loser of that race would
+# previously crash the whole worker on an uncaught IntegrityError. Catch
+# it specifically (not a blanket Exception) and just re-read what the
+# winning worker inserted — that's the correct outcome, not an error.
+from sqlalchemy.exc import IntegrityError
+
 with SessionLocal() as db:
     if db.query(Agent).count() == 0:
         logger.info(f"No agents found. Creating initial manager: {settings.agent_username}")
@@ -140,7 +150,14 @@ with SessionLocal() as db:
                 role="manager", 
                 employee_id="EMP-1001"
             ))
-            db.commit()
+            try:
+                db.commit()
+            except IntegrityError:
+                logger.info(
+                    f"Agent '{settings.agent_username}' was already created by "
+                    "another worker process (race on startup) — continuing."
+                )
+                db.rollback()
     else:
         admin_agent = db.query(Agent).filter_by(username=settings.agent_username).first()
         if admin_agent and settings.agent_password_hash and admin_agent.password_hash != settings.agent_password_hash:
@@ -165,37 +182,17 @@ with SessionLocal() as db:
     if agents_without_id:
         db.commit()
 
-    # Manual migrations for SQLite (to add new columns to existing tables)
-    from sqlalchemy import text
-    try:
-        db.execute(text("ALTER TABLE conversations ADD COLUMN sentiment VARCHAR"))
-        db.commit()
-    except Exception:
-        db.rollback()
-        
-    try:
-        db.execute(text("ALTER TABLE conversations ADD COLUMN language VARCHAR"))
-        db.commit()
-    except Exception:
-        db.rollback()
-
-    try:
-        db.execute(text("ALTER TABLE conversations ADD COLUMN intent_category VARCHAR"))
-        db.commit()
-    except Exception:
-        db.rollback()
-
-    try:
-        db.execute(text("ALTER TABLE messages ADD COLUMN author_username VARCHAR"))
-        db.commit()
-    except Exception:
-        db.rollback()
-
-    try:
-        db.execute(text("ALTER TABLE agents ADD COLUMN token_version INTEGER DEFAULT 1"))
-        db.commit()
-    except Exception:
-        db.rollback()
+    # NOTE: the manual "ALTER TABLE ... " fallback migrations that used to
+    # live here have been removed. Every column they added (sentiment,
+    # language, intent_category, author_username, token_version) is now
+    # covered by a proper Alembic migration, and start.sh already runs
+    # `alembic upgrade head` once, sequentially, before any uvicorn worker
+    # is started — so this block was fully redundant. Keeping it was also
+    # a latent bug: this whole module executes at *import* time, once per
+    # worker process, so with WEB_CONCURRENCY > 1 several workers could run
+    # overlapping ALTER TABLE statements against the same database at once.
+    # If you ever need an ad-hoc column backfill again, put it in a real
+    # Alembic migration (see backend/alembic/versions/) instead of here.
 
 app.include_router(chat_router, prefix="/api")
 app.include_router(agent_router, prefix="/api")
