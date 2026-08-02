@@ -223,7 +223,8 @@ loginForm.addEventListener("submit", async (e) => {
 
     connectSocket();
     await loadConversations();
-    loadAgents(); // was previously only called once, pre-login, at script load —
+    loadAgents();
+    loadMacros(); // was previously only called once, pre-login, at script load —
                    // that call always 403s (not authenticated yet) and was never
                    // retried, so @mentions and the assignee dropdown silently had
                    // an empty agent list. Refresh it now that we have a session.
@@ -269,6 +270,7 @@ function connectSocket() {
         fetchAndRenderMessages(activeSessionId);
       }
       loadConversations();
+      loadMacros();
     }
   };
 
@@ -345,10 +347,31 @@ function connectSocket() {
           hideCustomerTypingIndicator();
         }
       }
+    } else if (data.type === "viewers_update") {
+      if (data.session_id === activeSessionId) {
+        renderCollisionBadge(data.viewers || []);
+      }
     } else {
       console.warn("Unrecognized WebSocket message:", data);
     }
   };
+}
+
+// --- Collision detection: "another agent has this ticket open too" ---
+function renderCollisionBadge(viewers) {
+  const badge = document.getElementById("collision-badge");
+  if (!badge) return;
+  const myUsername = localStorage.getItem("agent_username");
+  const others = viewers.filter(v => v !== myUsername);
+  if (others.length === 0) {
+    badge.classList.add("hidden");
+    badge.textContent = "";
+    return;
+  }
+  badge.classList.remove("hidden");
+  badge.textContent = others.length === 1
+    ? `⚠ ${others[0]} is also viewing this ticket`
+    : `⚠ ${others.length} other agents are also viewing this ticket`;
 }
 
 // --- Section Tabs ---
@@ -402,14 +425,27 @@ async function loadConversations() {
     "all": "/agent/conversations"
   };
   
-  const endpoint = endpoints[activeSection] || endpoints["my_cases"];
+  let endpoint = endpoints[activeSection] || endpoints["my_cases"];
+  
+  const pri = document.getElementById("filter-priority")?.value;
+  const ass = document.getElementById("filter-assignee")?.value;
+  const tag = document.getElementById("filter-tag")?.value;
+  
+  const qs = new URLSearchParams();
+  if (pri) qs.append("priority", pri);
+  if (ass) qs.append("assigned_agent", ass);
+  if (tag) qs.append("tag", tag);
+  const qStr = qs.toString();
+  if (qStr) endpoint += "?" + qStr;
+
+  const fetchUrl = (base) => base + (qStr ? "?" + qStr : "");
   
   // Use Promise.all to fetch concurrently and save time
   const [conversations, myCasesList, attnList, actList] = await Promise.all([
     authedFetch(endpoint),
-    activeSection === "my_cases" ? null : authedFetch(endpoints["my_cases"]),
-    activeSection === "attention" ? null : authedFetch(endpoints["attention"]),
-    activeSection === "active" ? null : authedFetch(endpoints["active"])
+    activeSection === "my_cases" ? null : authedFetch(fetchUrl(endpoints["my_cases"])),
+    activeSection === "attention" ? null : authedFetch(fetchUrl(endpoints["attention"])),
+    activeSection === "active" ? null : authedFetch(fetchUrl(endpoints["active"]))
   ]);
 
   if (!conversations) {
@@ -429,6 +465,8 @@ async function loadConversations() {
 
 function renderConversationList(conversations) {
   conversationList.innerHTML = "";
+  selectedConversations.clear();
+  updateBulkActionBar();
 
   for (const conv of conversations) {
     const item = document.createElement("div");
@@ -496,12 +534,25 @@ function renderConversationList(conversations) {
     const hash = conv.short_id ? conv.short_id.split('').reduce((a, b) => {a = ((a << 5) - a) + b.charCodeAt(0); return a & a}, 0) : 0;
     const platformIcon = platforms[Math.abs(hash) % platforms.length];
 
+    const customerDisplayName = conv.customer_name || conv.customer_email || "Unknown Customer";
+    let avatarHtml = "";
+    if (!conv.customer_name && !conv.customer_email) {
+      avatarHtml = `<img src="/agent/images/default-avatar.png?v=2" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border-light); box-shadow: 0 1px 3px rgba(0,0,0,0.1);" alt="Avatar">`;
+    } else {
+      const dpId = conv.customer_email || conv.customer_id || conv.session_id || hash;
+      avatarHtml = `<img src="https://i.pravatar.cc/150?u=${encodeURIComponent(dpId)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border-light); box-shadow: 0 1px 3px rgba(0,0,0,0.1);" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">`;
+    }
+
     item.innerHTML = `
-      <div class="conv-item-header">
-        <span class="conv-item-email" style="display:flex; align-items:center; gap:4px;">
-            ${escapeHtml(conv.customer_email || "Unknown Customer")}
-        </span>
-        <span class="conv-item-time">${formatSidebarTime(conv.updated_at)}</span>
+      <div class="conv-item-header" style="display: flex; justify-content: space-between;">
+        <div style="display: flex; gap: 10px; align-items: center; overflow: hidden;">
+            <input type="checkbox" class="conv-checkbox" data-session-id="${conv.session_id}" onclick="event.stopPropagation(); toggleBulkSelection(this, '${conv.session_id}')" style="cursor: pointer; flex-shrink: 0;">
+            <span class="conv-item-email" style="display:flex; align-items:center; gap:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size: 14px; font-weight: 500;">
+                ${avatarHtml}
+                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(customerDisplayName)}</span>
+            </span>
+        </div>
+        <span class="conv-item-time" style="flex-shrink: 0;">${formatSidebarTime(conv.updated_at)}</span>
       </div>
       <div class="conv-item-preview">${formatPreview(conv)}</div>
       <div class="badge-row">
@@ -570,14 +621,27 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
   activeSessionId = sessionId;
   emptyState.classList.add("hidden");
   activeConversationEl.classList.remove("hidden");
+
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ type: "view_conversation", session_id: sessionId }));
+  }
+  document.getElementById("collision-badge")?.classList.add("hidden");
   
   agentInput.value = drafts[sessionId] || "";
   agentInput.dispatchEvent(new Event("input"));
 
   conversationEmail.textContent = customerEmail || "Unknown Customer";
-  conversationSession.textContent = shortId || sessionId;
-
-
+  const webSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
+  const waSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>`;
+  const igSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>`;
+  const platformsInfo = [
+    { svg: webSvg, text: "via Web Widget" },
+    { svg: waSvg, text: "via WhatsApp" },
+    { svg: igSvg, text: "via Instagram" }
+  ];
+  const hash = shortId ? shortId.split('').reduce((a, b) => {a = ((a << 5) - a) + b.charCodeAt(0); return a & a}, 0) : 0;
+  const platform = platformsInfo[Math.abs(hash) % platformsInfo.length];
+  conversationSession.innerHTML = `${platform.svg} ${platform.text}`;
   
   const resolveTimeEl = document.getElementById("resolve-time");
   if (isResolved) {
@@ -699,17 +763,30 @@ function updatePinnedMessageUI(pinnedMessages) {
     displayContent = displayContent.replace(/\[INTERNAL_IMAGE_DESC\][\s\S]*?\[\/INTERNAL_IMAGE_DESC\]/g, '');
     const isInternal = msg.sender === 'agent_internal' || displayContent.includes("INTERNAL NOTE");
     if (isInternal) displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
+    displayContent = displayContent.replace(/!\[.*?\]\(.*?\)/g, '[Image] '); // strip images
+    displayContent = displayContent.replace(/\[(.*?)\]\(.*?\)/g, '$1'); // strip links
+    displayContent = displayContent.replace(/[*_~`#>]/g, ''); // strip basic markdown
+    displayContent = displayContent.replace(/<[^>]*>?/gm, '').trim().replace(/\s+/g, ' ');
+    
+    let senderName = msg.author_username;
+    if (!senderName) {
+      if (msg.sender === "customer" || msg.sender === "human") {
+        senderName = document.getElementById("conversation-email").textContent || "Customer";
+      } else {
+        senderName = "You";
+      }
+    }
     
     html += `
       <div class="pinned-message ${isInternal ? 'pinned-message--internal' : ''}" data-id="${msg.id}" onclick="if (event.target.closest('.unpin-btn')) return; const el = document.querySelector('.msg-content[data-msg-id=\\'${msg.id}\\']'); if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});">
-        <div class="pinned-message-content">
-          <div class="pinned-message-header">
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
-            ${isInternal ? '<span class="pinned-badge">Internal Note</span>' : 'Pinned Message'}
+        <div class="pinned-message-content" style="display:flex; flex-direction:row; align-items:center; gap:8px; overflow:hidden;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+          <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            <strong style="margin-right: 4px; font-weight:600;">${escapeHtml(senderName)}:</strong>
+            <span class="pinned-message-text" style="display:inline; color: inherit; white-space:nowrap;">${escapeHtml(displayContent)}</span>
           </div>
-          <div class="pinned-message-text">${escapeHtml(displayContent)}</div>
         </div>
-        <button class="unpin-btn" data-id="${msg.id}" title="Unpin">
+        <button class="unpin-btn" data-id="${msg.id}" title="Unpin" style="flex-shrink:0;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
@@ -1098,12 +1175,17 @@ document.addEventListener("click", async (e) => {
 
 // --- Sending a reply ---
 // ── Feature 3: Slash Commands & Feature 7: Mentions Autocomplete ──
-const MACROS = [
-  { cmd: "/refund", desc: "Refund policy template", text: "Hi there! I can help you with your refund. According to our policy, we can process a full refund within 30 days of purchase. Would you like me to proceed with that?" },
-  { cmd: "/greeting", desc: "Standard welcome message", text: "Hello! Thank you for reaching out to Wrennon Support. How can I assist you today?" },
-  { cmd: "/delay", desc: "Apology for delay", text: "I sincerely apologize for the delay in my response. I'm looking into this for you right now." },
-  { cmd: "/escalate", desc: "Escalate to manager", text: "I understand your frustration. I am escalating this issue to my manager immediately, and they will reach out to you within the hour." }
-];
+let MACROS = [];
+async function loadMacros() {
+  try {
+    const data = await authedFetch("/agent/canned-responses");
+    if (data && Array.isArray(data)) {
+      MACROS = data.map(c => ({ cmd: c.shortcut, desc: c.title, text: c.body }));
+    }
+  } catch(e) {
+    console.error("Failed to load macros", e);
+  }
+}
 
 const AGENTS = [];
 const AGENT_DIRECTORY = []; // [{username, full_name, role}] — same fetch, reused by the assignee dropdown
@@ -1349,16 +1431,47 @@ if (agentVoiceBtn) {
 }
 
 const noteTypeSelect = document.getElementById("note-type-select");
-if (noteTypeSelect) {
+const chatInputWrapper = document.getElementById("chat-input-wrapper");
+const sendToggleBtn = document.getElementById("agent-send-toggle");
+const sendTypeMenu = document.getElementById("send-type-menu");
+const sendTypeOptions = document.querySelectorAll(".send-type-option");
+
+if (sendToggleBtn && sendTypeMenu) {
+  sendToggleBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    sendTypeMenu.classList.toggle("hidden");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!sendTypeMenu.contains(e.target) && !sendToggleBtn.contains(e.target)) {
+      sendTypeMenu.classList.add("hidden");
+    }
+  });
+
+  sendTypeOptions.forEach(option => {
+    option.addEventListener("click", () => {
+      const type = option.getAttribute("data-type");
+      noteTypeSelect.value = type;
+      noteTypeSelect.dispatchEvent(new Event("change"));
+      sendTypeMenu.classList.add("hidden");
+      
+      // Update checkmarks
+      sendTypeOptions.forEach(opt => opt.querySelector(".check-icon").classList.add("hidden"));
+      option.querySelector(".check-icon").classList.remove("hidden");
+    });
+  });
+}
+
+if (noteTypeSelect && chatInputWrapper) {
   noteTypeSelect.addEventListener("change", () => {
     if (noteTypeSelect.value === "internal") {
-      agentInput.style.backgroundColor = "color-mix(in srgb, var(--accent) 10%, transparent)";
-      agentInput.style.borderColor = "var(--accent)";
+      chatInputWrapper.classList.add("internal-mode");
       agentInput.placeholder = "Type internal note... (Use @ to tag, / for cmds)";
+      document.getElementById("agent-send-btn").textContent = "Add Note";
     } else {
-      agentInput.style.backgroundColor = "var(--bg-base)";
-      agentInput.style.borderColor = "var(--line)";
-      agentInput.placeholder = "Type a reply";
+      chatInputWrapper.classList.remove("internal-mode");
+      agentInput.placeholder = "Type a message...";
+      document.getElementById("agent-send-btn").textContent = "Send";
     }
     agentInput.focus();
   });
@@ -1370,6 +1483,17 @@ document.addEventListener("keydown", (e) => {
     if (noteTypeSelect) {
       noteTypeSelect.value = noteTypeSelect.value === "internal" ? "public" : "internal";
       noteTypeSelect.dispatchEvent(new Event("change"));
+      
+      // Update checkmarks visually for shortcut
+      if (sendTypeOptions) {
+        sendTypeOptions.forEach(opt => {
+          if (opt.getAttribute("data-type") === noteTypeSelect.value) {
+            opt.querySelector(".check-icon").classList.remove("hidden");
+          } else {
+            opt.querySelector(".check-icon").classList.add("hidden");
+          }
+        });
+      }
     }
   }
 });
@@ -1500,6 +1624,9 @@ async function fetchOrderContext(sessionId) {
     
     if (result.customer) {
       showCustomerSidebar(result.customer);
+      if (sessionId === activeSessionId && result.customer.name) {
+        conversationEmail.textContent = result.customer.name;
+      }
     } else {
       clearCustomerSidebar();
     }
@@ -1985,41 +2112,85 @@ function showCustomerSidebar(customer) {
   
   const initials = customer.name.split(" ").map(n => n[0]).join("").toUpperCase();
   
+  const interactions = [
+    { action: 'Conversation with Alex Smith', time: 'Active now', status: 'O', highlight: true },
+    { action: 'Ordered #12965', time: 'Aug 08, 9:05 AM', status: 'empty' },
+    { action: 'Change email address', time: 'Jan 21, 9:43 AM', status: 'P' },
+    { action: 'Article viewed', time: 'Jan 21, 9:14 AM', status: 'empty' },
+    { action: 'Article viewed', time: 'Jan 21, 9:38 AM', status: 'empty' },
+    { action: 'Receipt for order #2232534', time: 'Jan 05, 3:24 PM', status: 'S' }
+  ];
+
+  const getStatusIcon = (status) => {
+    if (status === 'O') return `<div class="status-icon bg-red">O</div>`;
+    if (status === 'P') return `<div class="status-icon bg-blue">P</div>`;
+    if (status === 'S') return `<div class="status-icon bg-gray">S</div>`;
+    return `<div class="status-icon border-only"></div>`;
+  };
+
   content.innerHTML = `
-    <div class="customer-profile">
-      <div class="customer-profile__avatar">${initials}</div>
-      <div class="customer-profile__name">${escapeHtml(customer.name)}</div>
-      <div class="customer-profile__id">${escapeHtml(customer.id)}</div>
-      <div class="customer-tags">
-        ${customer.tags.map(tag => `<span class="customer-tag">${escapeHtml(tag)}</span>`).join("")}
+    <div class="customer-profile-compact">
+      <div class="customer-profile__avatar-small">
+        <img src="https://i.pravatar.cc/150?u=${encodeURIComponent(customer.email || customer.id)}" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">
+      </div>
+      <div class="customer-profile-info">
+        <div class="customer-profile__name">${escapeHtml(customer.name)} <span class="customer-profile__id" style="font-size:11px; color:var(--text-muted); font-weight:normal; margin-left:6px;">#${customer.id.substring(0,6).toUpperCase()}</span></div>
+        <div class="customer-profile-actions">
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </div>
       </div>
     </div>
     
-    <div class="customer-section">
-      <div class="customer-section__title">Contact Info</div>
-      <div class="customer-info-row">
-        <span class="label">Email</span>
-        <span class="value">${escapeHtml(customer.email)}</span>
+    <div class="customer-contact-list">
+      <div class="contact-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+        <span class="value link">${escapeHtml(customer.email)}</span>
       </div>
-      <div class="customer-info-row">
-        <span class="label">Phone</span>
-        <span class="value">${escapeHtml(customer.phone)}</span>
+      <div class="contact-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+        <span class="value">+1 (415) 123-2399</span>
+      </div>
+      <div class="contact-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        <span class="value">United States</span>
+      </div>
+      <div class="contact-item tags">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+        <div class="customer-tags-inline">
+          <span class="customer-tag">premium</span>
+          <span class="customer-tag">priority shopping</span>
+        </div>
+      </div>
+      <div class="contact-item note" style="align-items: flex-start; margin-top: 12px;">
+        <svg style="margin-top: 10px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        <textarea class="note-textarea" placeholder="Add user notes"></textarea>
       </div>
     </div>
-    
-    <div class="customer-section">
-      <div class="customer-section__title">Account Summary</div>
-      <div class="customer-info-row">
-        <span class="label">Tier</span>
-        <span class="value">${escapeHtml(customer.loyalty_tier)}</span>
+
+    <div class="customer-section interactions-section">
+      <div class="interactions-header">
+        <div class="customer-section__title">Interactions</div>
+        <div class="interactions-actions">
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </div>
       </div>
-      <div class="customer-info-row">
-        <span class="label">LTV</span>
-        <span class="value">${escapeHtml(customer.lifetime_value)}</span>
-      </div>
-      <div class="customer-info-row">
-        <span class="label">Last Order</span>
-        <span class="value" style="color: var(--accent); cursor: pointer; text-decoration: underline;">${escapeHtml(customer.recent_order)}</span>
+      <div class="interactions-timeline-compact">
+        ${interactions.map((item, index) => `
+          <div class="timeline-item-compact ${item.highlight ? 'highlight' : ''}">
+            <div class="timeline-status-col">
+               ${getStatusIcon(item.status)}
+               ${index < interactions.length - 1 ? '<div class="timeline-line"></div>' : ''}
+            </div>
+            <div class="timeline-content">
+              <div class="timeline-action">${escapeHtml(item.action)}</div>
+              <div class="timeline-time">${escapeHtml(item.time)}</div>
+            </div>
+          </div>
+        `).join('')}
       </div>
     </div>
   `;
@@ -2148,6 +2319,7 @@ function resetTicketPropertiesBar() {
   renderTagChips([]);
   document.getElementById("priority-dropdown")?.classList.add("hidden");
   document.getElementById("assignee-dropdown")?.classList.add("hidden");
+  renderCsatBadge(null, null);
 }
 
 async function loadTicketProperties(sessionId) {
@@ -2162,6 +2334,21 @@ async function loadTicketProperties(sessionId) {
   renderAssigneeDropdown();
   renderAssigneeBadge(currentTicketProperties.assigned_agent);
   renderTagChips(currentTicketProperties.tags);
+  renderCsatBadge(result.csat_rating, result.csat_comment);
+}
+
+function renderCsatBadge(rating, comment) {
+  const badge = document.getElementById("csat-badge");
+  if (!badge) return;
+  if (!rating) {
+    badge.classList.add("hidden");
+    badge.textContent = "";
+    badge.removeAttribute("title");
+    return;
+  }
+  badge.classList.remove("hidden");
+  badge.textContent = "★".repeat(rating) + "☆".repeat(5 - rating);
+  badge.title = comment ? `CSAT: ${rating}/5 — "${comment}"` : `CSAT: ${rating}/5`;
 }
 
 async function saveTicketProperty(fields) {
@@ -2299,3 +2486,202 @@ document.addEventListener("contextmenu", (e) => {
 
 
 
+
+
+// --- Filters and Saved Views ---
+const savedViews = JSON.parse(localStorage.getItem("wrennon_saved_views") || "[]");
+function renderSavedViews() {
+  const container = document.getElementById("saved-views-container");
+  if (!container) return;
+  container.innerHTML = "";
+  if (savedViews.length > 0) {
+     container.style.display = "flex";
+     savedViews.forEach((view, idx) => {
+        const btn = document.createElement("button");
+        btn.className = "badge";
+        btn.style.cursor = "pointer";
+        btn.style.background = "var(--bg-hover)";
+        btn.style.border = "1px solid var(--border-light)";
+        btn.style.color = "var(--ink)";
+        btn.textContent = view.name;
+        btn.onclick = () => {
+           document.getElementById("filter-priority").value = view.priority || "";
+           document.getElementById("filter-assignee").value = view.assignee || "";
+           document.getElementById("filter-tag").value = view.tag || "";
+           loadConversations();
+           document.getElementById("clear-filters-btn").style.display = "inline-block";
+        };
+        const delBtn = document.createElement("span");
+        delBtn.innerHTML = "&times;";
+        delBtn.style.marginLeft = "4px";
+        delBtn.style.fontWeight = "bold";
+        delBtn.onclick = (e) => {
+           e.stopPropagation();
+           savedViews.splice(idx, 1);
+           localStorage.setItem("wrennon_saved_views", JSON.stringify(savedViews));
+           renderSavedViews();
+        };
+        btn.appendChild(delBtn);
+        container.appendChild(btn);
+     });
+  } else {
+     container.style.display = "none";
+  }
+}
+document.getElementById("save-view-btn")?.addEventListener("click", () => {
+  const pri = document.getElementById("filter-priority").value;
+  const ass = document.getElementById("filter-assignee").value;
+  const tag = document.getElementById("filter-tag").value;
+  if (!pri && !ass && !tag) return alert("Nothing to save");
+  const name = prompt("Name for this view?");
+  if (name) {
+    savedViews.push({ name, priority: pri, assignee: ass, tag: tag });
+    localStorage.setItem("wrennon_saved_views", JSON.stringify(savedViews));
+    renderSavedViews();
+  }
+});
+
+const globalFilterBtn = document.getElementById("global-filter-btn");
+const globalFilterDropdown = document.getElementById("global-filter-dropdown");
+if (globalFilterBtn && globalFilterDropdown) {
+  globalFilterBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    globalFilterDropdown.classList.toggle("hidden");
+  });
+  document.addEventListener("click", (e) => {
+    if (!globalFilterDropdown.contains(e.target) && !globalFilterBtn.contains(e.target)) {
+      globalFilterDropdown.classList.add("hidden");
+    }
+  });
+}
+
+const globalBulkSelectBtn = document.getElementById("global-bulk-select-btn");
+if (globalBulkSelectBtn) {
+  globalBulkSelectBtn.addEventListener("click", () => {
+    const sidebar = document.getElementById("sidebar");
+    const isActive = sidebar.classList.toggle("bulk-mode-active");
+    globalBulkSelectBtn.classList.toggle("active", isActive);
+    if (!isActive) {
+      document.querySelectorAll(".conv-checkbox").forEach(cb => cb.checked = false);
+      selectedConversations.clear();
+      updateBulkActionBar();
+    }
+  });
+}
+
+document.getElementById("apply-filters-btn")?.addEventListener("click", () => {
+  document.getElementById("clear-filters-btn").style.display = "inline-block";
+  loadConversations();
+});
+document.getElementById("clear-filters-btn")?.addEventListener("click", () => {
+  document.getElementById("filter-priority").value = "";
+  document.getElementById("filter-assignee").value = "";
+  document.getElementById("filter-tag").value = "";
+  document.getElementById("clear-filters-btn").style.display = "none";
+  loadConversations();
+});
+renderSavedViews();
+
+// --- Bulk Actions ---
+const selectedConversations = new Set();
+function toggleBulkSelection(cb, sessionId) {
+    if (cb.checked) {
+        selectedConversations.add(sessionId);
+    } else {
+        selectedConversations.delete(sessionId);
+    }
+    updateBulkActionBar();
+}
+
+function updateBulkActionBar() {
+    const bar = document.getElementById("bulk-actions-bar");
+    if (!bar) return;
+    if (selectedConversations.size > 0) {
+        bar.style.display = "flex";
+        document.getElementById("bulk-selected-count").textContent = selectedConversations.size;
+    } else {
+        bar.style.display = "none";
+        document.getElementById("bulk-action-value-container").style.display = "none";
+        document.getElementById("bulk-action-select").value = "";
+    }
+}
+
+document.getElementById("bulk-cancel-btn")?.addEventListener("click", () => {
+    selectedConversations.clear();
+    document.querySelectorAll(".conv-checkbox").forEach(cb => cb.checked = false);
+    updateBulkActionBar();
+});
+
+document.getElementById("bulk-action-select")?.addEventListener("change", (e) => {
+    const val = e.target.value;
+    const valContainer = document.getElementById("bulk-action-value-container");
+    const valSelect = document.getElementById("bulk-action-value-select");
+    if (val === "assign") {
+        valContainer.style.display = "block";
+        valSelect.innerHTML = `<option value="">Unassigned</option>`;
+        const agents = document.getElementById("filter-assignee").innerHTML;
+        valSelect.innerHTML = agents;
+    } else if (val === "priority") {
+        valContainer.style.display = "block";
+        valSelect.innerHTML = `
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="normal">Normal</option>
+            <option value="low">Low</option>
+        `;
+    } else {
+        valContainer.style.display = "none";
+    }
+});
+
+document.getElementById("bulk-apply-btn")?.addEventListener("click", async () => {
+    const action = document.getElementById("bulk-action-select").value;
+    if (!action) return;
+    const val = document.getElementById("bulk-action-value-select").value;
+    
+    let updates = {};
+    if (action === "resolve") updates.resolved = true;
+    if (action === "assign") updates.handled_by = val || null;
+    if (action === "priority") updates.priority = val;
+    
+    const session_ids = Array.from(selectedConversations);
+    try {
+        const response = await fetch(`${API_BASE}/agent/conversations/bulk`, {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json", ...authHeaders },
+            body: JSON.stringify({ session_ids, updates })
+        });
+        if (response.ok) {
+            selectedConversations.clear();
+            document.querySelectorAll(".conv-checkbox").forEach(cb => cb.checked = false);
+            updateBulkActionBar();
+            loadConversations();
+            if (activeSessionId && session_ids.includes(activeSessionId)) {
+                // refresh current open conversation if it was selected
+                fetchAndRenderMessages(activeSessionId);
+            }
+        } else {
+            const err = await response.json();
+            alert("Bulk action failed: " + (err.detail || ""));
+        }
+    } catch (e) {
+        alert("Network error");
+    }
+});
+
+// populate filter-assignee when agents are loaded
+const originalLoadAgents = loadAgents;
+loadAgents = async function() {
+    await originalLoadAgents();
+    const filterAss = document.getElementById("filter-assignee");
+    if (filterAss) {
+        filterAss.innerHTML = `<option value="">Assignee: All</option><option value="unassigned">Unassigned</option>`;
+        Object.keys(AGENT_DIRECTORY).forEach(uname => {
+            const opt = document.createElement("option");
+            opt.value = uname;
+            opt.textContent = AGENT_DIRECTORY[uname].full_name;
+            filterAss.appendChild(opt);
+        });
+    }
+}

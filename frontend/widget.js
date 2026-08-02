@@ -563,6 +563,9 @@ function connectSocket() {
       } else if (data.type === "stopped_typing") {
         hideTypingIndicator();
         return;
+      } else if (data.type === "resolved") {
+        showCsatPrompt();
+        return;
       } else if (data.type === "new_message" || data.reply || data.message || data.content) {
         hideTypingIndicator();
         const sender = data.sender || "bot";
@@ -811,6 +814,52 @@ document.addEventListener("visibilitychange", () => {
     clearUnreadIndicator();
   }
 });
+
+function showCsatPrompt() {
+  const csatKey = `wrennon_csat_submitted_${SESSION_ID}`;
+  if (localStorage.getItem(csatKey)) return; // already rated this conversation
+  if (document.getElementById("wrennon-csat-card")) return; // already showing
+
+  const card = document.createElement("div");
+  card.id = "wrennon-csat-card";
+  card.className = "csat-card";
+  card.innerHTML = `
+    <div class="csat-card__question">How was your support experience?</div>
+    <div class="csat-card__stars" role="radiogroup" aria-label="Rate your experience">
+      ${[1, 2, 3, 4, 5].map(n => `<button type="button" class="csat-star" data-rating="${n}" aria-label="${n} star${n > 1 ? 's' : ''}">★</button>`).join("")}
+    </div>
+  `;
+  messagesEl.appendChild(card);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+
+  const stars = card.querySelectorAll(".csat-star");
+  stars.forEach(star => {
+    star.addEventListener("mouseenter", () => {
+      const n = Number(star.dataset.rating);
+      stars.forEach(s => s.classList.toggle("csat-star--hover", Number(s.dataset.rating) <= n));
+    });
+    star.addEventListener("mouseleave", () => {
+      stars.forEach(s => s.classList.remove("csat-star--hover"));
+    });
+    star.addEventListener("click", async () => {
+      const rating = Number(star.dataset.rating);
+      stars.forEach(s => { s.disabled = true; });
+      stars.forEach(s => s.classList.toggle("csat-star--selected", Number(s.dataset.rating) <= rating));
+      try {
+        await fetch(`${API_BASE}/chat/${SESSION_ID}/csat`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${SESSION_TOKEN}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ rating }),
+        });
+      } catch (err) {
+        console.error("Failed to submit CSAT rating:", err);
+      }
+      localStorage.setItem(csatKey, "1");
+      const question = card.querySelector(".csat-card__question");
+      if (question) question.textContent = "Thanks for your feedback!";
+    });
+  });
+}
 
 function appendMessage(role, text, save = true, timestamp = Date.now(), name = null) {
   const wasNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 100;

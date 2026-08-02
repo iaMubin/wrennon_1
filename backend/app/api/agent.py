@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Body, status, Response, Form, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Body, status, Response, Form, BackgroundTasks, Query
 from fastapi.security import OAuth2PasswordRequestForm
 import pyotp
 from app.services.qa import process_resolved_conversation_tasks
@@ -24,7 +24,7 @@ from app.config import settings
 from app.logger import logger
 import re
 from app.services.mock_apis import get_order_status, get_order_by_email, get_customer_info
-from app.db.models import Agent, Conversation, Message, AuditLog
+from app.db.models import Agent, Conversation, Message, AuditLog, CSATResponse, CannedResponse
 from app.db.session import get_db
 from app.realtime.connection_manager import manager
 from app.config import settings
@@ -196,13 +196,31 @@ def verify_2fa(
     db.commit()
     return {"status": "success"}
 
+
+def _apply_conversation_filters(q, priority: str | None, assigned_agent: str | None, tag: str | None):
+    if priority:
+        q = q.filter(Conversation.priority == priority)
+    if assigned_agent:
+        if assigned_agent.lower() == "unassigned":
+            q = q.filter(Conversation.assigned_agent == None)
+        else:
+            q = q.filter(Conversation.assigned_agent == assigned_agent)
+    if tag:
+        q = q.filter(Conversation.tags.like(f'%"{tag}"%'))
+    return q
+
 @router.get("/agent/conversations/needs-attention")
 def needs_attention(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
+    priority: str | None = None,
+    assigned_agent: str | None = None,
+    tag: str | None = None,
 ) -> list[dict]:
+    q = db.query(Conversation)
+    q = _apply_conversation_filters(q, priority, assigned_agent, tag)
     conversations = (
-        db.query(Conversation)
+        q
         .filter(Conversation.handoff_active == True, Conversation.resolved == False, Conversation.handled_by == None)
         .filter(Conversation.messages.any())
         .options(selectinload(Conversation.messages))
@@ -216,8 +234,13 @@ def needs_attention(
 def get_my_cases(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
+    priority: str | None = None,
+    assigned_agent: str | None = None,
+    tag: str | None = None,
 ):
-    convs = db.query(Conversation).options(selectinload(Conversation.messages)).outerjoin(
+    q = db.query(Conversation)
+    q = _apply_conversation_filters(q, priority, assigned_agent, tag)
+    convs = q.options(selectinload(Conversation.messages)).outerjoin(
         Message, Conversation.id == Message.conversation_id
     ).filter(
         Conversation.resolved == False,
@@ -248,9 +271,14 @@ async def list_agents(
 def active_chats(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
+    priority: str | None = None,
+    assigned_agent: str | None = None,
+    tag: str | None = None,
 ) -> list[dict]:
+    q = db.query(Conversation)
+    q = _apply_conversation_filters(q, priority, assigned_agent, tag)
     conversations = (
-        db.query(Conversation)
+        q
         .filter(Conversation.resolved == False)
         .filter(Conversation.messages.any())
         .options(selectinload(Conversation.messages))
@@ -264,9 +292,14 @@ def active_chats(
 def all_conversations(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
+    priority: str | None = None,
+    assigned_agent: str | None = None,
+    tag: str | None = None,
 ) -> list[dict]:
+    q = db.query(Conversation)
+    q = _apply_conversation_filters(q, priority, assigned_agent, tag)
     conversations = (
-        db.query(Conversation)
+        q
         .filter(Conversation.messages.any())
         .options(selectinload(Conversation.messages))
         .order_by(Conversation.updated_at.desc())
@@ -334,20 +367,8 @@ def resolve_conversation(
     conversation = db.query(Conversation).filter_by(session_id=session_id).first()
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    conversation.resolved = True
-    conversation.resolved_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
-    conversation.handoff_active = False
-    conversation.handled_by = agent.username
-    
-    audit = AuditLog(
-        actor_username=agent.username,
-        action="resolve_conversation",
-        target_username=session_id
-    )
-    db.add(audit)
+    _do_resolve_conversation(conversation, agent.username, db, background_tasks)
     db.commit()
-
-    background_tasks.add_task(process_resolved_conversation_tasks, conversation.id)
     return {"status": "resolved", "session_id": session_id}
 
 
@@ -370,46 +391,7 @@ def update_ticket_properties(
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    changes = []
-
-    if priority is not None:
-        if priority not in VALID_PRIORITIES:
-            raise HTTPException(status_code=400, detail=f"priority must be one of {sorted(VALID_PRIORITIES)}")
-        if conversation.priority != priority:
-            changes.append(f"priority: {conversation.priority} -> {priority}")
-        conversation.priority = priority
-
-    if tags is not None:
-        # Normalize: strip, drop empties, dedupe, cap length so one agent
-        # fat-fingering a paste can't blow up the column.
-        clean_tags = []
-        for t in tags:
-            t = t.strip()[:40]
-            if t and t not in clean_tags:
-                clean_tags.append(t)
-        clean_tags = clean_tags[:20]
-        conversation.tags = json.dumps(clean_tags)
-        changes.append(f"tags: {clean_tags}")
-
-    if assigned_agent is not None:
-        # Empty string means "unassign".
-        new_assignee = assigned_agent.strip() or None
-        if new_assignee is not None:
-            exists = db.query(Agent).filter_by(username=new_assignee).first()
-            if not exists:
-                raise HTTPException(status_code=400, detail=f"No agent with username '{new_assignee}'")
-        if conversation.assigned_agent != new_assignee:
-            changes.append(f"assigned_agent: {conversation.assigned_agent} -> {new_assignee}")
-        conversation.assigned_agent = new_assignee
-
-    if changes:
-        audit = AuditLog(
-            actor_username=agent.username,
-            action="update_ticket_properties",
-            target_username=session_id,
-            details="; ".join(changes),
-        )
-        db.add(audit)
+    _do_update_ticket_properties(conversation, agent.username, db, priority, tags, assigned_agent)
 
     db.commit()
     db.refresh(conversation)
@@ -601,6 +583,193 @@ def get_order_context(
 
 
 
+
+def _do_resolve_conversation(conversation: Conversation, agent_username: str, db: Session, background_tasks: BackgroundTasks):
+    if not conversation.resolved:
+        conversation.resolved = True
+        conversation.resolved_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+        conversation.handoff_active = False
+        conversation.handled_by = agent_username
+        
+        audit = AuditLog(
+            actor_username=agent_username,
+            action="resolve_conversation",
+            target_username=conversation.session_id
+        )
+        db.add(audit)
+        background_tasks.add_task(process_resolved_conversation_tasks, conversation.id)
+        background_tasks.add_task(manager.send_to_customer, conversation.session_id, {"type": "resolved"})
+
+def _do_update_ticket_properties(conversation: Conversation, agent_username: str, db: Session, priority: str | None = None, tags: list[str] | None = None, assigned_agent: str | None = None) -> list[str]:
+    changes = []
+    if priority is not None:
+        if priority not in VALID_PRIORITIES:
+            raise HTTPException(status_code=400, detail=f"priority must be one of {sorted(VALID_PRIORITIES)}")
+        if conversation.priority != priority:
+            changes.append(f"priority: {conversation.priority} -> {priority}")
+        conversation.priority = priority
+
+    if tags is not None:
+        clean_tags = []
+        for t in tags:
+            t = t.strip()[:40]
+            if t and t not in clean_tags:
+                clean_tags.append(t)
+        clean_tags = clean_tags[:20]
+        conversation.tags = json.dumps(clean_tags)
+        changes.append(f"tags: {clean_tags}")
+
+    if assigned_agent is not None:
+        new_assignee = assigned_agent.strip() or None
+        if new_assignee is not None:
+            exists = db.query(Agent).filter_by(username=new_assignee).first()
+            if not exists:
+                raise HTTPException(status_code=400, detail=f"No agent with username '{new_assignee}'")
+        if conversation.assigned_agent != new_assignee:
+            changes.append(f"assigned_agent: {conversation.assigned_agent} -> {new_assignee}")
+        conversation.assigned_agent = new_assignee
+
+    if changes:
+        audit = AuditLog(
+            actor_username=agent_username,
+            action="update_ticket_properties",
+            target_username=conversation.session_id,
+            details="; ".join(changes),
+        )
+        db.add(audit)
+    return changes
+
+class BulkActionRequest(BaseModel):
+    session_ids: list[str]
+    action: str  # "resolve" | "assign" | "tag" | "priority"
+    value: str | list[str] | None = None
+
+@router.patch("/agent/conversations/bulk")
+def bulk_update_conversations(
+    payload: BulkActionRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent),
+) -> dict:
+    if not payload.session_ids:
+        return {"status": "success", "updated": 0}
+        
+    conversations = db.query(Conversation).filter(Conversation.session_id.in_(payload.session_ids)).all()
+    
+    updated_count = 0
+    for conv in conversations:
+        if payload.action == "resolve":
+            _do_resolve_conversation(conv, agent.username, db, background_tasks)
+            updated_count += 1
+        elif payload.action == "assign":
+            _do_update_ticket_properties(conv, agent.username, db, assigned_agent=payload.value)
+            updated_count += 1
+        elif payload.action == "tag":
+            if isinstance(payload.value, list):
+                _do_update_ticket_properties(conv, agent.username, db, tags=payload.value)
+                updated_count += 1
+            else:
+                _do_update_ticket_properties(conv, agent.username, db, tags=[payload.value] if payload.value else [])
+                updated_count += 1
+        elif payload.action == "priority":
+            _do_update_ticket_properties(conv, agent.username, db, priority=payload.value)
+            updated_count += 1
+            
+    db.commit()
+    return {"status": "success", "updated": updated_count}
+
+class CannedResponseCreate(BaseModel):
+    shortcut: str
+    title: str
+    body: str
+
+@router.get("/agent/canned-responses")
+def get_canned_responses(
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent)
+) -> list[dict]:
+    responses = db.query(CannedResponse).order_by(CannedResponse.shortcut).all()
+    return [{"id": r.id, "shortcut": r.shortcut, "title": r.title, "body": r.body} for r in responses]
+
+@router.post("/agent/canned-responses")
+def create_canned_response(
+    payload: CannedResponseCreate,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent)
+) -> dict:
+    if agent.role not in ["admin", "manager"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    if not payload.shortcut.startswith("/"):
+        raise HTTPException(status_code=400, detail="Shortcut must start with /")
+        
+    existing = db.query(CannedResponse).filter_by(shortcut=payload.shortcut).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Shortcut already exists")
+        
+    new_resp = CannedResponse(
+        shortcut=payload.shortcut,
+        title=payload.title,
+        body=payload.body,
+        created_by=agent.username
+    )
+    db.add(new_resp)
+    
+    audit = AuditLog(actor_username=agent.username, action="create_canned_response", target_username=payload.shortcut)
+    db.add(audit)
+    db.commit()
+    
+    return {"status": "created", "id": new_resp.id}
+
+@router.patch("/agent/canned-responses/{response_id}")
+def update_canned_response(
+    response_id: str,
+    payload: CannedResponseCreate,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent)
+) -> dict:
+    if agent.role not in ["admin", "manager"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    if not payload.shortcut.startswith("/"):
+        raise HTTPException(status_code=400, detail="Shortcut must start with /")
+        
+    resp = db.query(CannedResponse).filter_by(id=response_id).first()
+    if not resp:
+        raise HTTPException(status_code=404, detail="Not found")
+        
+    existing = db.query(CannedResponse).filter(CannedResponse.shortcut == payload.shortcut, CannedResponse.id != response_id).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Shortcut already exists")
+        
+    resp.shortcut = payload.shortcut
+    resp.title = payload.title
+    resp.body = payload.body
+    
+    audit = AuditLog(actor_username=agent.username, action="update_canned_response", target_username=payload.shortcut)
+    db.add(audit)
+    db.commit()
+    
+    return {"status": "updated"}
+
+@router.delete("/agent/canned-responses/{response_id}")
+def delete_canned_response(
+    response_id: str,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent)
+) -> dict:
+    if agent.role not in ["admin", "manager"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    resp = db.query(CannedResponse).filter_by(id=response_id).first()
+    if not resp:
+        raise HTTPException(status_code=404, detail="Not found")
+        
+    audit = AuditLog(actor_username=agent.username, action="delete_canned_response", target_username=resp.shortcut)
+    db.add(audit)
+    db.delete(resp)
+    db.commit()
+    
+    return {"status": "deleted"}
+
 def _conversation_summary(c: Conversation) -> dict:
     last_msg_obj = c.messages[-1] if c.messages else None
     last_message = last_msg_obj.content if last_msg_obj else None
@@ -612,10 +781,45 @@ def _conversation_summary(c: Conversation) -> dict:
     elif c.handoff_active:
         stage = "Human Agent"
 
+    customer_name = None
+    email_to_use = c.customer_email
+
+    if not email_to_use and c.messages:
+        # 1. Scan for explicit Order ID first
+        for msg in reversed(c.messages):
+            if msg.sender == "human":
+                order_match = re.search(r'(?:order\s*[#:]?\s*|#)(\d{4,})', msg.content, re.IGNORECASE)
+                if order_match:
+                    order = get_order_status(order_match.group(1))
+                    if order and "email" in order:
+                        email_to_use = order["email"]
+                        break
+                        
+        # 2. Check for explicit email if no order found
+        if not email_to_use:
+            for msg in reversed(c.messages):
+                if msg.sender == "human":
+                    email_match = re.search(r'[\w.+-]+@[\w-]+\.[\w.]+', msg.content)
+                    if email_match:
+                        email_to_use = email_match.group(0)
+                        break
+
+        # 3. Check for last_order_id stored on the conversation state
+        if not email_to_use and c.last_order_id:
+            order = get_order_status(c.last_order_id)
+            if order and "email" in order:
+                email_to_use = order["email"]
+
+    if email_to_use:
+        cust = get_customer_info(email=email_to_use)
+        if cust:
+            customer_name = cust.get("name")
+
     return {
         "session_id": c.session_id,
         "short_id": getattr(c, "short_id", "CUST-XXXX"),
-        "customer_email": c.customer_email,
+        "customer_email": email_to_use,
+        "customer_name": customer_name,
         "handoff_active": c.handoff_active,
         "resolved": c.resolved,
         "reopen_count": getattr(c, "reopen_count", 0),
@@ -629,6 +833,8 @@ def _conversation_summary(c: Conversation) -> dict:
         "priority": getattr(c, "priority", None) or "normal",
         "tags": _safe_json_list(getattr(c, "tags", None)),
         "assigned_agent": getattr(c, "assigned_agent", None),
+        "csat_rating": c.csat_response.rating if c.csat_response else None,
+        "csat_comment": c.csat_response.comment if c.csat_response else None,
     }
 
 

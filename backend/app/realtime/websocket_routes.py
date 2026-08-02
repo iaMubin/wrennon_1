@@ -872,6 +872,14 @@ async def agent_websocket(websocket: WebSocket, access_token: str | None = Cooki
                 if session_id:
                     await manager.send_to_customer(session_id, {"type": data["type"]})
                 continue
+
+            if data.get("type") == "view_conversation":
+                await manager.set_viewing(websocket, session_id)
+                continue
+
+            if data.get("type") == "leave_conversation":
+                await manager.set_viewing(websocket, None)
+                continue
                 
             reply_text = data.get("message")
             is_internal = data.get("is_internal", False)

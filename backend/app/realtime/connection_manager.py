@@ -35,6 +35,12 @@ class ConnectionManager:
         self._customer_tasks: dict[str, asyncio.Task] = {}
         self._customer_debounce_tasks: dict[str, asyncio.Task] = {}
         self._agent_task: asyncio.Task | None = None
+        # Collision detection: which agents currently have which
+        # conversation open. One entry per connection (a websocket can
+        # only be "viewing" one conversation at a time) so switching or
+        # disconnecting cleanly removes exactly one entry.
+        self._viewing: dict[WebSocket, str] = {}  # websocket -> session_id
+        self._viewers_by_session: dict[str, dict[WebSocket, str]] = {}  # session_id -> {websocket: username}
 
     # --- Customer side ---
 
@@ -140,8 +146,45 @@ class ConnectionManager:
             try:
                 loop = asyncio.get_running_loop()
                 loop.create_task(self.broadcast_presence())
+                loop.create_task(self.set_viewing(websocket, None))
             except RuntimeError:
                 pass
+
+    async def set_viewing(self, websocket: WebSocket, session_id: str | None) -> None:
+        """Records that this agent connection is now viewing `session_id`
+        (or no conversation, if None) and broadcasts the updated viewer
+        list for any session that changed — this is what powers collision
+        detection ("2 agents viewing/replying to the same ticket")."""
+        username = self._agent_connections.get(websocket)
+        old_session_id = self._viewing.get(websocket)
+
+        if old_session_id == session_id:
+            return  # no-op, nothing changed
+
+        changed_sessions = set()
+
+        if old_session_id is not None:
+            viewers = self._viewers_by_session.get(old_session_id)
+            if viewers is not None:
+                viewers.pop(websocket, None)
+                if not viewers:
+                    self._viewers_by_session.pop(old_session_id, None)
+                changed_sessions.add(old_session_id)
+
+        if session_id is not None:
+            self._viewing[websocket] = session_id
+            self._viewers_by_session.setdefault(session_id, {})[websocket] = username or "unknown"
+            changed_sessions.add(session_id)
+        else:
+            self._viewing.pop(websocket, None)
+
+        for sid in changed_sessions:
+            viewer_usernames = list(set(self._viewers_by_session.get(sid, {}).values()))
+            await self.broadcast_to_agents({
+                "type": "viewers_update",
+                "session_id": sid,
+                "viewers": viewer_usernames,
+            })
 
     async def broadcast_presence(self) -> None:
         # Get unique list of currently connected usernames across this worker

@@ -7,8 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/agent/theme.css?v=58">
-<link rel="stylesheet" href="/agent/agent.css?v=58">
+<link rel="stylesheet" href="/agent/theme.css?v=62">
+<link rel="stylesheet" href="/agent/agent.css?v=62">
 <script>
   (function() {
     function applyTheme(theme) {
@@ -176,7 +176,58 @@
         <button class="tab" data-section="all">All history</button>
       </nav>
 
+      <div id="filter-bar" style="padding: 12px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--line);">
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <select id="filter-priority" style="flex: 1; padding: 4px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--ink);">
+            <option value="">Priority: All</option>
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="normal">Normal</option>
+            <option value="low">Low</option>
+          </select>
+          <select id="filter-assignee" style="flex: 1; padding: 4px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--ink);">
+            <option value="">Assignee: All</option>
+            <option value="unassigned">Unassigned</option>
+            <!-- Agents will be populated by JS -->
+          </select>
+          <input type="text" id="filter-tag" placeholder="Tag..." style="flex: 1; padding: 4px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--ink);">
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; gap: 4px;">
+            <button id="apply-filters-btn" class="btn btn-sm" style="padding: 4px 8px; font-size: 11px;">Apply</button>
+            <button id="clear-filters-btn" class="btn btn-sm btn-secondary" style="padding: 4px 8px; font-size: 11px; display: none;">Clear</button>
+          </div>
+          <button id="save-view-btn" class="btn btn-sm btn-secondary" style="padding: 4px 8px; font-size: 11px;">Save View</button>
+        </div>
+        <div id="saved-views-container" style="display: none; gap: 4px; flex-wrap: wrap; margin-top: 4px;">
+          <!-- Saved views populated by JS -->
+        </div>
+      </div>
+
       <div id="conversation-list"></div>
+      
+      <!-- Bulk Actions Bar -->
+      <div id="bulk-actions-bar" style="display: none; position: absolute; bottom: 16px; left: 16px; right: 16px; background: var(--bg-surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; box-shadow: var(--shadow-lg); z-index: 100; flex-direction: column; gap: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 13px; font-weight: 600; color: var(--ink);"><span id="bulk-selected-count">0</span> selected</span>
+          <button id="bulk-cancel-btn" style="background: none; border: none; cursor: pointer; color: var(--ink-soft); display: flex; align-items: center; justify-content: center; padding: 0;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <select id="bulk-action-select" style="flex: 1; padding: 6px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--ink);">
+            <option value="">Select Action...</option>
+            <option value="resolve">Mark Resolved</option>
+            <option value="assign">Assign To...</option>
+            <option value="priority">Set Priority...</option>
+          </select>
+          <button id="bulk-apply-btn" class="btn btn-sm btn-primary">Apply</button>
+        </div>
+        <div id="bulk-action-value-container" style="display: none; margin-top: 4px;">
+            <select id="bulk-action-value-select" style="width: 100%; padding: 6px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--ink);">
+            </select>
+        </div>
+      </div>
     </aside>
 
     <div id="resizer"></div>
@@ -191,6 +242,7 @@
           <div class="conv-header-info">
             <h2 id="conversation-email">Unknown Customer</h2>
             <span id="conversation-session" class="short-id">CUST-XXXX</span>
+            <span id="collision-badge" class="collision-badge hidden"></span>
           </div>
           <div class="conv-header-actions" style="flex-direction: row; align-items: center; gap: 12px; position: relative;">
             <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; position:relative;">
@@ -241,6 +293,8 @@
             </button>
             <input id="tag-input" class="tag-input hidden" placeholder="Add tag, Enter to confirm" maxlength="40" />
           </div>
+
+          <span id="csat-badge" class="csat-badge hidden"></span>
         </div>
 
         <div style="display: flex; flex: 1; overflow: hidden; background: var(--bg-base);">
@@ -289,7 +343,7 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
                 </button>
 
-                <textarea id="agent-message-input" placeholder="Type a reply" style="resize: vertical; min-height: 44px; height: 44px; font-family: inherit; line-height: 24px; box-sizing: border-box; overflow-y: hidden;" rows="1"></textarea>
+                <textarea id="agent-message-input" placeholder="Type a reply" style="resize: none; min-height: 44px; height: 44px; font-family: inherit; line-height: 24px; box-sizing: border-box; overflow-y: hidden;" rows="1"></textarea>
                 <select id="note-type-select">
                   <option value="public">Reply</option>
                   <option value="internal">Internal Note</option>
@@ -317,7 +371,7 @@
 
   </div>
 
-  <script src="/agent/agent.js?v=58"></script>
+  <script src="/agent/agent.js?v=61"></script>
 </body>
 </html>
 

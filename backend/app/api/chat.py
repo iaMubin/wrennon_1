@@ -8,13 +8,13 @@ WebSocket connection takes over for everything that happens next.
 import datetime
 import uuid
 
-from fastapi import APIRouter, Depends, Request, Header, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, Request, Header, HTTPException, status, UploadFile, File, Body
 from sqlalchemy.orm import Session
 import shutil
 import os
 import re
 
-from app.db.models import Conversation
+from app.db.models import Conversation, CSATResponse
 from app.db.session import get_db
 from app.limiter import limiter
 from app.auth.security import create_session_token, decode_session_token, decode_access_token
@@ -193,3 +193,37 @@ async def upload_file(
         
     file_url = f"{request.base_url}uploads/{safe_filename}"
     return {"url": file_url, "filename": safe_filename, "type": file.content_type}
+
+
+@router.post("/chat/{session_id}/csat")
+@limiter.limit("10/minute")
+def submit_csat(
+    request: Request,
+    session_id: str,
+    rating: int = Body(..., embed=True),
+    comment: str | None = Body(None, embed=True),
+    db: Session = Depends(get_db),
+    _=Depends(verify_session_token),
+) -> dict:
+    """Customer-submitted satisfaction rating after a conversation is
+    resolved. One per conversation — resubmitting overwrites rather than
+    creating duplicates, since a customer double-tapping a star button
+    shouldn't be treated as two separate data points."""
+    if rating < 1 or rating > 5:
+        raise HTTPException(status_code=400, detail="rating must be between 1 and 5")
+
+    conversation = db.query(Conversation).filter_by(session_id=session_id).first()
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    comment = (comment or "").strip()[:1000] or None
+
+    existing = db.query(CSATResponse).filter_by(conversation_id=conversation.id).first()
+    if existing:
+        existing.rating = rating
+        existing.comment = comment
+    else:
+        db.add(CSATResponse(conversation_id=conversation.id, rating=rating, comment=comment))
+
+    db.commit()
+    return {"status": "success"}

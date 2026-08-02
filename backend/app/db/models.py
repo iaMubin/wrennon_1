@@ -89,6 +89,7 @@ class Conversation(Base):
     messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation", order_by="Message.created_at"
     )
+    csat_response: Mapped["CSATResponse | None"] = relationship(viewonly=True, uselist=False)
 
 
 class Message(Base):
@@ -184,6 +185,22 @@ class AnalyticsScorecard(Base):
     )
 
 
+class CSATResponse(Base):
+    __tablename__ = "csat_responses"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
+    # unique: one real customer rating per conversation — this is the actual
+    # submitted score, distinct from AnalyticsScorecard.csat_prediction
+    # (an internal AI guess used for QA before the customer ever responds).
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id"), unique=True)
+    rating: Mapped[int] = mapped_column(Integer)  # 1-5
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    )
+
+
 class SystemSetting(Base):
     __tablename__ = "system_settings"
 
@@ -191,6 +208,22 @@ class SystemSetting(Base):
     key: Mapped[str] = mapped_column(String, unique=True, index=True)
     value: Mapped[str] = mapped_column(Text)
 
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    )
+
+class CannedResponse(Base):
+    __tablename__ = "canned_responses"
+    
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
+    shortcut: Mapped[str] = mapped_column(String, unique=True)  # e.g., "/refund"
+    title: Mapped[str] = mapped_column(String)                  # Dropdown description
+    body: Mapped[str] = mapped_column(Text)                     # Actual text inserted
+    created_by: Mapped[str] = mapped_column(String)             # Username of the creator
+    
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    )
     updated_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
     )

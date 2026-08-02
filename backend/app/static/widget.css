@@ -266,8 +266,8 @@ body {
   font-family: ui-monospace, monospace;
 }
 
-#input-row { display: flex; gap: 8px; padding: 16px 20px; border-top: 1px solid var(--line); background: var(--paper); align-items: center; }
-#message-input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 24px; padding: 12px 18px; font-size: 14px; font-family: inherit; background: var(--paper); color: var(--ink); outline: none; transition: var(--transition); box-shadow: inset 0 1px 2px rgba(0,0,0,0.02); }
+#input-row { display: flex; gap: 8px; padding: 16px 20px; border-top: 1px solid var(--line); background: var(--paper); align-items: flex-start; }
+#message-input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 24px; padding: 12px 18px; font-size: 14px; font-family: inherit; background: var(--paper); color: var(--ink); outline: none; transition: border-color 0.3s, box-shadow 0.3s; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02); }
 #message-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-subtle), inset 0 1px 2px rgba(0,0,0,0.02); }
 #message-input::placeholder { color: var(--ink-soft); font-weight: 400; }
 
@@ -607,3 +607,44 @@ body {
 }
 
 
+
+/* --- CSAT prompt (shown after an agent/AI resolves the conversation) --- */
+.csat-card {
+  align-self: center;
+  max-width: 260px;
+  width: 100%;
+  margin: 12px auto;
+  padding: 14px 16px;
+  background: var(--bg-surface, var(--paper));
+  border: 1px solid var(--line, rgba(0,0,0,0.1));
+  border-radius: 14px;
+  text-align: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+}
+.csat-card__question {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink, #222);
+  margin-bottom: 10px;
+}
+.csat-card__stars {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+.csat-star {
+  background: none;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--line, #d0d0d0);
+  transition: color 0.15s ease, transform 0.1s ease;
+}
+.csat-star:hover { transform: scale(1.12); }
+.csat-star--hover,
+.csat-star--selected {
+  color: #f5b400;
+}
+.csat-star:disabled { cursor: default; }
