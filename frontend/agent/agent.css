@@ -982,6 +982,7 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   animation: slideUpFade 0.25s var(--ease-out-expo) forwards;
   overflow: hidden;
   box-shadow: var(--shadow-lg);
+  width: 520px;
 }
 .order-popup.hidden { display: none; }
 .order-popup__header {
@@ -1001,21 +1002,22 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
 .order-popup__title { color: var(--accent); }
 .order-popup__body {
   display: flex;
-  flex-direction: column;
   font-size: var(--fs-sm);
   align-items: stretch;
 }
 .order-popup__details-col {
+  flex: 1.2;
   padding: 16px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px 20px;
 }
 .order-popup__timeline-col {
+  flex: 1;
   padding: 16px;
-  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
   background: var(--bg-base);
-  max-height: 160px;
+  max-height: 200px;
   overflow-y: auto;
 }
 .order-timeline-item {
