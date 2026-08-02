@@ -982,7 +982,7 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   animation: slideUpFade 0.25s var(--ease-out-expo) forwards;
   overflow: hidden;
   box-shadow: var(--shadow-lg);
-  width: 520px;
+  width: max-content;
 }
 .order-popup.hidden { display: none; }
 .order-popup__header {
@@ -1006,14 +1006,16 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   align-items: stretch;
 }
 .order-popup__details-col {
-  flex: 1.2;
+  width: 320px;
+  flex-shrink: 0;
   padding: 16px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px 20px;
 }
 .order-popup__timeline-col {
-  flex: 1;
+  width: 220px;
+  flex-shrink: 0;
   padding: 16px;
   border-left: 1px solid var(--line);
   background: var(--bg-base);
