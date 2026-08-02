@@ -20,8 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     conn = op.get_bind()
-    from sqlalchemy.engine.reflection import Inspector
-    inspector = Inspector.from_engine(conn)
+    inspector = sa.inspect(conn)
     """Upgrade schema."""
     conn = op.get_bind()
     inspector = sa.inspect(conn)

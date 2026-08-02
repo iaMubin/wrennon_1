@@ -57,7 +57,13 @@ def _save_message(db: Session, conversation_id: str, sender: str, content: str, 
     # Update the conversation's updated_at so sorting works
     conversation = db.query(Conversation).filter_by(id=conversation_id).first()
     if conversation:
-        conversation.updated_at = datetime.datetime.utcnow()
+        # datetime.utcnow() is deprecated (returns a naive datetime
+        # in a way that's easy to misuse with tz-aware code elsewhere).
+        # now(timezone.utc).replace(tzinfo=None) produces the identical
+        # naive-UTC value the 'updated_at' column expects (see models.py,
+        # which already uses this exact pattern), just via the
+        # non-deprecated API.
+        conversation.updated_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
     db.commit()
     return message
 
@@ -223,7 +229,7 @@ def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None, m
             })
         elif updated_state and updated_state.get("conversation_mode") == "resolved":
             conversation.resolved = True
-            conversation.resolved_at = datetime.datetime.utcnow()
+            conversation.resolved_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
             conversation.handoff_active = False
             conversation.handled_by = None
             

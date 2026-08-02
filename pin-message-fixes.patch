@@ -1,0 +1,667 @@
+diff --git a/backend/alembic/versions/9b1c7e4a2f08_drop_pinned_message_id.py b/backend/alembic/versions/9b1c7e4a2f08_drop_pinned_message_id.py
+new file mode 100644
+index 0000000..3f1948d
+--- /dev/null
++++ b/backend/alembic/versions/9b1c7e4a2f08_drop_pinned_message_id.py
+@@ -0,0 +1,36 @@
++"""Drop dead pinned_message_id column from Conversation
++
++pinned_message_id was an earlier single-pin-per-conversation design that
++was superseded by Message.is_pinned (per-message, multiple pins) in
++f3b12c285d84. It was left behind, unused by any application code —
++this migration removes it so the schema has one source of truth for
++pin state instead of two.
++
++Revision ID: 9b1c7e4a2f08
++Revises: 7a2d4e91c3f6
++Create Date: 2026-08-01 00:00:00.000000
++
++"""
++from typing import Sequence, Union
++
++from alembic import op
++import sqlalchemy as sa
++
++
++# revision identifiers, used by Alembic.
++revision: str = '9b1c7e4a2f08'
++down_revision: Union[str, Sequence[str], None] = '7a2d4e91c3f6'
++branch_labels: Union[str, Sequence[str], None] = None
++depends_on: Union[str, Sequence[str], None] = None
++
++
++def upgrade() -> None:
++    """Upgrade schema."""
++    with op.batch_alter_table('conversations', schema=None) as batch_op:
++        batch_op.drop_column('pinned_message_id')
++
++
++def downgrade() -> None:
++    """Downgrade schema."""
++    with op.batch_alter_table('conversations', schema=None) as batch_op:
++        batch_op.add_column(sa.Column('pinned_message_id', sa.String(), nullable=True))
+diff --git a/backend/app/api/agent.py b/backend/app/api/agent.py
+index 4f6d743..e41b501 100644
+--- a/backend/app/api/agent.py
++++ b/backend/app/api/agent.py
+@@ -444,6 +444,34 @@ def delete_internal_note(
+     return {"status": "deleted", "message_id": message_id}
+ 
+ 
++MAX_PINNED_PER_CONVERSATION = 5  # Slack/Discord-style small cap — this is a
++                                  # ticket-triage aid (key order #, key promise),
++                                  # not a bookmarking system; an unbounded list
++                                  # defeats the point and blows up the banner.
++
++
++def _pinned_messages_payload(conversation: Conversation, db: Session) -> list[dict]:
++    """Serializes the conversation's currently-pinned messages, oldest first
++    (i.e. pin order), for the pinned-messages banner. Shared by pin_message
++    and get_conversation_messages so both return an identical shape."""
++    pinned = (
++        db.query(Message)
++        .filter_by(conversation_id=conversation.id, is_pinned=True)
++        .order_by(Message.created_at.asc())
++        .all()
++    )
++    return [
++        {
++            "id": m.id,
++            "sender": m.sender,
++            "content": m.content,
++            "author_username": m.author_username,
++            "created_at": m.created_at.isoformat(),
++        }
++        for m in pinned
++    ]
++
++
+ @router.post("/agent/conversations/{session_id}/pin")
+ def pin_message(
+     session_id: str,
+@@ -455,14 +483,50 @@ def pin_message(
+     conversation = db.query(Conversation).filter_by(session_id=session_id).first()
+     if not conversation:
+         raise HTTPException(status_code=404, detail="Conversation not found")
+-        
++
+     msg = db.query(Message).filter_by(id=message_id, conversation_id=conversation.id).first()
+     if not msg:
+         raise HTTPException(status_code=404, detail="Message not found in this conversation")
+-        
++
++    if msg.is_pinned == is_pinned:
++        # Idempotent no-op: nothing changed, so no commit/audit-log noise —
++        # just return current state (still useful, e.g. after a race with
++        # another agent's click).
++        return {
++            "status": "success",
++            "message_id": msg.id,
++            "is_pinned": msg.is_pinned,
++            "pinned_messages": _pinned_messages_payload(conversation, db),
++        }
++
++    if is_pinned:
++        current_count = db.query(Message).filter_by(
++            conversation_id=conversation.id, is_pinned=True
++        ).count()
++        if current_count >= MAX_PINNED_PER_CONVERSATION:
++            raise HTTPException(
++                status_code=409,
++                detail=f"Already at the {MAX_PINNED_PER_CONVERSATION}-pin limit for this conversation — unpin something first.",
++            )
++
+     msg.is_pinned = is_pinned
++
++    audit = AuditLog(
++        actor_username=agent.username,
++        action="pin_message" if is_pinned else "unpin_message",
++        target_username=session_id,
++        details=f"message_id={message_id}",
++    )
++    db.add(audit)
+     db.commit()
+-    return {"status": "success", "message_id": msg.id, "is_pinned": msg.is_pinned}
++    db.refresh(msg)
++
++    return {
++        "status": "success",
++        "message_id": msg.id,
++        "is_pinned": msg.is_pinned,
++        "pinned_messages": _pinned_messages_payload(conversation, db),
++    }
+ 
+ 
+ @router.get("/agent/conversations/{session_id}/order-context")
+diff --git a/backend/app/db/models.py b/backend/app/db/models.py
+index 2addc73..e5bae58 100644
+--- a/backend/app/db/models.py
++++ b/backend/app/db/models.py
+@@ -69,7 +69,6 @@ class Conversation(Base):
+     active_topic: Mapped[str | None] = mapped_column(String, nullable=True)
+     last_order_id: Mapped[str | None] = mapped_column(String, nullable=True)
+     turn_count: Mapped[int] = mapped_column(Integer, default=0)
+-    pinned_message_id: Mapped[str | None] = mapped_column(String, nullable=True)
+ 
+     # --- Ticket properties (agent-facing triage metadata) ---
+     # priority: "low" | "normal" | "high" | "urgent" — agent-set, drives
+diff --git a/backend/app/static/agent/agent.css b/backend/app/static/agent/agent.css
+index df7c6dc..f0f684c 100644
+--- a/backend/app/static/agent/agent.css
++++ b/backend/app/static/agent/agent.css
+@@ -2074,6 +2074,12 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
+   position: sticky;
+   top: 0;
+   z-index: 100;
++  /* Server caps pins at 5, but 5 full rows is still a lot of vertical
++     space to permanently steal from the conversation — cap the visible
++     height to ~2.5 rows and let the rest scroll, same pattern Slack uses
++     for its pinned-items panel. */
++  max-height: 132px;
++  overflow-y: auto;
+ }
+ 
+ .pinned-message {
+@@ -2087,14 +2093,15 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
+   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+   transition: all 0.2s;
+   cursor: pointer;
++  flex-shrink: 0;
+ }
+ .pinned-message:hover {
+   background: color-mix(in srgb, var(--bg-surface) 95%, var(--ink));
+ }
+ 
+ .pinned-message--internal {
+-  border-left: 4px solid #ef4444; /* Alert Red */
+-  background: color-mix(in srgb, #ef4444 8%, var(--bg-surface));
++  border-left: 4px solid var(--accent-alert);
++  background: color-mix(in srgb, var(--accent-alert) 8%, var(--bg-surface));
+ }
+ 
+ .pinned-message-content {
+@@ -2118,11 +2125,11 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
+ }
+ 
+ .pinned-message--internal .pinned-message-header {
+-  color: #ef4444;
++  color: var(--accent-alert);
+ }
+ 
+ .pinned-badge {
+-  background: #ef4444;
++  background: var(--accent-alert);
+   color: white;
+   padding: 1.5px 5px;
+   border-radius: 4px;
+@@ -2149,9 +2156,36 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
+   align-items: center;
+   justify-content: center;
+   transition: all 0.2s;
++  flex-shrink: 0;
+ }
+ .unpin-btn:hover {
+   background: rgba(0,0,0,0.08);
+   color: var(--ink);
+ }
+ 
++/* Persistent pin indicator on a pinned message bubble itself — unlike the
++   3-dot menu (opacity 0 until hover), this must stay visible at all times
++   since it's the only always-on signal (besides the banner) that a given
++   message is pinned. */
++.msg-pin-indicator {
++  position: absolute;
++  top: -7px;
++  left: -7px;
++  width: 18px;
++  height: 18px;
++  border-radius: 50%;
++  background: var(--accent);
++  color: white;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
++  pointer-events: none;
++  transform: rotate(-40deg);
++}
++
++.msg--agent .msg-pin-indicator {
++  background: var(--bg-base);
++  color: var(--accent);
++}
++
+diff --git a/backend/app/static/agent/agent.js b/backend/app/static/agent/agent.js
+index 8c9ff10..ce763e2 100644
+--- a/backend/app/static/agent/agent.js
++++ b/backend/app/static/agent/agent.js
+@@ -549,7 +549,7 @@ async function fetchAndRenderMessages(sessionId) {
+         agentMessages.appendChild(dateDiv);
+         lastDateStr = dateStr;
+       }
+-      appendMessage(msg.sender, msg.content, msg.created_at, msg.sender === "agent_internal", msg.id, msg.author_username, msg.author_role);
++      appendMessage(msg.sender, msg.content, msg.created_at, msg.sender === "agent_internal", msg.id, msg.author_username, msg.author_role, msg.is_pinned);
+     }
+ 
+     updatePinnedMessageUI(pinnedMessages);
+@@ -691,9 +691,10 @@ function updatePinnedMessageUI(pinnedMessages) {
+     let displayContent = msg.content || "";
+     displayContent = displayContent.replace(/\[INTERNAL_IMAGE_DESC\][\s\S]*?\[\/INTERNAL_IMAGE_DESC\]/g, '');
+     const isInternal = msg.sender === 'agent_internal' || displayContent.includes("INTERNAL NOTE");
++    if (isInternal) displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
+     
+     html += `
+-      <div class="pinned-message ${isInternal ? 'pinned-message--internal' : ''}" data-id="${msg.id}" onclick="const el = document.querySelector('.msg-content[data-msg-id=\\'${msg.id}\\']'); if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});">
++      <div class="pinned-message ${isInternal ? 'pinned-message--internal' : ''}" data-id="${msg.id}" onclick="if (event.target.closest('.unpin-btn')) return; const el = document.querySelector('.msg-content[data-msg-id=\\'${msg.id}\\']'); if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});">
+         <div class="pinned-message-content">
+           <div class="pinned-message-header">
+             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+@@ -701,7 +702,7 @@ function updatePinnedMessageUI(pinnedMessages) {
+           </div>
+           <div class="pinned-message-text">${escapeHtml(displayContent)}</div>
+         </div>
+-        <button class="unpin-btn" data-id="${msg.id}" title="Unpin" onclick="event.stopPropagation();">
++        <button class="unpin-btn" data-id="${msg.id}" title="Unpin">
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+         </button>
+       </div>
+@@ -711,13 +712,74 @@ function updatePinnedMessageUI(pinnedMessages) {
+   pinnedContainer.innerHTML = html;
+ }
+ 
++// Dedicated fetch for pin/unpin — unlike authedFetch, this reads the
++// response body even on a non-2xx status, so the 5-pin cap's 409 message
++// actually reaches the agent instead of silently failing (authedFetch
++// discards the body on any !response.ok).
++async function togglePinMessage(messageId, newState) {
++  if (!activeSessionId) return null;
++  try {
++    const response = await fetch(`${API_BASE}/agent/conversations/${activeSessionId}/pin`, {
++      method: "POST",
++      credentials: "include",
++      headers: { "Content-Type": "application/json", "X-Wrennon-Client": "agent-dashboard" },
++      body: JSON.stringify({ message_id: messageId, is_pinned: newState }),
++    });
++    if (response.status === 401) { logout(); return null; }
++    const data = await response.json().catch(() => null);
++    if (!response.ok) {
++      alert((data && data.detail) || "Couldn't update pin.");
++      return null;
++    }
++    return data;
++  } catch (err) {
++    console.error(err);
++    return null;
++  }
++}
++
++// Applies a pin/unpin result everywhere it's reflected: the pinned-messages
++// banner AND the specific message bubble (indicator + dropdown label) if
++// it's currently rendered. This is what was missing before — the old code
++// only refreshed the conversation *list* after pinning, so the banner and
++// bubble silently went stale until the agent reopened the conversation.
++function syncPinnedUIAfterToggle(messageId, isPinnedNow, pinnedMessages) {
++  updatePinnedMessageUI(pinnedMessages);
++
++  const wrapper = document.querySelector(`[data-msg-id="${messageId}"]`);
++  if (!wrapper) return;
++  wrapper.dataset.pinned = isPinnedNow ? "1" : "0";
++
++  const bubble = wrapper.querySelector(".msg");
++  if (bubble) {
++    bubble.classList.toggle("msg--pinned", isPinnedNow);
++    const existingIndicator = bubble.querySelector(".msg-pin-indicator");
++    if (isPinnedNow && !existingIndicator) {
++      bubble.insertAdjacentHTML("afterbegin", `
++        <span class="msg-pin-indicator" title="Pinned">
++          <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" stroke="none"><path d="M12 2a1 1 0 0 1 1 1v5.764l3.447 1.723A2 2 0 0 1 17.55 12.5H18a1 1 0 1 1 0 2h-5v6a1 1 0 1 1-2 0v-6H6a1 1 0 1 1 0-2h.45a2 2 0 0 1 1.103-1.013L11 8.764V3a1 1 0 0 1 1-1z"/></svg>
++        </span>
++      `);
++    } else if (!isPinnedNow && existingIndicator) {
++      existingIndicator.remove();
++    }
++  }
++
++  const pinItem = wrapper.querySelector(".msg-action-pin");
++  if (pinItem) {
++    pinItem.dataset.pinned = isPinnedNow ? "1" : "0";
++    const label = pinItem.querySelector(".msg-action-pin__label");
++    if (label) label.textContent = isPinnedNow ? "Unpin" : "Pin";
++  }
++}
++
+ document.addEventListener("visibilitychange", () => {
+   if (document.visibilityState === "visible" && !activeConversationEl.classList.contains("hidden")) {
+     clearUnreadIndicator();
+   }
+ });
+ 
+-function appendMessage(sender, content, isoString = new Date().toISOString(), isInternal = false, msgId = null, author_username = null, author_role = null) {
++function appendMessage(sender, content, isoString = new Date().toISOString(), isInternal = false, msgId = null, author_username = null, author_role = null, isPinned = false) {
+   if (!isInternal) {
+     extractAndShowCustomerDetails(content);
+   }
+@@ -747,6 +809,7 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
+   contentWrapper.style.display = "flex";
+   contentWrapper.style.flexDirection = "column";
+   if (msgId) contentWrapper.dataset.msgId = msgId;
++  contentWrapper.dataset.pinned = isPinned ? "1" : "0";
+ 
+   const div = document.createElement("div");
+   div.className = `msg msg--${actualSender}${isInternal ? ' msg--internal' : ''}`;
+@@ -804,6 +867,15 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
+     div.innerHTML = nameHtml + replyHtml + renderMarkdown(displayContent) + transcriptHtml;
+   }
+ 
++  if (isPinned) {
++    div.classList.add("msg--pinned");
++    div.insertAdjacentHTML("afterbegin", `
++      <span class="msg-pin-indicator" title="Pinned">
++        <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" stroke="none"><path d="M12 2a1 1 0 0 1 1 1v5.764l3.447 1.723A2 2 0 0 1 17.55 12.5H18a1 1 0 1 1 0 2h-5v6a1 1 0 1 1-2 0v-6H6a1 1 0 1 1 0-2h.45a2 2 0 0 1 1.103-1.013L11 8.764V3a1 1 0 0 1 1-1z"/></svg>
++      </span>
++    `);
++  }
++
+   if (msgId) {
+     let actionsHtml = `<div class="msg-dropdown-container">
+       <button class="msg-dropdown-btn" title="Message options">
+@@ -816,8 +888,8 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
+         <div class="msg-dropdown-item msg-action-copy" data-content="${escapeHtml(displayContent)}">
+           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy
+         </div>
+-        <div class="msg-dropdown-item msg-action-pin" data-id="${msgId}" data-content="${escapeHtml(displayContent)}">
+-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg> Pin
++        <div class="msg-dropdown-item msg-action-pin" data-id="${msgId}" data-pinned="${isPinned ? "1" : "0"}">
++          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg> <span class="msg-action-pin__label">${isPinned ? "Unpin" : "Pin"}</span>
+         </div>
+         <div class="msg-dropdown-item msg-action-copilot" data-content="${escapeHtml(displayContent)}">
+             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg> Ask Copilot
+@@ -995,10 +1067,11 @@ document.addEventListener("click", async (e) => {
+   if (pinBtn) {
+     const msgId = pinBtn.dataset.id;
+     if (!msgId || !activeSessionId) return;
+-    
+-    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: msgId, is_pinned: true });
++    const currentlyPinned = pinBtn.dataset.pinned === "1";
++
++    const result = await togglePinMessage(msgId, !currentlyPinned);
+     if (result) {
+-      loadConversations();
++      syncPinnedUIAfterToggle(msgId, result.is_pinned, result.pinned_messages);
+     }
+     document.querySelectorAll('.msg-dropdown-menu.show').forEach(el => el.classList.remove('show'));
+     return;
+@@ -1008,10 +1081,10 @@ document.addEventListener("click", async (e) => {
+   if (unpinBtn) {
+     const msgId = unpinBtn.dataset.id;
+     if (!msgId || !activeSessionId) return;
+-    
+-    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: msgId, is_pinned: false });
++
++    const result = await togglePinMessage(msgId, false);
+     if (result) {
+-      loadConversations();
++      syncPinnedUIAfterToggle(msgId, result.is_pinned, result.pinned_messages);
+     }
+   }
+ });
+diff --git a/frontend/agent/agent.css b/frontend/agent/agent.css
+index df7c6dc..f0f684c 100644
+--- a/frontend/agent/agent.css
++++ b/frontend/agent/agent.css
+@@ -2074,6 +2074,12 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
+   position: sticky;
+   top: 0;
+   z-index: 100;
++  /* Server caps pins at 5, but 5 full rows is still a lot of vertical
++     space to permanently steal from the conversation — cap the visible
++     height to ~2.5 rows and let the rest scroll, same pattern Slack uses
++     for its pinned-items panel. */
++  max-height: 132px;
++  overflow-y: auto;
+ }
+ 
+ .pinned-message {
+@@ -2087,14 +2093,15 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
+   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+   transition: all 0.2s;
+   cursor: pointer;
++  flex-shrink: 0;
+ }
+ .pinned-message:hover {
+   background: color-mix(in srgb, var(--bg-surface) 95%, var(--ink));
+ }
+ 
+ .pinned-message--internal {
+-  border-left: 4px solid #ef4444; /* Alert Red */
+-  background: color-mix(in srgb, #ef4444 8%, var(--bg-surface));
++  border-left: 4px solid var(--accent-alert);
++  background: color-mix(in srgb, var(--accent-alert) 8%, var(--bg-surface));
+ }
+ 
+ .pinned-message-content {
+@@ -2118,11 +2125,11 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
+ }
+ 
+ .pinned-message--internal .pinned-message-header {
+-  color: #ef4444;
++  color: var(--accent-alert);
+ }
+ 
+ .pinned-badge {
+-  background: #ef4444;
++  background: var(--accent-alert);
+   color: white;
+   padding: 1.5px 5px;
+   border-radius: 4px;
+@@ -2149,9 +2156,36 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
+   align-items: center;
+   justify-content: center;
+   transition: all 0.2s;
++  flex-shrink: 0;
+ }
+ .unpin-btn:hover {
+   background: rgba(0,0,0,0.08);
+   color: var(--ink);
+ }
+ 
++/* Persistent pin indicator on a pinned message bubble itself — unlike the
++   3-dot menu (opacity 0 until hover), this must stay visible at all times
++   since it's the only always-on signal (besides the banner) that a given
++   message is pinned. */
++.msg-pin-indicator {
++  position: absolute;
++  top: -7px;
++  left: -7px;
++  width: 18px;
++  height: 18px;
++  border-radius: 50%;
++  background: var(--accent);
++  color: white;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
++  pointer-events: none;
++  transform: rotate(-40deg);
++}
++
++.msg--agent .msg-pin-indicator {
++  background: var(--bg-base);
++  color: var(--accent);
++}
++
+diff --git a/frontend/agent/agent.js b/frontend/agent/agent.js
+index 8c9ff10..ce763e2 100644
+--- a/frontend/agent/agent.js
++++ b/frontend/agent/agent.js
+@@ -549,7 +549,7 @@ async function fetchAndRenderMessages(sessionId) {
+         agentMessages.appendChild(dateDiv);
+         lastDateStr = dateStr;
+       }
+-      appendMessage(msg.sender, msg.content, msg.created_at, msg.sender === "agent_internal", msg.id, msg.author_username, msg.author_role);
++      appendMessage(msg.sender, msg.content, msg.created_at, msg.sender === "agent_internal", msg.id, msg.author_username, msg.author_role, msg.is_pinned);
+     }
+ 
+     updatePinnedMessageUI(pinnedMessages);
+@@ -691,9 +691,10 @@ function updatePinnedMessageUI(pinnedMessages) {
+     let displayContent = msg.content || "";
+     displayContent = displayContent.replace(/\[INTERNAL_IMAGE_DESC\][\s\S]*?\[\/INTERNAL_IMAGE_DESC\]/g, '');
+     const isInternal = msg.sender === 'agent_internal' || displayContent.includes("INTERNAL NOTE");
++    if (isInternal) displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
+     
+     html += `
+-      <div class="pinned-message ${isInternal ? 'pinned-message--internal' : ''}" data-id="${msg.id}" onclick="const el = document.querySelector('.msg-content[data-msg-id=\\'${msg.id}\\']'); if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});">
++      <div class="pinned-message ${isInternal ? 'pinned-message--internal' : ''}" data-id="${msg.id}" onclick="if (event.target.closest('.unpin-btn')) return; const el = document.querySelector('.msg-content[data-msg-id=\\'${msg.id}\\']'); if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});">
+         <div class="pinned-message-content">
+           <div class="pinned-message-header">
+             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+@@ -701,7 +702,7 @@ function updatePinnedMessageUI(pinnedMessages) {
+           </div>
+           <div class="pinned-message-text">${escapeHtml(displayContent)}</div>
+         </div>
+-        <button class="unpin-btn" data-id="${msg.id}" title="Unpin" onclick="event.stopPropagation();">
++        <button class="unpin-btn" data-id="${msg.id}" title="Unpin">
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+         </button>
+       </div>
+@@ -711,13 +712,74 @@ function updatePinnedMessageUI(pinnedMessages) {
+   pinnedContainer.innerHTML = html;
+ }
+ 
++// Dedicated fetch for pin/unpin — unlike authedFetch, this reads the
++// response body even on a non-2xx status, so the 5-pin cap's 409 message
++// actually reaches the agent instead of silently failing (authedFetch
++// discards the body on any !response.ok).
++async function togglePinMessage(messageId, newState) {
++  if (!activeSessionId) return null;
++  try {
++    const response = await fetch(`${API_BASE}/agent/conversations/${activeSessionId}/pin`, {
++      method: "POST",
++      credentials: "include",
++      headers: { "Content-Type": "application/json", "X-Wrennon-Client": "agent-dashboard" },
++      body: JSON.stringify({ message_id: messageId, is_pinned: newState }),
++    });
++    if (response.status === 401) { logout(); return null; }
++    const data = await response.json().catch(() => null);
++    if (!response.ok) {
++      alert((data && data.detail) || "Couldn't update pin.");
++      return null;
++    }
++    return data;
++  } catch (err) {
++    console.error(err);
++    return null;
++  }
++}
++
++// Applies a pin/unpin result everywhere it's reflected: the pinned-messages
++// banner AND the specific message bubble (indicator + dropdown label) if
++// it's currently rendered. This is what was missing before — the old code
++// only refreshed the conversation *list* after pinning, so the banner and
++// bubble silently went stale until the agent reopened the conversation.
++function syncPinnedUIAfterToggle(messageId, isPinnedNow, pinnedMessages) {
++  updatePinnedMessageUI(pinnedMessages);
++
++  const wrapper = document.querySelector(`[data-msg-id="${messageId}"]`);
++  if (!wrapper) return;
++  wrapper.dataset.pinned = isPinnedNow ? "1" : "0";
++
++  const bubble = wrapper.querySelector(".msg");
++  if (bubble) {
++    bubble.classList.toggle("msg--pinned", isPinnedNow);
++    const existingIndicator = bubble.querySelector(".msg-pin-indicator");
++    if (isPinnedNow && !existingIndicator) {
++      bubble.insertAdjacentHTML("afterbegin", `
++        <span class="msg-pin-indicator" title="Pinned">
++          <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" stroke="none"><path d="M12 2a1 1 0 0 1 1 1v5.764l3.447 1.723A2 2 0 0 1 17.55 12.5H18a1 1 0 1 1 0 2h-5v6a1 1 0 1 1-2 0v-6H6a1 1 0 1 1 0-2h.45a2 2 0 0 1 1.103-1.013L11 8.764V3a1 1 0 0 1 1-1z"/></svg>
++        </span>
++      `);
++    } else if (!isPinnedNow && existingIndicator) {
++      existingIndicator.remove();
++    }
++  }
++
++  const pinItem = wrapper.querySelector(".msg-action-pin");
++  if (pinItem) {
++    pinItem.dataset.pinned = isPinnedNow ? "1" : "0";
++    const label = pinItem.querySelector(".msg-action-pin__label");
++    if (label) label.textContent = isPinnedNow ? "Unpin" : "Pin";
++  }
++}
++
+ document.addEventListener("visibilitychange", () => {
+   if (document.visibilityState === "visible" && !activeConversationEl.classList.contains("hidden")) {
+     clearUnreadIndicator();
+   }
+ });
+ 
+-function appendMessage(sender, content, isoString = new Date().toISOString(), isInternal = false, msgId = null, author_username = null, author_role = null) {
++function appendMessage(sender, content, isoString = new Date().toISOString(), isInternal = false, msgId = null, author_username = null, author_role = null, isPinned = false) {
+   if (!isInternal) {
+     extractAndShowCustomerDetails(content);
+   }
+@@ -747,6 +809,7 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
+   contentWrapper.style.display = "flex";
+   contentWrapper.style.flexDirection = "column";
+   if (msgId) contentWrapper.dataset.msgId = msgId;
++  contentWrapper.dataset.pinned = isPinned ? "1" : "0";
+ 
+   const div = document.createElement("div");
+   div.className = `msg msg--${actualSender}${isInternal ? ' msg--internal' : ''}`;
+@@ -804,6 +867,15 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
+     div.innerHTML = nameHtml + replyHtml + renderMarkdown(displayContent) + transcriptHtml;
+   }
+ 
++  if (isPinned) {
++    div.classList.add("msg--pinned");
++    div.insertAdjacentHTML("afterbegin", `
++      <span class="msg-pin-indicator" title="Pinned">
++        <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" stroke="none"><path d="M12 2a1 1 0 0 1 1 1v5.764l3.447 1.723A2 2 0 0 1 17.55 12.5H18a1 1 0 1 1 0 2h-5v6a1 1 0 1 1-2 0v-6H6a1 1 0 1 1 0-2h.45a2 2 0 0 1 1.103-1.013L11 8.764V3a1 1 0 0 1 1-1z"/></svg>
++      </span>
++    `);
++  }
++
+   if (msgId) {
+     let actionsHtml = `<div class="msg-dropdown-container">
+       <button class="msg-dropdown-btn" title="Message options">
+@@ -816,8 +888,8 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
+         <div class="msg-dropdown-item msg-action-copy" data-content="${escapeHtml(displayContent)}">
+           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy
+         </div>
+-        <div class="msg-dropdown-item msg-action-pin" data-id="${msgId}" data-content="${escapeHtml(displayContent)}">
+-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg> Pin
++        <div class="msg-dropdown-item msg-action-pin" data-id="${msgId}" data-pinned="${isPinned ? "1" : "0"}">
++          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg> <span class="msg-action-pin__label">${isPinned ? "Unpin" : "Pin"}</span>
+         </div>
+         <div class="msg-dropdown-item msg-action-copilot" data-content="${escapeHtml(displayContent)}">
+             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg> Ask Copilot
+@@ -995,10 +1067,11 @@ document.addEventListener("click", async (e) => {
+   if (pinBtn) {
+     const msgId = pinBtn.dataset.id;
+     if (!msgId || !activeSessionId) return;
+-    
+-    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: msgId, is_pinned: true });
++    const currentlyPinned = pinBtn.dataset.pinned === "1";
++
++    const result = await togglePinMessage(msgId, !currentlyPinned);
+     if (result) {
+-      loadConversations();
++      syncPinnedUIAfterToggle(msgId, result.is_pinned, result.pinned_messages);
+     }
+     document.querySelectorAll('.msg-dropdown-menu.show').forEach(el => el.classList.remove('show'));
+     return;
+@@ -1008,10 +1081,10 @@ document.addEventListener("click", async (e) => {
+   if (unpinBtn) {
+     const msgId = unpinBtn.dataset.id;
+     if (!msgId || !activeSessionId) return;
+-    
+-    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: msgId, is_pinned: false });
++
++    const result = await togglePinMessage(msgId, false);
+     if (result) {
+-      loadConversations();
++      syncPinnedUIAfterToggle(msgId, result.is_pinned, result.pinned_messages);
+     }
+   }
+ });

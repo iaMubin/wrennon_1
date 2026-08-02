@@ -1,0 +1,32 @@
+diff --git a/backend/app/static/agent/agent.css b/backend/app/static/agent/agent.css
+index f0f684c..8c88e7d 100644
+--- a/backend/app/static/agent/agent.css
++++ b/backend/app/static/agent/agent.css
+@@ -1505,7 +1505,10 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
+   border-radius: var(--radius-md);
+   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+   padding: 6px;
+-  z-index: 40;
++  /* Must beat .pinned-messages-wrapper (z-index: 100) — when a message
++     is pinned, that banner sits directly below this bar in the DOM and
++     was covering the open dropdown's options. */
++  z-index: 150;
+ }
+ .tp-dropdown.hidden { display: none; }
+ 
+diff --git a/frontend/agent/agent.css b/frontend/agent/agent.css
+index f0f684c..8c88e7d 100644
+--- a/frontend/agent/agent.css
++++ b/frontend/agent/agent.css
+@@ -1505,7 +1505,10 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
+   border-radius: var(--radius-md);
+   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+   padding: 6px;
+-  z-index: 40;
++  /* Must beat .pinned-messages-wrapper (z-index: 100) — when a message
++     is pinned, that banner sits directly below this bar in the DOM and
++     was covering the open dropdown's options. */
++  z-index: 150;
+ }
+ .tp-dropdown.hidden { display: none; }
+ 

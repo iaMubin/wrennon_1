@@ -1,0 +1,40 @@
+diff --git a/backend/app/static/agent/agent.js b/backend/app/static/agent/agent.js
+index ce763e2..a85a41b 100644
+--- a/backend/app/static/agent/agent.js
++++ b/backend/app/static/agent/agent.js
+@@ -593,6 +593,7 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
+   clearCustomerSidebar();
+   hideOrderPopup();
+   resetTicketPropertiesBar();
++  document.getElementById("slash-command-popup")?.classList.remove("active");
+   
+   // Reset input type to public (reply)
+   const noteTypeSelect = document.getElementById("note-type-select");
+@@ -1461,6 +1462,7 @@ function sendAgentReply() {
+   agentInput.value = "";
+   drafts[activeSessionId] = ""; 
+   agentInput.style.height = "auto";
++  document.getElementById("slash-command-popup")?.classList.remove("active");
+ }
+ 
+ // --- Order Context Popup ---
+diff --git a/frontend/agent/agent.js b/frontend/agent/agent.js
+index ce763e2..a85a41b 100644
+--- a/frontend/agent/agent.js
++++ b/frontend/agent/agent.js
+@@ -593,6 +593,7 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
+   clearCustomerSidebar();
+   hideOrderPopup();
+   resetTicketPropertiesBar();
++  document.getElementById("slash-command-popup")?.classList.remove("active");
+   
+   // Reset input type to public (reply)
+   const noteTypeSelect = document.getElementById("note-type-select");
+@@ -1461,6 +1462,7 @@ function sendAgentReply() {
+   agentInput.value = "";
+   drafts[activeSessionId] = ""; 
+   agentInput.style.height = "auto";
++  document.getElementById("slash-command-popup")?.classList.remove("active");
+ }
+ 
+ // --- Order Context Popup ---

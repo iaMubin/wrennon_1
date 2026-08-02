@@ -32,8 +32,7 @@ def upgrade() -> None:
     be force-invalidated by this migration itself.
     """
     conn = op.get_bind()
-    from sqlalchemy.engine.reflection import Inspector
-    inspector = Inspector.from_engine(conn)
+    inspector = sa.inspect(conn)
     columns_agents = [c['name'] for c in inspector.get_columns('agents')]
     if 'token_version' not in columns_agents:
         op.add_column('agents', sa.Column('token_version', sa.Integer(), nullable=False, server_default='1'))

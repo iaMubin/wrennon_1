@@ -136,6 +136,11 @@ if (logoutBtn) {
 let typingTimeout;
 let isTyping = false;
 agentInput.addEventListener("input", (e) => {
+  agentInput.style.height = '44px';
+  const newHeight = Math.min(agentInput.scrollHeight, 120);
+  agentInput.style.height = newHeight + 'px';
+  agentInput.style.overflowY = agentInput.scrollHeight > 120 ? 'auto' : 'hidden';
+
   if (!activeSessionId || !socket || socket.readyState !== WebSocket.OPEN) return;
   const isInternal = noteTypeSelect && noteTypeSelect.value === "internal";
   if (isInternal) return; // Don't broadcast typing for internal notes
@@ -218,6 +223,10 @@ loginForm.addEventListener("submit", async (e) => {
 
     connectSocket();
     await loadConversations();
+    loadAgents(); // was previously only called once, pre-login, at script load —
+                   // that call always 403s (not authenticated yet) and was never
+                   // retried, so @mentions and the assignee dropdown silently had
+                   // an empty agent list. Refresh it now that we have a session.
   } catch (err) {
     loginError.classList.remove("hidden");
     console.error(err);
@@ -545,7 +554,7 @@ async function fetchAndRenderMessages(sessionId) {
         agentMessages.appendChild(dateDiv);
         lastDateStr = dateStr;
       }
-      appendMessage(msg.sender, msg.content, msg.created_at, msg.sender === "agent_internal", msg.id, msg.author_username, msg.author_role);
+      appendMessage(msg.sender, msg.content, msg.created_at, msg.sender === "agent_internal", msg.id, msg.author_username, msg.author_role, msg.is_pinned);
     }
 
     updatePinnedMessageUI(pinnedMessages);
@@ -563,6 +572,7 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
   activeConversationEl.classList.remove("hidden");
   
   agentInput.value = drafts[sessionId] || "";
+  agentInput.dispatchEvent(new Event("input"));
 
   conversationEmail.textContent = customerEmail || "Unknown Customer";
   conversationSession.textContent = shortId || sessionId;
@@ -588,6 +598,8 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
   // Clear sidebars immediately to prevent showing old data while loading
   clearCustomerSidebar();
   hideOrderPopup();
+  resetTicketPropertiesBar();
+  document.getElementById("slash-command-popup")?.classList.remove("active");
   
   // Reset input type to public (reply)
   const noteTypeSelect = document.getElementById("note-type-select");
@@ -603,6 +615,7 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
   await fetchAndRenderMessages(sessionId);
 
   fetchOrderContext(sessionId);
+  loadTicketProperties(sessionId);
   loadConversations();
 }
 
@@ -685,9 +698,10 @@ function updatePinnedMessageUI(pinnedMessages) {
     let displayContent = msg.content || "";
     displayContent = displayContent.replace(/\[INTERNAL_IMAGE_DESC\][\s\S]*?\[\/INTERNAL_IMAGE_DESC\]/g, '');
     const isInternal = msg.sender === 'agent_internal' || displayContent.includes("INTERNAL NOTE");
+    if (isInternal) displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
     
     html += `
-      <div class="pinned-message ${isInternal ? 'pinned-message--internal' : ''}" data-id="${msg.id}" onclick="const el = document.querySelector('.msg-content[data-msg-id=\\'${msg.id}\\']'); if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});">
+      <div class="pinned-message ${isInternal ? 'pinned-message--internal' : ''}" data-id="${msg.id}" onclick="if (event.target.closest('.unpin-btn')) return; const el = document.querySelector('.msg-content[data-msg-id=\\'${msg.id}\\']'); if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});">
         <div class="pinned-message-content">
           <div class="pinned-message-header">
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
@@ -695,7 +709,7 @@ function updatePinnedMessageUI(pinnedMessages) {
           </div>
           <div class="pinned-message-text">${escapeHtml(displayContent)}</div>
         </div>
-        <button class="unpin-btn" data-id="${msg.id}" title="Unpin" onclick="event.stopPropagation();">
+        <button class="unpin-btn" data-id="${msg.id}" title="Unpin">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
@@ -705,13 +719,74 @@ function updatePinnedMessageUI(pinnedMessages) {
   pinnedContainer.innerHTML = html;
 }
 
+// Dedicated fetch for pin/unpin — unlike authedFetch, this reads the
+// response body even on a non-2xx status, so the 5-pin cap's 409 message
+// actually reaches the agent instead of silently failing (authedFetch
+// discards the body on any !response.ok).
+async function togglePinMessage(messageId, newState) {
+  if (!activeSessionId) return null;
+  try {
+    const response = await fetch(`${API_BASE}/agent/conversations/${activeSessionId}/pin`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", "X-Wrennon-Client": "agent-dashboard" },
+      body: JSON.stringify({ message_id: messageId, is_pinned: newState }),
+    });
+    if (response.status === 401) { logout(); return null; }
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      alert((data && data.detail) || "Couldn't update pin.");
+      return null;
+    }
+    return data;
+  } catch (err) {
+    console.error(err);
+    return null;
+  }
+}
+
+// Applies a pin/unpin result everywhere it's reflected: the pinned-messages
+// banner AND the specific message bubble (indicator + dropdown label) if
+// it's currently rendered. This is what was missing before — the old code
+// only refreshed the conversation *list* after pinning, so the banner and
+// bubble silently went stale until the agent reopened the conversation.
+function syncPinnedUIAfterToggle(messageId, isPinnedNow, pinnedMessages) {
+  updatePinnedMessageUI(pinnedMessages);
+
+  const wrapper = document.querySelector(`[data-msg-id="${messageId}"]`);
+  if (!wrapper) return;
+  wrapper.dataset.pinned = isPinnedNow ? "1" : "0";
+
+  const bubble = wrapper.querySelector(".msg");
+  if (bubble) {
+    bubble.classList.toggle("msg--pinned", isPinnedNow);
+    const existingIndicator = bubble.querySelector(".msg-pin-indicator");
+    if (isPinnedNow && !existingIndicator) {
+      bubble.insertAdjacentHTML("afterbegin", `
+        <span class="msg-pin-indicator" title="Pinned">
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" stroke="none"><path d="M12 2a1 1 0 0 1 1 1v5.764l3.447 1.723A2 2 0 0 1 17.55 12.5H18a1 1 0 1 1 0 2h-5v6a1 1 0 1 1-2 0v-6H6a1 1 0 1 1 0-2h.45a2 2 0 0 1 1.103-1.013L11 8.764V3a1 1 0 0 1 1-1z"/></svg>
+        </span>
+      `);
+    } else if (!isPinnedNow && existingIndicator) {
+      existingIndicator.remove();
+    }
+  }
+
+  const pinItem = wrapper.querySelector(".msg-action-pin");
+  if (pinItem) {
+    pinItem.dataset.pinned = isPinnedNow ? "1" : "0";
+    const label = pinItem.querySelector(".msg-action-pin__label");
+    if (label) label.textContent = isPinnedNow ? "Unpin" : "Pin";
+  }
+}
+
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && !activeConversationEl.classList.contains("hidden")) {
     clearUnreadIndicator();
   }
 });
 
-function appendMessage(sender, content, isoString = new Date().toISOString(), isInternal = false, msgId = null, author_username = null, author_role = null) {
+function appendMessage(sender, content, isoString = new Date().toISOString(), isInternal = false, msgId = null, author_username = null, author_role = null, isPinned = false) {
   if (!isInternal) {
     extractAndShowCustomerDetails(content);
   }
@@ -741,6 +816,7 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
   contentWrapper.style.display = "flex";
   contentWrapper.style.flexDirection = "column";
   if (msgId) contentWrapper.dataset.msgId = msgId;
+  contentWrapper.dataset.pinned = isPinned ? "1" : "0";
 
   const div = document.createElement("div");
   div.className = `msg msg--${actualSender}${isInternal ? ' msg--internal' : ''}`;
@@ -798,6 +874,15 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
     div.innerHTML = nameHtml + replyHtml + renderMarkdown(displayContent) + transcriptHtml;
   }
 
+  if (isPinned) {
+    div.classList.add("msg--pinned");
+    div.insertAdjacentHTML("afterbegin", `
+      <span class="msg-pin-indicator" title="Pinned">
+        <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" stroke="none"><path d="M12 2a1 1 0 0 1 1 1v5.764l3.447 1.723A2 2 0 0 1 17.55 12.5H18a1 1 0 1 1 0 2h-5v6a1 1 0 1 1-2 0v-6H6a1 1 0 1 1 0-2h.45a2 2 0 0 1 1.103-1.013L11 8.764V3a1 1 0 0 1 1-1z"/></svg>
+      </span>
+    `);
+  }
+
   if (msgId) {
     let actionsHtml = `<div class="msg-dropdown-container">
       <button class="msg-dropdown-btn" title="Message options">
@@ -810,8 +895,8 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
         <div class="msg-dropdown-item msg-action-copy" data-content="${escapeHtml(displayContent)}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy
         </div>
-        <div class="msg-dropdown-item msg-action-pin" data-id="${msgId}" data-content="${escapeHtml(displayContent)}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg> Pin
+        <div class="msg-dropdown-item msg-action-pin" data-id="${msgId}" data-pinned="${isPinned ? "1" : "0"}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg> <span class="msg-action-pin__label">${isPinned ? "Unpin" : "Pin"}</span>
         </div>
         <div class="msg-dropdown-item msg-action-copilot" data-content="${escapeHtml(displayContent)}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg> Ask Copilot
@@ -989,10 +1074,11 @@ document.addEventListener("click", async (e) => {
   if (pinBtn) {
     const msgId = pinBtn.dataset.id;
     if (!msgId || !activeSessionId) return;
-    
-    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: msgId, is_pinned: true });
+    const currentlyPinned = pinBtn.dataset.pinned === "1";
+
+    const result = await togglePinMessage(msgId, !currentlyPinned);
     if (result) {
-      loadConversations();
+      syncPinnedUIAfterToggle(msgId, result.is_pinned, result.pinned_messages);
     }
     document.querySelectorAll('.msg-dropdown-menu.show').forEach(el => el.classList.remove('show'));
     return;
@@ -1002,10 +1088,10 @@ document.addEventListener("click", async (e) => {
   if (unpinBtn) {
     const msgId = unpinBtn.dataset.id;
     if (!msgId || !activeSessionId) return;
-    
-    const result = await authedFetch(`/agent/conversations/${activeSessionId}/pin`, "POST", { message_id: msgId, is_pinned: false });
+
+    const result = await togglePinMessage(msgId, false);
     if (result) {
-      loadConversations();
+      syncPinnedUIAfterToggle(msgId, result.is_pinned, result.pinned_messages);
     }
   }
 });
@@ -1020,18 +1106,22 @@ const MACROS = [
 ];
 
 const AGENTS = [];
+const AGENT_DIRECTORY = []; // [{username, full_name, role}] — same fetch, reused by the assignee dropdown
 
 async function loadAgents() {
   const data = await authedFetch("/agent/list");
   if (data && Array.isArray(data)) {
     AGENTS.length = 0;
+    AGENT_DIRECTORY.length = 0;
     for (const agent of data) {
       if (agent.role === "agent" || agent.role === "manager" || agent.role === "admin") {
         let title = agent.role.charAt(0).toUpperCase() + agent.role.slice(1);
         let display = agent.full_name || agent.username;
         AGENTS.push({ cmd: "@" + agent.username, desc: display + " (" + title + ")" });
+        AGENT_DIRECTORY.push({ username: agent.username, full_name: agent.full_name, role: agent.role });
       }
     }
+    renderAssigneeDropdown(); // refresh in case the dropdown was already open/rendered
   }
 }
 loadAgents();
@@ -1057,11 +1147,14 @@ function renderSlashPopup(matches, mode) {
         const lastSpace = val.lastIndexOf(" ");
         if (lastSpace === -1) {
           agentInput.value = m.cmd + " ";
+          agentInput.dispatchEvent(new Event("input"));
         } else {
           agentInput.value = val.substring(0, lastSpace + 1) + m.cmd + " ";
+          agentInput.dispatchEvent(new Event("input"));
         }
       } else {
         agentInput.value = m.text;
+        agentInput.dispatchEvent(new Event("input"));
       }
       popup.classList.remove("active");
       agentInput.focus();
@@ -1145,6 +1238,17 @@ agentInput.addEventListener("keydown", (e) => {
   }
 });
 
+// Catch-all: close the mention/macro popup on any click outside it or the
+// input. The input-event handler above only closes it while typing; clicks
+// elsewhere (send button, sidebar, another panel) previously left it stuck
+// open indefinitely.
+document.addEventListener("click", (e) => {
+  const popup = document.getElementById("slash-command-popup");
+  if (!popup || !popup.classList.contains("active")) return;
+  if (e.target === agentInput || popup.contains(e.target)) return;
+  popup.classList.remove("active");
+});
+
 async function handleAgentFileUpload(file, inputElement, uploadInputElement, autoSend = false, sendFunction = null) {
   if (!file) return;
   
@@ -1170,6 +1274,7 @@ async function handleAgentFileUpload(file, inputElement, uploadInputElement, aut
       else if (file.type.startsWith("video/")) md = `[Video](${data.url})`;
       
       inputElement.value = (inputElement.value + (inputElement.value ? " " : "") + md).trim();
+      inputElement.dispatchEvent(new Event("input"));
       if (autoSend && sendFunction) {
         sendFunction();
       }
@@ -1296,6 +1401,7 @@ if (agentCopilotBtn) {
         const data = await res.json();
         // Insert suggested draft into the input field
         agentInput.value = data.suggested_reply;
+        agentInput.dispatchEvent(new Event("input"));
         
         // Render action buttons if any
         if (data.actions && data.actions.length > 0) {
@@ -1377,7 +1483,9 @@ function sendAgentReply() {
   
   agentInput.value = "";
   drafts[activeSessionId] = ""; 
-  agentInput.style.height = "auto";
+  agentInput.style.height = "44px";
+  agentInput.style.overflowY = "hidden";
+  document.getElementById("slash-command-popup")?.classList.remove("active");
 }
 
 // --- Order Context Popup ---
@@ -1712,6 +1820,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       
       connectSocket();
       loadConversations();
+      loadAgents(); // same fix as the fresh-login path above — this is the
+                     // "already logged in, cookie still valid" restore path.
     } else {
       logout();
     }
@@ -1953,6 +2063,199 @@ function clearCustomerSidebar() {
   if (closeBtn) {
     closeBtn.addEventListener("click", hideCustomerSidebar);
   }
+})();
+
+// ── Ticket Properties Bar: priority / assignee / tags ──
+// State for whichever conversation is currently open. Kept separate from
+// the customer-sidebar state above (currentlyShowingCustomerId) since a
+// conversation can have properties even when no customer record was
+// matched yet (order-context lookup can fail independently).
+let currentTicketProperties = { priority: "normal", tags: [], assigned_agent: null };
+
+const PRIORITY_LABELS = { low: "Low", normal: "Normal", high: "High", urgent: "Urgent" };
+
+function initials(name) {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  return parts.length > 1
+    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    : name.slice(0, 2).toUpperCase();
+}
+
+function renderPriorityBadge(priority) {
+  const badge = document.getElementById("priority-badge");
+  const label = document.getElementById("priority-label");
+  if (!badge || !label) return;
+  const p = PRIORITY_LABELS[priority] ? priority : "normal";
+  badge.className = `priority-badge priority-badge--${p}`;
+  badge.querySelector(".priority-dot").className = `priority-dot priority-dot--${p}`;
+  label.textContent = PRIORITY_LABELS[p];
+
+  document.querySelectorAll("#priority-dropdown .tp-dropdown__item").forEach(item => {
+    item.classList.toggle("tp-dropdown__item--active", item.dataset.priority === p);
+  });
+}
+
+function renderAssigneeBadge(username) {
+  const avatar = document.getElementById("assignee-avatar");
+  const label = document.getElementById("assignee-label");
+  if (!avatar || !label) return;
+  if (!username) {
+    avatar.textContent = "?";
+    avatar.className = "assignee-avatar assignee-avatar--unassigned";
+    label.textContent = "Unassigned";
+    return;
+  }
+  const entry = AGENT_DIRECTORY.find(a => a.username === username);
+  const display = entry ? (entry.full_name || entry.username) : username;
+  avatar.textContent = initials(display);
+  avatar.className = "assignee-avatar";
+  label.textContent = display;
+}
+
+function renderAssigneeDropdown() {
+  const dropdown = document.getElementById("assignee-dropdown");
+  if (!dropdown) return;
+  const current = currentTicketProperties.assigned_agent;
+  const unassignedActive = !current ? "tp-dropdown__item--active" : "";
+  let html = `<button class="tp-dropdown__item ${unassignedActive}" data-assignee=""><span class="assignee-avatar assignee-avatar--unassigned" style="width:18px;height:18px;font-size:9px;">?</span>Unassigned</button>`;
+  for (const a of AGENT_DIRECTORY) {
+    const active = a.username === current ? "tp-dropdown__item--active" : "";
+    const display = a.full_name || a.username;
+    html += `<button class="tp-dropdown__item ${active}" data-assignee="${escapeHtml(a.username)}"><span class="assignee-avatar" style="width:18px;height:18px;font-size:9px;">${escapeHtml(initials(display))}</span>${escapeHtml(display)}</button>`;
+  }
+  dropdown.innerHTML = html;
+}
+
+function renderTagChips(tags) {
+  const container = document.getElementById("tag-chips");
+  if (!container) return;
+  container.innerHTML = (tags || []).map(tag => `
+    <span class="tp-tag-chip">
+      ${escapeHtml(tag)}
+      <button class="tp-tag-chip__remove" data-tag="${escapeHtml(tag)}" aria-label="Remove tag ${escapeHtml(tag)}">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </span>
+  `).join("");
+}
+
+function resetTicketPropertiesBar() {
+  currentTicketProperties = { priority: "normal", tags: [], assigned_agent: null };
+  renderPriorityBadge("normal");
+  renderAssigneeBadge(null);
+  renderAssigneeDropdown();
+  renderTagChips([]);
+  document.getElementById("priority-dropdown")?.classList.add("hidden");
+  document.getElementById("assignee-dropdown")?.classList.add("hidden");
+}
+
+async function loadTicketProperties(sessionId) {
+  const result = await authedFetch(`/agent/conversations/${sessionId}`);
+  if (!result || activeSessionId !== sessionId) return; // conversation switched again before this resolved
+  currentTicketProperties = {
+    priority: result.priority || "normal",
+    tags: result.tags || [],
+    assigned_agent: result.assigned_agent || null,
+  };
+  renderPriorityBadge(currentTicketProperties.priority);
+  renderAssigneeDropdown();
+  renderAssigneeBadge(currentTicketProperties.assigned_agent);
+  renderTagChips(currentTicketProperties.tags);
+}
+
+async function saveTicketProperty(fields) {
+  if (!activeSessionId) return;
+  const result = await authedFetch(`/agent/conversations/${activeSessionId}/properties`, "PATCH", fields);
+  if (!result) return;
+  currentTicketProperties = {
+    priority: result.priority || "normal",
+    tags: result.tags || [],
+    assigned_agent: result.assigned_agent || null,
+  };
+  renderPriorityBadge(currentTicketProperties.priority);
+  renderAssigneeDropdown();
+  renderAssigneeBadge(currentTicketProperties.assigned_agent);
+  renderTagChips(currentTicketProperties.tags);
+  loadConversations(); // list rows show priority/tags too, keep them in sync
+}
+
+(function setupTicketPropertiesBar() {
+  const priorityBadge = document.getElementById("priority-badge");
+  const priorityDropdown = document.getElementById("priority-dropdown");
+  const assigneeBadge = document.getElementById("assignee-badge");
+  const assigneeDropdown = document.getElementById("assignee-dropdown");
+  const addTagBtn = document.getElementById("add-tag-btn");
+  const tagInput = document.getElementById("tag-input");
+  const tagChips = document.getElementById("tag-chips");
+  if (!priorityBadge || !assigneeBadge) return; // markup not present on this page
+
+  function closeAllDropdowns(except) {
+    if (priorityDropdown && priorityDropdown !== except) priorityDropdown.classList.add("hidden");
+    if (assigneeDropdown && assigneeDropdown !== except) assigneeDropdown.classList.add("hidden");
+  }
+
+  priorityBadge.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const willOpen = priorityDropdown.classList.contains("hidden");
+    closeAllDropdowns();
+    priorityDropdown.classList.toggle("hidden", !willOpen);
+  });
+
+  priorityDropdown.addEventListener("click", (e) => {
+    const item = e.target.closest("[data-priority]");
+    if (!item) return;
+    priorityDropdown.classList.add("hidden");
+    if (item.dataset.priority === currentTicketProperties.priority) return;
+    saveTicketProperty({ priority: item.dataset.priority });
+  });
+
+  assigneeBadge.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const willOpen = assigneeDropdown.classList.contains("hidden");
+    closeAllDropdowns();
+    assigneeDropdown.classList.toggle("hidden", !willOpen);
+  });
+
+  assigneeDropdown.addEventListener("click", (e) => {
+    const item = e.target.closest("[data-assignee]");
+    if (!item) return;
+    assigneeDropdown.classList.add("hidden");
+    const chosen = item.dataset.assignee || null;
+    if (chosen === currentTicketProperties.assigned_agent) return;
+    saveTicketProperty({ assigned_agent: chosen === null ? "" : chosen });
+  });
+
+  document.addEventListener("click", () => closeAllDropdowns());
+
+  addTagBtn.addEventListener("click", () => {
+    addTagBtn.classList.add("hidden");
+    tagInput.classList.remove("hidden");
+    tagInput.value = "";
+    tagInput.focus();
+  });
+
+  function commitTagInput() {
+    const value = tagInput.value.trim();
+    tagInput.classList.add("hidden");
+    addTagBtn.classList.remove("hidden");
+    if (!value) return;
+    if (currentTicketProperties.tags.includes(value)) return;
+    saveTicketProperty({ tags: [...currentTicketProperties.tags, value] });
+  }
+
+  tagInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); commitTagInput(); }
+    if (e.key === "Escape") { tagInput.classList.add("hidden"); addTagBtn.classList.remove("hidden"); }
+  });
+  tagInput.addEventListener("blur", commitTagInput);
+
+  tagChips.addEventListener("click", (e) => {
+    const removeBtn = e.target.closest(".tp-tag-chip__remove");
+    if (!removeBtn) return;
+    const tagToRemove = removeBtn.dataset.tag;
+    saveTicketProperty({ tags: currentTicketProperties.tags.filter(t => t !== tagToRemove) });
+  });
 })();
 
 // Periodic SLA Check

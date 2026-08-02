@@ -20,8 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     conn = op.get_bind()
-    from sqlalchemy.engine.reflection import Inspector
-    inspector = Inspector.from_engine(conn)
+    inspector = sa.inspect(conn)
     columns = [c['name'] for c in inspector.get_columns('messages')]
     if 'author_username' not in columns:
         op.add_column('messages', sa.Column('author_username', sa.String(), nullable=True))

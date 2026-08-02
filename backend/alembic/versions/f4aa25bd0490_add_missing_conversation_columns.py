@@ -20,8 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     conn = op.get_bind()
-    from sqlalchemy.engine.reflection import Inspector
-    inspector = Inspector.from_engine(conn)
+    inspector = sa.inspect(conn)
     bind = op.get_bind()
     insp = sa.inspect(bind)
     columns = [c['name'] for c in insp.get_columns('conversations')]

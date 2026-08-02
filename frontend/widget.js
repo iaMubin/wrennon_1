@@ -278,7 +278,10 @@ panel.addEventListener("click", (e) => {
 
 sendBtn.addEventListener("click", sendMessage);
 inputEl.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") sendMessage();
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
 });
 
 // ── Typing indicator (customer -> backend) ──────────────────────────
@@ -291,6 +294,11 @@ inputEl.addEventListener("keydown", (e) => {
 let typingTimeout;
 let isTyping = false;
 inputEl.addEventListener("input", () => {
+  inputEl.style.height = '44px';
+  const newHeight = Math.min(inputEl.scrollHeight, 120);
+  inputEl.style.height = newHeight + 'px';
+  inputEl.style.overflowY = inputEl.scrollHeight > 120 ? 'auto' : 'hidden';
+
   if (!socket || socket.readyState !== WebSocket.OPEN) return;
 
   if (!isTyping) {
@@ -331,6 +339,7 @@ async function handleFileUpload(file, inputElement, uploadInputElement, autoSend
       else if (file.type.startsWith("video/")) md = `[Video](${data.url})`;
       
       inputElement.value = (inputElement.value + (inputElement.value ? " " : "") + md).trim();
+      inputElement.dispatchEvent(new Event("input"));
       if (autoSend && sendFunction) {
         sendFunction();
       }
@@ -915,6 +924,8 @@ function sendMessage() {
 
   appendMessage("user", text);
   inputEl.value = "";
+  inputEl.style.height = '44px';
+  inputEl.style.overflowY = 'hidden';
 
   // A sent message means typing has definitely ended — tell the backend
   // right away instead of waiting for the 1.5s idle timeout to expire on

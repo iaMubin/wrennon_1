@@ -1,3 +1,14 @@
+import warnings
+
+# Same filters as app/main.py, registered here too: conftest.py's Alembic
+# upgrade below runs at collection time, before app.main (and its own
+# copy of these filters) gets imported by any test module — so without
+# this, the same warnings app/main.py suppresses in the real app can
+# still leak through during test collection depending on which test
+# file happens to trigger them first.
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic")
+warnings.filterwarnings("ignore", category=PendingDeprecationWarning, module="sentry_sdk")
+
 import os
 import pytest
 from sqlalchemy import create_engine

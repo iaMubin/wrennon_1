@@ -8,6 +8,7 @@ these REST routes are for the initial page load only.
 from __future__ import annotations
 
 import datetime
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, Body, status, Response, Form, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
@@ -275,6 +276,25 @@ def all_conversations(
     return [_conversation_summary(c) for c in conversations]
 
 
+@router.get("/agent/conversations/{session_id}")
+def get_conversation(
+    session_id: str,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent),
+) -> dict:
+    """Single-conversation summary (priority/tags/assignee/stage/etc).
+    Used by the dashboard to (re)hydrate the ticket properties bar when a
+    conversation is opened, independent of whichever list view it was
+    clicked from — the list's cached copy can be stale by the time the
+    agent clicks it."""
+    conversation = db.query(Conversation).filter_by(session_id=session_id).options(
+        selectinload(Conversation.messages)
+    ).first()
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return _conversation_summary(conversation)
+
+
 @router.get("/agent/conversations/{session_id}/messages")
 def conversation_messages(
     session_id: str,
@@ -330,6 +350,72 @@ def resolve_conversation(
     background_tasks.add_task(process_resolved_conversation_tasks, conversation.id)
     return {"status": "resolved", "session_id": session_id}
 
+
+VALID_PRIORITIES = {"low", "normal", "high", "urgent"}
+
+
+@router.patch("/agent/conversations/{session_id}/properties")
+def update_ticket_properties(
+    session_id: str,
+    priority: str | None = Body(None, embed=True),
+    tags: list[str] | None = Body(None, embed=True),
+    assigned_agent: str | None = Body(None, embed=True),
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent),
+) -> dict:
+    """Partial update of agent-facing ticket metadata (priority, tags,
+    assignee). Separate from /resolve — this is triage info an agent can
+    change at any point in a ticket's life, not a workflow transition."""
+    conversation = db.query(Conversation).filter_by(session_id=session_id).first()
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    changes = []
+
+    if priority is not None:
+        if priority not in VALID_PRIORITIES:
+            raise HTTPException(status_code=400, detail=f"priority must be one of {sorted(VALID_PRIORITIES)}")
+        if conversation.priority != priority:
+            changes.append(f"priority: {conversation.priority} -> {priority}")
+        conversation.priority = priority
+
+    if tags is not None:
+        # Normalize: strip, drop empties, dedupe, cap length so one agent
+        # fat-fingering a paste can't blow up the column.
+        clean_tags = []
+        for t in tags:
+            t = t.strip()[:40]
+            if t and t not in clean_tags:
+                clean_tags.append(t)
+        clean_tags = clean_tags[:20]
+        conversation.tags = json.dumps(clean_tags)
+        changes.append(f"tags: {clean_tags}")
+
+    if assigned_agent is not None:
+        # Empty string means "unassign".
+        new_assignee = assigned_agent.strip() or None
+        if new_assignee is not None:
+            exists = db.query(Agent).filter_by(username=new_assignee).first()
+            if not exists:
+                raise HTTPException(status_code=400, detail=f"No agent with username '{new_assignee}'")
+        if conversation.assigned_agent != new_assignee:
+            changes.append(f"assigned_agent: {conversation.assigned_agent} -> {new_assignee}")
+        conversation.assigned_agent = new_assignee
+
+    if changes:
+        audit = AuditLog(
+            actor_username=agent.username,
+            action="update_ticket_properties",
+            target_username=session_id,
+            details="; ".join(changes),
+        )
+        db.add(audit)
+
+    db.commit()
+    db.refresh(conversation)
+    return _conversation_summary(conversation)
+
+
 @router.delete("/agent/messages/{message_id}")
 def delete_internal_note(
     message_id: str,
@@ -358,6 +444,34 @@ def delete_internal_note(
     return {"status": "deleted", "message_id": message_id}
 
 
+MAX_PINNED_PER_CONVERSATION = 5  # Slack/Discord-style small cap — this is a
+                                  # ticket-triage aid (key order #, key promise),
+                                  # not a bookmarking system; an unbounded list
+                                  # defeats the point and blows up the banner.
+
+
+def _pinned_messages_payload(conversation: Conversation, db: Session) -> list[dict]:
+    """Serializes the conversation's currently-pinned messages, oldest first
+    (i.e. pin order), for the pinned-messages banner. Shared by pin_message
+    and get_conversation_messages so both return an identical shape."""
+    pinned = (
+        db.query(Message)
+        .filter_by(conversation_id=conversation.id, is_pinned=True)
+        .order_by(Message.created_at.asc())
+        .all()
+    )
+    return [
+        {
+            "id": m.id,
+            "sender": m.sender,
+            "content": m.content,
+            "author_username": m.author_username,
+            "created_at": m.created_at.isoformat(),
+        }
+        for m in pinned
+    ]
+
+
 @router.post("/agent/conversations/{session_id}/pin")
 def pin_message(
     session_id: str,
@@ -369,14 +483,50 @@ def pin_message(
     conversation = db.query(Conversation).filter_by(session_id=session_id).first()
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-        
+
     msg = db.query(Message).filter_by(id=message_id, conversation_id=conversation.id).first()
     if not msg:
         raise HTTPException(status_code=404, detail="Message not found in this conversation")
-        
+
+    if msg.is_pinned == is_pinned:
+        # Idempotent no-op: nothing changed, so no commit/audit-log noise —
+        # just return current state (still useful, e.g. after a race with
+        # another agent's click).
+        return {
+            "status": "success",
+            "message_id": msg.id,
+            "is_pinned": msg.is_pinned,
+            "pinned_messages": _pinned_messages_payload(conversation, db),
+        }
+
+    if is_pinned:
+        current_count = db.query(Message).filter_by(
+            conversation_id=conversation.id, is_pinned=True
+        ).count()
+        if current_count >= MAX_PINNED_PER_CONVERSATION:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Already at the {MAX_PINNED_PER_CONVERSATION}-pin limit for this conversation — unpin something first.",
+            )
+
     msg.is_pinned = is_pinned
+
+    audit = AuditLog(
+        actor_username=agent.username,
+        action="pin_message" if is_pinned else "unpin_message",
+        target_username=session_id,
+        details=f"message_id={message_id}",
+    )
+    db.add(audit)
     db.commit()
-    return {"status": "success", "message_id": msg.id, "is_pinned": msg.is_pinned}
+    db.refresh(msg)
+
+    return {
+        "status": "success",
+        "message_id": msg.id,
+        "is_pinned": msg.is_pinned,
+        "pinned_messages": _pinned_messages_payload(conversation, db),
+    }
 
 
 @router.get("/agent/conversations/{session_id}/order-context")
@@ -476,4 +626,21 @@ def _conversation_summary(c: Conversation) -> dict:
         "updated_at": c.updated_at.isoformat(),
         "sentiment": getattr(c, "sentiment", None),
         "language": getattr(c, "language", None),
+        "priority": getattr(c, "priority", None) or "normal",
+        "tags": _safe_json_list(getattr(c, "tags", None)),
+        "assigned_agent": getattr(c, "assigned_agent", None),
     }
+
+
+def _safe_json_list(raw: str | None) -> list[str]:
+    """Parses the Conversation.tags JSON-text column defensively — a
+    conversation created before this migration has tags=None, and any
+    hand-edited or corrupted value should degrade to an empty list rather
+    than 500ing the whole conversation list."""
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, list) else []
+    except (json.JSONDecodeError, TypeError):
+        return []

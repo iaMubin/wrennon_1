@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 set -x
 
 export WEB_CONCURRENCY=${WEB_CONCURRENCY:-2}

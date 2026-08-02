@@ -69,7 +69,22 @@ class Conversation(Base):
     active_topic: Mapped[str | None] = mapped_column(String, nullable=True)
     last_order_id: Mapped[str | None] = mapped_column(String, nullable=True)
     turn_count: Mapped[int] = mapped_column(Integer, default=0)
-    pinned_message_id: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # --- Ticket properties (agent-facing triage metadata) ---
+    # priority: "low" | "normal" | "high" | "urgent" — agent-set, drives
+    # the priority badge in the dashboard. Distinct from `sentiment`
+    # (AI-inferred) and `handoff_active`/`resolved` (workflow state).
+    priority: Mapped[str] = mapped_column(String, default="normal", server_default="normal")
+    # tags: JSON-encoded list of strings, e.g. '["vip","refund-dispute"]'.
+    # Stored as Text rather than a separate table — ticket tags here are
+    # simple labels, not a shared/managed taxonomy. Always read via
+    # json.loads with a [] fallback.
+    tags: Mapped[str] = mapped_column(Text, default="[]", server_default="[]")
+    # assigned_agent: the *owning* agent's username, distinct from
+    # `handled_by` (set automatically on resolve) — this is an explicit,
+    # agent-facing "who owns this ticket" assignment editable at any time,
+    # independent of resolution state.
+    assigned_agent: Mapped[str | None] = mapped_column(String, nullable=True)
 
     messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation", order_by="Message.created_at"

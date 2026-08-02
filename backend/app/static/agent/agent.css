@@ -1430,6 +1430,214 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   text-transform: uppercase;
 }
 
+/* ── Ticket Properties Bar: priority / assignee / tags ── */
+.ticket-properties-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+  min-height: 40px;
+}
+
+.tp-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--line);
+  flex-shrink: 0;
+}
+
+.tp-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Priority badge */
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: var(--bg-hover);
+  color: var(--ink);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.priority-badge:hover { background: color-mix(in srgb, var(--accent) 8%, var(--bg-hover)); }
+
+.priority-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+.priority-dot--low { background: var(--ink-soft, #8a8a8a); }
+.priority-dot--normal { background: var(--accent); }
+.priority-dot--high { background: var(--warning); }
+.priority-dot--urgent { background: var(--danger); animation: pulseSLA 2s infinite; }
+
+.priority-badge--low .priority-dot,
+.priority-badge--low { color: var(--ink-soft, #8a8a8a); }
+.priority-badge--high { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 40%, var(--line)); background: color-mix(in srgb, var(--warning) 10%, transparent); }
+.priority-badge--urgent { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+
+.tp-caret { opacity: 0.55; flex-shrink: 0; }
+
+/* Shared dropdown shell (priority + assignee) */
+.tp-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 168px;
+  background: var(--bg-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+  padding: 6px;
+  /* Must beat .pinned-messages-wrapper (z-index: 100) — when a message
+     is pinned, that banner sits directly below this bar in the DOM and
+     was covering the open dropdown's options. */
+  z-index: 150;
+}
+.tp-dropdown.hidden { display: none; }
+
+.tp-dropdown__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  text-align: left;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.tp-dropdown__item:hover { background: var(--bg-hover); }
+.tp-dropdown__item.tp-dropdown__item--active { background: color-mix(in srgb, var(--accent) 12%, transparent); font-weight: 700; }
+
+/* Assignee badge */
+.assignee-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 4px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: var(--bg-hover);
+  color: var(--ink);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.assignee-badge:hover { background: color-mix(in srgb, var(--accent) 8%, var(--bg-hover)); }
+
+.assignee-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+.assignee-avatar--unassigned { background: var(--ink-soft, #8a8a8a); opacity: 0.6; }
+
+.tp-dropdown__item .assignee-avatar { width: 18px; height: 18px; font-size: 9px; }
+
+/* Tags */
+.tp-item--tags { flex: 1; min-width: 140px; flex-wrap: wrap; gap: 6px; }
+
+.tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tp-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  padding: 3px 6px 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+
+.tp-tag-chip__remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.6;
+  padding: 0;
+}
+.tp-tag-chip__remove:hover { opacity: 1; background: color-mix(in srgb, var(--accent) 20%, transparent); }
+
+.tag-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px dashed var(--line);
+  background: transparent;
+  color: var(--ink-soft, var(--ink));
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.tag-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.tag-input {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 3px 12px;
+  font-size: var(--fs-xs);
+  background: var(--bg-base);
+  color: var(--ink);
+  width: 150px;
+}
+.tag-input.hidden { display: none; }
+.tag-input:focus { outline: none; border-color: var(--accent); }
+
+@media (max-width: 800px) {
+  .ticket-properties-bar { padding: 6px 12px; }
+  .tp-item--tags { min-width: 100%; order: 10; }
+}
+
 /* ── Feature 7: Agent Mentions ── */
 .agent-mention {
   background: var(--accent);
@@ -1463,7 +1671,7 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   bottom: 100%;
   left: 24px;
   margin-bottom: 8px;
-  background: var(--bg-surface, #ffffff); opacity: 1 !important;
+  background: var(--bg-surface, #ffffff);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(0,0,0,0.1);
@@ -1869,6 +2077,12 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   position: sticky;
   top: 0;
   z-index: 100;
+  /* Server caps pins at 5, but 5 full rows is still a lot of vertical
+     space to permanently steal from the conversation — cap the visible
+     height to ~2.5 rows and let the rest scroll, same pattern Slack uses
+     for its pinned-items panel. */
+  max-height: 132px;
+  overflow-y: auto;
 }
 
 .pinned-message {
@@ -1882,14 +2096,15 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   transition: all 0.2s;
   cursor: pointer;
+  flex-shrink: 0;
 }
 .pinned-message:hover {
   background: color-mix(in srgb, var(--bg-surface) 95%, var(--ink));
 }
 
 .pinned-message--internal {
-  border-left: 4px solid #ef4444; /* Alert Red */
-  background: color-mix(in srgb, #ef4444 8%, var(--bg-surface));
+  border-left: 4px solid var(--accent-alert);
+  background: color-mix(in srgb, var(--accent-alert) 8%, var(--bg-surface));
 }
 
 .pinned-message-content {
@@ -1913,11 +2128,11 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
 }
 
 .pinned-message--internal .pinned-message-header {
-  color: #ef4444;
+  color: var(--accent-alert);
 }
 
 .pinned-badge {
-  background: #ef4444;
+  background: var(--accent-alert);
   color: white;
   padding: 1.5px 5px;
   border-radius: 4px;
@@ -1944,9 +2159,36 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  flex-shrink: 0;
 }
 .unpin-btn:hover {
   background: rgba(0,0,0,0.08);
   color: var(--ink);
+}
+
+/* Persistent pin indicator on a pinned message bubble itself — unlike the
+   3-dot menu (opacity 0 until hover), this must stay visible at all times
+   since it's the only always-on signal (besides the banner) that a given
+   message is pinned. */
+.msg-pin-indicator {
+  position: absolute;
+  top: -7px;
+  left: -7px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  transform: rotate(-40deg);
+}
+
+.msg--agent .msg-pin-indicator {
+  background: var(--bg-base);
+  color: var(--accent);
 }
 

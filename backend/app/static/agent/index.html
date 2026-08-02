@@ -7,8 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/agent/theme.css?v=55">
-<link rel="stylesheet" href="/agent/agent.css?v=55">
+<link rel="stylesheet" href="/agent/theme.css?v=58">
+<link rel="stylesheet" href="/agent/agent.css?v=58">
 <script>
   (function() {
     function applyTheme(theme) {
@@ -203,6 +203,46 @@
           </div>
         </header>
 
+        <!-- Ticket Properties Bar: priority / assignee / tags, always visible so
+             triage state is legible without opening the customer sidebar. -->
+        <div id="ticket-properties-bar" class="ticket-properties-bar">
+          <div class="tp-item tp-item--priority">
+            <button id="priority-badge" class="priority-badge priority-badge--normal" type="button" aria-haspopup="true" aria-expanded="false">
+              <span class="priority-dot"></span>
+              <span id="priority-label">Normal</span>
+              <svg class="tp-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+            <div id="priority-dropdown" class="tp-dropdown hidden" role="menu">
+              <button class="tp-dropdown__item" data-priority="low" role="menuitem"><span class="priority-dot priority-dot--low"></span>Low</button>
+              <button class="tp-dropdown__item" data-priority="normal" role="menuitem"><span class="priority-dot priority-dot--normal"></span>Normal</button>
+              <button class="tp-dropdown__item" data-priority="high" role="menuitem"><span class="priority-dot priority-dot--high"></span>High</button>
+              <button class="tp-dropdown__item" data-priority="urgent" role="menuitem"><span class="priority-dot priority-dot--urgent"></span>Urgent</button>
+            </div>
+          </div>
+
+          <div class="tp-divider"></div>
+
+          <div class="tp-item tp-item--assignee">
+            <button id="assignee-badge" class="assignee-badge" type="button" aria-haspopup="true" aria-expanded="false">
+              <span id="assignee-avatar" class="assignee-avatar">?</span>
+              <span id="assignee-label">Unassigned</span>
+              <svg class="tp-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+            <div id="assignee-dropdown" class="tp-dropdown hidden" role="menu"></div>
+          </div>
+
+          <div class="tp-divider"></div>
+
+          <div class="tp-item tp-item--tags">
+            <div id="tag-chips" class="tag-chips"></div>
+            <button id="add-tag-btn" class="tag-add-btn" type="button" title="Add tag">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              Tag
+            </button>
+            <input id="tag-input" class="tag-input hidden" placeholder="Add tag, Enter to confirm" maxlength="40" />
+          </div>
+        </div>
+
         <div style="display: flex; flex: 1; overflow: hidden; background: var(--bg-base);">
           <div style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
             <!-- Order Context Popup -->
@@ -277,7 +317,7 @@
 
   </div>
 
-  <script src="/agent/agent.js?v=55"></script>
+  <script src="/agent/agent.js?v=58"></script>
 </body>
 </html>
 

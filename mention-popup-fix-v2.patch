@@ -1,0 +1,44 @@
+diff --git a/backend/app/static/agent/agent.js b/backend/app/static/agent/agent.js
+index a85a41b..ff7c86d 100644
+--- a/backend/app/static/agent/agent.js
++++ b/backend/app/static/agent/agent.js
+@@ -1229,6 +1229,17 @@ agentInput.addEventListener("keydown", (e) => {
+   }
+ });
+ 
++// Catch-all: close the mention/macro popup on any click outside it or the
++// input. The input-event handler above only closes it while typing; clicks
++// elsewhere (send button, sidebar, another panel) previously left it stuck
++// open indefinitely.
++document.addEventListener("click", (e) => {
++  const popup = document.getElementById("slash-command-popup");
++  if (!popup || !popup.classList.contains("active")) return;
++  if (e.target === agentInput || popup.contains(e.target)) return;
++  popup.classList.remove("active");
++});
++
+ async function handleAgentFileUpload(file, inputElement, uploadInputElement, autoSend = false, sendFunction = null) {
+   if (!file) return;
+   
+diff --git a/frontend/agent/agent.js b/frontend/agent/agent.js
+index a85a41b..ff7c86d 100644
+--- a/frontend/agent/agent.js
++++ b/frontend/agent/agent.js
+@@ -1229,6 +1229,17 @@ agentInput.addEventListener("keydown", (e) => {
+   }
+ });
+ 
++// Catch-all: close the mention/macro popup on any click outside it or the
++// input. The input-event handler above only closes it while typing; clicks
++// elsewhere (send button, sidebar, another panel) previously left it stuck
++// open indefinitely.
++document.addEventListener("click", (e) => {
++  const popup = document.getElementById("slash-command-popup");
++  if (!popup || !popup.classList.contains("active")) return;
++  if (e.target === agentInput || popup.contains(e.target)) return;
++  popup.classList.remove("active");
++});
++
+ async function handleAgentFileUpload(file, inputElement, uploadInputElement, autoSend = false, sendFunction = null) {
+   if (!file) return;
+   

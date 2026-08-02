@@ -266,8 +266,8 @@ body {
   font-family: ui-monospace, monospace;
 }
 
-#input-row { display: flex; gap: 8px; padding: 16px 20px; border-top: 1px solid var(--line); background: var(--paper); align-items: center; }
-#message-input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 24px; padding: 12px 18px; font-size: 14px; font-family: inherit; background: var(--paper); color: var(--ink); outline: none; transition: var(--transition); box-shadow: inset 0 1px 2px rgba(0,0,0,0.02); }
+#input-row { display: flex; gap: 8px; padding: 16px 20px; border-top: 1px solid var(--line); background: var(--paper); align-items: flex-start; }
+#message-input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 24px; padding: 12px 18px; font-size: 14px; font-family: inherit; background: var(--paper); color: var(--ink); outline: none; transition: border-color 0.3s, box-shadow 0.3s; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02); }
 #message-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-subtle), inset 0 1px 2px rgba(0,0,0,0.02); }
 #message-input::placeholder { color: var(--ink-soft); font-weight: 400; }
 
