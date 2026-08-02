@@ -1033,22 +1033,27 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--bg-hover);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--text-muted);
   z-index: 2;
   flex-shrink: 0;
 }
+.order-timeline-icon--placed { background: #8B5CF6; color: white; }
+.order-timeline-icon--processing { background: #F59E0B; color: white; }
+.order-timeline-icon--shipped { background: #3B82F6; color: white; }
+.order-timeline-icon--delivered { background: #10B981; color: white; }
+
 .order-timeline-line {
   position: absolute;
   top: 24px;
   bottom: -16px;
   left: 11px;
   width: 2px;
-  background: var(--accent);
-  opacity: 0.3;
+  background: var(--line);
+  opacity: 0.8;
   z-index: 1;
 }
 .order-timeline-item:last-child .order-timeline-line {

@@ -1656,10 +1656,10 @@ function showOrderPopup(order) {
   const currentStatusIndex = statuses.indexOf((order.status || 'placed').toLowerCase());
   
   const timelineEvents = [
-    { label: 'Order Placed', time: '10:00 AM', icon: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>' },
-    { label: 'Processing', time: '11:30 AM', icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>' },
-    { label: 'Shipped', time: '02:15 PM', icon: '<circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>' },
-    { label: 'Delivered', time: '04:00 PM', icon: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>' },
+    { status: 'placed', label: 'Order Placed', time: 'Aug 2, 10:00 AM', icon: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>' },
+    { status: 'processing', label: 'Processing', time: 'Aug 2, 11:30 AM', icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>' },
+    { status: 'shipped', label: 'Shipped', time: 'Aug 3, 02:15 PM', icon: '<circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>' },
+    { status: 'delivered', label: 'Delivered', time: 'Aug 5, 04:00 PM', icon: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>' },
   ];
 
   let timelineHtml = timelineEvents.map((evt, i) => {
@@ -1668,7 +1668,7 @@ function showOrderPopup(order) {
     const isLast = index === arr.length - 1;
     return `
       <div class="order-timeline-item">
-        <div class="order-timeline-icon">
+        <div class="order-timeline-icon order-timeline-icon--${evt.status}">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${evt.icon}</svg>
         </div>
         ${!isLast ? '<div class="order-timeline-line"></div>' : ''}
