@@ -84,7 +84,7 @@ orig_inner = """    item.innerHTML = `
 new_inner = """    item.innerHTML = `
       <div class="conv-item-header" style="display: flex; justify-content: space-between;">
         <div style="display: flex; gap: 8px; align-items: center;">
-            <input type="checkbox" class="conv-checkbox" data-session-id="${conv.session_id}" onclick="event.stopPropagation(); toggleBulkSelection(this, '${conv.session_id}')" style="cursor: pointer; flex-shrink: 0;">
+            <input type="checkbox" class="conv-checkbox" data-session-id="${conv.session_id}" onclick="event.stopPropagation(); toggleBulkSelection(this, '${conv.session_id}')" style="cursor: pointer; flex-shrink: 0; display: none;">
             <span class="conv-item-email" style="display:flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis;">
                 ${escapeHtml(conv.customer_email || "Unknown Customer")}
             </span>

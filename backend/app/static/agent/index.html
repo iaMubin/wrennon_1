@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/agent/theme.css?v=62">
-<link rel="stylesheet" href="/agent/agent.css?v=62">
+<link rel="stylesheet" href="/agent/agent.css?v=65">
 <script>
   (function() {
     function applyTheme(theme) {
@@ -176,33 +176,7 @@
         <button class="tab" data-section="all">All history</button>
       </nav>
 
-      <div id="filter-bar" style="padding: 12px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--line);">
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <select id="filter-priority" style="flex: 1; padding: 4px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--ink);">
-            <option value="">Priority: All</option>
-            <option value="urgent">Urgent</option>
-            <option value="high">High</option>
-            <option value="normal">Normal</option>
-            <option value="low">Low</option>
-          </select>
-          <select id="filter-assignee" style="flex: 1; padding: 4px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--ink);">
-            <option value="">Assignee: All</option>
-            <option value="unassigned">Unassigned</option>
-            <!-- Agents will be populated by JS -->
-          </select>
-          <input type="text" id="filter-tag" placeholder="Tag..." style="flex: 1; padding: 4px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--ink);">
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div style="display: flex; gap: 4px;">
-            <button id="apply-filters-btn" class="btn btn-sm" style="padding: 4px 8px; font-size: 11px;">Apply</button>
-            <button id="clear-filters-btn" class="btn btn-sm btn-secondary" style="padding: 4px 8px; font-size: 11px; display: none;">Clear</button>
-          </div>
-          <button id="save-view-btn" class="btn btn-sm btn-secondary" style="padding: 4px 8px; font-size: 11px;">Save View</button>
-        </div>
-        <div id="saved-views-container" style="display: none; gap: 4px; flex-wrap: wrap; margin-top: 4px;">
-          <!-- Saved views populated by JS -->
-        </div>
-      </div>
+
 
       <div id="conversation-list"></div>
       

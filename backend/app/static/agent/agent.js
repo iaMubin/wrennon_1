@@ -534,12 +534,26 @@ function renderConversationList(conversations) {
     const hash = conv.short_id ? conv.short_id.split('').reduce((a, b) => {a = ((a << 5) - a) + b.charCodeAt(0); return a & a}, 0) : 0;
     const platformIcon = platforms[Math.abs(hash) % platforms.length];
 
+    const customerDisplayName = conv.customer_name || conv.customer_email || "Unknown Customer";
+    let avatarHtml = "";
+    if (!conv.customer_name && !conv.customer_email) {
+      avatarHtml = `<img src="/agent/images/default-avatar.png?v=2" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border-light); box-shadow: 0 1px 3px rgba(0,0,0,0.1);" alt="Avatar">`;
+    } else {
+      const dpId = conv.customer_email || conv.customer_id || conv.session_id || hash;
+      avatarHtml = `<img src="https://i.pravatar.cc/150?u=${encodeURIComponent(dpId)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border-light); box-shadow: 0 1px 3px rgba(0,0,0,0.1);" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">`;
+    }
+
+    const shortIdForBadge = conv.short_id || conv.session_id;
+    const ticketIdText = shortIdForBadge ? `#${shortIdForBadge.substring(0, 8).toUpperCase()}` : '';
+
     item.innerHTML = `
       <div class="conv-item-header" style="display: flex; justify-content: space-between;">
-        <div style="display: flex; gap: 8px; align-items: center;">
-            <input type="checkbox" class="conv-checkbox" data-session-id="${conv.session_id}" onclick="event.stopPropagation(); toggleBulkSelection(this, '${conv.session_id}')" style="cursor: pointer; flex-shrink: 0;">
-            <span class="conv-item-email" style="display:flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis;">
-                ${escapeHtml(conv.customer_name || conv.customer_email || "Unknown Customer")}
+        <div style="display: flex; gap: 10px; align-items: center; overflow: hidden;">
+            <input type="checkbox" class="conv-checkbox" data-session-id="${conv.session_id}" onclick="event.stopPropagation(); toggleBulkSelection(this, '${conv.session_id}')" style="cursor: pointer; flex-shrink: 0; display: none;">
+            <span class="conv-item-email" style="display:flex; align-items:center; gap:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size: 14px; font-weight: 500;">
+                ${avatarHtml}
+                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(customerDisplayName)}</span>
+                <span style="background: var(--bg-hover); color: var(--text-muted); padding: 1px 6px; border-radius: 4px; font-size: 10px; font-family: monospace; border: 1px solid var(--border-light); line-height: 1.2;">${ticketIdText}</span>
             </span>
         </div>
         <span class="conv-item-time" style="flex-shrink: 0;">${formatSidebarTime(conv.updated_at)}</span>
@@ -621,9 +635,22 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
   agentInput.dispatchEvent(new Event("input"));
 
   conversationEmail.textContent = customerEmail || "Unknown Customer";
-  conversationSession.textContent = shortId || sessionId;
-
-
+  const ticketIdBadge = document.getElementById("ticket-id-badge");
+  if (ticketIdBadge) {
+    const idStr = shortId || sessionId;
+    ticketIdBadge.textContent = `#${idStr.substring(0, 8).toUpperCase()}`;
+  }
+  const webSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
+  const waSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>`;
+  const igSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>`;
+  const platformsInfo = [
+    { svg: webSvg, text: "via Web Widget" },
+    { svg: waSvg, text: "via WhatsApp" },
+    { svg: igSvg, text: "via Instagram" }
+  ];
+  const hash = shortId ? shortId.split('').reduce((a, b) => {a = ((a << 5) - a) + b.charCodeAt(0); return a & a}, 0) : 0;
+  const platform = platformsInfo[Math.abs(hash) % platformsInfo.length];
+  conversationSession.innerHTML = `${platform.svg} ${platform.text}`;
   
   const resolveTimeEl = document.getElementById("resolve-time");
   if (isResolved) {
@@ -745,17 +772,30 @@ function updatePinnedMessageUI(pinnedMessages) {
     displayContent = displayContent.replace(/\[INTERNAL_IMAGE_DESC\][\s\S]*?\[\/INTERNAL_IMAGE_DESC\]/g, '');
     const isInternal = msg.sender === 'agent_internal' || displayContent.includes("INTERNAL NOTE");
     if (isInternal) displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
+    displayContent = displayContent.replace(/!\[.*?\]\(.*?\)/g, '[Image] '); // strip images
+    displayContent = displayContent.replace(/\[(.*?)\]\(.*?\)/g, '$1'); // strip links
+    displayContent = displayContent.replace(/[*_~`#>]/g, ''); // strip basic markdown
+    displayContent = displayContent.replace(/<[^>]*>?/gm, '').trim().replace(/\s+/g, ' ');
+    
+    let senderName = msg.author_username;
+    if (!senderName) {
+      if (msg.sender === "customer" || msg.sender === "human") {
+        senderName = document.getElementById("conversation-email").textContent || "Customer";
+      } else {
+        senderName = "You";
+      }
+    }
     
     html += `
       <div class="pinned-message ${isInternal ? 'pinned-message--internal' : ''}" data-id="${msg.id}" onclick="if (event.target.closest('.unpin-btn')) return; const el = document.querySelector('.msg-content[data-msg-id=\\'${msg.id}\\']'); if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});">
-        <div class="pinned-message-content">
-          <div class="pinned-message-header">
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
-            ${isInternal ? '<span class="pinned-badge">Internal Note</span>' : 'Pinned Message'}
+        <div class="pinned-message-content" style="display:flex; flex-direction:row; align-items:center; gap:8px; overflow:hidden;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+          <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            <strong style="margin-right: 4px; font-weight:600;">${escapeHtml(senderName)}:</strong>
+            <span class="pinned-message-text" style="display:inline; color: inherit; white-space:nowrap;">${escapeHtml(displayContent)}</span>
           </div>
-          <div class="pinned-message-text">${escapeHtml(displayContent)}</div>
         </div>
-        <button class="unpin-btn" data-id="${msg.id}" title="Unpin">
+        <button class="unpin-btn" data-id="${msg.id}" title="Unpin" style="flex-shrink:0;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
@@ -1400,16 +1440,47 @@ if (agentVoiceBtn) {
 }
 
 const noteTypeSelect = document.getElementById("note-type-select");
-if (noteTypeSelect) {
+const chatInputWrapper = document.getElementById("chat-input-wrapper");
+const sendToggleBtn = document.getElementById("agent-send-toggle");
+const sendTypeMenu = document.getElementById("send-type-menu");
+const sendTypeOptions = document.querySelectorAll(".send-type-option");
+
+if (sendToggleBtn && sendTypeMenu) {
+  sendToggleBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    sendTypeMenu.classList.toggle("hidden");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!sendTypeMenu.contains(e.target) && !sendToggleBtn.contains(e.target)) {
+      sendTypeMenu.classList.add("hidden");
+    }
+  });
+
+  sendTypeOptions.forEach(option => {
+    option.addEventListener("click", () => {
+      const type = option.getAttribute("data-type");
+      noteTypeSelect.value = type;
+      noteTypeSelect.dispatchEvent(new Event("change"));
+      sendTypeMenu.classList.add("hidden");
+      
+      // Update checkmarks
+      sendTypeOptions.forEach(opt => opt.querySelector(".check-icon").classList.add("hidden"));
+      option.querySelector(".check-icon").classList.remove("hidden");
+    });
+  });
+}
+
+if (noteTypeSelect && chatInputWrapper) {
   noteTypeSelect.addEventListener("change", () => {
     if (noteTypeSelect.value === "internal") {
-      agentInput.style.backgroundColor = "color-mix(in srgb, var(--accent) 10%, transparent)";
-      agentInput.style.borderColor = "var(--accent)";
+      chatInputWrapper.classList.add("internal-mode");
       agentInput.placeholder = "Type internal note... (Use @ to tag, / for cmds)";
+      document.getElementById("agent-send-btn").textContent = "Add Note";
     } else {
-      agentInput.style.backgroundColor = "var(--bg-base)";
-      agentInput.style.borderColor = "var(--line)";
-      agentInput.placeholder = "Type a reply";
+      chatInputWrapper.classList.remove("internal-mode");
+      agentInput.placeholder = "Type a message...";
+      document.getElementById("agent-send-btn").textContent = "Send";
     }
     agentInput.focus();
   });
@@ -1421,6 +1492,17 @@ document.addEventListener("keydown", (e) => {
     if (noteTypeSelect) {
       noteTypeSelect.value = noteTypeSelect.value === "internal" ? "public" : "internal";
       noteTypeSelect.dispatchEvent(new Event("change"));
+      
+      // Update checkmarks visually for shortcut
+      if (sendTypeOptions) {
+        sendTypeOptions.forEach(opt => {
+          if (opt.getAttribute("data-type") === noteTypeSelect.value) {
+            opt.querySelector(".check-icon").classList.remove("hidden");
+          } else {
+            opt.querySelector(".check-icon").classList.add("hidden");
+          }
+        });
+      }
     }
   }
 });
@@ -1822,10 +1904,23 @@ function formatTime(isoString) {
 }
 
 function formatSidebarTime(isoString) {
+  if (!isoString) return '';
   const date = new Date(isoString);
-  const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: "Asia/Dhaka" });
-  const timeStr = date.toLocaleTimeString('en-US', { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dhaka" });
-  return `${dateStr}, ${timeStr}`;
+  const now = new Date();
+  
+  const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+  
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = date.getDate() === yesterday.getDate() && date.getMonth() === yesterday.getMonth() && date.getFullYear() === yesterday.getFullYear();
+
+  if (isToday) {
+    return date.toLocaleTimeString('en-GB', { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dhaka" });
+  } else if (isYesterday) {
+    return 'Yesterday';
+  } else {
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: "Asia/Dhaka" });
+  }
 }
 
 function logout() {
@@ -2039,41 +2134,112 @@ function showCustomerSidebar(customer) {
   
   const initials = customer.name.split(" ").map(n => n[0]).join("").toUpperCase();
   
+  const interactions = [
+    { action: 'Conversation with Alex Smith', time: 'Active now', status: 'O', highlight: true },
+    { action: 'Ordered #12965', time: 'Aug 08, 9:05 AM', status: 'empty' },
+    { action: 'Change email address', time: 'Jan 21, 9:43 AM', status: 'P' },
+    { action: 'Article viewed', time: 'Jan 21, 9:14 AM', status: 'empty' },
+    { action: 'Article viewed', time: 'Jan 21, 9:38 AM', status: 'empty' },
+    { action: 'Receipt for order #2232534', time: 'Jan 05, 3:24 PM', status: 'S' }
+  ];
+
+  const getStatusIcon = (item) => {
+    const act = item.action.toLowerCase();
+    let bgClass = "bg-gray";
+    if (item.status === 'O') bgClass = "bg-red";
+    if (item.status === 'P') bgClass = "bg-blue";
+    if (item.status === 'empty') bgClass = "border-only";
+    
+    let iconSvg = '';
+    if (act.includes('conversation') || act.includes('chat')) {
+      iconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
+    }
+    else if (act.includes('order') || act.includes('receipt')) {
+      iconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>`;
+    }
+    else if (act.includes('email') || act.includes('address')) {
+      iconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>`;
+    }
+    else if (act.includes('article') || act.includes('viewed')) {
+      iconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`;
+    }
+    else {
+      iconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
+    }
+
+    if (bgClass === "border-only") {
+      return `<div class="status-icon" style="background:transparent; border:1px solid var(--line); color:var(--text-muted); width:20px; height:20px; border-radius:4px;">${iconSvg}</div>`;
+    }
+
+    return `<div class="status-icon ${bgClass}">${iconSvg}</div>`;
+  };
+
   content.innerHTML = `
-    <div class="customer-profile">
-      <div class="customer-profile__avatar">${initials}</div>
-      <div class="customer-profile__name">${escapeHtml(customer.name)}</div>
-      <div class="customer-profile__id">${escapeHtml(customer.id)}</div>
-      <div class="customer-tags">
-        ${customer.tags.map(tag => `<span class="customer-tag">${escapeHtml(tag)}</span>`).join("")}
+    <div class="customer-profile-compact">
+      <div class="customer-profile__avatar-small">
+        <img src="https://i.pravatar.cc/150?u=${encodeURIComponent(customer.email || customer.id)}" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">
+      </div>
+      <div class="customer-profile-info">
+        <div style="display:flex; flex-direction:column; gap:2px; flex:1; overflow:hidden;">
+          <div class="customer-profile__name" style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(customer.name)}</div>
+          <div class="customer-profile__id" style="display:block; font-size:11px; color:var(--text-muted); font-weight:normal;">#${customer.id.substring(0,6).toUpperCase()}</div>
+        </div>
+        <div class="customer-profile-actions" style="margin-top:2px;">
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </div>
       </div>
     </div>
     
-    <div class="customer-section">
-      <div class="customer-section__title">Contact Info</div>
-      <div class="customer-info-row">
-        <span class="label">Email</span>
-        <span class="value">${escapeHtml(customer.email)}</span>
+    <div class="customer-contact-list">
+      <div class="contact-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+        <span class="value link">${escapeHtml(customer.email)}</span>
       </div>
-      <div class="customer-info-row">
-        <span class="label">Phone</span>
-        <span class="value">${escapeHtml(customer.phone)}</span>
+      <div class="contact-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+        <span class="value">+1 (415) 123-2399</span>
+      </div>
+      <div class="contact-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        <span class="value">United States</span>
+      </div>
+      <div class="contact-item tags">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+        <div class="customer-tags-inline">
+          <span class="customer-tag">premium</span>
+          <span class="customer-tag">priority shopping</span>
+        </div>
+      </div>
+      <div class="contact-item note" style="align-items: flex-start; margin-top: 12px;">
+        <svg style="margin-top: 10px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        <textarea class="note-textarea" placeholder="Add user notes"></textarea>
       </div>
     </div>
-    
-    <div class="customer-section">
-      <div class="customer-section__title">Account Summary</div>
-      <div class="customer-info-row">
-        <span class="label">Tier</span>
-        <span class="value">${escapeHtml(customer.loyalty_tier)}</span>
+
+    <div class="customer-section interactions-section">
+      <div class="interactions-header">
+        <div class="customer-section__title">Interactions</div>
+        <div class="interactions-actions">
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </div>
       </div>
-      <div class="customer-info-row">
-        <span class="label">LTV</span>
-        <span class="value">${escapeHtml(customer.lifetime_value)}</span>
-      </div>
-      <div class="customer-info-row">
-        <span class="label">Last Order</span>
-        <span class="value" style="color: var(--accent); cursor: pointer; text-decoration: underline;">${escapeHtml(customer.recent_order)}</span>
+      <div class="interactions-timeline-compact">
+        ${interactions.map((item, index) => `
+          <div class="timeline-item-compact ${item.highlight ? 'highlight' : ''}">
+            <div class="timeline-status-col">
+               ${getStatusIcon(item)}
+               ${index < interactions.length - 1 ? '<div class="timeline-line"></div>' : ''}
+            </div>
+            <div class="timeline-content">
+              <div class="timeline-action">${escapeHtml(item.action)}</div>
+              <div class="timeline-time">${escapeHtml(item.time)}</div>
+            </div>
+          </div>
+        `).join('')}
       </div>
     </div>
   `;
@@ -2423,6 +2589,35 @@ document.getElementById("save-view-btn")?.addEventListener("click", () => {
     renderSavedViews();
   }
 });
+
+const globalFilterBtn = document.getElementById("global-filter-btn");
+const globalFilterDropdown = document.getElementById("global-filter-dropdown");
+if (globalFilterBtn && globalFilterDropdown) {
+  globalFilterBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    globalFilterDropdown.classList.toggle("hidden");
+  });
+  document.addEventListener("click", (e) => {
+    if (!globalFilterDropdown.contains(e.target) && !globalFilterBtn.contains(e.target)) {
+      globalFilterDropdown.classList.add("hidden");
+    }
+  });
+}
+
+const globalBulkSelectBtn = document.getElementById("global-bulk-select-btn");
+if (globalBulkSelectBtn) {
+  globalBulkSelectBtn.addEventListener("click", () => {
+    const sidebar = document.getElementById("sidebar");
+    const isActive = sidebar.classList.toggle("bulk-mode-active");
+    globalBulkSelectBtn.classList.toggle("active", isActive);
+    if (!isActive) {
+      document.querySelectorAll(".conv-checkbox").forEach(cb => cb.checked = false);
+      selectedConversations.clear();
+      updateBulkActionBar();
+    }
+  });
+}
+
 document.getElementById("apply-filters-btn")?.addEventListener("click", () => {
   document.getElementById("clear-filters-btn").style.display = "inline-block";
   loadConversations();

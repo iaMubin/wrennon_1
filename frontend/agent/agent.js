@@ -543,13 +543,17 @@ function renderConversationList(conversations) {
       avatarHtml = `<img src="https://i.pravatar.cc/150?u=${encodeURIComponent(dpId)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border-light); box-shadow: 0 1px 3px rgba(0,0,0,0.1);" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">`;
     }
 
+    const shortIdForBadge = conv.short_id || conv.session_id;
+    const ticketIdText = shortIdForBadge ? `#${shortIdForBadge.substring(0, 8).toUpperCase()}` : '';
+
     item.innerHTML = `
       <div class="conv-item-header" style="display: flex; justify-content: space-between;">
         <div style="display: flex; gap: 10px; align-items: center; overflow: hidden;">
-            <input type="checkbox" class="conv-checkbox" data-session-id="${conv.session_id}" onclick="event.stopPropagation(); toggleBulkSelection(this, '${conv.session_id}')" style="cursor: pointer; flex-shrink: 0;">
+            <input type="checkbox" class="conv-checkbox" data-session-id="${conv.session_id}" onclick="event.stopPropagation(); toggleBulkSelection(this, '${conv.session_id}')" style="cursor: pointer; flex-shrink: 0; display: none;">
             <span class="conv-item-email" style="display:flex; align-items:center; gap:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size: 14px; font-weight: 500;">
                 ${avatarHtml}
                 <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(customerDisplayName)}</span>
+                <span style="background: var(--bg-hover); color: var(--text-muted); padding: 1px 6px; border-radius: 4px; font-size: 10px; font-family: monospace; border: 1px solid var(--border-light); line-height: 1.2;">${ticketIdText}</span>
             </span>
         </div>
         <span class="conv-item-time" style="flex-shrink: 0;">${formatSidebarTime(conv.updated_at)}</span>
@@ -631,6 +635,11 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
   agentInput.dispatchEvent(new Event("input"));
 
   conversationEmail.textContent = customerEmail || "Unknown Customer";
+  const ticketIdBadge = document.getElementById("ticket-id-badge");
+  if (ticketIdBadge) {
+    const idStr = shortId || sessionId;
+    ticketIdBadge.textContent = `#${idStr.substring(0, 8).toUpperCase()}`;
+  }
   const webSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
   const waSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>`;
   const igSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>`;
@@ -1643,18 +1652,51 @@ function showOrderPopup(order) {
   
   const statusClass = `order-status-badge--${(order.status || '').toLowerCase()}`;
   
+  const statuses = ['placed', 'processing', 'shipped', 'delivered'];
+  const currentStatusIndex = statuses.indexOf((order.status || 'placed').toLowerCase());
+  
+  const timelineEvents = [
+    { label: 'Order Placed', time: '10:00 AM', icon: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>' },
+    { label: 'Processing', time: '11:30 AM', icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>' },
+    { label: 'Shipped', time: '02:15 PM', icon: '<circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>' },
+    { label: 'Delivered', time: '04:00 PM', icon: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>' },
+  ];
+
+  let timelineHtml = timelineEvents.map((evt, i) => {
+    return { ...evt, isCompleted: i <= currentStatusIndex };
+  }).reverse().map((evt, index, arr) => {
+    const isLast = index === arr.length - 1;
+    return `
+      <div class="order-timeline-item">
+        <div class="order-timeline-icon">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${evt.icon}</svg>
+        </div>
+        ${!isLast ? '<div class="order-timeline-line"></div>' : ''}
+        <div class="order-timeline-content">
+          <div class="order-timeline-label">${evt.label}</div>
+          ${evt.isCompleted ? `<div class="order-timeline-time">${evt.time}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
   body.innerHTML = `
-    <div class="order-popup__field">
-      <span class="order-popup__label">Order ID</span>
-      <span class="order-popup__value">#${escapeHtml(order.order_id)}</span>
+    <div class="order-popup__details-col">
+      <div class="order-popup__field">
+        <span class="order-popup__label">Order ID</span>
+        <span class="order-popup__value">#${escapeHtml(order.order_id)}</span>
+      </div>
+      <div class="order-popup__field">
+        <span class="order-popup__label">Status</span>
+        <span class="order-popup__value"><span class="order-status-badge ${statusClass}">${escapeHtml(order.status)}</span></span>
+      </div>
+      ${order.carrier ? `<div class="order-popup__field"><span class="order-popup__label">Carrier</span><span class="order-popup__value">${escapeHtml(order.carrier)}</span></div>` : ''}
+      ${order.eta ? `<div class="order-popup__field"><span class="order-popup__label">ETA</span><span class="order-popup__value">${escapeHtml(order.eta)}</span></div>` : ''}
+      ${order.tracking_url ? `<div class="order-popup__field" style="grid-column: span 2;"><span class="order-popup__label">Tracking</span><span class="order-popup__value"><a href="${escapeHtml(order.tracking_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(order.tracking_url)}</a></span></div>` : ''}
     </div>
-    <div class="order-popup__field">
-      <span class="order-popup__label">Status</span>
-      <span class="order-popup__value"><span class="order-status-badge ${statusClass}">${escapeHtml(order.status)}</span></span>
+    <div class="order-popup__timeline-col">
+      ${timelineHtml}
     </div>
-    ${order.carrier ? `<div class="order-popup__field"><span class="order-popup__label">Carrier</span><span class="order-popup__value">${escapeHtml(order.carrier)}</span></div>` : ''}
-    ${order.eta ? `<div class="order-popup__field"><span class="order-popup__label">ETA</span><span class="order-popup__value">${escapeHtml(order.eta)}</span></div>` : ''}
-    ${order.tracking_url ? `<div class="order-popup__field" style="grid-column: span 2;"><span class="order-popup__label">Tracking</span><span class="order-popup__value"><a href="${escapeHtml(order.tracking_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(order.tracking_url)}</a></span></div>` : ''}
   `;
   popup.classList.remove('hidden');
   body.classList.remove('hidden');
@@ -1895,10 +1937,23 @@ function formatTime(isoString) {
 }
 
 function formatSidebarTime(isoString) {
+  if (!isoString) return '';
   const date = new Date(isoString);
-  const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: "Asia/Dhaka" });
-  const timeStr = date.toLocaleTimeString('en-US', { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dhaka" });
-  return `${dateStr}, ${timeStr}`;
+  const now = new Date();
+  
+  const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+  
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = date.getDate() === yesterday.getDate() && date.getMonth() === yesterday.getMonth() && date.getFullYear() === yesterday.getFullYear();
+
+  if (isToday) {
+    return date.toLocaleTimeString('en-GB', { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dhaka" });
+  } else if (isYesterday) {
+    return 'Yesterday';
+  } else {
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: "Asia/Dhaka" });
+  }
 }
 
 function logout() {
@@ -2121,11 +2176,35 @@ function showCustomerSidebar(customer) {
     { action: 'Receipt for order #2232534', time: 'Jan 05, 3:24 PM', status: 'S' }
   ];
 
-  const getStatusIcon = (status) => {
-    if (status === 'O') return `<div class="status-icon bg-red">O</div>`;
-    if (status === 'P') return `<div class="status-icon bg-blue">P</div>`;
-    if (status === 'S') return `<div class="status-icon bg-gray">S</div>`;
-    return `<div class="status-icon border-only"></div>`;
+  const getStatusIcon = (item) => {
+    const act = item.action.toLowerCase();
+    let bgClass = "bg-gray";
+    if (item.status === 'O') bgClass = "bg-red";
+    if (item.status === 'P') bgClass = "bg-blue";
+    if (item.status === 'empty') bgClass = "border-only";
+    
+    let iconSvg = '';
+    if (act.includes('conversation') || act.includes('chat')) {
+      iconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
+    }
+    else if (act.includes('order') || act.includes('receipt')) {
+      iconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>`;
+    }
+    else if (act.includes('email') || act.includes('address')) {
+      iconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>`;
+    }
+    else if (act.includes('article') || act.includes('viewed')) {
+      iconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`;
+    }
+    else {
+      iconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
+    }
+
+    if (bgClass === "border-only") {
+      return `<div class="status-icon" style="background:transparent; border:1px solid var(--line); color:var(--text-muted); width:20px; height:20px; border-radius:4px;">${iconSvg}</div>`;
+    }
+
+    return `<div class="status-icon ${bgClass}">${iconSvg}</div>`;
   };
 
   content.innerHTML = `
@@ -2134,8 +2213,11 @@ function showCustomerSidebar(customer) {
         <img src="https://i.pravatar.cc/150?u=${encodeURIComponent(customer.email || customer.id)}" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">
       </div>
       <div class="customer-profile-info">
-        <div class="customer-profile__name">${escapeHtml(customer.name)} <span class="customer-profile__id" style="font-size:11px; color:var(--text-muted); font-weight:normal; margin-left:6px;">#${customer.id.substring(0,6).toUpperCase()}</span></div>
-        <div class="customer-profile-actions">
+        <div style="display:flex; flex-direction:column; gap:2px; flex:1; overflow:hidden;">
+          <div class="customer-profile__name" style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(customer.name)}</div>
+          <div class="customer-profile__id" style="display:block; font-size:11px; color:var(--text-muted); font-weight:normal;">#${customer.id.substring(0,6).toUpperCase()}</div>
+        </div>
+        <div class="customer-profile-actions" style="margin-top:2px;">
            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -2173,8 +2255,10 @@ function showCustomerSidebar(customer) {
       <div class="interactions-header">
         <div class="customer-section__title">Interactions</div>
         <div class="interactions-actions">
-           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
-           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Wishlist"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Cart"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Filter"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Refresh"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </div>
       </div>
@@ -2182,7 +2266,7 @@ function showCustomerSidebar(customer) {
         ${interactions.map((item, index) => `
           <div class="timeline-item-compact ${item.highlight ? 'highlight' : ''}">
             <div class="timeline-status-col">
-               ${getStatusIcon(item.status)}
+               ${getStatusIcon(item)}
                ${index < interactions.length - 1 ? '<div class="timeline-line"></div>' : ''}
             </div>
             <div class="timeline-content">
