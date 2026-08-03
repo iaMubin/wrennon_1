@@ -2900,3 +2900,280 @@ loadAgents = async function() {
         });
     }
 }
+
+// --- View Switching Logic ---
+document.addEventListener('DOMContentLoaded', () => {
+  const views = {
+    'dashboard': document.getElementById('view-dashboard'),
+    'conversations': document.getElementById('view-conversations'),
+    'customers': document.getElementById('view-customers'),
+    'analytics': document.getElementById('view-analytics')
+  };
+  const btns = {
+    'dashboard': document.getElementById('nav-dashboard-btn'),
+    'conversations': document.getElementById('nav-conversations-btn'),
+    'customers': document.getElementById('nav-customers-btn'),
+    'analytics': document.getElementById('nav-analytics-btn')
+  };
+
+  function switchView(viewName) {
+    // Hide all views and remove active class from all buttons
+    Object.keys(views).forEach(key => {
+      if(views[key]) views[key].classList.add('hidden');
+      if(btns[key]) btns[key].classList.remove('active');
+    });
+
+    // Show selected view and set button to active
+    if(views[viewName]) {
+      views[viewName].classList.remove('hidden');
+    }
+    if(btns[viewName]) {
+      btns[viewName].classList.add('active');
+    }
+  }
+
+  if(btns['dashboard']) btns['dashboard'].addEventListener('click', () => switchView('dashboard'));
+  if(btns['conversations']) btns['conversations'].addEventListener('click', () => switchView('conversations'));
+  if(btns['customers']) btns['customers'].addEventListener('click', () => switchView('customers'));
+  if(btns['analytics']) btns['analytics'].addEventListener('click', () => switchView('analytics'));
+});
+
+
+// --- Production Features Logic ---
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Chart.js Initialization
+    let volumeChart, csatChart, resolutionChart, miniVolumeChart;
+
+    function initCharts() {
+        const textColor = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#1e293b';
+        const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--line').trim() || '#e2e8f0';
+        const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#3b82f6';
+        
+        Chart.defaults.color = textColor;
+        Chart.defaults.font.family = "'Inter', sans-serif";
+
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: { grid: { color: gridColor } },
+                y: { grid: { color: gridColor }, beginAtZero: true }
+            }
+        };
+
+        // Mini Volume Chart (Dashboard)
+        const ctxMini = document.getElementById('miniVolumeChart');
+        if(ctxMini && !miniVolumeChart) {
+            miniVolumeChart = new Chart(ctxMini, {
+                type: 'line',
+                data: {
+                    labels: ['8am', '10am', '12pm', '2pm', '4pm', '6pm'],
+                    datasets: [{
+                        data: [12, 28, 45, 32, 56, 18],
+                        borderColor: accentColor,
+                        borderWidth: 2,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    scales: { x: { display: false }, y: { display: false } }
+                }
+            });
+        }
+
+        // Volume Chart (Analytics)
+        const ctxVol = document.getElementById('volumeChart');
+        if(ctxVol && !volumeChart) {
+            volumeChart = new Chart(ctxVol, {
+                type: 'line',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [{
+                        label: 'Tickets',
+                        data: [120, 190, 150, 220, 180, 90, 110],
+                        borderColor: accentColor,
+                        backgroundColor: accentColor + '20',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: commonOptions
+            });
+        }
+
+        // CSAT Chart (Analytics)
+        const ctxCsat = document.getElementById('csatChart');
+        if(ctxCsat && !csatChart) {
+            csatChart = new Chart(ctxCsat, {
+                type: 'doughnut',
+                data: {
+                    labels: ['5 Stars', '4 Stars', '3 Stars', '1-2 Stars'],
+                    datasets: [{
+                        data: [65, 20, 10, 5],
+                        backgroundColor: ['#22c55e', '#84cc16', '#eab308', '#ef4444'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: { position: 'right' }
+                    }
+                }
+            });
+        }
+
+        // Resolution Chart (Analytics)
+        const ctxRes = document.getElementById('resolutionChart');
+        if(ctxRes && !resolutionChart) {
+            resolutionChart = new Chart(ctxRes, {
+                type: 'bar',
+                data: {
+                    labels: ['Email', 'Chat', 'Social', 'Phone'],
+                    datasets: [{
+                        label: 'Avg Hours',
+                        data: [12, 1.5, 4, 0.5],
+                        backgroundColor: accentColor,
+                        borderRadius: 4
+                    }]
+                },
+                options: commonOptions
+            });
+        }
+    }
+
+    // Call initCharts when Analytics view is shown, or just initialize immediately if Chart.js is loaded
+    if(typeof Chart !== 'undefined') {
+        initCharts();
+    } else {
+        // Fallback if CDN is slow
+        setTimeout(initCharts, 1000);
+    }
+
+
+    // 2. Customers Table Logic (Mock API & Rendering)
+    const mockCustomers = [
+        { id: 1, name: "Sarah Johnson", email: "sarah.j@example.com", initials: "SJ", color: "var(--accent)", plan: "Pro", tickets: 24, ltv: ",200", lastActive: "Just now", status: "Online", isOnline: true },
+        { id: 2, name: "Michael Ross", email: "mross@company.com", initials: "MR", color: "#64748b", plan: "Enterprise", tickets: 142, ltv: ",500", lastActive: "2 hrs ago", status: "Offline", isOnline: false },
+        { id: 3, name: "Jessica Alba", email: "jess@startup.io", initials: "JA", color: "#10b981", plan: "Pro", tickets: 8, ltv: "", lastActive: "Yesterday", status: "Offline", isOnline: false },
+        { id: 4, name: "David Chen", email: "david.c@tech.co", initials: "DC", color: "#f59e0b", plan: "Basic", tickets: 3, ltv: "", lastActive: "5 mins ago", status: "Online", isOnline: true },
+        { id: 5, name: "Emma Watson", email: "emma@design.net", initials: "EW", color: "#ec4899", plan: "Enterprise", tickets: 87, ltv: ",400", lastActive: "1 day ago", status: "Offline", isOnline: false },
+        { id: 6, name: "James Bond", email: "007@mi6.gov.uk", initials: "JB", color: "#334155", plan: "Enterprise", tickets: 1, ltv: ",000", lastActive: "3 weeks ago", status: "Offline", isOnline: false },
+        { id: 7, name: "Olivia Pope", email: "olivia@fixer.com", initials: "OP", color: "#8b5cf6", plan: "Pro", tickets: 45, ltv: ",200", lastActive: "Today", status: "Online", isOnline: true },
+    ];
+
+    let currentSort = { column: 'tickets', dir: 'desc' };
+
+    function renderCustomers() {
+        const tbody = document.getElementById('customers-table-body');
+        if(!tbody) return;
+        
+        // Sort
+        const sorted = [...mockCustomers].sort((a, b) => {
+            let valA = a[currentSort.column];
+            let valB = b[currentSort.column];
+            
+            // Handle numeric sorting for strings like ",200"
+            if(typeof valA === 'string' && valA.startsWith('$')) {
+                valA = parseFloat(valA.replace(/[$,]/g, ''));
+                valB = parseFloat(valB.replace(/[$,]/g, ''));
+            }
+
+            if (valA < valB) return currentSort.dir === 'asc' ? -1 : 1;
+            if (valA > valB) return currentSort.dir === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        tbody.innerHTML = sorted.map(c => `
+            <tr>
+                <td>
+                    <div class="customer-cell">
+                    <div class="avatar" style="background: ${c.color};">${c.initials}</div>
+                    <div>
+                        <div class="name">${c.name}</div>
+                        <div class="email">${c.email}</div>
+                    </div>
+                    </div>
+                </td>
+                <td><span class="plan-badge plan-${c.plan.toLowerCase()}">${c.plan}</span></td>
+                <td>${c.tickets}</td>
+                <td>${c.ltv}</td>
+                <td>${c.lastActive}</td>
+                <td><span class="badge ${c.isOnline ? 'badge-active' : 'badge-offline'}">${c.status}</span></td>
+                <td>
+                    <button class="btn-icon" title="More Actions">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+
+        // Update headers
+        document.querySelectorAll('th.sortable').forEach(th => {
+            th.classList.remove('sort-asc', 'sort-desc');
+            if(th.dataset.sort === currentSort.column) {
+                th.classList.add(currentSort.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+            }
+        });
+    }
+
+    document.querySelectorAll('th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.dataset.sort;
+            if(currentSort.column === col) {
+                currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.column = col;
+                currentSort.dir = 'asc';
+            }
+            renderCustomers();
+        });
+    });
+
+    renderCustomers();
+
+    // 3. Populate SLA Risks
+    const slaList = document.getElementById('sla-risk-list');
+    if(slaList) {
+        slaList.innerHTML = `
+            <div class="activity-item warning">
+                <div class="activity-icon" style="background: var(--warning); color: white;">!</div>
+                <div class="activity-details" style="flex: 1;">
+                    <p style="display:flex; justify-content: space-between;"><strong>VIP Customer Waiting</strong> <span class="badge" style="background: var(--danger); color:white;">14m breach</span></p>
+                    <span class="time">Ticket #4928 - Enterprise Plan</span>
+                </div>
+            </div>
+            <div class="activity-item">
+                <div class="activity-icon" style="background: var(--warning); color: white;">!</div>
+                <div class="activity-details" style="flex: 1;">
+                    <p style="display:flex; justify-content: space-between;"><strong>SLA Warning</strong> <span class="badge" style="background: var(--warning); color:white;">5m remaining</span></p>
+                    <span class="time">Ticket #4931 - Refund Request</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // 4. Update Charts when theme changes
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.attributeName === 'data-theme') {
+                if(volumeChart) volumeChart.destroy();
+                if(csatChart) csatChart.destroy();
+                if(resolutionChart) resolutionChart.destroy();
+                if(miniVolumeChart) miniVolumeChart.destroy();
+                volumeChart = csatChart = resolutionChart = miniVolumeChart = null;
+                setTimeout(initCharts, 100);
+            }
+        });
+    });
+    observer.observe(document.documentElement, { attributes: true });
+
+});
