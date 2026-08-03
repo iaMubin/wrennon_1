@@ -204,7 +204,8 @@ def dashboard_summary(
 ):
     from sqlalchemy import func
     from datetime import datetime
-    import pytz
+    from zoneinfo import ZoneInfo
+    from datetime import timezone
 
     open_tickets = db.query(Conversation).filter(Conversation.resolved == False).count()
 
@@ -213,10 +214,10 @@ def dashboard_summary(
         Conversation.resolved == False
     ).count()
 
-    tz = pytz.timezone('Asia/Dhaka')
+    tz = ZoneInfo('Asia/Dhaka')
     now = datetime.now(tz)
     start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    start_of_today_utc_naive = start_of_today.astimezone(pytz.utc).replace(tzinfo=None)
+    start_of_today_utc_naive = start_of_today.astimezone(timezone.utc).replace(tzinfo=None)
     
     solved_today = db.query(Conversation).filter(
         Conversation.resolved == True,
@@ -243,7 +244,7 @@ def dashboard_summary(
     hourly_volume = [0] * 24
     for c in todays_convs:
         if c.created_at.tzinfo is None:
-             local_dt = pytz.utc.localize(c.created_at).astimezone(tz)
+             local_dt = c.created_at.replace(tzinfo=timezone.utc).astimezone(tz)
         else:
              local_dt = c.created_at.astimezone(tz)
         hourly_volume[local_dt.hour] += 1
