@@ -216,10 +216,11 @@ def dashboard_summary(
     tz = pytz.timezone('Asia/Dhaka')
     now = datetime.now(tz)
     start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_today_utc_naive = start_of_today.astimezone(pytz.utc).replace(tzinfo=None)
     
     solved_today = db.query(Conversation).filter(
         Conversation.resolved == True,
-        Conversation.resolved_at >= start_of_today
+        Conversation.resolved_at >= start_of_today_utc_naive
     ).count()
 
     csat_avg = db.query(func.avg(CSATResponse.rating)).scalar()
@@ -236,7 +237,7 @@ def dashboard_summary(
     agent_chat_counts = {agent_name: count for agent_name, count in chat_counts}
     
     todays_convs = db.query(Conversation.created_at).filter(
-        Conversation.created_at >= start_of_today
+        Conversation.created_at >= start_of_today_utc_naive
     ).all()
 
     hourly_volume = [0] * 24

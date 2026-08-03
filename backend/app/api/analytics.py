@@ -25,6 +25,7 @@ def get_dashboard_metrics(
     tz = pytz.timezone('Asia/Dhaka')
     now = datetime.now(tz)
     start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_today_utc_naive = start_of_today.astimezone(pytz.utc).replace(tzinfo=None)
 
     # 1. Avg Resolution Time & One-touch %
     resolved_convs = db.query(
@@ -82,7 +83,7 @@ def get_dashboard_metrics(
             
     # 4. Volume Trend (Today's hourly)
     todays_convs = db.query(Conversation.created_at).filter(
-        Conversation.created_at >= start_of_today
+        Conversation.created_at >= start_of_today_utc_naive
     ).all()
     hourly_volume = [0] * 24
     for c in todays_convs:
