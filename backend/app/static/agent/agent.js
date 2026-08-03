@@ -195,7 +195,6 @@ loginForm.addEventListener("submit", async (e) => {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
-      credentials: "include",
     });
 
     if (!response.ok) {
