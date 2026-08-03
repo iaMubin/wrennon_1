@@ -210,6 +210,13 @@ loginForm.addEventListener("submit", async (e) => {
     // button) is kept client-side.
     localStorage.setItem("agent_username", username); // Save username to identify self
     localStorage.setItem("agent_role", data.role); // Save role to show admin btn
+    if (data.dp_url) {
+      localStorage.setItem("agent_dp_url", data.dp_url);
+      document.getElementById("agent-profile-dp").src = data.dp_url;
+    } else {
+      localStorage.removeItem("agent_dp_url");
+      document.getElementById("agent-profile-dp").src = "/agent/images/default-avatar.svg";
+    }
     
     if (data.role === "manager" || data.role === "admin") {
       document.getElementById("admin-dashboard-btn").classList.remove("hidden");
@@ -1472,16 +1479,32 @@ if (sendToggleBtn && sendTypeMenu) {
 }
 
 if (noteTypeSelect && chatInputWrapper) {
-  noteTypeSelect.addEventListener("change", () => {
+  function updatePlaceholder() {
     if (noteTypeSelect.value === "internal") {
       chatInputWrapper.classList.add("internal-mode");
-      agentInput.placeholder = "Type internal note... (Use @ to tag, / for cmds)";
+      // Use the actual width of the input to determine if we should show the full message
+      agentInput.placeholder = agentInput.clientWidth > 380 
+        ? "Type internal note... (Use @ to tag, / for cmds)" 
+        : "Type internal note...";
       document.getElementById("agent-send-btn").textContent = "Add Note";
     } else {
       chatInputWrapper.classList.remove("internal-mode");
       agentInput.placeholder = "Type a message...";
       document.getElementById("agent-send-btn").textContent = "Send";
     }
+  }
+
+  // Observe the input element's width to dynamically update placeholder
+  // This handles both window resizing and sidebar toggling
+  const resizeObserver = new ResizeObserver(() => {
+    if (noteTypeSelect.value === "internal") {
+      updatePlaceholder();
+    }
+  });
+  resizeObserver.observe(agentInput);
+
+  noteTypeSelect.addEventListener("change", () => {
+    updatePlaceholder();
     agentInput.focus();
   });
 }
@@ -1626,7 +1649,7 @@ async function fetchOrderContext(sessionId) {
   const result = await authedFetch(`/agent/conversations/${sessionId}/order-context`);
   if (result) {
     if (result.order) {
-      showOrderPopup(result.order);
+      showOrderPopup(result.order, result.customer);
     } else {
       hideOrderPopup();
     }
@@ -1645,25 +1668,121 @@ async function fetchOrderContext(sessionId) {
   }
 }
 
-function showOrderPopup(order) {
+function showOrderPopup(order, customer) {
   const popup = document.getElementById('order-popup');
   const body = document.getElementById('order-popup-body');
   if (!popup || !body) return;
   
   const statusClass = `order-status-badge--${(order.status || '').toLowerCase()}`;
   
+  const formatTime = (isoStr) => {
+    if (!isoStr) return '';
+    try {
+      const d = new Date(isoStr);
+      if (isNaN(d.getTime())) return isoStr;
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return isoStr;
+    }
+  };
+
+  const statuses = ['placed', 'processing', 'shipped', 'delivered'];
+  let currentStatus = (order.status || 'placed').toLowerCase();
+  
+  const baseTimelineEvents = [
+    { status: 'placed', label: 'Order Placed', time: '', icon: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>' },
+    { status: 'processing', label: 'Processing', time: '', icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>' },
+    { status: 'shipped', label: 'Shipped', time: '', icon: '<circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>' },
+    { status: 'delivered', label: 'Delivered', time: '', icon: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>' },
+  ];
+  
+  if (currentStatus === 'cancelled') {
+      baseTimelineEvents[3] = { status: 'cancelled', label: 'Cancelled', time: '', icon: '<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>' };
+  }
+
+  const timelineEvents = baseTimelineEvents.map(baseEvt => {
+      let time = '';
+      if (order.timeline && Array.isArray(order.timeline)) {
+          const matched = order.timeline.find(t => t.status === baseEvt.status);
+          if (matched && matched.time) {
+              time = formatTime(matched.time);
+          }
+      }
+      return { ...baseEvt, time };
+  });
+
+  const currentStatusIndex = statuses.indexOf(currentStatus);
+
+  let timelineHtml = timelineEvents.map((evt, i) => {
+    const isCompleted = (order.timeline && Array.isArray(order.timeline)) 
+        ? !!order.timeline.find(t => t.status === evt.status) 
+        : (i <= currentStatusIndex);
+    return { ...evt, isCompleted };
+  }).reverse().map((evt, index, arr) => {
+    const isLast = index === arr.length - 1;
+    return `
+      <div class="order-timeline-item ${!evt.isCompleted ? 'order-timeline-item--incomplete' : ''}">
+        <div class="order-timeline-icon ${evt.isCompleted ? `order-timeline-icon--${evt.status}` : 'order-timeline-icon--incomplete'}">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${evt.icon}</svg>
+        </div>
+        ${!isLast ? '<div class="order-timeline-line"></div>' : ''}
+        <div class="order-timeline-content">
+          <div class="order-timeline-label">${evt.label}</div>
+          ${evt.isCompleted ? `<div class="order-timeline-time">${evt.time}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const availableFields = [];
+  
+  if (customer && customer.name) {
+      availableFields.push({ label: 'Customer', value: escapeHtml(customer.name) });
+  }
+  
+  availableFields.push({ label: 'Order ID', value: `#${escapeHtml(order.order_id)}` });
+  availableFields.push({ label: 'Status', value: `<span class="order-status-badge ${statusClass}">${escapeHtml(order.status)}</span>` });
+  
+  if (order.order_date) availableFields.push({ label: 'Date', value: escapeHtml(order.order_date) });
+  if (order.total_amount) availableFields.push({ label: 'Total', value: escapeHtml(order.total_amount) });
+  
+  if ((order.status || '').toLowerCase() === 'shipped' || (order.status || '').toLowerCase() === 'delivered') {
+      if (order.tracking_url || order.carrier) {
+          let labelHtml = `<span style="display:flex; align-items:center;">Tracking ${order.carrier ? `<span style="margin-left: 6px; padding: 2px 4px; background: color-mix(in srgb, var(--ink) 8%, transparent); border-radius: 4px; font-family: var(--font-sans); font-size: 10px; font-weight: 600; color: var(--ink); text-transform: none; letter-spacing: normal;">${escapeHtml(order.carrier)}</span>` : ''}</span>`;
+          let valueHtml = '';
+          if (order.tracking_url) {
+              valueHtml = `<div style="display: flex; align-items: center; gap: 4px; line-height: 1;"><a href="${escapeHtml(order.tracking_url)}" target="_blank" rel="noopener noreferrer" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${escapeHtml(order.tracking_url)}</a><button class="icon-action-btn" style="padding: 2px; height: 18px; width: 18px; margin: 0; min-height: 0; min-width: 0;" onclick="navigator.clipboard.writeText('${escapeHtml(order.tracking_url)}')" title="Copy tracking URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>`;
+          } else {
+              valueHtml = `<span style="color: var(--text-muted);">No tracking link</span>`;
+          }
+          availableFields.push({ 
+              label: labelHtml, 
+              value: valueHtml,
+              span: 2
+          });
+      }
+  }
+  
+  if (order.eta && (order.status || '').toLowerCase() !== 'delivered' && (order.status || '').toLowerCase() !== 'cancelled') {
+      availableFields.push({ label: 'ETA', value: escapeHtml(order.eta) });
+  }
+  
+  if (order.payment_method) availableFields.push({ label: 'Payment', value: escapeHtml(order.payment_method) });
+  if (order.shipping_method) availableFields.push({ label: 'Shipping', value: escapeHtml(order.shipping_method) });
+
+  const fieldsToShow = availableFields.slice(0, 5);
+  
+  const fieldsHtml = fieldsToShow.map(f => {
+      return `<div class="order-popup__field" ${f.span ? `style="grid-column: span ${f.span};"` : ''}><span class="order-popup__label">${f.label}</span><span class="order-popup__value">${f.value}</span></div>`;
+  }).join('');
+
   body.innerHTML = `
-    <div class="order-popup__field">
-      <span class="order-popup__label">Order ID</span>
-      <span class="order-popup__value">#${escapeHtml(order.order_id)}</span>
+    <div class="order-popup__details-col">
+      ${fieldsHtml}
     </div>
-    <div class="order-popup__field">
-      <span class="order-popup__label">Status</span>
-      <span class="order-popup__value"><span class="order-status-badge ${statusClass}">${escapeHtml(order.status)}</span></span>
+    <div class="order-popup__timeline-col">
+      ${timelineHtml}
     </div>
-    ${order.carrier ? `<div class="order-popup__field"><span class="order-popup__label">Carrier</span><span class="order-popup__value">${escapeHtml(order.carrier)}</span></div>` : ''}
-    ${order.eta ? `<div class="order-popup__field"><span class="order-popup__label">ETA</span><span class="order-popup__value">${escapeHtml(order.eta)}</span></div>` : ''}
-    ${order.tracking_url ? `<div class="order-popup__field" style="grid-column: span 2;"><span class="order-popup__label">Tracking</span><span class="order-popup__value"><a href="${escapeHtml(order.tracking_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(order.tracking_url)}</a></span></div>` : ''}
   `;
   popup.classList.remove('hidden');
   body.classList.remove('hidden');
@@ -1935,6 +2054,7 @@ function logout() {
 
   localStorage.removeItem("agent_username");
   localStorage.removeItem("agent_role");
+  localStorage.removeItem("agent_dp_url");
   
   const antiFlash = document.getElementById('anti-flash-style');
   if(antiFlash) antiFlash.remove();
@@ -1948,6 +2068,7 @@ function logout() {
 document.addEventListener("DOMContentLoaded", async () => {
   const savedUsername = localStorage.getItem("agent_username");
   const savedRole = localStorage.getItem("agent_role");
+  const savedDp = localStorage.getItem("agent_dp_url");
   
   if (savedUsername) {
     // We make a test request to see if we're authenticated, since the token is an HTTP-only cookie.
@@ -1956,6 +2077,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (checkAuth) {
       loginScreen.classList.add("hidden");
       dashboard.classList.remove("hidden");
+      
+      if (savedDp) {
+        const dpEl = document.getElementById("agent-profile-dp");
+        if (dpEl) dpEl.src = savedDp;
+      }
       
       if (savedRole === "manager" || savedRole === "admin") {
         const adminBtn = document.getElementById("admin-dashboard-btn");
@@ -2143,6 +2269,24 @@ function showCustomerSidebar(customer) {
     { action: 'Receipt for order #2232534', time: 'Jan 05, 3:24 PM', status: 'S' }
   ];
 
+  window.addCustomerNote = function(inputElem, event) {
+    if (event.key !== 'Enter') return;
+    const text = inputElem.value.trim();
+    if (!text) return;
+    inputElem.value = '';
+    const container = inputElem.parentElement.previousElementSibling;
+    const noteDiv = document.createElement('div');
+    noteDiv.style.cssText = 'background: color-mix(in srgb, var(--accent) 8%, transparent); padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--ink); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; line-height: 1.4; margin-bottom: 6px;';
+    const escapedText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    noteDiv.innerHTML = `
+      <span style="flex:1;word-break:break-word;">${escapedText}</span>
+      <button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:2px;margin:-2px;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:color 0.2s, background 0.2s;" onmouseover="this.style.color='var(--danger)';this.style.background='color-mix(in srgb, var(--danger) 10%, transparent)'" onmouseout="this.style.color='var(--text-muted)';this.style.background='none'">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    `;
+    container.appendChild(noteDiv);
+  };
+
   const getStatusIcon = (item) => {
     const act = item.action.toLowerCase();
     let bgClass = "bg-gray";
@@ -2175,17 +2319,18 @@ function showCustomerSidebar(customer) {
   };
 
   content.innerHTML = `
-    <div class="customer-profile-compact">
-      <div class="customer-profile__avatar-small">
-        <img src="https://i.pravatar.cc/150?u=${encodeURIComponent(customer.email || customer.id)}" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">
-      </div>
-      <div class="customer-profile-info">
-        <div style="display:flex; flex-direction:column; gap:2px; flex:1; overflow:hidden;">
-          <div class="customer-profile__name" style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(customer.name)}</div>
-          <div class="customer-profile__id" style="display:block; font-size:11px; color:var(--text-muted); font-weight:normal;">#${customer.id.substring(0,6).toUpperCase()}</div>
+    <div class="customer-details-box">
+      <div class="customer-profile-compact">
+        <div class="customer-profile__avatar-small">
+          <img src="https://i.pravatar.cc/150?u=${encodeURIComponent(customer.email || customer.id)}" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">
         </div>
-        <div class="customer-profile-actions" style="margin-top:2px;">
-           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        <div class="customer-profile-info">
+          <div style="display:flex; flex-direction:column; gap:2px; flex:1; overflow:hidden;">
+            <div class="customer-profile__name" style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(customer.name)}</div>
+            <div class="customer-profile__id" style="display:inline-block; width:fit-content; margin-top:2px; font-size:11px; color:var(--text-muted); font-weight:normal;">#${escapeHtml(customer.id)}</div>
+          </div>
+          <div class="customer-profile-actions" style="margin-top:2px;">
+             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </div>
@@ -2212,18 +2357,23 @@ function showCustomerSidebar(customer) {
           <span class="customer-tag">priority shopping</span>
         </div>
       </div>
-      <div class="contact-item note" style="align-items: flex-start; margin-top: 12px;">
-        <svg style="margin-top: 10px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-        <textarea class="note-textarea" placeholder="Add user notes"></textarea>
+      <div class="contact-item note" style="flex-direction: column; align-items: flex-start; margin-top: -4px; width: 100%;">
+        <div id="saved-notes-container" style="display: flex; flex-direction: column; width: 100%;"></div>
+        <div style="display: flex; gap: 10px; width: 100%; align-items: center;">
+          <svg style="flex-shrink: 0; color: var(--text-muted);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          <input type="text" class="note-input-field" placeholder="Add user notes..." style="flex: 1; border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); border-radius: 6px; background: color-mix(in srgb, var(--bg-surface) 50%, transparent); color: var(--ink); font-size: 13px; outline: none; padding: 8px 12px; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='color-mix(in srgb, var(--line) 80%, transparent)'" onkeydown="window.addCustomerNote(this, event)">
+        </div>
       </div>
     </div>
 
-    <div class="customer-section interactions-section">
+    <div class="interactions-section">
       <div class="interactions-header">
         <div class="customer-section__title">Interactions</div>
         <div class="interactions-actions">
-           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
-           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Wishlist"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Cart"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Filter"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Refresh"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </div>
       </div>
@@ -2242,9 +2392,18 @@ function showCustomerSidebar(customer) {
         `).join('')}
       </div>
     </div>
+    </div>
   `;
   
   sidebar.classList.remove("hidden");
+  
+  const toggleBtn = document.getElementById("customer-sidebar-toggle");
+  if (toggleBtn) {
+    const avatarUrl = `https://i.pravatar.cc/150?u=${encodeURIComponent(customer.email || customer.id)}`;
+    toggleBtn.innerHTML = `<img src="${avatarUrl}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" alt="Customer Details" onerror="this.src='/agent/images/default-avatar.png?v=2'">`;
+    toggleBtn.style.padding = "2px";
+    toggleBtn.style.borderRadius = "50%";
+  }
 }
 
 function hideCustomerSidebar() {
@@ -2257,6 +2416,13 @@ function hideCustomerSidebar() {
 function clearCustomerSidebar() {
   hideCustomerSidebar();
   currentlyShowingCustomerId = null;
+  
+  const toggleBtn = document.getElementById("customer-sidebar-toggle");
+  if (toggleBtn) {
+    toggleBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+    toggleBtn.style.padding = "0";
+    toggleBtn.style.borderRadius = "10px";
+  }
 }
 
 // Toggle Sidebar Buttons
@@ -2538,7 +2704,26 @@ document.addEventListener("contextmenu", (e) => {
 
 
 // --- Filters and Saved Views ---
-const savedViews = JSON.parse(localStorage.getItem("wrennon_saved_views") || "[]");
+const savedViews = [];
+
+async function loadSavedViews() {
+    try {
+        const authHeaders = { 'Authorization': 'Bearer ' + getCookie('access_token') };
+        const res = await fetch(`${API_BASE}/agent/saved-views`, {
+            headers: authHeaders,
+            credentials: 'include'
+        });
+        if (res.ok) {
+            const data = await res.json();
+            savedViews.length = 0;
+            savedViews.push(...data);
+            renderSavedViews();
+        }
+    } catch (e) {
+        console.error("Failed to load saved views", e);
+    }
+}
+
 function renderSavedViews() {
   const container = document.getElementById("saved-views-container");
   if (!container) return;
@@ -2553,10 +2738,14 @@ function renderSavedViews() {
         btn.style.border = "1px solid var(--border-light)";
         btn.style.color = "var(--ink)";
         btn.textContent = view.name;
+        
+        let filterObj = {};
+        try { filterObj = JSON.parse(view.filter_json); } catch(e){}
+
         btn.onclick = () => {
-           document.getElementById("filter-priority").value = view.priority || "";
-           document.getElementById("filter-assignee").value = view.assignee || "";
-           document.getElementById("filter-tag").value = view.tag || "";
+           document.getElementById("filter-priority").value = filterObj.priority || "";
+           document.getElementById("filter-assignee").value = filterObj.assignee || "";
+           document.getElementById("filter-tag").value = filterObj.tag || "";
            loadConversations();
            document.getElementById("clear-filters-btn").style.display = "inline-block";
         };
@@ -2564,11 +2753,16 @@ function renderSavedViews() {
         delBtn.innerHTML = "&times;";
         delBtn.style.marginLeft = "4px";
         delBtn.style.fontWeight = "bold";
-        delBtn.onclick = (e) => {
+        delBtn.onclick = async (e) => {
            e.stopPropagation();
-           savedViews.splice(idx, 1);
-           localStorage.setItem("wrennon_saved_views", JSON.stringify(savedViews));
-           renderSavedViews();
+           try {
+               await fetch(`${API_BASE}/agent/saved-views/${view.id}`, {
+                   method: 'DELETE',
+                   headers: { 'Authorization': 'Bearer ' + getCookie('access_token') },
+                   credentials: 'include'
+               });
+               loadSavedViews();
+           } catch(err) { console.error(err); }
         };
         btn.appendChild(delBtn);
         container.appendChild(btn);
@@ -2577,16 +2771,27 @@ function renderSavedViews() {
      container.style.display = "none";
   }
 }
-document.getElementById("save-view-btn")?.addEventListener("click", () => {
+
+document.getElementById("save-view-btn")?.addEventListener("click", async () => {
   const pri = document.getElementById("filter-priority").value;
   const ass = document.getElementById("filter-assignee").value;
   const tag = document.getElementById("filter-tag").value;
   if (!pri && !ass && !tag) return alert("Nothing to save");
   const name = prompt("Name for this view?");
   if (name) {
-    savedViews.push({ name, priority: pri, assignee: ass, tag: tag });
-    localStorage.setItem("wrennon_saved_views", JSON.stringify(savedViews));
-    renderSavedViews();
+    const filterJson = JSON.stringify({ priority: pri, assignee: ass, tag: tag });
+    try {
+        await fetch(`${API_BASE}/agent/saved-views`, {
+            method: 'POST',
+            headers: { 
+                'Authorization': 'Bearer ' + getCookie('access_token'),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name: name, filter_json: filterJson }),
+            credentials: 'include'
+        });
+        loadSavedViews();
+    } catch(err) { console.error(err); }
   }
 });
 
@@ -2629,7 +2834,7 @@ document.getElementById("clear-filters-btn")?.addEventListener("click", () => {
   document.getElementById("clear-filters-btn").style.display = "none";
   loadConversations();
 });
-renderSavedViews();
+loadSavedViews();
 
 // --- Bulk Actions ---
 const selectedConversations = new Set();
@@ -2734,3 +2939,422 @@ loadAgents = async function() {
         });
     }
 }
+
+// --- View Switching Logic ---
+document.addEventListener('DOMContentLoaded', () => {
+  const views = {
+    'dashboard': document.getElementById('view-dashboard'),
+    'conversations': document.getElementById('view-conversations'),
+    'customers': document.getElementById('view-customers'),
+    'analytics': document.getElementById('view-analytics')
+  };
+  const btns = {
+    'dashboard': document.getElementById('nav-dashboard-btn'),
+    'conversations': document.getElementById('nav-conversations-btn'),
+    'customers': document.getElementById('nav-customers-btn'),
+    'analytics': document.getElementById('nav-analytics-btn')
+  };
+
+  function switchView(viewName) {
+    // Hide all views and remove active class from all buttons
+    Object.keys(views).forEach(key => {
+      if(views[key]) views[key].classList.add('hidden');
+      if(btns[key]) btns[key].classList.remove('active');
+    });
+
+    // Show selected view and set button to active
+    if(views[viewName]) {
+      views[viewName].classList.remove('hidden');
+    }
+    if(btns[viewName]) {
+      btns[viewName].classList.add('active');
+    }
+    
+    if (viewName === 'dashboard') {
+        window.loadDashboard();
+    } else if (viewName === 'customers') {
+        window.loadCustomers();
+    } else if (viewName === 'analytics') {
+        window.loadAnalytics();
+    }
+  }
+
+  window.loadDashboard = async function() {
+      try {
+          const res = await fetch(`${API_BASE}/agent/dashboard-summary`, {
+              headers: { 'Authorization': 'Bearer ' + getCookie('access_token') },
+              credentials: 'include'
+          });
+          if (res.ok) {
+              const data = await res.json();
+              const openEl = document.getElementById('metric-open-tickets');
+              if(openEl) openEl.textContent = data.open_tickets;
+              const unassignedEl = document.getElementById('metric-unassigned');
+              if(unassignedEl) unassignedEl.textContent = data.unassigned;
+              const solvedEl = document.getElementById('metric-solved-today');
+              if(solvedEl) solvedEl.textContent = data.solved_today;
+              const csatEl = document.getElementById('metric-csat');
+              if (csatEl) {
+                  csatEl.textContent = data.csat_score ? data.csat_score.toFixed(1) + ' ★' : '—';
+              }
+          }
+      } catch (e) { console.error("Failed to load dashboard summary", e); }
+  };
+
+  window.loadAnalytics = async function() {
+      try {
+          const res = await fetch(`${API_BASE}/analytics/dashboard-metrics`, {
+              headers: { 'Authorization': 'Bearer ' + getCookie('access_token') },
+              credentials: 'include'
+          });
+          if (res.ok) {
+              const data = await res.json();
+              const formatDuration = (secs) => {
+                  if (!secs) return "—";
+                  const h = Math.floor(secs / 3600);
+                  const m = Math.floor((secs % 3600) / 60);
+                  if (h > 0) return `${h}h ${m}m`;
+                  return `${m}m`;
+              };
+              const frtEl = document.getElementById('analytics-first-response');
+              if(frtEl) frtEl.textContent = formatDuration(data.first_response_time_seconds);
+              const artEl = document.getElementById('analytics-avg-resolution-time');
+              if(artEl) artEl.textContent = formatDuration(data.avg_resolution_time_seconds);
+              const otEl = document.getElementById('analytics-one-touch');
+              if(otEl) otEl.textContent = data.one_touch_resolutions_pct ? data.one_touch_resolutions_pct.toFixed(0) + '%' : '0%';
+              
+              if (window.volumeChart) {
+                  window.volumeChart.data.datasets[0].data = data.hourly_volume;
+                  window.volumeChart.update();
+              }
+              if (window.csatChart) {
+                  window.csatChart.data.datasets[0].data = data.csat_distribution.reverse();
+                  window.csatChart.update();
+              }
+          }
+      } catch (e) { console.error("Failed to load analytics", e); }
+  };
+
+  if(btns['dashboard']) btns['dashboard'].addEventListener('click', () => switchView('dashboard'));
+  if(btns['conversations']) btns['conversations'].addEventListener('click', () => switchView('conversations'));
+  if(btns['customers']) btns['customers'].addEventListener('click', () => switchView('customers'));
+  if(btns['analytics']) btns['analytics'].addEventListener('click', () => switchView('analytics'));
+});
+
+
+// --- Production Features Logic ---
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Chart.js Initialization
+    let volumeChart, csatChart, resolutionChart, miniVolumeChart;
+
+    function initCharts() {
+        const textColor = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#1e293b';
+        const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--line').trim() || '#e2e8f0';
+        const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#3b82f6';
+        
+        Chart.defaults.color = textColor;
+        Chart.defaults.font.family = "'Inter', sans-serif";
+
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: { grid: { color: gridColor } },
+                y: { grid: { color: gridColor }, beginAtZero: true }
+            }
+        };
+
+        // Mini Volume Chart (Dashboard)
+        const ctxMini = document.getElementById('miniVolumeChart');
+        if(ctxMini && !miniVolumeChart) {
+            miniVolumeChart = new Chart(ctxMini, {
+                type: 'line',
+                data: {
+                    labels: ['8am', '10am', '12pm', '2pm', '4pm', '6pm'],
+                    datasets: [{
+                        data: [12, 28, 45, 32, 56, 18],
+                        borderColor: accentColor,
+                        borderWidth: 2,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    scales: { x: { display: false }, y: { display: false } }
+                }
+            });
+        }
+
+        // Volume Chart (Analytics)
+        const ctxVol = document.getElementById('volumeChart');
+        if(ctxVol && !window.volumeChart) {
+            window.volumeChart = new Chart(ctxVol, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+                    datasets: [{
+                        label: 'Tickets',
+                        data: Array(24).fill(0),
+                        borderColor: accentColor,
+                        backgroundColor: accentColor + '20',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: commonOptions
+            });
+        }
+
+        // CSAT Chart (Analytics)
+        const ctxCsat = document.getElementById('csatChart');
+        if(ctxCsat && !window.csatChart) {
+            window.csatChart = new Chart(ctxCsat, {
+                type: 'doughnut',
+                data: {
+                    labels: ['5 Stars', '4 Stars', '3 Stars', '1-2 Stars'],
+                    datasets: [{
+                        data: [0, 0, 0, 0],
+                        backgroundColor: ['#22c55e', '#84cc16', '#eab308', '#ef4444'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: { position: 'right' }
+                    }
+                }
+            });
+        }
+
+        // Resolution Chart (Analytics)
+        const ctxRes = document.getElementById('resolutionChart');
+        if(ctxRes && !resolutionChart) {
+            resolutionChart = new Chart(ctxRes, {
+                type: 'bar',
+                data: {
+                    labels: ['Email', 'Chat', 'Social', 'Phone'],
+                    datasets: [{
+                        label: 'Avg Hours',
+                        data: [12, 1.5, 4, 0.5],
+                        backgroundColor: accentColor,
+                        borderRadius: 4
+                    }]
+                },
+                options: commonOptions
+            });
+        }
+    }
+
+    // Call initCharts when Analytics view is shown, or just initialize immediately if Chart.js is loaded
+    if(typeof Chart !== 'undefined') {
+        initCharts();
+    } else {
+        // Fallback if CDN is slow
+        setTimeout(initCharts, 1000);
+    }
+
+
+    // 2. Customers Table Logic (API & Rendering)
+    window.customersData = [];
+    
+    window.loadCustomers = async function() {
+        try {
+            const authHeaders = {
+                'Authorization': 'Bearer ' + getCookie('access_token')
+            };
+            const res = await fetch(`${API_BASE}/agent/customers`, {
+                headers: authHeaders,
+                credentials: 'include'
+            });
+            if (res.ok) {
+                window.customersData = await res.json();
+                renderCustomers();
+            }
+        } catch (e) {
+            console.error('Failed to load customers', e);
+        }
+    };
+
+    let currentSort = { column: 'total_tickets', dir: 'desc' };
+
+    function renderCustomers() {
+        const tbody = document.getElementById('customers-table-body');
+        if(!tbody) return;
+        
+        // Filter
+        const searchInput = document.getElementById('customer-search-input');
+        const query = searchInput ? searchInput.value.toLowerCase() : '';
+        let filtered = window.customersData;
+        if (query) {
+            filtered = filtered.filter(c => c.email && c.email.toLowerCase().includes(query));
+        }
+        
+        // Sort
+        const sorted = [...filtered].sort((a, b) => {
+            let valA = a[currentSort.column];
+            let valB = b[currentSort.column];
+            
+            // Handle nulls
+            if (valA === null) valA = '';
+            if (valB === null) valB = '';
+
+            if (valA < valB) return currentSort.dir === 'asc' ? -1 : 1;
+            if (valA > valB) return currentSort.dir === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        // Generate initials/color
+        function stringToColor(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            let color = '#';
+            for (let i = 0; i < 3; i++) color += ('00' + ((hash >> (i * 8)) & 0xFF).toString(16)).substr(-2);
+            return color;
+        }
+
+        // Format dates
+        function formatAgo(isoStr) {
+            if (!isoStr) return "—";
+            const diff = (new Date() - new Date(isoStr)) / 1000;
+            if (diff < 60) return "Just now";
+            const mins = Math.floor(diff / 60);
+            if (mins < 60) return `${mins}m ago`;
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24) return `${hrs}h ago`;
+            const days = Math.floor(hrs / 24);
+            return `${days}d ago`;
+        }
+
+        tbody.innerHTML = sorted.map(c => {
+            const initial = c.email ? c.email.charAt(0).toUpperCase() : '?';
+            const color = c.email ? stringToColor(c.email) : '#94a3b8';
+            const resRatio = c.resolved_ratio != null ? (c.resolved_ratio * 100).toFixed(0) + '%' : '—';
+            const avgCsat = c.avg_csat != null ? c.avg_csat.toFixed(1) + ' ★' : '—';
+            const lastActive = formatAgo(c.last_active);
+            
+            return `
+            <tr>
+                <td>
+                    <div class="customer-cell">
+                    <div class="avatar" style="background: ${color};">${initial}</div>
+                    <div>
+                        <div class="name">${c.email}</div>
+                        <div class="email">${c.email}</div>
+                    </div>
+                    </div>
+                </td>
+                <td>${c.total_tickets}</td>
+                <td>${resRatio}</td>
+                <td>${avgCsat}</td>
+                <td>${lastActive}</td>
+                <td>
+                    <button class="btn-icon" title="More Actions">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                    </button>
+                </td>
+            </tr>
+            `;
+        }).join('');
+
+        // Update headers
+        document.querySelectorAll('th.sortable').forEach(th => {
+            th.classList.remove('sort-asc', 'sort-desc');
+            if(th.dataset.sort === currentSort.column) {
+                th.classList.add(currentSort.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+            }
+        });
+    }
+
+    document.querySelectorAll('th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.dataset.sort;
+            if(currentSort.column === col) {
+                currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.column = col;
+                currentSort.dir = 'asc';
+            }
+            renderCustomers();
+        });
+    });
+
+    const searchInput = document.getElementById('customer-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            renderCustomers();
+        });
+    }
+
+    const exportBtn = document.getElementById('customer-export-btn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            const query = searchInput ? searchInput.value.toLowerCase() : '';
+            let filtered = window.customersData;
+            if (query) {
+                filtered = filtered.filter(c => c.email && c.email.toLowerCase().includes(query));
+            }
+            
+            let csv = 'Customer,Total Tickets,Resolved Ratio,Avg CSAT,Last Active\n';
+            filtered.forEach(c => {
+                const resRatio = c.resolved_ratio != null ? (c.resolved_ratio * 100).toFixed(0) + '%' : '';
+                const avgCsat = c.avg_csat != null ? c.avg_csat.toFixed(1) : '';
+                csv += `"${c.email || ''}",${c.total_tickets},"${resRatio}","${avgCsat}","${c.last_active || ''}"\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'customers.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        });
+    }
+
+    renderCustomers();
+
+    // 3. Populate SLA Risks
+    const slaList = document.getElementById('sla-risk-list');
+    if(slaList) {
+        slaList.innerHTML = `
+            <div class="activity-item warning">
+                <div class="activity-icon" style="background: var(--warning); color: white;">!</div>
+                <div class="activity-details" style="flex: 1;">
+                    <p style="display:flex; justify-content: space-between;"><strong>VIP Customer Waiting</strong> <span class="badge" style="background: var(--danger); color:white;">14m breach</span></p>
+                    <span class="time">Ticket #4928 - Enterprise Plan</span>
+                </div>
+            </div>
+            <div class="activity-item">
+                <div class="activity-icon" style="background: var(--warning); color: white;">!</div>
+                <div class="activity-details" style="flex: 1;">
+                    <p style="display:flex; justify-content: space-between;"><strong>SLA Warning</strong> <span class="badge" style="background: var(--warning); color:white;">5m remaining</span></p>
+                    <span class="time">Ticket #4931 - Refund Request</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // 4. Update Charts when theme changes
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.attributeName === 'data-theme') {
+                if(volumeChart) volumeChart.destroy();
+                if(csatChart) csatChart.destroy();
+                if(resolutionChart) resolutionChart.destroy();
+                if(miniVolumeChart) miniVolumeChart.destroy();
+                volumeChart = csatChart = resolutionChart = miniVolumeChart = null;
+                setTimeout(initCharts, 100);
+            }
+        });
+    });
+    observer.observe(document.documentElement, { attributes: true });
+
+});
