@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/agent/theme.css?v=62">
-<link rel="stylesheet" href="/agent/agent.css?v=65">
+<link rel="stylesheet" href="/agent/agent.css?v=72">
 <script>
   (function() {
     function applyTheme(theme) {
@@ -95,12 +95,65 @@
 
   <!-- Dashboard -->
   <div id="dashboard" class="hidden">
-    <button id="mobile-sidebar-toggle" aria-label="Toggle Sidebar" title="Toggle Sidebar">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-        <line x1="9" y1="3" x2="9" y2="21"></line>
-      </svg>
-    </button>
+    <nav id="global-nav">
+      <div class="global-nav-top">
+        <button id="mobile-sidebar-toggle" class="global-nav-btn" aria-label="Toggle Sidebar" title="Toggle Sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="9" y1="3" x2="9" y2="21"></line>
+          </svg>
+        </button>
+        <button class="global-nav-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></button>
+        <button class="global-nav-btn active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg></button>
+        <button class="global-nav-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></button>
+        <button class="global-nav-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg></button>
+        <button id="global-bulk-select-btn" class="global-nav-btn" title="Bulk Select">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="margin: 0 auto; display: block;">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+          </svg>
+        </button>
+        <div style="position: relative; width: 100%;">
+          <button id="global-filter-btn" class="global-nav-btn" title="Filters" aria-haspopup="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="margin: 0 auto; display: block;">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+            </svg>
+          </button>
+          <div id="global-filter-dropdown" class="hidden" style="position: absolute; left: 100%; top: 0; margin-left: 8px; width: 260px; padding: 16px; background: var(--bg-surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 1000; display: flex; flex-direction: column; gap: 12px; color: var(--ink); text-align: left;">
+            <h3 style="margin: 0; font-size: 14px; color: var(--ink);">Filters</h3>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <select id="filter-priority" style="padding: 6px; font-size: 13px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-base); color: var(--ink);">
+                <option value="">Priority: All</option>
+                <option value="urgent">Urgent</option>
+                <option value="high">High</option>
+                <option value="normal">Normal</option>
+                <option value="low">Low</option>
+              </select>
+              <select id="filter-assignee" style="padding: 6px; font-size: 13px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-base); color: var(--ink);">
+                <option value="">Assignee: All</option>
+                <option value="unassigned">Unassigned</option>
+                <!-- Agents will be populated by JS -->
+              </select>
+              <input type="text" id="filter-tag" placeholder="Tag..." style="padding: 6px; font-size: 13px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-base); color: var(--ink);">
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+              <div style="display: flex; gap: 8px;">
+                <button id="apply-filters-btn" class="btn btn-sm" style="padding: 6px 12px;">Apply</button>
+                <button id="clear-filters-btn" class="btn btn-sm btn-secondary" style="padding: 6px 12px; display: none;">Clear</button>
+              </div>
+              <button id="save-view-btn" class="btn btn-sm btn-secondary" style="padding: 6px 12px;">Save</button>
+            </div>
+            <div id="saved-views-container" style="display: none; gap: 4px; flex-wrap: wrap; margin-top: 4px;"></div>
+          </div>
+        </div>
+        <button class="global-nav-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
+      </div>
+      <div class="global-nav-bottom">
+        <div class="global-nav-logo bottom">
+           <img src="/agent/images/wren-mark.svg" alt="Wrennon" style="width: 28px; height: 28px; opacity: 1;">
+        </div>
+      </div>
+    </nav>
     <aside id="sidebar">
       <div id="sidebar-header">
         <div>
@@ -202,6 +255,29 @@
             </select>
         </div>
       </div>
+      
+      <!-- Bulk Actions Bar -->
+      <div id="bulk-actions-bar" style="display: none; position: absolute; bottom: 16px; left: 16px; right: 16px; background: var(--bg-surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; box-shadow: var(--shadow-lg); z-index: 100; flex-direction: column; gap: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 13px; font-weight: 600; color: var(--ink);"><span id="bulk-selected-count">0</span> selected</span>
+          <button id="bulk-cancel-btn" style="background: none; border: none; cursor: pointer; color: var(--ink-soft); display: flex; align-items: center; justify-content: center; padding: 0;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <select id="bulk-action-select" style="flex: 1; padding: 6px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--ink);">
+            <option value="">Select Action...</option>
+            <option value="resolve">Mark Resolved</option>
+            <option value="assign">Assign To...</option>
+            <option value="priority">Set Priority...</option>
+          </select>
+          <button id="bulk-apply-btn" class="btn btn-sm btn-primary">Apply</button>
+        </div>
+        <div id="bulk-action-value-container" style="display: none; margin-top: 4px;">
+            <select id="bulk-action-value-select" style="width: 100%; padding: 6px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--ink);">
+            </select>
+        </div>
+      </div>
     </aside>
 
     <div id="resizer"></div>
@@ -212,11 +288,55 @@
       </div>
 
       <div id="active-conversation" class="hidden">
-        <header id="conversation-header">
-          <div class="conv-header-info">
-            <h2 id="conversation-email">Unknown Customer</h2>
-            <span id="conversation-session" class="short-id">CUST-XXXX</span>
-            <span id="collision-badge" class="collision-badge hidden"></span>
+        <header id="conversation-header" style="padding-left: 12px;">
+          <div class="conv-header-info" style="display:flex; flex-direction:column; justify-content:center; gap: 6px;">
+            <div style="display:flex; align-items:center; gap: 8px;">
+              <h2 id="conversation-email" style="margin:0;">Unknown Customer</h2>
+              <span id="ticket-id-badge" style="background: var(--bg-hover); color: var(--text-muted); padding: 2px 8px; border-radius: 4px; font-size: 12px; font-family: monospace; border: 1px solid var(--border-light);"></span>
+              <span id="collision-badge" class="collision-badge hidden"></span>
+            </div>
+            <div style="display:flex; align-items:center; gap: 12px; flex-wrap:wrap;">
+              <span id="conversation-session" class="short-id">CUST-XXXX</span>
+              <div id="ticket-properties-bar" class="ticket-properties-bar" style="border: none; padding: 0; background: transparent; min-height: auto;">
+              <div class="tp-item tp-item--priority">
+                <button id="priority-badge" class="priority-badge priority-badge--normal" type="button" aria-haspopup="true" aria-expanded="false">
+                  <span class="priority-dot"></span>
+                  <span id="priority-label">Normal</span>
+                  <svg class="tp-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+                <div id="priority-dropdown" class="tp-dropdown hidden" role="menu">
+                  <button class="tp-dropdown__item" data-priority="low" role="menuitem"><span class="priority-dot priority-dot--low"></span>Low</button>
+                  <button class="tp-dropdown__item" data-priority="normal" role="menuitem"><span class="priority-dot priority-dot--normal"></span>Normal</button>
+                  <button class="tp-dropdown__item" data-priority="high" role="menuitem"><span class="priority-dot priority-dot--high"></span>High</button>
+                  <button class="tp-dropdown__item" data-priority="urgent" role="menuitem"><span class="priority-dot priority-dot--urgent"></span>Urgent</button>
+                </div>
+              </div>
+
+              <div class="tp-divider"></div>
+
+              <div class="tp-item tp-item--assignee">
+                <button id="assignee-badge" class="assignee-badge" type="button" aria-haspopup="true" aria-expanded="false">
+                  <span id="assignee-avatar" class="assignee-avatar">?</span>
+                  <span id="assignee-label">Unassigned</span>
+                  <svg class="tp-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+                <div id="assignee-dropdown" class="tp-dropdown hidden" role="menu"></div>
+              </div>
+
+              <div class="tp-divider"></div>
+
+              <div class="tp-item tp-item--tags">
+                <div id="tag-chips" class="tag-chips"></div>
+                <button id="add-tag-btn" class="tag-add-btn" type="button" title="Add tag">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                  Tag
+                </button>
+                <input id="tag-input" class="tag-input hidden" placeholder="Add tag, Enter to confirm" maxlength="40" />
+              </div>
+
+              <span id="csat-badge" class="csat-badge hidden"></span>
+            </div>
+          </div>
           </div>
           <div class="conv-header-actions" style="flex-direction: row; align-items: center; gap: 12px; position: relative;">
             <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; position:relative;">
@@ -229,50 +349,12 @@
           </div>
         </header>
 
-        <!-- Ticket Properties Bar: priority / assignee / tags, always visible so
-             triage state is legible without opening the customer sidebar. -->
-        <div id="ticket-properties-bar" class="ticket-properties-bar">
-          <div class="tp-item tp-item--priority">
-            <button id="priority-badge" class="priority-badge priority-badge--normal" type="button" aria-haspopup="true" aria-expanded="false">
-              <span class="priority-dot"></span>
-              <span id="priority-label">Normal</span>
-              <svg class="tp-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-            </button>
-            <div id="priority-dropdown" class="tp-dropdown hidden" role="menu">
-              <button class="tp-dropdown__item" data-priority="low" role="menuitem"><span class="priority-dot priority-dot--low"></span>Low</button>
-              <button class="tp-dropdown__item" data-priority="normal" role="menuitem"><span class="priority-dot priority-dot--normal"></span>Normal</button>
-              <button class="tp-dropdown__item" data-priority="high" role="menuitem"><span class="priority-dot priority-dot--high"></span>High</button>
-              <button class="tp-dropdown__item" data-priority="urgent" role="menuitem"><span class="priority-dot priority-dot--urgent"></span>Urgent</button>
-            </div>
-          </div>
-
-          <div class="tp-divider"></div>
-
-          <div class="tp-item tp-item--assignee">
-            <button id="assignee-badge" class="assignee-badge" type="button" aria-haspopup="true" aria-expanded="false">
-              <span id="assignee-avatar" class="assignee-avatar">?</span>
-              <span id="assignee-label">Unassigned</span>
-              <svg class="tp-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-            </button>
-            <div id="assignee-dropdown" class="tp-dropdown hidden" role="menu"></div>
-          </div>
-
-          <div class="tp-divider"></div>
-
-          <div class="tp-item tp-item--tags">
-            <div id="tag-chips" class="tag-chips"></div>
-            <button id="add-tag-btn" class="tag-add-btn" type="button" title="Add tag">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-              Tag
-            </button>
-            <input id="tag-input" class="tag-input hidden" placeholder="Add tag, Enter to confirm" maxlength="40" />
-          </div>
-
-          <span id="csat-badge" class="csat-badge hidden"></span>
-        </div>
-
         <div style="display: flex; flex: 1; overflow: hidden; background: var(--bg-base);">
           <div style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
+            <!-- Ticket Properties Bar: priority / assignee / tags, always visible so
+                 triage state is legible without opening the customer sidebar. -->
+
+
             <!-- Order Context Popup -->
             <div id="order-popup" class="order-popup hidden">
               <div class="order-popup__header">
@@ -297,45 +379,65 @@
                 </div>
                 <button id="close-reply-preview" style="background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px; border-radius: 50%;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
               </div>
-              <div id="agent-input-row" style="position: relative; padding: 12px 16px; display: flex; align-items: center; border-top: none; box-shadow: none; background: transparent;">
-                <!-- Slash Command Popup -->
-                <div id="slash-command-popup" class="slash-popup"></div>
-                <input type="file" id="agent-file-upload" style="display: none;" accept="image/*,audio/*,video/*,.pdf,.doc,.docx" />
-                <input type="file" id="agent-photo-upload" style="display: none;" accept="image/*" />
-                <input type="file" id="agent-voice-upload" style="display: none;" accept="audio/*" capture="user" />
+              <div id="agent-input-row" style="position: relative; padding: 0; display: flex; flex-direction: column; border-top: none; box-shadow: none; background: transparent;">
+                <div id="chat-input-wrapper" class="chat-input-wrapper-horizontal">
+                  <div class="chat-input-actions-left">
+                    <input type="file" id="agent-file-upload" style="display: none;" accept="image/*,audio/*,video/*,.pdf,.doc,.docx" />
+                    <input type="file" id="agent-voice-upload" style="display: none;" accept="audio/*" capture="user" />
 
-                <button id="agent-upload-btn" class="icon-action-btn" aria-label="Upload file">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-                </button>
-                <button id="agent-photo-btn" class="icon-action-btn" aria-label="Upload photo">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                </button>
-                <button id="agent-voice-btn" class="icon-action-btn" aria-label="Record voice">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
-                </button>
-                <button id="agent-copilot-btn" class="icon-action-btn" aria-label="Ask Copilot" title="Generate draft with AI">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
-                </button>
-
-                <textarea id="agent-message-input" placeholder="Type a reply" style="resize: none; min-height: 44px; height: 44px; font-family: inherit; line-height: 24px; box-sizing: border-box; overflow-y: hidden;" rows="1"></textarea>
-                <select id="note-type-select">
-                  <option value="public">Reply</option>
-                  <option value="internal">Internal Note</option>
-                </select>
-                <button id="agent-send-btn">Send</button>
+                    <button id="agent-upload-btn" class="icon-action-btn" aria-label="Attach file" title="Attach file">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                    </button>
+                    <button id="agent-copilot-btn" class="icon-action-btn" aria-label="Ask Copilot" title="Generate draft with AI">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
+                    </button>
+                  </div>
+                  
+                  <div class="chat-input-center-pill">
+                    <div id="slash-command-popup" class="slash-popup"></div>
+                    <textarea id="agent-message-input" placeholder="Type a message..." class="chat-input-textarea-horizontal" rows="1"></textarea>
+                  </div>
+                  
+                  <div class="chat-input-actions-right">
+                    <button id="agent-voice-btn" class="icon-action-btn" aria-label="Record voice" title="Voice message" style="margin-right: 8px;">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                    </button>
+                    
+                    <select id="note-type-select" style="display:none;">
+                      <option value="public">Reply</option>
+                      <option value="internal">Internal Note</option>
+                    </select>
+                    <div class="split-send-btn-group">
+                      <button id="agent-send-btn" class="btn btn-primary split-btn-main">Send</button>
+                      <button id="agent-send-toggle" class="btn btn-primary split-btn-toggle" aria-haspopup="true" aria-expanded="false">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                      </button>
+                      <div id="send-type-menu" class="send-type-menu hidden" role="menu">
+                        <button class="send-type-option" data-type="public" role="menuitem">
+                          <span style="display:flex; align-items:center; gap:8px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg>
+                            Public Reply
+                          </span>
+                          <svg class="check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </button>
+                        <button class="send-type-option" data-type="internal" role="menuitem">
+                          <span style="display:flex; align-items:center; gap:8px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                            Internal Note
+                          </span>
+                          <svg class="check-icon hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
           <!-- Customer Details Sidebar -->
           <aside id="customer-sidebar" class="customer-sidebar hidden">
-            <div class="customer-sidebar__header">
-              <h3 class="customer-sidebar__title">Customer Details</h3>
-              <button id="customer-sidebar-close" class="icon-action-btn" aria-label="Close sidebar">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-              </button>
-            </div>
-            <div id="customer-sidebar-content" class="customer-sidebar__content">
+            <div id="customer-sidebar-content" class="customer-sidebar__content" style="padding-top:0;">
               <!-- Populated via JS -->
             </div>
           </aside>
@@ -345,7 +447,7 @@
 
   </div>
 
-  <script src="/agent/agent.js?v=61"></script>
+  <script src="/agent/agent.js?v=70"></script>
 </body>
 </html>
 
