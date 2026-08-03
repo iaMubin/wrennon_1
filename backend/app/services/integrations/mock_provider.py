@@ -98,17 +98,11 @@ def _public_fields(item: dict) -> Dict[str, Any]:
     return {k: v for k, v in item.items() if k != "keywords"}
 
 
+from app.services.mock_apis import MOCK_ORDERS
+
 class MockEcommerceProvider(EcommerceProvider):
     def __init__(self):
-        self.mock_orders = {
-            "1001": {"order_id": "1001", "email": "customer1@example.com", "status": "shipped", "carrier": "Pathao Courier", "eta": "2026-06-27", "tracking_url": "https://example.com/track/1001"},
-            "1002": {"order_id": "1002", "email": "test@example.com", "status": "processing", "carrier": None, "eta": "2026-06-30", "tracking_url": None},
-            "1003": {"order_id": "1003", "email": "customer3@example.com", "status": "delivered", "carrier": "Sundarban Courier", "eta": "2026-06-20", "tracking_url": "https://example.com/track/1003"},
-            "1004": {"order_id": "1004", "email": "test@example.com", "status": "cancelled", "carrier": None, "eta": None, "tracking_url": None},
-            "1005": {"order_id": "1005", "email": "test@example.com", "status": "processing", "carrier": None, "eta": "2026-07-15", "tracking_url": None},
-            "1006": {"order_id": "1006", "email": "customer6@example.com", "status": "shipped", "carrier": "DHL", "eta": "2026-07-08", "tracking_url": "https://dhl.com/track/1006"},
-            "1007": {"order_id": "1007", "email": "customer7@example.com", "status": "delivered", "carrier": "FedEx", "eta": "2026-06-05", "tracking_url": "https://fedex.com/track/1007"},
-        }
+        self.mock_orders = MOCK_ORDERS
 
     def get_order_status(self, order_id: str) -> Optional[Dict[str, Any]]:
         order = self.mock_orders.get(order_id)

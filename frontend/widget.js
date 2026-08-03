@@ -57,141 +57,7 @@ let SESSION_ID = null;
 let SESSION_TOKEN = null;
 let reconnectInterval = null;
 
-// ── Theme Management ───────────────────────────────────────────────
-function setupThemeDropdown() {
-  const menuBtn = document.getElementById("theme-menu-btn");
-  const dropdown = document.getElementById("theme-dropdown");
-  const options = document.querySelectorAll(".theme-option");
-  if (!menuBtn || !dropdown) return;
 
-  function applyTheme(themeValue) {
-    localStorage.setItem("wrennon_widget_theme", themeValue);
-    const widget = document.getElementById("wrennon-widget");
-    if (!widget) return;
-    
-    // Also apply to documentElement for full-page backdrop preview
-    if (themeValue === "system") {
-      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const resolved = isDark ? "dark-matte" : "light-brownish";
-      widget.setAttribute("data-theme", resolved);
-      document.documentElement.setAttribute('data-theme', resolved);
-    } else {
-      widget.setAttribute("data-theme", themeValue);
-      document.documentElement.setAttribute('data-theme', themeValue);
-    }
-    
-    options.forEach(opt => {
-      if (opt.dataset.themeValue) {
-        opt.classList.toggle("active", opt.dataset.themeValue === themeValue);
-      }
-    });
-  }
-
-  // Set initial active state based on local storage
-  const currentTheme = localStorage.getItem('wrennon_widget_theme') || 'system';
-  applyTheme(currentTheme);
-
-  const menuMainView = document.getElementById("menu-main-view");
-  const menuAppearanceView = document.getElementById("menu-appearance-view");
-  const btnShowAppearance = document.getElementById("btn-show-appearance");
-  const btnBackAppearance = document.getElementById("btn-back-appearance");
-
-  // Handle theme tabs (Light vs Dark)
-  const themeTabs = document.querySelectorAll(".theme-tab");
-  const themeTabContents = document.querySelectorAll(".theme-tab-content");
-  
-  themeTabs.forEach(tab => {
-    tab.addEventListener("click", (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      
-      themeTabs.forEach(t => t.classList.remove("active"));
-      themeTabContents.forEach(c => c.classList.add("hidden"));
-      themeTabContents.forEach(c => c.classList.remove("active"));
-      
-      tab.classList.add("active");
-      const targetId = tab.getAttribute("data-target");
-      const targetContent = document.getElementById(targetId);
-      if (targetContent) {
-        targetContent.classList.remove("hidden");
-        targetContent.classList.add("active");
-      }
-    });
-  });
-
-  menuBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const isExpanded = menuBtn.getAttribute("aria-expanded") === "true";
-    menuBtn.setAttribute("aria-expanded", !isExpanded);
-    dropdown.classList.toggle("hidden");
-    
-    // Always open to main view when toggling the menu open
-    if (!dropdown.classList.contains("hidden") && menuMainView && menuAppearanceView) {
-      menuMainView.classList.remove("hidden");
-      menuAppearanceView.classList.add("hidden");
-    }
-
-    if (!isExpanded && options.length > 0) {
-      options[0].focus();
-    }
-  });
-
-  if (btnShowAppearance && menuMainView && menuAppearanceView) {
-    btnShowAppearance.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      menuMainView.classList.add("hidden");
-      menuAppearanceView.classList.remove("hidden");
-    });
-  }
-
-
-
-  if (btnBackAppearance && menuMainView && menuAppearanceView) {
-    btnBackAppearance.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      menuAppearanceView.classList.add("hidden");
-      menuMainView.classList.remove("hidden");
-    });
-  }
-
-  document.addEventListener("click", (e) => {
-    if (!e.target.closest("#theme-dropdown") && !e.target.closest("#theme-menu-btn")) {
-      dropdown.classList.add("hidden");
-      menuBtn.setAttribute("aria-expanded", "false");
-    }
-  });
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      dropdown.classList.add("hidden");
-      menuBtn.setAttribute("aria-expanded", "false");
-      menuBtn.focus();
-    }
-  });
-
-  options.forEach(opt => {
-    opt.addEventListener("click", () => {
-      if (!opt.dataset.themeValue) return; // Don't trigger theme change for submenu navigation buttons
-      applyTheme(opt.dataset.themeValue);
-      dropdown.classList.add("hidden");
-      menuBtn.setAttribute("aria-expanded", "false");
-    });
-  });
-
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-    if (localStorage.getItem("wrennon_widget_theme") === "system") {
-      const widget = document.getElementById("wrennon-widget");
-      if (widget) {
-        const resolved = e.matches ? "dark-matte" : "light-brownish";
-        widget.setAttribute("data-theme", resolved);
-        document.documentElement.setAttribute('data-theme', resolved);
-      }
-    }
-  });
-}
-setupThemeDropdown();
 
 // ── Session Management ─────────────────────────────────────────────
 // Persist session_id in localStorage so the customer can continue
@@ -880,33 +746,8 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   lastMsgTime = timestamp;
   
   const wrapper = document.createElement("div");
-  wrapper.className = `msg-wrapper msg-wrapper--${uiRole}${isGrouped ? ' msg-wrapper--grouped' : ''}`;
-  // For ARIA accessibility
+  wrapper.className = `bubble bubble-${uiRole} bubble-enter`;
   wrapper.setAttribute("role", "listitem");
-  
-  // Add Avatar for incoming messages
-  if ((uiRole === "bot" || uiRole === "agent") && !isGrouped) {
-    const botSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
-    const agentSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
-    
-    const avatarImg = uiRole === "bot" ? botSvg : agentSvg;
-    wrapper.innerHTML += `<div class="msg-avatar ${uiRole === 'agent' ? 'msg-avatar--agent' : 'msg-avatar--bot'}">${avatarImg}</div>`;
-  }
-  
-  const contentWrapper = document.createElement("div");
-  contentWrapper.className = `msg-content msg-content--${uiRole}${isGrouped ? ' msg-content--grouped' : ''}`;
-  contentWrapper.style.display = "flex";
-  contentWrapper.style.flexDirection = "column";
-  
-  const div = document.createElement("div");
-  div.className = `msg msg--${uiRole}`;
-  
-  let nameHtml = "";
-  if ((uiRole === "bot" || uiRole === "agent") && !isGrouped) {
-      const displayName = uiRole === "bot" ? "AI Assistant" : (name || "Support Agent");
-      const badgeHtml = uiRole === "agent" ? `<span style="background: var(--agent-accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; vertical-align: middle;">Agent</span>` : "";
-      nameHtml = `<div class="msg-name" style="display: flex; align-items: center;">${displayName}${badgeHtml}</div>`;
-  }
   
   let displayText = text || "";
   // Hide internal system annotations from the customer
@@ -921,31 +762,15 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
     displayText = replyMatch[2];
     
     replyHtml = `
-      <div class="msg-reply-bubble">
-        <div class="msg-reply-author">Replied to</div>
+      <div class="msg-reply-bubble" style="font-size: 11px; opacity: 0.8; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px solid var(--line);">
+        <div class="msg-reply-author" style="font-weight: 600;">Replied to</div>
         <div class="msg-reply-text">${escapeHtml(quotedLines)}</div>
       </div>
     `;
   }
 
-  if (uiRole === "bot" || uiRole === "agent") {
-    div.innerHTML = nameHtml + replyHtml + renderMarkdown(displayText);
-  } else {
-    div.innerHTML = replyHtml + renderMarkdown(displayText);
-  }
+  wrapper.innerHTML = replyHtml + renderMarkdown(displayText);
   
-  contentWrapper.appendChild(div);
-  
-  if (uiRole !== "system") {
-      const timeStr = formatTime(timestamp);
-      const ticks = (uiRole === "user") ? `<span class="msg-ticks"><svg viewBox="0 0 512 512" width="16" height="16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="44"><path d="M464 128L240 384l-96-96M144 384l-96-96M368 128L232 284"/></svg></span>` : "";
-      const metaDiv = document.createElement("div");
-      metaDiv.className = `msg-meta msg-meta--${uiRole}`;
-      metaDiv.innerHTML = `<span>${timeStr}</span>${ticks}`;
-      contentWrapper.appendChild(metaDiv);
-  }
-  
-  wrapper.appendChild(contentWrapper);
   messagesEl.appendChild(wrapper);
   
   if (wasNearBottom || uiRole === 'user') {

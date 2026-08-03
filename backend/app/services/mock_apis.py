@@ -15,129 +15,96 @@ from __future__ import annotations
 from typing import Optional
 import json
 
-MOCK_CUSTOMERS = [
-    {
-        "id": "CUST-1001",
-        "name": "Eleanor Vance",
-        "email": "eleanor.v@example.com",
-        "phone": "+1-555-0198",
-        "lifetime_value": "$195.00",
-        "loyalty_tier": "Silver",
-        "recent_order": "1001",
-        "tags": [
-            "New Customer"
-        ]
-    },
-    {
-        "id": "CUST-1002",
-        "name": "Michael Chang",
-        "email": "mchang.tech@example.com",
-        "phone": "+1-555-0245",
-        "lifetime_value": "$345.00",
-        "loyalty_tier": "Silver",
-        "recent_order": "1002",
-        "tags": [
-            "New Customer"
-        ]
-    },
-    {
-        "id": "CUST-1003",
-        "name": "Sarah Jenkins",
-        "email": "sjenkins88@example.com",
-        "phone": "+1-555-0372",
-        "lifetime_value": "$495.00",
-        "loyalty_tier": "Silver",
-        "recent_order": "1003",
-        "tags": [
-            "New Customer"
-        ]
-    },
-    {
-        "id": "CUST-1004",
-        "name": "David Rodriguez",
-        "email": "drodriguez@example.com",
-        "phone": "+1-555-0411",
-        "lifetime_value": "$645.00",
-        "loyalty_tier": "Silver",
-        "recent_order": "1004",
-        "tags": [
-            "New Customer"
-        ]
-    },
-    {
-        "id": "CUST-1005",
-        "name": "Emily Chen",
-        "email": "emily.c@example.com",
-        "phone": "+1-555-0588",
-        "lifetime_value": "$795.00",
-        "loyalty_tier": "Silver",
-        "recent_order": "1005",
-        "tags": [
-            "New Customer"
-        ]
-    },
-    {
-        "id": "CUST-1006",
-        "name": "James Wilson",
-        "email": "jwilson@example.com",
-        "phone": "+1-555-0634",
-        "lifetime_value": "$945.00",
-        "loyalty_tier": "Gold",
-        "recent_order": "1006",
-        "tags": [
-            "New Customer"
-        ]
-    },
-    {
-        "id": "CUST-1007",
-        "name": "Olivia Martinez",
-        "email": "omartinez99@example.com",
-        "phone": "+1-555-0721",
-        "lifetime_value": "$1095.00",
-        "loyalty_tier": "Gold",
-        "recent_order": "1007",
-        "tags": [
-            "New Customer"
-        ]
-    },
-    {
-        "id": "CUST-1008",
-        "name": "William Taylor",
-        "email": "wtaylor.biz@example.com",
-        "phone": "+1-555-0899",
-        "lifetime_value": "$1245.00",
-        "loyalty_tier": "Gold",
-        "recent_order": "1008",
-        "tags": [
-            "New Customer"
-        ]
-    },
-    {
-        "id": "CUST-1009",
-        "name": "Sophia Anderson",
-        "email": "sanderson@example.com",
-        "phone": "+1-555-0956",
-        "lifetime_value": "$1395.00",
-        "loyalty_tier": "Gold",
-        "recent_order": "1009",
-        "tags": [
-            "VIP"
-        ]
-    },
-    {
-        "id": "CUST-10010",
-        "name": "Alexander Thomas",
-        "email": "athomas.design@example.com",
-        "phone": "+1-555-1042",
-        "lifetime_value": "$1545.00",
-        "loyalty_tier": "Gold",
-        "recent_order": "1010",
-        "tags": [
-            "VIP"
-        ]
-    }
-]
-
+MOCK_CUSTOMERS = [   {   'id': 'CUST-1001',
+        'name': 'Eleanor Vance',
+        'email': 'eleanor.v@example.com',
+        'phone': '+1-555-0198',
+        'lifetime_value': '$195.00',
+        'loyalty_tier': 'Silver',
+        'recent_order': '1001',
+        'tags': ['Premium'],
+        'total_orders': 3},
+    {   'id': 'CUST-1002',
+        'name': 'Michael Chang',
+        'email': 'mchang.tech@example.com',
+        'phone': '+1-555-0245',
+        'lifetime_value': '$345.00',
+        'loyalty_tier': 'Silver',
+        'recent_order': '1002',
+        'tags': ['Priority Shopping', 'VIP'],
+        'total_orders': 6},
+    {   'id': 'CUST-1003',
+        'name': 'Sarah Jenkins',
+        'email': 'sjenkins88@example.com',
+        'phone': '+1-555-0372',
+        'lifetime_value': '$495.00',
+        'loyalty_tier': 'Silver',
+        'recent_order': '1003',
+        'tags': ['VIP', 'Frequent Buyer', 'New Customer'],
+        'total_orders': 9},
+    {   'id': 'CUST-1004',
+        'name': 'David Rodriguez',
+        'email': 'drodriguez@example.com',
+        'phone': '+1-555-0411',
+        'lifetime_value': '$645.00',
+        'loyalty_tier': 'Silver',
+        'recent_order': '1004',
+        'tags': ['Frequent Buyer'],
+        'total_orders': 12},
+    {   'id': 'CUST-1005',
+        'name': 'Emily Chen',
+        'email': 'emily.c@example.com',
+        'phone': '+1-555-0588',
+        'lifetime_value': '$795.00',
+        'loyalty_tier': 'Silver',
+        'recent_order': '1005',
+        'tags': ['New Customer', 'Wholesale'],
+        'total_orders': 15},
+    {   'id': 'CUST-1006',
+        'name': 'James Wilson',
+        'email': 'jwilson@example.com',
+        'phone': '+1-555-0634',
+        'lifetime_value': '$945.00',
+        'loyalty_tier': 'Gold',
+        'recent_order': '1006',
+        'tags': ['Wholesale', 'International'],
+        'total_orders': 18},
+    {   'id': 'CUST-1007',
+        'name': 'Olivia Martinez',
+        'email': 'omartinez99@example.com',
+        'phone': '+1-555-0721',
+        'lifetime_value': '$1095.00',
+        'loyalty_tier': 'Gold',
+        'recent_order': '1007',
+        'tags': ['International'],
+        'total_orders': 1},
+    {   'id': 'CUST-1008',
+        'name': 'William Taylor',
+        'email': 'wtaylor.biz@example.com',
+        'phone': '+1-555-0899',
+        'lifetime_value': '$1245.00',
+        'loyalty_tier': 'Gold',
+        'recent_order': '1008',
+        'tags': ['Premium', 'Priority Shopping'],
+        'total_orders': 4},
+    {   'id': 'CUST-1009',
+        'name': 'Sophia Anderson',
+        'email': 'sanderson@example.com',
+        'phone': '+1-555-0956',
+        'lifetime_value': '$1395.00',
+        'loyalty_tier': 'Gold',
+        'recent_order': '1009',
+        'tags': ['Priority Shopping', 'VIP', 'Frequent Buyer'],
+        'total_orders': 7},
+    {   'id': 'CUST-10010',
+        'name': 'Alexander Thomas',
+        'email': 'athomas.design@example.com',
+        'phone': '+1-555-1042',
+        'lifetime_value': '$1545.00',
+        'loyalty_tier': 'Gold',
+        'recent_order': '1010',
+        'tags': ['VIP'],
+        'total_orders': 10}]
 
 MOCK_ORDERS = {
     "1001": {

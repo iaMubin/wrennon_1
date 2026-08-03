@@ -358,6 +358,33 @@ function connectSocket() {
       if (data.session_id === activeSessionId) {
         renderCollisionBadge(data.viewers || []);
       }
+    } else if (data.type === "presence") {
+      const teamList = document.getElementById("team-status-list");
+      if (teamList && data.online_agents) {
+        teamList.innerHTML = '';
+        data.online_agents.forEach(agent => {
+          const div = document.createElement('div');
+          div.className = 'activity-item';
+          div.innerHTML = `
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--surface-2); display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--ink);">
+              ${agent.substring(0,2).toUpperCase()}
+            </div>
+            <div class="activity-details" style="flex: 1; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong>${escapeHtml(agent)}</strong>
+                <div style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                  <span style="display: inline-block; width: 8px; height: 8px; background: var(--success); border-radius: 50%;"></span>
+                  Online
+                </div>
+              </div>
+            </div>
+          `;
+          teamList.appendChild(div);
+        });
+        if (data.online_agents.length === 0) {
+          teamList.innerHTML = '<div style="padding: 16px; color: var(--text-muted); text-align: center;">No agents currently online.</div>';
+        }
+      }
     } else {
       console.warn("Unrecognized WebSocket message:", data);
     }
@@ -2261,12 +2288,12 @@ function showCustomerSidebar(customer) {
   const initials = customer.name.split(" ").map(n => n[0]).join("").toUpperCase();
   
   const interactions = [
-    { action: 'Conversation with Alex Smith', time: 'Active now', status: 'O', highlight: true },
-    { action: 'Ordered #12965', time: 'Aug 08, 9:05 AM', status: 'empty' },
+    { action: `Conversation with ${customer.name || 'Agent'}`, time: 'Active now', status: 'O', highlight: true },
+    { action: `Ordered #${customer.recent_order || '12965'}`, time: 'Aug 08, 9:05 AM', status: 'empty' },
     { action: 'Change email address', time: 'Jan 21, 9:43 AM', status: 'P' },
     { action: 'Article viewed', time: 'Jan 21, 9:14 AM', status: 'empty' },
     { action: 'Article viewed', time: 'Jan 21, 9:38 AM', status: 'empty' },
-    { action: 'Receipt for order #2232534', time: 'Jan 05, 3:24 PM', status: 'S' }
+    { action: 'Account created / Sign up', time: 'Jan 01, 10:00 AM', status: 'S' }
   ];
 
   window.addCustomerNote = function(inputElem, event) {
@@ -2350,11 +2377,14 @@ function showCustomerSidebar(customer) {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
         <span class="value">United States</span>
       </div>
+      <div class="contact-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+        <span class="value">Total Orders: <strong>${customer.total_orders || 0}</strong></span>
+      </div>
       <div class="contact-item tags">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
         <div class="customer-tags-inline">
-          <span class="customer-tag">premium</span>
-          <span class="customer-tag">priority shopping</span>
+          ${(customer.tags || ['premium', 'priority shopping']).map(tag => `<span class="customer-tag">${escapeHtml(tag.toLowerCase())}</span>`).join('')}
         </div>
       </div>
       <div class="contact-item note" style="flex-direction: column; align-items: flex-start; margin-top: -4px; width: 100%;">
@@ -2996,6 +3026,42 @@ document.addEventListener('DOMContentLoaded', () => {
               if (csatEl) {
                   csatEl.textContent = data.csat_score ? data.csat_score.toFixed(1) + ' ★' : '—';
               }
+              const slaList = document.getElementById('sla-risk-list');
+              if (slaList && data.sla_risks) {
+                  slaList.innerHTML = '';
+                  if (data.sla_risks.length === 0) {
+                      slaList.innerHTML = '<div style="padding: 16px; color: var(--text-muted); text-align: center;">No SLA risks detected. Inbox is clear!</div>';
+                  } else {
+                      data.sla_risks.forEach(risk => {
+                          const openMs = new Date() - new Date(risk.created_at);
+                          const openMins = Math.floor(openMs / 60000);
+                          let badgeHtml = '';
+                          let iconClass = 'warning';
+                          if (openMins > 60) {
+                              badgeHtml = `<span class="badge" style="background: var(--danger); color:white;">${Math.floor(openMins/60)}h ${openMins%60}m old</span>`;
+                              iconClass = 'danger';
+                          } else {
+                              badgeHtml = `<span class="badge" style="background: var(--warning); color:white;">${openMins}m old</span>`;
+                          }
+                          const ticketId = risk.short_id ? `#${risk.short_id.substring(0,8).toUpperCase()}` : '';
+                          const div = document.createElement('div');
+                          div.className = `activity-item ${iconClass}`;
+                          div.style.cursor = 'pointer';
+                          div.innerHTML = `
+                              <div class="activity-icon" style="background: var(--${iconClass}); color: white;">!</div>
+                              <div class="activity-details" style="flex: 1;">
+                                  <p style="display:flex; justify-content: space-between;"><strong>Unresolved Ticket</strong> ${badgeHtml}</p>
+                                  <span class="time">${ticketId} - ${escapeHtml(risk.customer_email || 'Unknown Customer')}</span>
+                              </div>
+                          `;
+                          div.onclick = () => {
+                              switchView('conversations');
+                              openConversation(risk.session_id, risk.customer_email, risk.short_id, false, risk.created_at);
+                          };
+                          slaList.appendChild(div);
+                      });
+                  }
+              }
           }
       } catch (e) { console.error("Failed to load dashboard summary", e); }
   };
@@ -3069,6 +3135,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // Mini Volume Chart (Dashboard)
         const ctxMini = document.getElementById('miniVolumeChart');
         if(ctxMini && !miniVolumeChart) {
+            let gradientMini;
+            if (ctxMini.getContext) {
+                const ctx = ctxMini.getContext('2d');
+                gradientMini = ctx.createLinearGradient(0, 0, 0, 150);
+                gradientMini.addColorStop(0, accentColor + '40');
+                gradientMini.addColorStop(1, accentColor + '00');
+            }
             miniVolumeChart = new Chart(ctxMini, {
                 type: 'line',
                 data: {
@@ -3076,8 +3149,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     datasets: [{
                         data: [12, 28, 45, 32, 56, 18],
                         borderColor: accentColor,
+                        backgroundColor: gradientMini || 'transparent',
                         borderWidth: 2,
                         tension: 0.4,
+                        fill: true,
                         pointRadius: 0
                     }]
                 },
@@ -3092,6 +3167,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // Volume Chart (Analytics)
         const ctxVol = document.getElementById('volumeChart');
         if(ctxVol && !window.volumeChart) {
+            let gradientVol;
+            if (ctxVol.getContext) {
+                const ctx = ctxVol.getContext('2d');
+                gradientVol = ctx.createLinearGradient(0, 0, 0, 300);
+                gradientVol.addColorStop(0, accentColor + '60');
+                gradientVol.addColorStop(1, accentColor + '00');
+            }
             window.volumeChart = new Chart(ctxVol, {
                 type: 'line',
                 data: {
@@ -3100,10 +3182,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         label: 'Tickets',
                         data: Array(24).fill(0),
                         borderColor: accentColor,
-                        backgroundColor: accentColor + '20',
+                        backgroundColor: gradientVol || (accentColor + '20'),
                         borderWidth: 3,
                         fill: true,
-                        tension: 0.4
+                        tension: 0.4,
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: accentColor,
+                        pointBorderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
                     }]
                 },
                 options: commonOptions

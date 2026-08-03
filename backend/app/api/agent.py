@@ -248,13 +248,34 @@ def dashboard_summary(
              local_dt = c.created_at.astimezone(tz)
         hourly_volume[local_dt.hour] += 1
 
+    # SLA Risks: oldest unresolved tickets
+    sla_risks_query = db.query(Conversation).filter(
+        Conversation.resolved == False
+    ).order_by(Conversation.created_at.asc()).limit(5).all()
+
+    sla_risks = []
+    for c in sla_risks_query:
+        if c.created_at.tzinfo is None:
+            created_utc = c.created_at.replace(tzinfo=pytz.utc)
+        else:
+            created_utc = c.created_at.astimezone(pytz.utc)
+        
+        sla_risks.append({
+            "session_id": c.session_id,
+            "short_id": c.short_id,
+            "customer_email": c.customer_email,
+            "created_at": created_utc.isoformat(),
+            "reopen_count": c.reopen_count
+        })
+
     return {
         "open_tickets": open_tickets,
         "unassigned": unassigned,
         "solved_today": solved_today,
         "csat_score": csat_score,
         "agent_chat_counts": agent_chat_counts,
-        "hourly_volume": hourly_volume
+        "hourly_volume": hourly_volume,
+        "sla_risks": sla_risks
     }
 
 @router.get("/agent/customers")
