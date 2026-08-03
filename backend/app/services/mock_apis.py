@@ -12,72 +12,396 @@ docstring's "Returns" shape untouched, or downstream nodes will break.
 """
 
 from __future__ import annotations
-
 from typing import Optional
 import json
 
 MOCK_CUSTOMERS = [
-  {
-    "id": "CUST-089",
-    "name": "Alex Rivera",
-    "email": "customer1@example.com",
-    "phone": "555-0198",
-    "lifetime_value": "$1,240.50",
-    "loyalty_tier": "Gold",
-    "recent_order": "1001",
-    "tags": ["Frequent Buyer", "Tech Gadgets"]
-  },
-  {
-    "id": "CUST-102",
-    "name": "Sam Chen",
-    "email": "demo@example.com",
-    "phone": "555-0211",
-    "lifetime_value": "$450.00",
-    "loyalty_tier": "Silver",
-    "recent_order": "1002",
-    "tags": ["New Customer"]
-  },
-  {
-    "id": "CUST-103",
-    "name": "Jordan Lee",
-    "email": "customer3@example.com",
-    "phone": "555-0311",
-    "lifetime_value": "$890.00",
-    "loyalty_tier": "Silver",
-    "recent_order": "1003",
-    "tags": ["Apparel"]
-  },
-  {
-    "id": "CUST-106",
-    "name": "Casey Smith",
-    "email": "customer6@example.com",
-    "phone": "555-0611",
-    "lifetime_value": "$210.00",
-    "loyalty_tier": "Bronze",
-    "recent_order": "1006",
-    "tags": []
-  },
-  {
-    "id": "CUST-107",
-    "name": "Taylor Swift",
-    "email": "customer7@example.com",
-    "phone": "555-0711",
-    "lifetime_value": "$5,450.00",
-    "loyalty_tier": "Platinum",
-    "recent_order": "1007",
-    "tags": ["VIP"]
-  },
-  {
-    "id": "CUST-999",
-    "name": "Test User",
-    "email": "test@example.com",
-    "phone": "555-9999",
-    "lifetime_value": "$150.00",
-    "loyalty_tier": "Bronze",
-    "recent_order": "1005",
-    "tags": ["Test"]
-  }
+    {
+        "id": "CUST-1001",
+        "name": "Eleanor Vance",
+        "email": "eleanor.v@example.com",
+        "phone": "+1-555-0198",
+        "lifetime_value": "$195.00",
+        "loyalty_tier": "Silver",
+        "recent_order": "1001",
+        "tags": [
+            "New Customer"
+        ]
+    },
+    {
+        "id": "CUST-1002",
+        "name": "Michael Chang",
+        "email": "mchang.tech@example.com",
+        "phone": "+1-555-0245",
+        "lifetime_value": "$345.00",
+        "loyalty_tier": "Silver",
+        "recent_order": "1002",
+        "tags": [
+            "New Customer"
+        ]
+    },
+    {
+        "id": "CUST-1003",
+        "name": "Sarah Jenkins",
+        "email": "sjenkins88@example.com",
+        "phone": "+1-555-0372",
+        "lifetime_value": "$495.00",
+        "loyalty_tier": "Silver",
+        "recent_order": "1003",
+        "tags": [
+            "New Customer"
+        ]
+    },
+    {
+        "id": "CUST-1004",
+        "name": "David Rodriguez",
+        "email": "drodriguez@example.com",
+        "phone": "+1-555-0411",
+        "lifetime_value": "$645.00",
+        "loyalty_tier": "Silver",
+        "recent_order": "1004",
+        "tags": [
+            "New Customer"
+        ]
+    },
+    {
+        "id": "CUST-1005",
+        "name": "Emily Chen",
+        "email": "emily.c@example.com",
+        "phone": "+1-555-0588",
+        "lifetime_value": "$795.00",
+        "loyalty_tier": "Silver",
+        "recent_order": "1005",
+        "tags": [
+            "New Customer"
+        ]
+    },
+    {
+        "id": "CUST-1006",
+        "name": "James Wilson",
+        "email": "jwilson@example.com",
+        "phone": "+1-555-0634",
+        "lifetime_value": "$945.00",
+        "loyalty_tier": "Gold",
+        "recent_order": "1006",
+        "tags": [
+            "New Customer"
+        ]
+    },
+    {
+        "id": "CUST-1007",
+        "name": "Olivia Martinez",
+        "email": "omartinez99@example.com",
+        "phone": "+1-555-0721",
+        "lifetime_value": "$1095.00",
+        "loyalty_tier": "Gold",
+        "recent_order": "1007",
+        "tags": [
+            "New Customer"
+        ]
+    },
+    {
+        "id": "CUST-1008",
+        "name": "William Taylor",
+        "email": "wtaylor.biz@example.com",
+        "phone": "+1-555-0899",
+        "lifetime_value": "$1245.00",
+        "loyalty_tier": "Gold",
+        "recent_order": "1008",
+        "tags": [
+            "New Customer"
+        ]
+    },
+    {
+        "id": "CUST-1009",
+        "name": "Sophia Anderson",
+        "email": "sanderson@example.com",
+        "phone": "+1-555-0956",
+        "lifetime_value": "$1395.00",
+        "loyalty_tier": "Gold",
+        "recent_order": "1009",
+        "tags": [
+            "VIP"
+        ]
+    },
+    {
+        "id": "CUST-10010",
+        "name": "Alexander Thomas",
+        "email": "athomas.design@example.com",
+        "phone": "+1-555-1042",
+        "lifetime_value": "$1545.00",
+        "loyalty_tier": "Gold",
+        "recent_order": "1010",
+        "tags": [
+            "VIP"
+        ]
+    }
 ]
+
+
+MOCK_ORDERS = {
+    "1001": {
+        "order_id": "1001",
+        "email": "eleanor.v@example.com",
+        "status": "delivered",
+        "order_date": "2026-08-01",
+        "total_amount": "$101.50",
+        "payment_method": "Credit Card (Visa)",
+        "shipping_method": "Express Shipping",
+        "carrier": "FedEx",
+        "eta": None,
+        "tracking_url": "https://fedex.com/track/1001",
+        "timeline": [
+            {
+                "status": "placed",
+                "time": "2026-08-01T10:15:00Z",
+                "label": "Order Placed"
+            },
+            {
+                "status": "processing",
+                "time": "2026-08-01T14:30:00Z",
+                "label": "Processing"
+            },
+            {
+                "status": "shipped",
+                "time": "2026-08-02T09:45:00Z",
+                "label": "Shipped"
+            },
+            {
+                "status": "delivered",
+                "time": "2026-08-03T16:20:00Z",
+                "label": "Delivered"
+            }
+        ]
+    },
+    "1002": {
+        "order_id": "1002",
+        "email": "mchang.tech@example.com",
+        "status": "shipped",
+        "order_date": "2026-08-02",
+        "total_amount": "$190.50",
+        "payment_method": "PayPal",
+        "shipping_method": "Standard Delivery",
+        "carrier": "FedEx",
+        "eta": "2026-08-05",
+        "tracking_url": "https://fedex.com/track/1002",
+        "timeline": [
+            {
+                "status": "placed",
+                "time": "2026-08-02T10:15:00Z",
+                "label": "Order Placed"
+            },
+            {
+                "status": "processing",
+                "time": "2026-08-02T14:30:00Z",
+                "label": "Processing"
+            },
+            {
+                "status": "shipped",
+                "time": "2026-08-03T09:45:00Z",
+                "label": "Shipped"
+            }
+        ]
+    },
+    "1003": {
+        "order_id": "1003",
+        "email": "sjenkins88@example.com",
+        "status": "processing",
+        "order_date": "2026-08-03",
+        "total_amount": "$279.50",
+        "payment_method": "Credit Card (Visa)",
+        "shipping_method": "Express Shipping",
+        "carrier": None,
+        "eta": "2026-08-06",
+        "tracking_url": None,
+        "timeline": [
+            {
+                "status": "placed",
+                "time": "2026-08-03T10:15:00Z",
+                "label": "Order Placed"
+            },
+            {
+                "status": "processing",
+                "time": "2026-08-03T14:30:00Z",
+                "label": "Processing"
+            }
+        ]
+    },
+    "1004": {
+        "order_id": "1004",
+        "email": "drodriguez@example.com",
+        "status": "placed",
+        "order_date": "2026-08-04",
+        "total_amount": "$368.50",
+        "payment_method": "PayPal",
+        "shipping_method": "Standard Delivery",
+        "carrier": None,
+        "eta": "2026-08-07",
+        "tracking_url": None,
+        "timeline": [
+            {
+                "status": "placed",
+                "time": "2026-08-04T10:15:00Z",
+                "label": "Order Placed"
+            }
+        ]
+    },
+    "1005": {
+        "order_id": "1005",
+        "email": "emily.c@example.com",
+        "status": "cancelled",
+        "order_date": "2026-08-05",
+        "total_amount": "$457.50",
+        "payment_method": "Credit Card (Visa)",
+        "shipping_method": "Express Shipping",
+        "carrier": None,
+        "eta": None,
+        "tracking_url": None,
+        "timeline": [
+            {
+                "status": "placed",
+                "time": "2026-08-05T10:15:00Z",
+                "label": "Order Placed"
+            },
+            {
+                "status": "cancelled",
+                "time": "2026-08-05T18:05:00Z",
+                "label": "Cancelled"
+            }
+        ]
+    },
+    "1006": {
+        "order_id": "1006",
+        "email": "jwilson@example.com",
+        "status": "delivered",
+        "order_date": "2026-08-06",
+        "total_amount": "$546.50",
+        "payment_method": "PayPal",
+        "shipping_method": "Standard Delivery",
+        "carrier": "FedEx",
+        "eta": None,
+        "tracking_url": "https://fedex.com/track/1006",
+        "timeline": [
+            {
+                "status": "placed",
+                "time": "2026-08-06T10:15:00Z",
+                "label": "Order Placed"
+            },
+            {
+                "status": "processing",
+                "time": "2026-08-06T14:30:00Z",
+                "label": "Processing"
+            },
+            {
+                "status": "shipped",
+                "time": "2026-08-07T09:45:00Z",
+                "label": "Shipped"
+            },
+            {
+                "status": "delivered",
+                "time": "2026-08-08T16:20:00Z",
+                "label": "Delivered"
+            }
+        ]
+    },
+    "1007": {
+        "order_id": "1007",
+        "email": "omartinez99@example.com",
+        "status": "shipped",
+        "order_date": "2026-08-07",
+        "total_amount": "$635.50",
+        "payment_method": "Credit Card (Visa)",
+        "shipping_method": "Express Shipping",
+        "carrier": "FedEx",
+        "eta": "2026-08-10",
+        "tracking_url": "https://fedex.com/track/1007",
+        "timeline": [
+            {
+                "status": "placed",
+                "time": "2026-08-07T10:15:00Z",
+                "label": "Order Placed"
+            },
+            {
+                "status": "processing",
+                "time": "2026-08-07T14:30:00Z",
+                "label": "Processing"
+            },
+            {
+                "status": "shipped",
+                "time": "2026-08-08T09:45:00Z",
+                "label": "Shipped"
+            }
+        ]
+    },
+    "1008": {
+        "order_id": "1008",
+        "email": "wtaylor.biz@example.com",
+        "status": "processing",
+        "order_date": "2026-08-08",
+        "total_amount": "$724.50",
+        "payment_method": "PayPal",
+        "shipping_method": "Standard Delivery",
+        "carrier": None,
+        "eta": "2026-08-11",
+        "tracking_url": None,
+        "timeline": [
+            {
+                "status": "placed",
+                "time": "2026-08-08T10:15:00Z",
+                "label": "Order Placed"
+            },
+            {
+                "status": "processing",
+                "time": "2026-08-08T14:30:00Z",
+                "label": "Processing"
+            }
+        ]
+    },
+    "1009": {
+        "order_id": "1009",
+        "email": "sanderson@example.com",
+        "status": "placed",
+        "order_date": "2026-08-09",
+        "total_amount": "$813.50",
+        "payment_method": "Credit Card (Visa)",
+        "shipping_method": "Express Shipping",
+        "carrier": None,
+        "eta": "2026-08-12",
+        "tracking_url": None,
+        "timeline": [
+            {
+                "status": "placed",
+                "time": "2026-08-09T10:15:00Z",
+                "label": "Order Placed"
+            }
+        ]
+    },
+    "1010": {
+        "order_id": "1010",
+        "email": "athomas.design@example.com",
+        "status": "cancelled",
+        "order_date": "2026-08-10",
+        "total_amount": "$902.50",
+        "payment_method": "PayPal",
+        "shipping_method": "Standard Delivery",
+        "carrier": None,
+        "eta": None,
+        "tracking_url": None,
+        "timeline": [
+            {
+                "status": "placed",
+                "time": "2026-08-10T10:15:00Z",
+                "label": "Order Placed"
+            },
+            {
+                "status": "cancelled",
+                "time": "2026-08-10T18:05:00Z",
+                "label": "Cancelled"
+            }
+        ]
+    }
+}
+
 
 def get_customer_info(email: str = None, phone: str = None, customer_id: str = None) -> Optional[dict]:
     if email:
@@ -98,10 +422,6 @@ def get_customer_info(email: str = None, phone: str = None, customer_id: str = N
                 
     return None
 
-
-from typing import Optional
-
-
 def get_order_status(order_id: str) -> Optional[dict]:
     """Look up the current status of an order.
     Simulates:
@@ -115,71 +435,11 @@ def get_order_status(order_id: str) -> Optional[dict]:
         or None if no matching order is found.
     """
     # --- MOCK BODY ---
-    mock_orders = {
-        "1001": {
-            "order_id": "1001",
-            "email": "customer1@example.com",
-            "status": "shipped",
-            "carrier": "Pathao Courier",
-            "eta": "2026-06-27",
-            "tracking_url": "https://example.com/track/1001",
-        },
-        "1002": {
-            "order_id": "1002",
-            "email": "test@example.com",
-            "status": "processing",
-            "carrier": None,
-            "eta": "2026-06-30",
-            "tracking_url": None,
-        },
-        "1003": {
-            "order_id": "1003",
-            "email": "customer3@example.com",
-            "status": "delivered",
-            "carrier": "Sundarban Courier",
-            "eta": "2026-06-20",
-            "tracking_url": "https://example.com/track/1003",
-        },
-        "1004": {
-            "order_id": "1004",
-            "email": "test@example.com",
-            "status": "cancelled",
-            "carrier": None,
-            "eta": None,
-            "tracking_url": None,
-        },
-        "1005": {
-            "order_id": "1005",
-            "email": "test@example.com",
-            "status": "processing",
-            "carrier": None,
-            "eta": "2026-07-15",
-            "tracking_url": None,
-        },
-        "1006": {
-            "order_id": "1006",
-            "email": "customer6@example.com",
-            "status": "shipped",
-            "carrier": "DHL",
-            "eta": "2026-07-08",
-            "tracking_url": "https://dhl.com/track/1006",
-        },
-        "1007": {
-            "order_id": "1007",
-            "email": "customer7@example.com",
-            "status": "delivered",
-            "carrier": "FedEx",
-            "eta": "2026-06-05",
-            "tracking_url": "https://fedex.com/track/1007",
-        },
-    }
-    
-    order = mock_orders.get(order_id)
+    order = MOCK_ORDERS.get(order_id)
     if order:
         result = order.copy()
         return result
     return None
-
 
 def get_order_by_email(email: str) -> Optional[dict]:
     """Look up the most recent order by customer email.
@@ -193,21 +453,11 @@ def get_order_by_email(email: str) -> Optional[dict]:
         A dictionary containing order status, or None if no match.
     """
     # --- MOCK BODY ---
-    mock_orders = {
-        "1001": {"order_id": "1001", "email": "customer1@example.com", "status": "shipped", "carrier": "Pathao Courier", "eta": "2026-06-27", "tracking_url": "https://example.com/track/1001"},
-        "1002": {"order_id": "1002", "email": "test@example.com", "status": "processing", "carrier": None, "eta": "2026-06-30", "tracking_url": None},
-        "1003": {"order_id": "1003", "email": "customer3@example.com", "status": "delivered", "carrier": "Sundarban Courier", "eta": "2026-06-20", "tracking_url": "https://example.com/track/1003"},
-        "1004": {"order_id": "1004", "email": "test@example.com", "status": "cancelled", "carrier": None, "eta": None, "tracking_url": None},
-        "1005": {"order_id": "1005", "email": "test@example.com", "status": "processing", "carrier": None, "eta": "2026-07-15", "tracking_url": None},
-        "1006": {"order_id": "1006", "email": "customer6@example.com", "status": "shipped", "carrier": "DHL", "eta": "2026-07-08", "tracking_url": "https://dhl.com/track/1006"},
-        "1007": {"order_id": "1007", "email": "customer7@example.com", "status": "delivered", "carrier": "FedEx", "eta": "2026-06-05", "tracking_url": "https://fedex.com/track/1007"},
-    }
-    
     if not email:
         return None
     email_lower = email.lower().strip()
     matches = [
-        order for order in mock_orders.values()
+        order for order in MOCK_ORDERS.values()
         if order.get("email", "").lower() == email_lower
     ]
     if not matches:
@@ -218,7 +468,6 @@ def get_order_by_email(email: str) -> Optional[dict]:
     if "email" in result:
         del result["email"]
     return result
-
 
 def create_support_ticket(
     customer_email: str,

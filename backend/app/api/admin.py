@@ -37,6 +37,7 @@ class AgentCreate(BaseModel):
     employee_id: str
     password: str
     role: str = "agent"
+    dp_url: str | None = None
 
 class PasswordReset(BaseModel):
     new_password: str
@@ -67,7 +68,8 @@ def list_agents(
             "employee_id": a.employee_id or "N/A",
             "role": a.role,
             "created_at": a.created_at.isoformat(),
-            "resolved_count": stats_map.get(a.username, 0)
+            "resolved_count": stats_map.get(a.username, 0),
+            "dp_url": a.dp_url
         })
         
     # Append AI Agent
@@ -77,7 +79,8 @@ def list_agents(
         "employee_id": "AUTO",
         "role": "ai",
         "created_at": "",
-        "resolved_count": ai_count
+        "resolved_count": ai_count,
+        "dp_url": None
     })
     
     return directory
@@ -107,7 +110,8 @@ def create_agent(
         full_name=agent_in.full_name,
         employee_id=agent_in.employee_id,
         password_hash=hash_password(agent_in.password),
-        role=agent_in.role
+        role=agent_in.role,
+        dp_url=agent_in.dp_url
     )
     db.add(new_agent)
     
@@ -150,6 +154,37 @@ def delete_agent(
     
     db.commit()
     return {"status": "deleted", "username": username}
+
+class AgentUpdate(BaseModel):
+    dp_url: str | None = None
+
+@router.put("/admin/agents/{username}")
+def update_agent(
+    username: str,
+    payload: AgentUpdate,
+    db: Session = Depends(get_db),
+    manager: Agent = Depends(get_current_manager),
+) -> dict:
+    agent = db.query(Agent).filter_by(username=username).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+        
+    if manager.role == "manager" and agent.role != "agent":
+        if agent.username != manager.username:
+            raise HTTPException(status_code=403, detail="Managers can only update standard Agent accounts.")
+            
+    agent.dp_url = payload.dp_url
+    
+    audit = AuditLog(
+        actor_username=manager.username,
+        action="update_agent",
+        target_username=username,
+        details=f"Updated dp_url"
+    )
+    db.add(audit)
+    db.commit()
+    
+    return {"status": "success", "username": username, "dp_url": agent.dp_url}
 
 @router.put("/admin/agents/{username}/reset-password")
 def reset_password(

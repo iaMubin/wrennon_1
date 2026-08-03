@@ -121,6 +121,7 @@ class Agent(Base):
     username: Mapped[str] = mapped_column(String, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String)
     role: Mapped[str] = mapped_column(String, default="agent")
+    dp_url: Mapped[str | None] = mapped_column(String, nullable=True)
     totp_secret: Mapped[str | None] = mapped_column(String, nullable=True)
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     token_version: Mapped[int] = mapped_column(Integer, default=1)

@@ -210,6 +210,13 @@ loginForm.addEventListener("submit", async (e) => {
     // button) is kept client-side.
     localStorage.setItem("agent_username", username); // Save username to identify self
     localStorage.setItem("agent_role", data.role); // Save role to show admin btn
+    if (data.dp_url) {
+      localStorage.setItem("agent_dp_url", data.dp_url);
+      document.getElementById("agent-profile-dp").src = data.dp_url;
+    } else {
+      localStorage.removeItem("agent_dp_url");
+      document.getElementById("agent-profile-dp").src = "/agent/images/default-avatar.svg";
+    }
     
     if (data.role === "manager" || data.role === "admin") {
       document.getElementById("admin-dashboard-btn").classList.remove("hidden");
@@ -1472,16 +1479,32 @@ if (sendToggleBtn && sendTypeMenu) {
 }
 
 if (noteTypeSelect && chatInputWrapper) {
-  noteTypeSelect.addEventListener("change", () => {
+  function updatePlaceholder() {
     if (noteTypeSelect.value === "internal") {
       chatInputWrapper.classList.add("internal-mode");
-      agentInput.placeholder = "Type internal note... (Use @ to tag, / for cmds)";
+      // Use the actual width of the input to determine if we should show the full message
+      agentInput.placeholder = agentInput.clientWidth > 380 
+        ? "Type internal note... (Use @ to tag, / for cmds)" 
+        : "Type internal note...";
       document.getElementById("agent-send-btn").textContent = "Add Note";
     } else {
       chatInputWrapper.classList.remove("internal-mode");
       agentInput.placeholder = "Type a message...";
       document.getElementById("agent-send-btn").textContent = "Send";
     }
+  }
+
+  // Observe the input element's width to dynamically update placeholder
+  // This handles both window resizing and sidebar toggling
+  const resizeObserver = new ResizeObserver(() => {
+    if (noteTypeSelect.value === "internal") {
+      updatePlaceholder();
+    }
+  });
+  resizeObserver.observe(agentInput);
+
+  noteTypeSelect.addEventListener("change", () => {
+    updatePlaceholder();
     agentInput.focus();
   });
 }
@@ -1626,7 +1649,7 @@ async function fetchOrderContext(sessionId) {
   const result = await authedFetch(`/agent/conversations/${sessionId}/order-context`);
   if (result) {
     if (result.order) {
-      showOrderPopup(result.order);
+      showOrderPopup(result.order, result.customer);
     } else {
       hideOrderPopup();
     }
@@ -1645,30 +1668,61 @@ async function fetchOrderContext(sessionId) {
   }
 }
 
-function showOrderPopup(order) {
+function showOrderPopup(order, customer) {
   const popup = document.getElementById('order-popup');
   const body = document.getElementById('order-popup-body');
   if (!popup || !body) return;
   
   const statusClass = `order-status-badge--${(order.status || '').toLowerCase()}`;
   
+  const formatTime = (isoStr) => {
+    if (!isoStr) return '';
+    try {
+      const d = new Date(isoStr);
+      if (isNaN(d.getTime())) return isoStr;
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return isoStr;
+    }
+  };
+
   const statuses = ['placed', 'processing', 'shipped', 'delivered'];
-  const currentStatusIndex = statuses.indexOf((order.status || 'placed').toLowerCase());
+  let currentStatus = (order.status || 'placed').toLowerCase();
   
-  const timelineEvents = [
-    { status: 'placed', label: 'Order Placed', time: 'Aug 2, 10:00 AM', icon: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>' },
-    { status: 'processing', label: 'Processing', time: 'Aug 2, 11:30 AM', icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>' },
-    { status: 'shipped', label: 'Shipped', time: 'Aug 3, 02:15 PM', icon: '<circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>' },
-    { status: 'delivered', label: 'Delivered', time: 'Aug 5, 04:00 PM', icon: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>' },
+  const baseTimelineEvents = [
+    { status: 'placed', label: 'Order Placed', time: '', icon: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>' },
+    { status: 'processing', label: 'Processing', time: '', icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>' },
+    { status: 'shipped', label: 'Shipped', time: '', icon: '<circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>' },
+    { status: 'delivered', label: 'Delivered', time: '', icon: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>' },
   ];
+  
+  if (currentStatus === 'cancelled') {
+      baseTimelineEvents[3] = { status: 'cancelled', label: 'Cancelled', time: '', icon: '<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>' };
+  }
+
+  const timelineEvents = baseTimelineEvents.map(baseEvt => {
+      let time = '';
+      if (order.timeline && Array.isArray(order.timeline)) {
+          const matched = order.timeline.find(t => t.status === baseEvt.status);
+          if (matched && matched.time) {
+              time = formatTime(matched.time);
+          }
+      }
+      return { ...baseEvt, time };
+  });
+
+  const currentStatusIndex = statuses.indexOf(currentStatus);
 
   let timelineHtml = timelineEvents.map((evt, i) => {
-    return { ...evt, isCompleted: i <= currentStatusIndex };
+    const isCompleted = (order.timeline && Array.isArray(order.timeline)) 
+        ? !!order.timeline.find(t => t.status === evt.status) 
+        : (i <= currentStatusIndex);
+    return { ...evt, isCompleted };
   }).reverse().map((evt, index, arr) => {
     const isLast = index === arr.length - 1;
     return `
-      <div class="order-timeline-item">
-        <div class="order-timeline-icon order-timeline-icon--${evt.status}">
+      <div class="order-timeline-item ${!evt.isCompleted ? 'order-timeline-item--incomplete' : ''}">
+        <div class="order-timeline-icon ${evt.isCompleted ? `order-timeline-icon--${evt.status}` : 'order-timeline-icon--incomplete'}">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${evt.icon}</svg>
         </div>
         ${!isLast ? '<div class="order-timeline-line"></div>' : ''}
@@ -1680,19 +1734,51 @@ function showOrderPopup(order) {
     `;
   }).join('');
 
+  const availableFields = [];
+  
+  if (customer && customer.name) {
+      availableFields.push({ label: 'Customer', value: escapeHtml(customer.name) });
+  }
+  
+  availableFields.push({ label: 'Order ID', value: `#${escapeHtml(order.order_id)}` });
+  availableFields.push({ label: 'Status', value: `<span class="order-status-badge ${statusClass}">${escapeHtml(order.status)}</span>` });
+  
+  if (order.order_date) availableFields.push({ label: 'Date', value: escapeHtml(order.order_date) });
+  if (order.total_amount) availableFields.push({ label: 'Total', value: escapeHtml(order.total_amount) });
+  
+  if ((order.status || '').toLowerCase() === 'shipped' || (order.status || '').toLowerCase() === 'delivered') {
+      if (order.tracking_url || order.carrier) {
+          let labelHtml = `<span style="display:flex; align-items:center;">Tracking ${order.carrier ? `<span style="margin-left: 6px; padding: 2px 4px; background: color-mix(in srgb, var(--ink) 8%, transparent); border-radius: 4px; font-family: var(--font-sans); font-size: 10px; font-weight: 600; color: var(--ink); text-transform: none; letter-spacing: normal;">${escapeHtml(order.carrier)}</span>` : ''}</span>`;
+          let valueHtml = '';
+          if (order.tracking_url) {
+              valueHtml = `<div style="display: flex; align-items: center; gap: 4px; line-height: 1;"><a href="${escapeHtml(order.tracking_url)}" target="_blank" rel="noopener noreferrer" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${escapeHtml(order.tracking_url)}</a><button class="icon-action-btn" style="padding: 2px; height: 18px; width: 18px; margin: 0; min-height: 0; min-width: 0;" onclick="navigator.clipboard.writeText('${escapeHtml(order.tracking_url)}')" title="Copy tracking URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>`;
+          } else {
+              valueHtml = `<span style="color: var(--text-muted);">No tracking link</span>`;
+          }
+          availableFields.push({ 
+              label: labelHtml, 
+              value: valueHtml,
+              span: 2
+          });
+      }
+  }
+  
+  if (order.eta && (order.status || '').toLowerCase() !== 'delivered' && (order.status || '').toLowerCase() !== 'cancelled') {
+      availableFields.push({ label: 'ETA', value: escapeHtml(order.eta) });
+  }
+  
+  if (order.payment_method) availableFields.push({ label: 'Payment', value: escapeHtml(order.payment_method) });
+  if (order.shipping_method) availableFields.push({ label: 'Shipping', value: escapeHtml(order.shipping_method) });
+
+  const fieldsToShow = availableFields.slice(0, 5);
+  
+  const fieldsHtml = fieldsToShow.map(f => {
+      return `<div class="order-popup__field" ${f.span ? `style="grid-column: span ${f.span};"` : ''}><span class="order-popup__label">${f.label}</span><span class="order-popup__value">${f.value}</span></div>`;
+  }).join('');
+
   body.innerHTML = `
     <div class="order-popup__details-col">
-      <div class="order-popup__field">
-        <span class="order-popup__label">Order ID</span>
-        <span class="order-popup__value">#${escapeHtml(order.order_id)}</span>
-      </div>
-      <div class="order-popup__field">
-        <span class="order-popup__label">Status</span>
-        <span class="order-popup__value"><span class="order-status-badge ${statusClass}">${escapeHtml(order.status)}</span></span>
-      </div>
-      ${order.carrier ? `<div class="order-popup__field"><span class="order-popup__label">Carrier</span><span class="order-popup__value">${escapeHtml(order.carrier)}</span></div>` : ''}
-      ${order.eta ? `<div class="order-popup__field"><span class="order-popup__label">ETA</span><span class="order-popup__value">${escapeHtml(order.eta)}</span></div>` : ''}
-      ${order.tracking_url ? `<div class="order-popup__field" style="grid-column: span 2;"><span class="order-popup__label">Tracking</span><span class="order-popup__value"><a href="${escapeHtml(order.tracking_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(order.tracking_url)}</a></span></div>` : ''}
+      ${fieldsHtml}
     </div>
     <div class="order-popup__timeline-col">
       ${timelineHtml}
@@ -1968,6 +2054,7 @@ function logout() {
 
   localStorage.removeItem("agent_username");
   localStorage.removeItem("agent_role");
+  localStorage.removeItem("agent_dp_url");
   
   const antiFlash = document.getElementById('anti-flash-style');
   if(antiFlash) antiFlash.remove();
@@ -1981,6 +2068,7 @@ function logout() {
 document.addEventListener("DOMContentLoaded", async () => {
   const savedUsername = localStorage.getItem("agent_username");
   const savedRole = localStorage.getItem("agent_role");
+  const savedDp = localStorage.getItem("agent_dp_url");
   
   if (savedUsername) {
     // We make a test request to see if we're authenticated, since the token is an HTTP-only cookie.
@@ -1989,6 +2077,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (checkAuth) {
       loginScreen.classList.add("hidden");
       dashboard.classList.remove("hidden");
+      
+      if (savedDp) {
+        const dpEl = document.getElementById("agent-profile-dp");
+        if (dpEl) dpEl.src = savedDp;
+      }
       
       if (savedRole === "manager" || savedRole === "admin") {
         const adminBtn = document.getElementById("admin-dashboard-btn");
@@ -2176,6 +2269,24 @@ function showCustomerSidebar(customer) {
     { action: 'Receipt for order #2232534', time: 'Jan 05, 3:24 PM', status: 'S' }
   ];
 
+  window.addCustomerNote = function(inputElem, event) {
+    if (event.key !== 'Enter') return;
+    const text = inputElem.value.trim();
+    if (!text) return;
+    inputElem.value = '';
+    const container = inputElem.parentElement.previousElementSibling;
+    const noteDiv = document.createElement('div');
+    noteDiv.style.cssText = 'background: color-mix(in srgb, var(--accent) 8%, transparent); padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--ink); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; line-height: 1.4; margin-bottom: 6px;';
+    const escapedText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    noteDiv.innerHTML = `
+      <span style="flex:1;word-break:break-word;">${escapedText}</span>
+      <button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:2px;margin:-2px;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:color 0.2s, background 0.2s;" onmouseover="this.style.color='var(--danger)';this.style.background='color-mix(in srgb, var(--danger) 10%, transparent)'" onmouseout="this.style.color='var(--text-muted)';this.style.background='none'">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    `;
+    container.appendChild(noteDiv);
+  };
+
   const getStatusIcon = (item) => {
     const act = item.action.toLowerCase();
     let bgClass = "bg-gray";
@@ -2208,17 +2319,18 @@ function showCustomerSidebar(customer) {
   };
 
   content.innerHTML = `
-    <div class="customer-profile-compact">
-      <div class="customer-profile__avatar-small">
-        <img src="https://i.pravatar.cc/150?u=${encodeURIComponent(customer.email || customer.id)}" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">
-      </div>
-      <div class="customer-profile-info">
-        <div style="display:flex; flex-direction:column; gap:2px; flex:1; overflow:hidden;">
-          <div class="customer-profile__name" style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(customer.name)}</div>
-          <div class="customer-profile__id" style="display:block; font-size:11px; color:var(--text-muted); font-weight:normal;">#${customer.id.substring(0,6).toUpperCase()}</div>
+    <div class="customer-details-box">
+      <div class="customer-profile-compact">
+        <div class="customer-profile__avatar-small">
+          <img src="https://i.pravatar.cc/150?u=${encodeURIComponent(customer.email || customer.id)}" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">
         </div>
-        <div class="customer-profile-actions" style="margin-top:2px;">
-           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        <div class="customer-profile-info">
+          <div style="display:flex; flex-direction:column; gap:2px; flex:1; overflow:hidden;">
+            <div class="customer-profile__name" style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(customer.name)}</div>
+            <div class="customer-profile__id" style="display:inline-block; width:fit-content; margin-top:2px; font-size:11px; color:var(--text-muted); font-weight:normal;">#${escapeHtml(customer.id)}</div>
+          </div>
+          <div class="customer-profile-actions" style="margin-top:2px;">
+             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </div>
@@ -2245,13 +2357,16 @@ function showCustomerSidebar(customer) {
           <span class="customer-tag">priority shopping</span>
         </div>
       </div>
-      <div class="contact-item note" style="align-items: flex-start; margin-top: 12px;">
-        <svg style="margin-top: 10px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-        <textarea class="note-textarea" placeholder="Add user notes"></textarea>
+      <div class="contact-item note" style="flex-direction: column; align-items: flex-start; margin-top: -4px; width: 100%;">
+        <div id="saved-notes-container" style="display: flex; flex-direction: column; width: 100%;"></div>
+        <div style="display: flex; gap: 10px; width: 100%; align-items: center;">
+          <svg style="flex-shrink: 0; color: var(--text-muted);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          <input type="text" class="note-input-field" placeholder="Add user notes..." style="flex: 1; border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); border-radius: 6px; background: color-mix(in srgb, var(--bg-surface) 50%, transparent); color: var(--ink); font-size: 13px; outline: none; padding: 8px 12px; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='color-mix(in srgb, var(--line) 80%, transparent)'" onkeydown="window.addCustomerNote(this, event)">
+        </div>
       </div>
     </div>
 
-    <div class="customer-section interactions-section">
+    <div class="interactions-section">
       <div class="interactions-header">
         <div class="customer-section__title">Interactions</div>
         <div class="interactions-actions">
@@ -2277,9 +2392,18 @@ function showCustomerSidebar(customer) {
         `).join('')}
       </div>
     </div>
+    </div>
   `;
   
   sidebar.classList.remove("hidden");
+  
+  const toggleBtn = document.getElementById("customer-sidebar-toggle");
+  if (toggleBtn) {
+    const avatarUrl = `https://i.pravatar.cc/150?u=${encodeURIComponent(customer.email || customer.id)}`;
+    toggleBtn.innerHTML = `<img src="${avatarUrl}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" alt="Customer Details" onerror="this.src='/agent/images/default-avatar.png?v=2'">`;
+    toggleBtn.style.padding = "2px";
+    toggleBtn.style.borderRadius = "50%";
+  }
 }
 
 function hideCustomerSidebar() {
@@ -2292,6 +2416,13 @@ function hideCustomerSidebar() {
 function clearCustomerSidebar() {
   hideCustomerSidebar();
   currentlyShowingCustomerId = null;
+  
+  const toggleBtn = document.getElementById("customer-sidebar-toggle");
+  if (toggleBtn) {
+    toggleBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+    toggleBtn.style.padding = "0";
+    toggleBtn.style.borderRadius = "10px";
+  }
 }
 
 // Toggle Sidebar Buttons

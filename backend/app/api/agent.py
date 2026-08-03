@@ -141,7 +141,7 @@ async def login(
         max_age=60 * 60 * 24 * 7 # 7 days
     )
     
-    return {"access_token": token, "token_type": "bearer", "role": agent.role}  # nosec B105
+    return {"access_token": token, "token_type": "bearer", "role": agent.role, "dp_url": agent.dp_url}  # nosec B105
 
 
 @router.post("/agent/logout")
@@ -567,6 +567,18 @@ def get_order_context(
                 resp["customer"] = get_customer_info(email=email_match.group(0))
                 return resp
                 
+    # 2.5. Check for explicit phone number in messages
+    for msg in messages:
+        phone_match = re.search(r'\b\d{3}[-.\s]?\d{4}\b', msg.content)
+        if phone_match:
+            cust = get_customer_info(phone=phone_match.group(0))
+            if cust and cust.get("recent_order"):
+                order = get_order_status(cust["recent_order"])
+                if order:
+                    resp = build_response(order, "phone_scan")
+                    resp["customer"] = cust
+                    return resp
+
     # 3. Use logged-in customer_email (or fallback)
     if conversation.customer_email:
         order = get_order_by_email(conversation.customer_email)
