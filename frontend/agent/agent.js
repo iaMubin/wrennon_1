@@ -2968,10 +2968,72 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if(btns[viewName]) {
       btns[viewName].classList.add('active');
+    }
+    
+    if (viewName === 'dashboard') {
+        window.loadDashboard();
     } else if (viewName === 'customers') {
-      window.loadCustomers();
+        window.loadCustomers();
+    } else if (viewName === 'analytics') {
+        window.loadAnalytics();
     }
   }
+
+  window.loadDashboard = async function() {
+      try {
+          const res = await fetch(`${API_BASE}/agent/dashboard-summary`, {
+              headers: { 'Authorization': 'Bearer ' + getCookie('access_token') },
+              credentials: 'include'
+          });
+          if (res.ok) {
+              const data = await res.json();
+              const openEl = document.getElementById('metric-open-tickets');
+              if(openEl) openEl.textContent = data.open_tickets;
+              const unassignedEl = document.getElementById('metric-unassigned');
+              if(unassignedEl) unassignedEl.textContent = data.unassigned;
+              const solvedEl = document.getElementById('metric-solved-today');
+              if(solvedEl) solvedEl.textContent = data.solved_today;
+              const csatEl = document.getElementById('metric-csat');
+              if (csatEl) {
+                  csatEl.textContent = data.csat_score ? data.csat_score.toFixed(1) + ' ★' : '—';
+              }
+          }
+      } catch (e) { console.error("Failed to load dashboard summary", e); }
+  };
+
+  window.loadAnalytics = async function() {
+      try {
+          const res = await fetch(`${API_BASE}/analytics/dashboard-metrics`, {
+              headers: { 'Authorization': 'Bearer ' + getCookie('access_token') },
+              credentials: 'include'
+          });
+          if (res.ok) {
+              const data = await res.json();
+              const formatDuration = (secs) => {
+                  if (!secs) return "—";
+                  const h = Math.floor(secs / 3600);
+                  const m = Math.floor((secs % 3600) / 60);
+                  if (h > 0) return `${h}h ${m}m`;
+                  return `${m}m`;
+              };
+              const frtEl = document.getElementById('analytics-first-response');
+              if(frtEl) frtEl.textContent = formatDuration(data.first_response_time_seconds);
+              const artEl = document.getElementById('analytics-avg-resolution-time');
+              if(artEl) artEl.textContent = formatDuration(data.avg_resolution_time_seconds);
+              const otEl = document.getElementById('analytics-one-touch');
+              if(otEl) otEl.textContent = data.one_touch_resolutions_pct ? data.one_touch_resolutions_pct.toFixed(0) + '%' : '0%';
+              
+              if (window.volumeChart) {
+                  window.volumeChart.data.datasets[0].data = data.hourly_volume;
+                  window.volumeChart.update();
+              }
+              if (window.csatChart) {
+                  window.csatChart.data.datasets[0].data = data.csat_distribution.reverse();
+                  window.csatChart.update();
+              }
+          }
+      } catch (e) { console.error("Failed to load analytics", e); }
+  };
 
   if(btns['dashboard']) btns['dashboard'].addEventListener('click', () => switchView('dashboard'));
   if(btns['conversations']) btns['conversations'].addEventListener('click', () => switchView('conversations'));
@@ -3030,14 +3092,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Volume Chart (Analytics)
         const ctxVol = document.getElementById('volumeChart');
-        if(ctxVol && !volumeChart) {
-            volumeChart = new Chart(ctxVol, {
+        if(ctxVol && !window.volumeChart) {
+            window.volumeChart = new Chart(ctxVol, {
                 type: 'line',
                 data: {
-                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    labels: Array.from({length: 24}, (_, i) => `${i}:00`),
                     datasets: [{
                         label: 'Tickets',
-                        data: [120, 190, 150, 220, 180, 90, 110],
+                        data: Array(24).fill(0),
                         borderColor: accentColor,
                         backgroundColor: accentColor + '20',
                         borderWidth: 3,
@@ -3051,13 +3113,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // CSAT Chart (Analytics)
         const ctxCsat = document.getElementById('csatChart');
-        if(ctxCsat && !csatChart) {
-            csatChart = new Chart(ctxCsat, {
+        if(ctxCsat && !window.csatChart) {
+            window.csatChart = new Chart(ctxCsat, {
                 type: 'doughnut',
                 data: {
                     labels: ['5 Stars', '4 Stars', '3 Stars', '1-2 Stars'],
                     datasets: [{
-                        data: [65, 20, 10, 5],
+                        data: [0, 0, 0, 0],
                         backgroundColor: ['#22c55e', '#84cc16', '#eab308', '#ef4444'],
                         borderWidth: 0
                     }]
