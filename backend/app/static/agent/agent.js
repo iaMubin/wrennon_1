@@ -3093,7 +3093,15 @@ document.addEventListener('DOMContentLoaded', () => {
                   window.volumeChart.update();
               }
               if (window.csatChart) {
-                  window.csatChart.data.datasets[0].data = data.csat_distribution.reverse();
+                  const counts = data.csat_distribution || [0,0,0,0,0];
+                  // backend is [1, 2, 3, 4, 5], frontend is ['5 Stars', '4 Stars', '3 Stars', '1-2 Stars']
+                  const mappedCounts = [
+                      counts[4],                 // 5 stars
+                      counts[3],                 // 4 stars
+                      counts[2],                 // 3 stars
+                      counts[0] + counts[1]      // 1-2 stars
+                  ];
+                  window.csatChart.data.datasets[0].data = mappedCounts;
                   window.csatChart.update();
               }
           }
