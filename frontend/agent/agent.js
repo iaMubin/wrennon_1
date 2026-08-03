@@ -2704,7 +2704,26 @@ document.addEventListener("contextmenu", (e) => {
 
 
 // --- Filters and Saved Views ---
-const savedViews = JSON.parse(localStorage.getItem("wrennon_saved_views") || "[]");
+const savedViews = [];
+
+async function loadSavedViews() {
+    try {
+        const authHeaders = { 'Authorization': 'Bearer ' + getCookie('access_token') };
+        const res = await fetch(`${API_BASE}/agent/saved-views`, {
+            headers: authHeaders,
+            credentials: 'include'
+        });
+        if (res.ok) {
+            const data = await res.json();
+            savedViews.length = 0;
+            savedViews.push(...data);
+            renderSavedViews();
+        }
+    } catch (e) {
+        console.error("Failed to load saved views", e);
+    }
+}
+
 function renderSavedViews() {
   const container = document.getElementById("saved-views-container");
   if (!container) return;
@@ -2719,10 +2738,14 @@ function renderSavedViews() {
         btn.style.border = "1px solid var(--border-light)";
         btn.style.color = "var(--ink)";
         btn.textContent = view.name;
+        
+        let filterObj = {};
+        try { filterObj = JSON.parse(view.filter_json); } catch(e){}
+
         btn.onclick = () => {
-           document.getElementById("filter-priority").value = view.priority || "";
-           document.getElementById("filter-assignee").value = view.assignee || "";
-           document.getElementById("filter-tag").value = view.tag || "";
+           document.getElementById("filter-priority").value = filterObj.priority || "";
+           document.getElementById("filter-assignee").value = filterObj.assignee || "";
+           document.getElementById("filter-tag").value = filterObj.tag || "";
            loadConversations();
            document.getElementById("clear-filters-btn").style.display = "inline-block";
         };
@@ -2730,11 +2753,16 @@ function renderSavedViews() {
         delBtn.innerHTML = "&times;";
         delBtn.style.marginLeft = "4px";
         delBtn.style.fontWeight = "bold";
-        delBtn.onclick = (e) => {
+        delBtn.onclick = async (e) => {
            e.stopPropagation();
-           savedViews.splice(idx, 1);
-           localStorage.setItem("wrennon_saved_views", JSON.stringify(savedViews));
-           renderSavedViews();
+           try {
+               await fetch(`${API_BASE}/agent/saved-views/${view.id}`, {
+                   method: 'DELETE',
+                   headers: { 'Authorization': 'Bearer ' + getCookie('access_token') },
+                   credentials: 'include'
+               });
+               loadSavedViews();
+           } catch(err) { console.error(err); }
         };
         btn.appendChild(delBtn);
         container.appendChild(btn);
@@ -2743,16 +2771,27 @@ function renderSavedViews() {
      container.style.display = "none";
   }
 }
-document.getElementById("save-view-btn")?.addEventListener("click", () => {
+
+document.getElementById("save-view-btn")?.addEventListener("click", async () => {
   const pri = document.getElementById("filter-priority").value;
   const ass = document.getElementById("filter-assignee").value;
   const tag = document.getElementById("filter-tag").value;
   if (!pri && !ass && !tag) return alert("Nothing to save");
   const name = prompt("Name for this view?");
   if (name) {
-    savedViews.push({ name, priority: pri, assignee: ass, tag: tag });
-    localStorage.setItem("wrennon_saved_views", JSON.stringify(savedViews));
-    renderSavedViews();
+    const filterJson = JSON.stringify({ priority: pri, assignee: ass, tag: tag });
+    try {
+        await fetch(`${API_BASE}/agent/saved-views`, {
+            method: 'POST',
+            headers: { 
+                'Authorization': 'Bearer ' + getCookie('access_token'),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name: name, filter_json: filterJson }),
+            credentials: 'include'
+        });
+        loadSavedViews();
+    } catch(err) { console.error(err); }
   }
 });
 
@@ -2795,7 +2834,7 @@ document.getElementById("clear-filters-btn")?.addEventListener("click", () => {
   document.getElementById("clear-filters-btn").style.display = "none";
   loadConversations();
 });
-renderSavedViews();
+loadSavedViews();
 
 // --- Bulk Actions ---
 const selectedConversations = new Set();
@@ -2929,6 +2968,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if(btns[viewName]) {
       btns[viewName].classList.add('active');
+    } else if (viewName === 'customers') {
+      window.loadCustomers();
     }
   }
 
@@ -3059,62 +3100,107 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // 2. Customers Table Logic (Mock API & Rendering)
-    const mockCustomers = [
-        { id: 1, name: "Sarah Johnson", email: "sarah.j@example.com", initials: "SJ", color: "var(--accent)", plan: "Pro", tickets: 24, ltv: ",200", lastActive: "Just now", status: "Online", isOnline: true },
-        { id: 2, name: "Michael Ross", email: "mross@company.com", initials: "MR", color: "#64748b", plan: "Enterprise", tickets: 142, ltv: ",500", lastActive: "2 hrs ago", status: "Offline", isOnline: false },
-        { id: 3, name: "Jessica Alba", email: "jess@startup.io", initials: "JA", color: "#10b981", plan: "Pro", tickets: 8, ltv: "", lastActive: "Yesterday", status: "Offline", isOnline: false },
-        { id: 4, name: "David Chen", email: "david.c@tech.co", initials: "DC", color: "#f59e0b", plan: "Basic", tickets: 3, ltv: "", lastActive: "5 mins ago", status: "Online", isOnline: true },
-        { id: 5, name: "Emma Watson", email: "emma@design.net", initials: "EW", color: "#ec4899", plan: "Enterprise", tickets: 87, ltv: ",400", lastActive: "1 day ago", status: "Offline", isOnline: false },
-        { id: 6, name: "James Bond", email: "007@mi6.gov.uk", initials: "JB", color: "#334155", plan: "Enterprise", tickets: 1, ltv: ",000", lastActive: "3 weeks ago", status: "Offline", isOnline: false },
-        { id: 7, name: "Olivia Pope", email: "olivia@fixer.com", initials: "OP", color: "#8b5cf6", plan: "Pro", tickets: 45, ltv: ",200", lastActive: "Today", status: "Online", isOnline: true },
-    ];
+    // 2. Customers Table Logic (API & Rendering)
+    window.customersData = [];
+    
+    window.loadCustomers = async function() {
+        try {
+            const authHeaders = {
+                'Authorization': 'Bearer ' + getCookie('access_token')
+            };
+            const res = await fetch(`${API_BASE}/agent/customers`, {
+                headers: authHeaders,
+                credentials: 'include'
+            });
+            if (res.ok) {
+                window.customersData = await res.json();
+                renderCustomers();
+            }
+        } catch (e) {
+            console.error('Failed to load customers', e);
+        }
+    };
 
-    let currentSort = { column: 'tickets', dir: 'desc' };
+    let currentSort = { column: 'total_tickets', dir: 'desc' };
 
     function renderCustomers() {
         const tbody = document.getElementById('customers-table-body');
         if(!tbody) return;
         
+        // Filter
+        const searchInput = document.getElementById('customer-search-input');
+        const query = searchInput ? searchInput.value.toLowerCase() : '';
+        let filtered = window.customersData;
+        if (query) {
+            filtered = filtered.filter(c => c.email && c.email.toLowerCase().includes(query));
+        }
+        
         // Sort
-        const sorted = [...mockCustomers].sort((a, b) => {
+        const sorted = [...filtered].sort((a, b) => {
             let valA = a[currentSort.column];
             let valB = b[currentSort.column];
             
-            // Handle numeric sorting for strings like ",200"
-            if(typeof valA === 'string' && valA.startsWith('$')) {
-                valA = parseFloat(valA.replace(/[$,]/g, ''));
-                valB = parseFloat(valB.replace(/[$,]/g, ''));
-            }
+            // Handle nulls
+            if (valA === null) valA = '';
+            if (valB === null) valB = '';
 
             if (valA < valB) return currentSort.dir === 'asc' ? -1 : 1;
             if (valA > valB) return currentSort.dir === 'asc' ? 1 : -1;
             return 0;
         });
 
-        tbody.innerHTML = sorted.map(c => `
+        // Generate initials/color
+        function stringToColor(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            let color = '#';
+            for (let i = 0; i < 3; i++) color += ('00' + ((hash >> (i * 8)) & 0xFF).toString(16)).substr(-2);
+            return color;
+        }
+
+        // Format dates
+        function formatAgo(isoStr) {
+            if (!isoStr) return "—";
+            const diff = (new Date() - new Date(isoStr)) / 1000;
+            if (diff < 60) return "Just now";
+            const mins = Math.floor(diff / 60);
+            if (mins < 60) return `${mins}m ago`;
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24) return `${hrs}h ago`;
+            const days = Math.floor(hrs / 24);
+            return `${days}d ago`;
+        }
+
+        tbody.innerHTML = sorted.map(c => {
+            const initial = c.email ? c.email.charAt(0).toUpperCase() : '?';
+            const color = c.email ? stringToColor(c.email) : '#94a3b8';
+            const resRatio = c.resolved_ratio != null ? (c.resolved_ratio * 100).toFixed(0) + '%' : '—';
+            const avgCsat = c.avg_csat != null ? c.avg_csat.toFixed(1) + ' ★' : '—';
+            const lastActive = formatAgo(c.last_active);
+            
+            return `
             <tr>
                 <td>
                     <div class="customer-cell">
-                    <div class="avatar" style="background: ${c.color};">${c.initials}</div>
+                    <div class="avatar" style="background: ${color};">${initial}</div>
                     <div>
-                        <div class="name">${c.name}</div>
+                        <div class="name">${c.email}</div>
                         <div class="email">${c.email}</div>
                     </div>
                     </div>
                 </td>
-                <td><span class="plan-badge plan-${c.plan.toLowerCase()}">${c.plan}</span></td>
-                <td>${c.tickets}</td>
-                <td>${c.ltv}</td>
-                <td>${c.lastActive}</td>
-                <td><span class="badge ${c.isOnline ? 'badge-active' : 'badge-offline'}">${c.status}</span></td>
+                <td>${c.total_tickets}</td>
+                <td>${resRatio}</td>
+                <td>${avgCsat}</td>
+                <td>${lastActive}</td>
                 <td>
                     <button class="btn-icon" title="More Actions">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
                     </button>
                 </td>
             </tr>
-        `).join('');
+            `;
+        }).join('');
 
         // Update headers
         document.querySelectorAll('th.sortable').forEach(th => {
@@ -3137,6 +3223,39 @@ document.addEventListener('DOMContentLoaded', () => {
             renderCustomers();
         });
     });
+
+    const searchInput = document.getElementById('customer-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            renderCustomers();
+        });
+    }
+
+    const exportBtn = document.getElementById('customer-export-btn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            const query = searchInput ? searchInput.value.toLowerCase() : '';
+            let filtered = window.customersData;
+            if (query) {
+                filtered = filtered.filter(c => c.email && c.email.toLowerCase().includes(query));
+            }
+            
+            let csv = 'Customer,Total Tickets,Resolved Ratio,Avg CSAT,Last Active\n';
+            filtered.forEach(c => {
+                const resRatio = c.resolved_ratio != null ? (c.resolved_ratio * 100).toFixed(0) + '%' : '';
+                const avgCsat = c.avg_csat != null ? c.avg_csat.toFixed(1) : '';
+                csv += `"${c.email || ''}",${c.total_tickets},"${resRatio}","${avgCsat}","${c.last_active || ''}"\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'customers.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        });
+    }
 
     renderCustomers();
 

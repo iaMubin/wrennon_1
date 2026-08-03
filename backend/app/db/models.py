@@ -228,3 +228,15 @@ class CannedResponse(Base):
     updated_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
     )
+
+class SavedView(Base):
+    __tablename__ = "saved_views"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
+    agent_username: Mapped[str] = mapped_column(String, index=True)
+    name: Mapped[str] = mapped_column(String)
+    filter_json: Mapped[str] = mapped_column(Text)
+
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    )

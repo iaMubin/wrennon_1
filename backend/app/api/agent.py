@@ -24,7 +24,7 @@ from app.config import settings
 from app.logger import logger
 import re
 from app.services.mock_apis import get_order_status, get_order_by_email, get_customer_info
-from app.db.models import Agent, Conversation, Message, AuditLog, CSATResponse, CannedResponse
+from app.db.models import Agent, Conversation, Message, AuditLog, CSATResponse, CannedResponse, SavedView
 from app.db.session import get_db
 from app.realtime.connection_manager import manager
 from app.config import settings
@@ -195,6 +195,172 @@ def verify_2fa(
     db.add(audit)
     db.commit()
     return {"status": "success"}
+
+
+@router.get("/agent/dashboard-summary")
+def dashboard_summary(
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent),
+):
+    from sqlalchemy import func
+    from datetime import datetime
+    import pytz
+
+    open_tickets = db.query(Conversation).filter(Conversation.resolved == False).count()
+
+    unassigned = db.query(Conversation).filter(
+        Conversation.assigned_agent == None,
+        Conversation.resolved == False
+    ).count()
+
+    tz = pytz.timezone('Asia/Dhaka')
+    now = datetime.now(tz)
+    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    solved_today = db.query(Conversation).filter(
+        Conversation.resolved == True,
+        Conversation.resolved_at >= start_of_today
+    ).count()
+
+    csat_avg = db.query(func.avg(CSATResponse.rating)).scalar()
+    csat_score = round(csat_avg, 1) if csat_avg is not None else 0.0
+
+    chat_counts = db.query(
+        Conversation.assigned_agent, 
+        func.count(Conversation.id)
+    ).filter(
+        Conversation.resolved == False,
+        Conversation.assigned_agent != None
+    ).group_by(Conversation.assigned_agent).all()
+    
+    agent_chat_counts = {agent_name: count for agent_name, count in chat_counts}
+    
+    todays_convs = db.query(Conversation.created_at).filter(
+        Conversation.created_at >= start_of_today
+    ).all()
+
+    hourly_volume = [0] * 24
+    for c in todays_convs:
+        if c.created_at.tzinfo is None:
+             local_dt = pytz.utc.localize(c.created_at).astimezone(tz)
+        else:
+             local_dt = c.created_at.astimezone(tz)
+        hourly_volume[local_dt.hour] += 1
+
+    return {
+        "open_tickets": open_tickets,
+        "unassigned": unassigned,
+        "solved_today": solved_today,
+        "csat_score": csat_score,
+        "agent_chat_counts": agent_chat_counts,
+        "hourly_volume": hourly_volume
+    }
+
+@router.get("/agent/customers")
+def get_customers(
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent),
+):
+    from sqlalchemy import func
+    
+    # We want: email, total_tickets, last_active, resolved_ratio, avg_csat
+    
+    # Simpler memory-based grouping to avoid dialect cast issues:
+    all_convs = db.query(
+        Conversation.id,
+        Conversation.customer_email,
+        Conversation.created_at,
+        Conversation.resolved
+    ).filter(Conversation.customer_email != None).all()
+    
+    # We need csat ratings per customer
+    csat_responses = db.query(CSATResponse.conversation_id, CSATResponse.rating).all()
+    csat_map = {r.conversation_id: r.rating for r in csat_responses}
+    
+    customers = {}
+    for c in all_convs:
+        email = c.customer_email
+        if email not in customers:
+            customers[email] = {
+                "email": email,
+                "total_tickets": 0,
+                "resolved_count": 0,
+                "last_active": c.created_at,
+                "csat_total": 0,
+                "csat_count": 0
+            }
+        
+        cust = customers[email]
+        cust["total_tickets"] += 1
+        if c.resolved:
+            cust["resolved_count"] += 1
+        if c.created_at and (not cust["last_active"] or c.created_at > cust["last_active"]):
+            cust["last_active"] = c.created_at
+            
+        if c.id in csat_map:
+            cust["csat_total"] += csat_map[c.id]
+            cust["csat_count"] += 1
+            
+    results = []
+    for email, data in customers.items():
+        resolved_ratio = (data["resolved_count"] / data["total_tickets"]) if data["total_tickets"] > 0 else 0
+        avg_csat = (data["csat_total"] / data["csat_count"]) if data["csat_count"] > 0 else None
+        
+        # Convert datetime to ISO string for JSON serialization
+        last_active_str = data["last_active"].isoformat() if data["last_active"] else None
+        
+        results.append({
+            "email": email,
+            "total_tickets": data["total_tickets"],
+            "last_active": last_active_str,
+            "resolved_ratio": resolved_ratio,
+            "avg_csat": avg_csat
+        })
+        
+    # Sort by total_tickets descending for better default UX
+    results.sort(key=lambda x: x["total_tickets"], reverse=True)
+    return results
+
+class CreateSavedViewRequest(BaseModel):
+    name: str
+    filter_json: str
+
+@router.get("/agent/saved-views")
+def get_saved_views(
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent)
+):
+    views = db.query(SavedView).all()
+    return [{"id": v.id, "name": v.name, "filter_json": v.filter_json, "agent_username": v.agent_username} for v in views]
+
+@router.post("/agent/saved-views")
+def create_saved_view(
+    payload: CreateSavedViewRequest,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent)
+):
+    view = SavedView(
+        agent_username=agent.username,
+        name=payload.name,
+        filter_json=payload.filter_json
+    )
+    db.add(view)
+    db.commit()
+    db.refresh(view)
+    return {"id": view.id, "name": view.name, "filter_json": view.filter_json, "agent_username": view.agent_username}
+
+@router.delete("/agent/saved-views/{view_id}")
+def delete_saved_view(
+    view_id: str,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent)
+):
+    view = db.query(SavedView).filter(SavedView.id == view_id).first()
+    if not view:
+        raise HTTPException(status_code=404, detail="View not found")
+    db.delete(view)
+    db.commit()
+    return {"status": "deleted"}
 
 
 def _apply_conversation_filters(q, priority: str | None, assigned_agent: str | None, tag: str | None):

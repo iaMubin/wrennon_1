@@ -465,32 +465,31 @@
         <div class="view-header">
           <h2>Home Overview</h2>
           <div class="header-actions">
-             <button class="btn btn-secondary">Customize Dashboard</button>
           </div>
         </div>
         <div class="dashboard-grid">
           <div class="metric-card">
             <h3>Open Tickets</h3>
-            <div class="metric-value">24 <span class="trend trend-up">↑ 12%</span></div>
+            <div class="metric-value" id="metric-open-tickets">—</div>
           </div>
           <div class="metric-card">
             <h3>Unassigned</h3>
-            <div class="metric-value">7 <span class="trend trend-down">↓ 3%</span></div>
+            <div class="metric-value" id="metric-unassigned">—</div>
           </div>
           <div class="metric-card">
             <h3>Solved Today</h3>
-            <div class="metric-value">42 <span class="trend trend-up">↑ 8%</span></div>
+            <div class="metric-value" id="metric-solved-today">—</div>
           </div>
           <div class="metric-card">
             <h3>CSAT Score</h3>
-            <div class="metric-value">4.8 <span class="trend trend-up">↑ 0.2</span></div>
+            <div class="metric-value" id="metric-csat">—</div>
           </div>
         </div>
         <div class="dashboard-main-area">
           <div class="activity-feed-panel">
             <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                 <h3 style="margin: 0;">Priority Inbox / SLA Risks</h3>
-                <button class="btn btn-sm btn-secondary">View All</button>
+                <button class="btn btn-sm btn-secondary" onclick="switchView('conversations')">View All</button>
             </div>
             <div class="activity-list" id="sla-risk-list">
               <!-- Populated by JS -->
@@ -500,22 +499,7 @@
           <div style="display: flex; flex-direction: column; gap: 24px;">
               <div class="activity-feed-panel">
                 <h3 style="margin: 0 0 16px 0;">Live Team Status</h3>
-                <div class="team-status-list">
-                    <div class="team-member">
-                        <div class="avatar" style="background: var(--accent);">AJ</div>
-                        <div class="member-info">
-                            <span class="name">Agent Jane</span>
-                            <span class="status online">Online (3 chats)</span>
-                        </div>
-                    </div>
-                    <div class="team-member">
-                        <div class="avatar" style="background: #e2e8f0; color: #475569;">MR</div>
-                        <div class="member-info">
-                            <span class="name">Mike Ross</span>
-                            <span class="status away">Away</span>
-                        </div>
-                    </div>
-                </div>
+                <div class="team-status-list" id="team-status-list"></div>
               </div>
               <div class="activity-feed-panel">
                 <h3 style="margin: 0 0 16px 0;">Today's Volume</h3>
@@ -535,24 +519,23 @@
           <h2>Customers Directory</h2>
           <div class="header-actions">
             <input type="text" id="customer-search-input" class="search-input" placeholder="Search customers...">
-            <select class="filter-select">
+            <select class="filter-select" style="display:none;">
                 <option value="all">All Plans</option>
                 <option value="pro">Pro Plan</option>
                 <option value="enterprise">Enterprise</option>
             </select>
-            <button class="btn btn-primary">Export CSV</button>
+            <button class="btn btn-primary" id="customer-export-btn">Export CSV</button>
           </div>
         </div>
         <div class="table-container">
           <table class="data-table" id="customers-table">
             <thead>
               <tr>
-                <th data-sort="name" class="sortable">Customer <span class="sort-icon"></span></th>
-                <th data-sort="plan" class="sortable">Plan <span class="sort-icon"></span></th>
-                <th data-sort="tickets" class="sortable">Total Tickets <span class="sort-icon"></span></th>
-                <th data-sort="ltv" class="sortable">LTV <span class="sort-icon"></span></th>
-                <th data-sort="lastActive" class="sortable">Last Active <span class="sort-icon"></span></th>
-                <th>Status</th>
+                <th data-sort="email" class="sortable">Customer <span class="sort-icon"></span></th>
+                <th data-sort="total_tickets" class="sortable">Total Tickets <span class="sort-icon"></span></th>
+                <th data-sort="resolved_ratio" class="sortable">Resolved Ratio <span class="sort-icon"></span></th>
+                <th data-sort="avg_csat" class="sortable">Avg CSAT <span class="sort-icon"></span></th>
+                <th data-sort="last_active" class="sortable">Last Active <span class="sort-icon"></span></th>
                 <th></th>
               </tr>
             </thead>
@@ -577,13 +560,9 @@
         <div class="view-header">
           <h2>Analytics & Reporting</h2>
           <div class="header-actions">
-            <select class="date-select">
-                <option>Last 7 Days</option>
-                <option>Last 30 Days</option>
-                <option>This Quarter</option>
-                <option>Year to Date</option>
-            </select>
-            <button class="btn btn-secondary">Download PDF</button>
+            <span style="padding: 8px 12px; font-weight: 500;">All time</span>
+            <!-- Download PDF intentionally left dead for this phase or hidden -->
+            <button class="btn btn-secondary" style="display:none;">Download PDF</button>
           </div>
         </div>
         <div class="analytics-grid">
@@ -600,30 +579,24 @@
             </div>
           </div>
         </div>
-        <div class="analytics-grid" style="margin-top: 24px;">
-            <div class="chart-card">
-                <h3>Resolution Time by Channel</h3>
-                <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
-                    <canvas id="resolutionChart"></canvas>
-                </div>
-            </div>
+        <div class="analytics-grid" style="margin-top: 24px; grid-template-columns: 1fr;">
             <div class="stats-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div class="stat-item">
                 <span class="stat-label">First Response Time (Avg)</span>
-                <span class="stat-value">1m 24s</span>
-                <span class="trend trend-up">↑ 12% vs last period</span>
+                <span class="stat-value" id="analytics-first-response">—</span>
+                <!-- trend removed -->
                 </div>
                 <div class="stat-item">
                 <span class="stat-label">Avg Resolution Time</span>
-                <span class="stat-value">4h 12m</span>
-                <span class="trend trend-down">↓ 5% vs last period</span>
+                <span class="stat-value" id="analytics-avg-resolution-time">—</span>
+                <!-- trend removed -->
                 </div>
                 <div class="stat-item">
                 <span class="stat-label">One-Touch Resolutions</span>
-                <span class="stat-value">68%</span>
-                <span class="trend trend-up">↑ 2% vs last period</span>
+                <span class="stat-value" id="analytics-one-touch">—</span>
+                <!-- trend removed -->
                 </div>
-                <div class="stat-item">
+                <div class="stat-item" style="display:none;">
                 <span class="stat-label">Agent Utilization</span>
                 <span class="stat-value">74%</span>
                 <span class="trend trend-up">↑ 4% vs last period</span>
