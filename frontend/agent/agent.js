@@ -11,6 +11,7 @@ const WS_URL = IS_LOCAL
 
 let socket = null;
 let activeSessionId = null;
+let _agentToken = null; // stored on login for WebSocket auth
 let activeSection = "active"; // "attention" | "active" | "all"
 const drafts = {};
 
@@ -194,6 +195,7 @@ loginForm.addEventListener("submit", async (e) => {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
+      credentials: "include",
     });
 
     if (!response.ok) {
@@ -202,12 +204,9 @@ loginForm.addEventListener("submit", async (e) => {
     }
 
     const data = await response.json();
-    // The httpOnly, SameSite=None, Secure cookie set by the login response
-    // (see agent.py) is the real credential from here on — it isn't
-    // readable from JS, which is the point: an XSS bug elsewhere in this
-    // file can no longer just read a live session token out of storage.
-    // Only non-secret UI state (username/role, for display and the admin
-    // button) is kept client-side.
+    // Store the JWT for WebSocket auth (WS handshakes don't send httpOnly
+    // cookies reliably in cross-origin or some same-site scenarios).
+    _agentToken = data.access_token;
     localStorage.setItem("agent_username", username); // Save username to identify self
     localStorage.setItem("agent_role", data.role); // Save role to show admin btn
     if (data.dp_url) {
@@ -257,7 +256,8 @@ function connectSocket() {
   // cookie path works. If the cookie is missing/expired/invalid, the
   // server closes with 4401 and onclose() below sends the agent back to
   // login — no client-side pre-check needed.
-  socket = new WebSocket(WS_URL);
+  const wsUrl = _agentToken ? `${WS_URL}?token=${encodeURIComponent(_agentToken)}` : WS_URL;
+  socket = new WebSocket(wsUrl);
 
   socket.onopen = () => {
     const wasReconnecting = reconnectAttempts > 0;
@@ -2708,9 +2708,8 @@ const savedViews = [];
 
 async function loadSavedViews() {
     try {
-        const authHeaders = { 'Authorization': 'Bearer ' + getCookie('access_token') };
         const res = await fetch(`${API_BASE}/agent/saved-views`, {
-            headers: authHeaders,
+            headers: { 'X-Wrennon-Client': 'agent-dashboard' },
             credentials: 'include'
         });
         if (res.ok) {
@@ -2758,7 +2757,7 @@ function renderSavedViews() {
            try {
                await fetch(`${API_BASE}/agent/saved-views/${view.id}`, {
                    method: 'DELETE',
-                   headers: { 'Authorization': 'Bearer ' + getCookie('access_token') },
+                   headers: { 'X-Wrennon-Client': 'agent-dashboard' },
                    credentials: 'include'
                });
                loadSavedViews();
@@ -2784,7 +2783,7 @@ document.getElementById("save-view-btn")?.addEventListener("click", async () => 
         await fetch(`${API_BASE}/agent/saved-views`, {
             method: 'POST',
             headers: { 
-                'Authorization': 'Bearer ' + getCookie('access_token'),
+                'X-Wrennon-Client': 'agent-dashboard',
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ name: name, filter_json: filterJson }),
@@ -2982,7 +2981,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.loadDashboard = async function() {
       try {
           const res = await fetch(`${API_BASE}/agent/dashboard-summary`, {
-              headers: { 'Authorization': 'Bearer ' + getCookie('access_token') },
+              headers: { 'X-Wrennon-Client': 'agent-dashboard' },
               credentials: 'include'
           });
           if (res.ok) {
@@ -3004,7 +3003,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.loadAnalytics = async function() {
       try {
           const res = await fetch(`${API_BASE}/analytics/dashboard-metrics`, {
-              headers: { 'Authorization': 'Bearer ' + getCookie('access_token') },
+              headers: { 'X-Wrennon-Client': 'agent-dashboard' },
               credentials: 'include'
           });
           if (res.ok) {
@@ -3167,11 +3166,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     window.loadCustomers = async function() {
         try {
-            const authHeaders = {
-                'Authorization': 'Bearer ' + getCookie('access_token')
-            };
             const res = await fetch(`${API_BASE}/agent/customers`, {
-                headers: authHeaders,
+                headers: { 'X-Wrennon-Client': 'agent-dashboard' },
                 credentials: 'include'
             });
             if (res.ok) {
