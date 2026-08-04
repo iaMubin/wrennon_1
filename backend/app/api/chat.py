@@ -229,7 +229,7 @@ def submit_csat(
     db.commit()
 
     if rating <= 2:
-        from app.services.connection_manager import manager
+        from app.realtime.connection_manager import manager
         import asyncio
         
         async def send_low_csat_alert():

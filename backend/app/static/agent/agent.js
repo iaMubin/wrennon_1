@@ -8,6 +8,49 @@ const WS_URL = IS_LOCAL
   ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws/agent`
   : `wss://${_RENDER_HOST}/ws/agent`;
 
+window.showToast = function(msg, type = 'info') {
+    const toast = document.createElement('div');
+    toast.style.position = 'fixed';
+    toast.style.bottom = '24px';
+    toast.style.right = '24px';
+    toast.style.padding = '12px 24px';
+    toast.style.background = type === 'error' ? 'var(--accent-alert, #ef4444)' : 'var(--accent, #6366f1)';
+    toast.style.color = '#ffffff';
+    toast.style.borderRadius = '8px';
+    toast.style.boxShadow = 'var(--shadow-lg)';
+    toast.style.zIndex = '99999';
+    toast.style.fontFamily = "'Inter', sans-serif";
+    toast.style.fontWeight = '500';
+    toast.style.animation = 'fadeInBounce 0.3s ease-out';
+    toast.innerText = msg;
+    document.body.appendChild(toast);
+    
+    toast.style.cursor = 'pointer';
+    toast.onclick = () => toast.remove();
+    
+    setTimeout(() => {
+        if(toast.parentElement) {
+            toast.style.animation = 'fadeOut 0.3s ease-in forwards';
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 8000);
+};
+
+if (!document.getElementById('toast-styles')) {
+    const style = document.createElement('style');
+    style.id = 'toast-styles';
+    style.textContent = `
+        @keyframes fadeInBounce {
+            0% { transform: translateY(20px) scale(0.9); opacity: 0; }
+            60% { transform: translateY(-5px) scale(1.02); opacity: 1; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            to { opacity: 0; transform: translateY(10px); }
+        }
+    `;
+    document.head.appendChild(style);
+}
 
 let socket = null;
 let activeSessionId = null;
@@ -358,6 +401,10 @@ function connectSocket() {
       if (data.session_id === activeSessionId) {
         renderCollisionBadge(data.viewers || []);
       }
+    } else if (data.type === "low_csat_alert") {
+      if (window.showToast) {
+        window.showToast(`🚨 Low CSAT Alert! Session ${data.session_id.substring(0,8)} received a ${data.rating}-star rating: "${data.comment || 'No comment'}"`, 'error');
+      }
     } else if (data.type === "presence") {
       const teamList = document.getElementById("team-status-list");
       if (teamList && data.online_agents) {
@@ -545,14 +592,10 @@ function renderConversationList(conversations) {
     
     // Feature 6: SLA Warning
     let slaBadge = "";
-    if (conv.handoff_active && !conv.resolved) {
-      const updatedTime = new Date(conv.updated_at).getTime();
-      const now = new Date().getTime();
-      const diffMins = (now - updatedTime) / 60000;
-      if (diffMins >= 5) {
-        let timeStr = diffMins >= 60 ? `${Math.floor(diffMins / 60)}hr` : `${Math.floor(diffMins)}min`;
-        slaBadge = `<span class="badge badge--sla-warning">⏳ ${timeStr} waiting</span>`;
-      }
+    if (conv.sla_status === "breached") {
+      slaBadge = `<span class="badge" style="background: var(--danger); color:white;">Breached SLA</span>`;
+    } else if (conv.sla_status === "warning") {
+      slaBadge = `<span class="badge" style="background: var(--warning); color:white;">SLA Warning</span>`;
     }
     
     let languageBadge = '';
@@ -3120,15 +3163,17 @@ document.addEventListener('DOMContentLoaded', () => {
                       slaList.innerHTML = '<div style="padding: 16px; color: var(--text-muted); text-align: center;">No SLA risks detected. Inbox is clear!</div>';
                   } else {
                       data.sla_risks.forEach(risk => {
-                          const openMs = new Date() - new Date(risk.created_at);
-                          const openMins = Math.floor(openMs / 60000);
                           let badgeHtml = '';
                           let iconClass = 'warning';
-                          if (openMins > 60) {
-                              badgeHtml = `<span class="badge" style="background: var(--danger); color:white;">${Math.floor(openMins/60)}h ${openMins%60}m old</span>`;
+                          if (risk.sla_status === 'breached') {
+                              badgeHtml = `<span class="badge" style="background: var(--danger); color:white;">Breached SLA</span>`;
                               iconClass = 'danger';
+                          } else if (risk.sla_status === 'warning') {
+                              badgeHtml = `<span class="badge" style="background: var(--warning); color:white;">SLA Warning</span>`;
+                              iconClass = 'warning';
                           } else {
-                              badgeHtml = `<span class="badge" style="background: var(--warning); color:white;">${openMins}m old</span>`;
+                              badgeHtml = `<span class="badge" style="background: var(--success); color:white;">SLA OK</span>`;
+                              iconClass = 'success';
                           }
                           const ticketId = risk.short_id ? `#${risk.short_id.substring(0,8).toUpperCase()}` : '';
                           const div = document.createElement('div');
@@ -3150,9 +3195,27 @@ document.addEventListener('DOMContentLoaded', () => {
                   }
               }
               if (window.miniVolumeChart && data.hourly_volume) {
-                  window.miniVolumeChart.data.datasets[0].data = data.hourly_volume.map(v => v.count);
-                  window.miniVolumeChart.data.labels = data.hourly_volume.map(v => v.hour);
+                  window.miniVolumeChart.data.datasets[0].data = data.hourly_volume;
+                  window.miniVolumeChart.data.labels = data.hourly_volume.map((_, i) => `${i}:00`);
                   window.miniVolumeChart.update();
+              }
+              
+              const workloadList = document.getElementById('agent-chat-counts-list');
+              if (workloadList && data.agent_chat_counts) {
+                  workloadList.innerHTML = '';
+                  for (const [agentName, count] of Object.entries(data.agent_chat_counts)) {
+                      const div = document.createElement('div');
+                      div.style.display = 'flex';
+                      div.style.justifyContent = 'space-between';
+                      div.style.padding = '8px 0';
+                      div.style.borderBottom = '1px solid var(--line)';
+                      div.style.fontSize = '14px';
+                      div.innerHTML = `
+                          <span>${agentName}</span>
+                          <span style="font-weight: 600; color: var(--accent);">${count} active</span>
+                      `;
+                      workloadList.appendChild(div);
+                  }
               }
           }
       } catch (e) { console.error("Failed to load dashboard summary", e); }
@@ -3160,7 +3223,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.loadAnalytics = async function() {
       try {
-          const res = await fetch(`${API_BASE}/analytics/dashboard-metrics`, {
+          const rangeSelect = document.getElementById('analytics-date-range');
+          const rangeVal = rangeSelect ? rangeSelect.value : 'all';
+          const res = await fetch(`${API_BASE}/analytics/dashboard-metrics?range=${rangeVal}`, {
               headers: { 'X-Wrennon-Client': 'agent-dashboard' },
               credentials: 'include'
           });
@@ -3182,7 +3247,38 @@ document.addEventListener('DOMContentLoaded', () => {
               
               if (window.volumeChart) {
                   window.volumeChart.data.datasets[0].data = data.hourly_volume;
+                  window.volumeChart.data.labels = data.volume_labels;
                   window.volumeChart.update();
+              }
+              
+              // Rolling CSAT
+              const rcEl = document.getElementById('analytics-rolling-csat');
+              if (rcEl) {
+                  rcEl.textContent = data.rolling_weekly_csat ? data.rolling_weekly_csat.toFixed(1) + ' / 5.0' : '—';
+              }
+              
+              // Agent Leaderboard
+              const lbBody = document.getElementById('analytics-leaderboard-body');
+              if (lbBody && data.agent_leaderboard) {
+                  lbBody.innerHTML = '';
+                  data.agent_leaderboard.forEach(ag => {
+                      const tr = document.createElement('tr');
+                      tr.style.borderBottom = '1px solid var(--line)';
+                      tr.innerHTML = `
+                          <td style="padding: 8px;">${ag.assigned_agent || 'Unassigned'}</td>
+                          <td style="padding: 8px;">${ag.resolved_count}</td>
+                          <td style="padding: 8px;">${formatDuration(ag.avg_resolution_time_seconds)}</td>
+                      `;
+                      lbBody.appendChild(tr);
+                  });
+              }
+              
+              // Tags Frequency
+              if (window.tagsChart && data.tag_frequency) {
+                  const sortedTags = data.tag_frequency.slice(0, 5); // top 5
+                  window.tagsChart.data.labels = sortedTags.map(t => t.tag);
+                  window.tagsChart.data.datasets[0].data = sortedTags.map(t => t.count);
+                  window.tagsChart.update();
               }
               if (window.csatChart) {
                   const counts = data.csat_distribution || [0,0,0,0,0];

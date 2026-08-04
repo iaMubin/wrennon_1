@@ -153,7 +153,7 @@ class Agent(Base):
         if not perms:
             # Fallback for backwards compatibility with existing rows that haven't been updated
             if self.role == "manager":
-                perms = ["manage_agents", "view_analytics", "manage_canned_responses"]
+                perms = ["manage_agents", "manage_managers", "view_analytics", "manage_canned_responses"]
             else:
                 perms = []
                 

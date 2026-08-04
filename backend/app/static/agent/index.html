@@ -514,7 +514,12 @@
           <div style="display: flex; flex-direction: column; gap: 24px;">
               <div class="activity-feed-panel">
                 <h3 style="margin: 0 0 16px 0;">Live Team Status</h3>
-                <div class="team-status-list" id="team-status-list"></div>
+                <div class="team-status-list" id="team-status-list" style="margin-bottom: 24px;"></div>
+                
+                <h3 style="margin: 0 0 16px 0;">Agent Workload</h3>
+                <div id="agent-chat-counts-list">
+                    <!-- Populated by JS -->
+                </div>
               </div>
               <div class="activity-feed-panel">
                 <h3 style="margin: 0 0 16px 0;">Today's Volume</h3>
@@ -642,10 +647,9 @@
                 <span class="stat-value" id="analytics-one-touch">—</span>
                 <!-- trend removed -->
                 </div>
-                <div class="stat-item" style="display:none;">
-                <span class="stat-label">Agent Utilization</span>
-                <span class="stat-value">74%</span>
-                <span class="trend trend-up">↑ 4% vs last period</span>
+                <div class="stat-item">
+                <span class="stat-label">7-Day Rolling CSAT</span>
+                <span class="stat-value" id="analytics-rolling-csat">—</span>
                 </div>
             </div>
         </div>
