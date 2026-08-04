@@ -74,8 +74,6 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
             )
     except Exception as e:
         logger.error(f"Failed to fetch brand voice: {e}")
-    finally:
-        db.close()
 
     if state.get("conversation_mode") == "resolved" and not state.get("resolution_logged"):
         # The AI successfully closed the conversation on its own.
@@ -102,7 +100,7 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
         reason = state.get("handoff_reason") or "this needs a closer look from the team"
         from app.services.business_hours import is_within_business_hours
         
-        if is_within_business_hours():
+        if is_within_business_hours(db):
             context_parts.append(
                 f"IMPORTANT: This conversation is being handed to a human teammate because: "
                 f"{reason}. Let the customer know, naturally and briefly, that you're bringing "
@@ -121,6 +119,8 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
         context_parts.append(f"Summary of earlier conversation:\n{state['conversation_summary']}")
 
     context_text = "\n\n".join(context_parts) if context_parts else "No additional context available."
+
+    db.close()
 
     llm_messages = [{"role": "system", "content": system_instruction}]
     model_override = None

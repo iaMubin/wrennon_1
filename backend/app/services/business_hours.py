@@ -5,9 +5,13 @@ from app.db.session import SessionLocal
 from app.db.models import SystemSetting
 from app.logger import logger
 
-def is_within_business_hours() -> bool:
+from sqlalchemy.orm import Session
+def is_within_business_hours(db: Session = None) -> bool:
     """Check if the current time is within configured business hours."""
-    db = SessionLocal()
+    close_db = False
+    if db is None:
+        db = SessionLocal()
+        close_db = True
     try:
         setting = db.query(SystemSetting).filter_by(key="business_hours").first()
         if not setting or not setting.value:
@@ -37,4 +41,5 @@ def is_within_business_hours() -> bool:
         logger.error(f"Error checking business hours: {e}")
         return True # Default to open on error
     finally:
-        db.close()
+        if close_db:
+            db.close()
