@@ -2288,13 +2288,77 @@ function showCustomerSidebar(customer) {
   const initials = customer.name.split(" ").map(n => n[0]).join("").toUpperCase();
   
   const interactions = [
-    { action: `Conversation with ${customer.name || 'Agent'}`, time: 'Active now', status: 'O', highlight: true },
-    { action: `Ordered #${customer.recent_order || '12965'}`, time: 'Aug 08, 9:05 AM', status: 'empty' },
-    { action: 'Change email address', time: 'Jan 21, 9:43 AM', status: 'P' },
-    { action: 'Article viewed', time: 'Jan 21, 9:14 AM', status: 'empty' },
-    { action: 'Article viewed', time: 'Jan 21, 9:38 AM', status: 'empty' },
-    { action: 'Account created / Sign up', time: 'Jan 01, 10:00 AM', status: 'S' }
+    { action: `Conversation with ${customer.name || 'Agent'}`, time: 'Active now', status: 'O', highlight: true }
   ];
+
+  const totalOrders = customer.total_orders || 0;
+  const recentOrderStr = customer.recent_order || '12965';
+  let recentOrderNum = parseInt(recentOrderStr.toString().replace(/\D/g, ''));
+  if (isNaN(recentOrderNum)) recentOrderNum = 12965;
+  
+  const cId = customer.id || "CUST";
+  let hash = 0;
+  for (let c = 0; c < cId.length; c++) {
+    hash = ((hash << 5) - hash) + cId.charCodeAt(c);
+    hash |= 0;
+  }
+  const mulberry32 = (a) => {
+      return function() {
+        var t = a += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      }
+  }
+  const prng = mulberry32(Math.abs(hash));
+  
+  const formatDate = (d) => {
+       const hour = d.getHours();
+       const minute = d.getMinutes();
+       const ampm = hour >= 12 ? 'PM' : 'AM';
+       const hour12 = hour % 12 || 12;
+       const month = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getMonth()];
+       const day = String(d.getDate()).padStart(2, '0');
+       return `${month} ${day}, ${hour12}:${String(minute).padStart(2, '0')} ${ampm}`;
+  };
+
+  const possibleActions = [
+      { action: 'Left a 5-star review', status: 'empty' },
+      { action: 'Added items to Wishlist', status: 'empty' },
+      { action: 'Contacted support via Email', status: 'P' },
+      { action: 'Requested a return (RMA)', status: 'empty' },
+      { action: 'Browsed Help Center articles', status: 'empty' },
+      { action: 'Subscribed to Newsletter', status: 'empty' },
+      { action: 'Used a discount code', status: 'empty' },
+      { action: 'Reported a delayed shipment', status: 'O' }
+  ];
+
+  let currentPastOrderId = (recentOrderNum * 10000) + Math.floor(prng() * 9000);
+  const currentDate = new Date(2026, 7, 8, 9, 5); // Aug 08, 9:05 AM
+  
+  if (totalOrders > 0) {
+    interactions.push({ action: `Ordered #${recentOrderStr}`, time: formatDate(currentDate), status: 'empty' });
+    
+    for (let i = 1; i < totalOrders; i++) {
+       currentDate.setDate(currentDate.getDate() - (10 + Math.floor(prng() * 30)));
+       currentDate.setHours(8 + Math.floor(prng() * 12), Math.floor(prng() * 60));
+       
+       currentPastOrderId -= (1500 + Math.floor(prng() * 3500));
+       
+       interactions.push({ action: `Ordered #${currentPastOrderId}`, time: formatDate(currentDate), status: 'empty' });
+       
+       const numInteractions = Math.floor(prng() * 2) + 1;
+       for (let j = 0; j < numInteractions; j++) {
+           const actObj = possibleActions[Math.floor(prng() * possibleActions.length)];
+           const interactionDate = new Date(currentDate);
+           interactionDate.setDate(interactionDate.getDate() - Math.floor(prng() * 5));
+           interactions.push({ action: actObj.action, time: formatDate(interactionDate), status: actObj.status });
+       }
+    }
+  }
+
+  currentDate.setDate(currentDate.getDate() - (30 + Math.floor(prng() * 60)));
+  interactions.push({ action: 'Account created / Sign up', time: formatDate(currentDate), status: 'S' });
 
   window.addCustomerNote = function(inputElem, event) {
     if (event.key !== 'Enter') return;
@@ -2371,7 +2435,7 @@ function showCustomerSidebar(customer) {
       </div>
       <div class="contact-item">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-        <span class="value">+1 (415) 123-2399</span>
+        <span class="value">${escapeHtml(customer.phone || '+1 (415) 123-2399')}</span>
       </div>
       <div class="contact-item">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
@@ -3062,6 +3126,11 @@ document.addEventListener('DOMContentLoaded', () => {
                       });
                   }
               }
+              if (window.miniVolumeChart && data.hourly_volume) {
+                  window.miniVolumeChart.data.datasets[0].data = data.hourly_volume.map(v => v.count);
+                  window.miniVolumeChart.data.labels = data.hourly_volume.map(v => v.hour);
+                  window.miniVolumeChart.update();
+              }
           }
       } catch (e) { console.error("Failed to load dashboard summary", e); }
   };
@@ -3337,8 +3406,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="customer-cell">
                     <div class="avatar" style="background: ${color};">${initial}</div>
                     <div>
-                        <div class="name">${c.email}</div>
-                        <div class="email">${c.email}</div>
+                        <div class="name">${escapeHtml(c.email || 'Unknown')}</div>
+                        <div class="email">${escapeHtml(c.email || 'Unknown')}</div>
                     </div>
                     </div>
                 </td>
@@ -3362,6 +3431,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 th.classList.add(currentSort.dir === 'asc' ? 'sort-asc' : 'sort-desc');
             }
         });
+
+        const paginationInfo = document.querySelector('.pagination-info');
+        if (paginationInfo) {
+            paginationInfo.textContent = `Showing ${filtered.length > 0 ? 1 : 0}-${filtered.length} of ${window.customersData.length} customers`;
+        }
+        
+        const prevBtn = document.querySelector('.pagination button:first-child');
+        const nextBtn = document.querySelector('.pagination button:last-child');
+        if (prevBtn) { prevBtn.disabled = true; prevBtn.style.opacity = '0.5'; }
+        if (nextBtn) { nextBtn.disabled = true; nextBtn.style.opacity = '0.5'; }
     }
 
     document.querySelectorAll('th.sortable').forEach(th => {
@@ -3411,27 +3490,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     renderCustomers();
-
-    // 3. Populate SLA Risks
-    const slaList = document.getElementById('sla-risk-list');
-    if(slaList) {
-        slaList.innerHTML = `
-            <div class="activity-item warning">
-                <div class="activity-icon" style="background: var(--warning); color: white;">!</div>
-                <div class="activity-details" style="flex: 1;">
-                    <p style="display:flex; justify-content: space-between;"><strong>VIP Customer Waiting</strong> <span class="badge" style="background: var(--danger); color:white;">14m breach</span></p>
-                    <span class="time">Ticket #4928 - Enterprise Plan</span>
-                </div>
-            </div>
-            <div class="activity-item">
-                <div class="activity-icon" style="background: var(--warning); color: white;">!</div>
-                <div class="activity-details" style="flex: 1;">
-                    <p style="display:flex; justify-content: space-between;"><strong>SLA Warning</strong> <span class="badge" style="background: var(--warning); color:white;">5m remaining</span></p>
-                    <span class="time">Ticket #4931 - Refund Request</span>
-                </div>
-            </div>
-        `;
-    }
 
     // 4. Update Charts when theme changes
     const observer = new MutationObserver((mutations) => {

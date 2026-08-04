@@ -257,9 +257,9 @@ def dashboard_summary(
     sla_risks = []
     for c in sla_risks_query:
         if c.created_at.tzinfo is None:
-            created_utc = c.created_at.replace(tzinfo=pytz.utc)
+            created_utc = c.created_at.replace(tzinfo=timezone.utc)
         else:
-            created_utc = c.created_at.astimezone(pytz.utc)
+            created_utc = c.created_at.astimezone(timezone.utc)
         
         sla_risks.append({
             "session_id": c.session_id,
