@@ -157,6 +157,11 @@
           <div id="theme-dropdown" class="theme-dropdown-menu hidden" role="menu" style="left: 100%; top: auto; bottom: 0; margin-left: 8px; right: auto; transform: none; width: 220px;">
               <!-- Main Menu View -->
               <div id="menu-main-view">
+                <button id="btn-show-profile" class="theme-option" style="display:flex; justify-content:space-between; align-items:center;" role="menuitem">
+                  <span>Profile & QA</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+                <div style="height: 1px; background: var(--line); margin: 4px 0;"></div>
                 <button id="btn-show-appearance" class="theme-option" style="display:flex; justify-content:space-between; align-items:center;" role="menuitem">
                   <span>Appearance</span>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -359,9 +364,19 @@
             <button id="customer-sidebar-toggle" class="icon-action-btn" aria-label="Customer Details" title="Customer Details" style="border: 1px solid var(--line); background: var(--bg-surface);">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
             </button>
+            <div style="position:relative;">
+              <button id="conv-overflow-btn" class="icon-action-btn" aria-label="More Actions" title="More Actions" style="border: 1px solid var(--line); background: var(--bg-surface);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+              </button>
+              <div id="conv-overflow-menu" class="hidden" style="position:absolute; top:100%; right:0; margin-top:4px; background:var(--bg-main); border:1px solid var(--line); border-radius:6px; box-shadow:var(--shadow-lg); z-index:100; min-width:160px; padding:4px;">
+                <button id="merge-ticket-btn" style="width:100%; text-align:left; background:none; border:none; padding:8px 12px; cursor:pointer; color:var(--text-main); font-size:13px; display:flex; align-items:center; gap:8px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> Merge with...
+                </button>
+              </div>
+            </div>
           </div>
         </header>
-
+        <div id="merge-banner-container" style="display:none; padding: 12px 16px; background: var(--surface-2); border-bottom: 1px solid var(--line); font-size: 13px;"></div>
         <div style="display: flex; flex: 1; overflow: hidden; background: var(--bg-base);">
           <div style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
             <!-- Ticket Properties Bar: priority / assignee / tags, always visible so
@@ -560,7 +575,13 @@
         <div class="view-header">
           <h2>Analytics & Reporting</h2>
           <div class="header-actions">
-            <span style="padding: 8px 12px; font-weight: 500;">All time</span>
+            <select id="analytics-date-range" class="form-select" onchange="loadAnalytics()" style="padding: 8px 12px; font-weight: 500; border-radius: 8px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--text-main);">
+                <option value="all">All time</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="quarter">This Quarter</option>
+                <option value="ytd">Year to Date</option>
+            </select>
             <!-- Download PDF intentionally left dead for this phase or hidden -->
             <button class="btn btn-secondary" style="display:none;">Download PDF</button>
           </div>
@@ -578,6 +599,31 @@
                 <canvas id="csatChart"></canvas>
             </div>
           </div>
+        </div>
+        <div class="analytics-grid" style="margin-top: 24px;">
+            <div class="chart-card">
+                <h3>Agent Leaderboard</h3>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--line);">
+                                <th style="padding: 8px;">Agent</th>
+                                <th style="padding: 8px;">Resolved</th>
+                                <th style="padding: 8px;">Avg Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analytics-leaderboard-body">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Tag Breakdown</h3>
+                <div class="chart-container" style="position: relative; height: 300px; width: 100%; display: flex; justify-content: center; align-items: center;">
+                    <canvas id="tagsChart"></canvas>
+                </div>
+            </div>
         </div>
         <div class="analytics-grid" style="margin-top: 24px; grid-template-columns: 1fr;">
             <div class="stats-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">

@@ -85,6 +85,7 @@ class Conversation(Base):
     # agent-facing "who owns this ticket" assignment editable at any time,
     # independent of resolution state.
     assigned_agent: Mapped[str | None] = mapped_column(String, nullable=True)
+    merged_into_id: Mapped[str | None] = mapped_column(ForeignKey("conversations.id"), nullable=True)
 
     messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation", order_by="Message.created_at"
@@ -125,6 +126,7 @@ class Agent(Base):
     totp_secret: Mapped[str | None] = mapped_column(String, nullable=True)
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     token_version: Mapped[int] = mapped_column(Integer, default=1)
+    permissions: Mapped[str] = mapped_column(Text, default="[]", server_default="[]")
     # Bumped whenever the password changes (or the account needs its
     # sessions force-revoked). The JWT carries the token_version that was
     # current when it was issued ("tv" claim); get_current_agent rejects
@@ -137,6 +139,25 @@ class Agent(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
     )
+
+    def has_permission(self, permission_name: str) -> bool:
+        if self.role == "admin":
+            return True
+            
+        import json
+        try:
+            perms = json.loads(self.permissions)
+        except:
+            perms = []
+            
+        if not perms:
+            # Fallback for backwards compatibility with existing rows that haven't been updated
+            if self.role == "manager":
+                perms = ["manage_agents", "view_analytics", "manage_canned_responses"]
+            else:
+                perms = []
+                
+        return permission_name in perms
 
 
 class AuditLog(Base):

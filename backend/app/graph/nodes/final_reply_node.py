@@ -100,12 +100,22 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
 
     if state.get("handoff_requested"):
         reason = state.get("handoff_reason") or "this needs a closer look from the team"
-        context_parts.append(
-            f"IMPORTANT: This conversation is being handed to a human teammate because: "
-            f"{reason}. Let the customer know, naturally and briefly, that you're bringing "
-            "in someone from the team to take care of this. Do not say 'ticket created' or "
-            "use internal jargon, and do not pretend to be that teammate yourself."
-        )
+        from app.services.business_hours import is_within_business_hours
+        
+        if is_within_business_hours():
+            context_parts.append(
+                f"IMPORTANT: This conversation is being handed to a human teammate because: "
+                f"{reason}. Let the customer know, naturally and briefly, that you're bringing "
+                "in someone from the team to take care of this. Do not say 'ticket created' or "
+                "use internal jargon, and do not pretend to be that teammate yourself."
+            )
+        else:
+            context_parts.append(
+                f"IMPORTANT: This conversation is being escalated because: {reason}. "
+                "However, our human team is currently offline. You must let the customer know "
+                "that the team is currently offline and we will respond within our next business hours. "
+                "Do not imply someone is about to jump in right now."
+            )
 
     if state.get("conversation_summary"):
         context_parts.append(f"Summary of earlier conversation:\n{state['conversation_summary']}")

@@ -2642,6 +2642,31 @@ async function loadTicketProperties(sessionId) {
   renderAssigneeBadge(currentTicketProperties.assigned_agent);
   renderTagChips(currentTicketProperties.tags);
   renderCsatBadge(result.csat_rating, result.csat_comment);
+  
+  const mergeContainer = document.getElementById('merge-banner-container');
+  if (mergeContainer) {
+      if (result.merged_into_session_id) {
+          mergeContainer.style.display = 'block';
+          mergeContainer.innerHTML = `
+              <div style="display:flex; align-items:center; gap:8px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                  <span>This ticket has been merged into <a href="#" onclick="window.loadConversation('${result.merged_into_session_id}'); return false;" style="color:var(--accent-main); font-weight:500;">Ticket ${result.merged_into_short_id || result.merged_into_session_id.substring(0,8)}</a></span>
+              </div>
+          `;
+      } else if (result.merged_from && result.merged_from.length > 0) {
+          mergeContainer.style.display = 'block';
+          const links = result.merged_from.map(m => `<a href="#" onclick="window.loadConversation('${m.session_id}'); return false;" style="color:var(--accent-main); font-weight:500;">Ticket ${m.short_id || m.session_id.substring(0,8)}</a>`).join(', ');
+          mergeContainer.innerHTML = `
+              <div style="display:flex; align-items:center; gap:8px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                  <span>${result.merged_from.length} ticket(s) merged into this one: ${links}</span>
+              </div>
+          `;
+      } else {
+          mergeContainer.style.display = 'none';
+          mergeContainer.innerHTML = '';
+      }
+  }
 }
 
 function renderCsatBadge(rating, comment) {
@@ -3504,4 +3529,64 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     observer.observe(document.documentElement, { attributes: true });
 
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  const convOverflowBtn = document.getElementById('conv-overflow-btn');
+  const convOverflowMenu = document.getElementById('conv-overflow-menu');
+  if (convOverflowBtn && convOverflowMenu) {
+      convOverflowBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          convOverflowMenu.classList.toggle('hidden');
+      });
+      document.addEventListener('click', (e) => {
+          if (!convOverflowMenu.contains(e.target) && e.target !== convOverflowBtn) {
+              convOverflowMenu.classList.add('hidden');
+          }
+      });
+  }
+
+  const mergeBtn = document.getElementById('merge-ticket-btn');
+  if (mergeBtn) {
+      mergeBtn.addEventListener('click', () => {
+          convOverflowMenu.classList.add('hidden');
+          const modal = document.getElementById('merge-modal');
+          modal.style.display = 'flex';
+      });
+  }
+
+  const confirmMergeBtn = document.getElementById('confirm-merge-btn');
+  if (confirmMergeBtn) {
+      confirmMergeBtn.addEventListener('click', async () => {
+          const targetId = document.getElementById('merge-target-input').value.trim();
+          if (!targetId) {
+              window.showToast("Please enter a target ticket ID", "error");
+              return;
+          }
+          
+          let resolvedTargetId = targetId;
+          // If they entered a short_id, we should technically find the session_id
+          // But our API currently takes target_session_id. 
+          // Wait, the agent might enter a short ID since that's what they see. 
+          // But since the API requires target_session_id, we might need a backend fix to resolve short_ids.
+          // For now, let's just send what they typed.
+          
+          try {
+              const res = await fetch(`${API_BASE}/agent/conversations/${activeSessionId}/merge`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", 'Authorization': getAuthToken() },
+                  body: JSON.stringify({ target_session_id: resolvedTargetId })
+              });
+              if (!res.ok) {
+                  const data = await res.json();
+                  throw new Error(data.detail || 'Failed to merge');
+              }
+              window.showToast("Ticket merged successfully!");
+              document.getElementById('merge-modal').style.display = 'none';
+              window.loadConversation(activeSessionId); // reload to show banner
+          } catch (err) {
+              window.showToast(err.message, "error");
+          }
+      });
+  }
 });

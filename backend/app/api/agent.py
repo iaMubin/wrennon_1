@@ -24,7 +24,7 @@ from app.config import settings
 from app.logger import logger
 import re
 from app.services.mock_apis import get_order_status, get_order_by_email, get_customer_info
-from app.db.models import Agent, Conversation, Message, AuditLog, CSATResponse, CannedResponse, SavedView
+from app.db.models import Agent, Conversation, Message, AuditLog, CSATResponse, CannedResponse, SavedView, SystemSetting
 from app.db.session import get_db
 from app.realtime.connection_manager import manager
 from app.config import settings
@@ -249,25 +249,44 @@ def dashboard_summary(
              local_dt = c.created_at.astimezone(tz)
         hourly_volume[local_dt.hour] += 1
 
-    # SLA Risks: oldest unresolved tickets
-    sla_risks_query = db.query(Conversation).filter(
-        Conversation.resolved == False
-    ).order_by(Conversation.created_at.asc()).limit(5).all()
-
-    sla_risks = []
-    for c in sla_risks_query:
+    # SLA Risks: tickets closest to or past breach, ordered by urgency
+    open_convs = db.query(Conversation).filter(
+        Conversation.resolved == False,
+        Conversation.handoff_active == True
+    ).all()
+    
+    sla_policy = get_sla_policy(db)
+    
+    sla_list = []
+    for c in open_convs:
+        status = get_sla_status(c, sla_policy)
+        if status == "ok":
+            continue
+            
         if c.created_at.tzinfo is None:
             created_utc = c.created_at.replace(tzinfo=timezone.utc)
         else:
             created_utc = c.created_at.astimezone(timezone.utc)
+            
+        age_minutes = (datetime.datetime.now(timezone.utc) - created_utc).total_seconds() / 60
+        priority = getattr(c, "priority", None) or "normal"
+        threshold = sla_policy.get(priority, 240)
+        ratio = age_minutes / threshold if threshold > 0 else 0
         
-        sla_risks.append({
+        sla_list.append({
             "session_id": c.session_id,
             "short_id": c.short_id,
             "customer_email": c.customer_email,
             "created_at": created_utc.isoformat(),
-            "reopen_count": c.reopen_count
+            "reopen_count": getattr(c, "reopen_count", 0),
+            "priority": priority,
+            "sla_status": status,
+            "ratio": ratio
         })
+        
+    # sort by ratio descending
+    sla_list.sort(key=lambda x: x["ratio"], reverse=True)
+    sla_risks = sla_list[:5]
 
     return {
         "open_tickets": open_tickets,
@@ -284,64 +303,43 @@ def get_customers(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
 ):
-    from sqlalchemy import func
+    from sqlalchemy import func, cast, Float, case
     
-    # We want: email, total_tickets, last_active, resolved_ratio, avg_csat
+    # Group by customer_email using SQL aggregations
+    query = db.query(
+        Conversation.customer_email.label("email"),
+        func.count(Conversation.id).label("total_tickets"),
+        func.max(Conversation.created_at).label("last_active"),
+        func.sum(case((Conversation.resolved == True, 1), else_=0)).label("resolved_count"),
+        func.avg(CSATResponse.rating).label("avg_csat")
+    ).outerjoin(
+        CSATResponse, Conversation.id == CSATResponse.conversation_id
+    ).filter(
+        Conversation.customer_email != None
+    ).group_by(
+        Conversation.customer_email
+    ).order_by(
+        func.count(Conversation.id).desc()
+    )
     
-    # Simpler memory-based grouping to avoid dialect cast issues:
-    all_convs = db.query(
-        Conversation.id,
-        Conversation.customer_email,
-        Conversation.created_at,
-        Conversation.resolved
-    ).filter(Conversation.customer_email != None).all()
-    
-    # We need csat ratings per customer
-    csat_responses = db.query(CSATResponse.conversation_id, CSATResponse.rating).all()
-    csat_map = {r.conversation_id: r.rating for r in csat_responses}
-    
-    customers = {}
-    for c in all_convs:
-        email = c.customer_email
-        if email not in customers:
-            customers[email] = {
-                "email": email,
-                "total_tickets": 0,
-                "resolved_count": 0,
-                "last_active": c.created_at,
-                "csat_total": 0,
-                "csat_count": 0
-            }
-        
-        cust = customers[email]
-        cust["total_tickets"] += 1
-        if c.resolved:
-            cust["resolved_count"] += 1
-        if c.created_at and (not cust["last_active"] or c.created_at > cust["last_active"]):
-            cust["last_active"] = c.created_at
-            
-        if c.id in csat_map:
-            cust["csat_total"] += csat_map[c.id]
-            cust["csat_count"] += 1
-            
+    rows = query.all()
     results = []
-    for email, data in customers.items():
-        resolved_ratio = (data["resolved_count"] / data["total_tickets"]) if data["total_tickets"] > 0 else 0
-        avg_csat = (data["csat_total"] / data["csat_count"]) if data["csat_count"] > 0 else None
-        
-        # Convert datetime to ISO string for JSON serialization
-        last_active_str = data["last_active"].isoformat() if data["last_active"] else None
+    for r in rows:
+        email = r.email
+        total_tickets = r.total_tickets or 0
+        resolved_count = r.resolved_count or 0
+        resolved_ratio = (resolved_count / total_tickets) if total_tickets > 0 else 0
+        last_active = r.last_active
+        avg_csat = r.avg_csat
         
         results.append({
             "email": email,
-            "total_tickets": data["total_tickets"],
-            "last_active": last_active_str,
+            "total_tickets": total_tickets,
+            "last_active": last_active.isoformat() if last_active else None,
             "resolved_ratio": resolved_ratio,
-            "avg_csat": avg_csat
+            "avg_csat": float(avg_csat) if avg_csat is not None else None
         })
         
-    # Sort by total_tickets descending for better default UX
-    results.sort(key=lambda x: x["total_tickets"], reverse=True)
     return results
 
 class CreateSavedViewRequest(BaseModel):
@@ -416,7 +414,8 @@ def needs_attention(
         .order_by(Conversation.updated_at.desc())
         .all()
     )
-    return [_conversation_summary(c) for c in conversations]
+    sla_policy = get_sla_policy(db)
+    return [_conversation_summary(c, sla_policy) for c in conversations]
 
 
 @router.get("/agent/conversations/my-cases")
@@ -441,7 +440,8 @@ def get_my_cases(
     
     results = []
     for c in convs:
-        summary = _conversation_summary(c)
+        sla_policy = get_sla_policy(db) if 'sla_policy' not in locals() else sla_policy
+        summary = _conversation_summary(c, sla_policy)
         summary["is_mentioned"] = (c.handled_by != agent.username)
         results.append(summary)
         
@@ -474,7 +474,8 @@ def active_chats(
         .order_by(Conversation.updated_at.desc())
         .all()
     )
-    return [_conversation_summary(c) for c in conversations]
+    sla_policy = get_sla_policy(db)
+    return [_conversation_summary(c, sla_policy) for c in conversations]
 
 
 @router.get("/agent/conversations")
@@ -495,7 +496,8 @@ def all_conversations(
         .limit(50)
         .all()
     )
-    return [_conversation_summary(c) for c in conversations]
+    sla_policy = get_sla_policy(db)
+    return [_conversation_summary(c, sla_policy) for c in conversations]
 
 
 @router.get("/agent/conversations/{session_id}")
@@ -514,7 +516,23 @@ def get_conversation(
     ).first()
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    return _conversation_summary(conversation)
+    sla_policy = get_sla_policy(db)
+    summary = _conversation_summary(conversation, sla_policy)
+    
+    # Add merge info
+    summary["merged_into_id"] = conversation.merged_into_id
+    summary["merged_into_session_id"] = None
+    summary["merged_into_short_id"] = None
+    if conversation.merged_into_id:
+        target = db.query(Conversation).filter_by(id=conversation.merged_into_id).first()
+        if target:
+            summary["merged_into_session_id"] = target.session_id
+            summary["merged_into_short_id"] = target.short_id
+            
+    merged_from = db.query(Conversation).filter_by(merged_into_id=conversation.id).all()
+    summary["merged_from"] = [{"session_id": m.session_id, "short_id": getattr(m, "short_id", "???")} for m in merged_from]
+    
+    return summary
 
 
 @router.get("/agent/conversations/{session_id}/messages")
@@ -584,7 +602,23 @@ def update_ticket_properties(
 
     db.commit()
     db.refresh(conversation)
-    return _conversation_summary(conversation)
+    sla_policy = get_sla_policy(db)
+    summary = _conversation_summary(conversation, sla_policy)
+    
+    # Add merge info
+    summary["merged_into_id"] = conversation.merged_into_id
+    summary["merged_into_session_id"] = None
+    summary["merged_into_short_id"] = None
+    if conversation.merged_into_id:
+        target = db.query(Conversation).filter_by(id=conversation.merged_into_id).first()
+        if target:
+            summary["merged_into_session_id"] = target.session_id
+            summary["merged_into_short_id"] = target.short_id
+            
+    merged_from = db.query(Conversation).filter_by(merged_into_id=conversation.id).all()
+    summary["merged_from"] = [{"session_id": m.session_id, "short_id": getattr(m, "short_id", "???")} for m in merged_from]
+    
+    return summary
 
 
 @router.delete("/agent/messages/{message_id}")
@@ -898,7 +932,7 @@ def create_canned_response(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent)
 ) -> dict:
-    if agent.role not in ["admin", "manager"]:
+    if not agent.has_permission("manage_canned_responses"):
         raise HTTPException(status_code=403, detail="Not authorized")
     if not payload.shortcut.startswith("/"):
         raise HTTPException(status_code=400, detail="Shortcut must start with /")
@@ -928,7 +962,7 @@ def update_canned_response(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent)
 ) -> dict:
-    if agent.role not in ["admin", "manager"]:
+    if not agent.has_permission("manage_canned_responses"):
         raise HTTPException(status_code=403, detail="Not authorized")
     if not payload.shortcut.startswith("/"):
         raise HTTPException(status_code=400, detail="Shortcut must start with /")
@@ -957,7 +991,7 @@ def delete_canned_response(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent)
 ) -> dict:
-    if agent.role not in ["admin", "manager"]:
+    if not agent.has_permission("manage_canned_responses"):
         raise HTTPException(status_code=403, detail="Not authorized")
         
     resp = db.query(CannedResponse).filter_by(id=response_id).first()
@@ -971,7 +1005,38 @@ def delete_canned_response(
     
     return {"status": "deleted"}
 
-def _conversation_summary(c: Conversation) -> dict:
+def get_sla_policy(db: Session) -> dict:
+    setting = db.query(SystemSetting).filter(SystemSetting.key == "sla_policy").first()
+    if setting:
+        import json
+        try:
+            return json.loads(setting.value)
+        except:
+            pass
+    return {"urgent": 15, "high": 60, "normal": 240, "low": 1440}
+
+def get_sla_status(c: Conversation, sla_policy: dict) -> str:
+    if c.resolved or not getattr(c, "handoff_active", False):
+        return "ok"
+    if c.created_at.tzinfo is None:
+        import datetime
+        created_utc = c.created_at.replace(tzinfo=datetime.timezone.utc)
+    else:
+        import datetime
+        created_utc = c.created_at.astimezone(datetime.timezone.utc)
+        
+    import datetime
+    age_minutes = (datetime.datetime.now(datetime.timezone.utc) - created_utc).total_seconds() / 60
+    priority = getattr(c, "priority", None) or "normal"
+    threshold = sla_policy.get(priority, 240)
+    
+    if age_minutes >= threshold:
+        return "breached"
+    elif age_minutes >= threshold * 0.8:
+        return "warning"
+    return "ok"
+
+def _conversation_summary(c: Conversation, sla_policy: dict = None) -> dict:
     last_msg_obj = c.messages[-1] if c.messages else None
     last_message = last_msg_obj.content if last_msg_obj else None
     last_message_is_internal = (last_msg_obj.sender == 'agent_internal') if last_msg_obj else False
@@ -1032,6 +1097,7 @@ def _conversation_summary(c: Conversation) -> dict:
         "sentiment": getattr(c, "sentiment", None),
         "language": getattr(c, "language", None),
         "priority": getattr(c, "priority", None) or "normal",
+        "sla_status": get_sla_status(c, sla_policy) if sla_policy else "ok",
         "tags": _safe_json_list(getattr(c, "tags", None)),
         "assigned_agent": getattr(c, "assigned_agent", None),
         "csat_rating": c.csat_response.rating if c.csat_response else None,
@@ -1051,3 +1117,68 @@ def _safe_json_list(raw: str | None) -> list[str]:
         return parsed if isinstance(parsed, list) else []
     except (json.JSONDecodeError, TypeError):
         return []
+
+@router.get("/agent/my-scorecards")
+def get_my_scorecards(
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent)
+):
+    from app.db.models import AnalyticsScorecard, Conversation
+    scorecards = (
+        db.query(AnalyticsScorecard, Conversation.short_id, Conversation.created_at)
+        .join(Conversation, Conversation.id == AnalyticsScorecard.conversation_id)
+        .filter(Conversation.handled_by == agent.username)
+        .order_by(AnalyticsScorecard.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    
+    results = []
+    for sc, short_id, conv_created_at in scorecards:
+        results.append({
+            "id": sc.id,
+            "conversation_id": sc.conversation_id,
+            "short_id": short_id,
+            "conversation_date": conv_created_at.isoformat() if conv_created_at else None,
+            "empathy_score": sc.empathy_score,
+            "accuracy_score": sc.accuracy_score,
+            "resolution_score": sc.resolution_score,
+            "csat_prediction": sc.csat_prediction,
+            "feedback_notes": sc.feedback_notes,
+            "created_at": sc.created_at.isoformat() if sc.created_at else None
+        })
+    return results
+
+class MergeRequest(BaseModel):
+    target_session_id: str
+
+@router.post("/agent/conversations/{session_id}/merge")
+def merge_conversation(
+    session_id: str,
+    payload: MergeRequest,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent)
+):
+    source = db.query(Conversation).filter_by(session_id=session_id).first()
+    if not source:
+        raise HTTPException(404, "Source conversation not found")
+        
+    target = db.query(Conversation).filter((Conversation.session_id == payload.target_session_id) | (Conversation.short_id == payload.target_session_id)).first()
+    if not target:
+        raise HTTPException(404, "Target conversation not found")
+        
+    if source.id == target.id:
+        raise HTTPException(400, "Cannot merge a conversation into itself")
+        
+    source.merged_into_id = target.id
+    
+    audit = AuditLog(
+        actor_username=agent.username,
+        action="merge_ticket",
+        target_username=session_id,
+        details=f"merged into target_session_id={target.session_id}"
+    )
+    db.add(audit)
+    db.commit()
+    
+    return {"status": "merged", "source_id": source.id, "target_id": target.id}

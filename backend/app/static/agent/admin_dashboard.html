@@ -409,6 +409,21 @@
         </div>
 
         <div class="section-block">
+            <h3>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent);">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                Business Hours
+            </h3>
+            <p class="section-subtitle">Configure when human agents are online. Use JSON format.</p>
+            <div class="panel" style="display: flex; flex-direction: column; gap: 16px;">
+                <textarea id="business-hours-textarea" style="width: 100%; height: 120px; padding: 12px; border-radius: 8px; border: 1px solid var(--border-light); background: var(--bg-body); color: var(--text-main); font-family: 'Inter', sans-serif; resize: vertical;" placeholder='{"timezone": "Asia/Dhaka", "mon": ["09:00","18:00"], "tue": ["09:00","18:00"], "wed": ["09:00","18:00"], "thu": ["09:00","18:00"], "fri": ["09:00","18:00"], "sat": null, "sun": null}'></textarea>
+                <button class="btn btn-primary" onclick="saveBusinessHours()" style="align-self: flex-start;">Save Business Hours</button>
+            </div>
+        </div>
+
+        <div class="section-block">
             <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent);">
                     <path d="M12 20h9"></path>
@@ -1133,6 +1148,38 @@
                 }
             } catch (err) {
                 console.error("Failed to fetch brand voice:", err);
+            }
+        }
+
+        async function fetchBusinessHours() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/settings/business_hours`, { headers: authHeaders, credentials: 'include' });
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('business-hours-textarea').value = data.value || '{"timezone": "Asia/Dhaka", "mon": ["09:00","18:00"], "tue": ["09:00","18:00"], "wed": ["09:00","18:00"], "thu": ["09:00","18:00"], "fri": ["09:00","18:00"], "sat": null, "sun": null}';
+                }
+            } catch (err) {
+                console.error("Failed to fetch business hours:", err);
+            }
+        }
+
+        async function saveBusinessHours() {
+            const val = document.getElementById('business-hours-textarea').value;
+            try {
+                JSON.parse(val);
+                const res = await fetch(`${API_BASE}/admin/settings/business_hours`, {
+                    method: 'PUT',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json', ...authHeaders },
+                    body: JSON.stringify({ value: val })
+                });
+                if (res.ok) {
+                    alert('Business Hours saved successfully!');
+                } else {
+                    alert('Failed to save Business Hours.');
+                }
+            } catch (err) {
+                alert('Invalid JSON format for Business Hours.');
             }
         }
 

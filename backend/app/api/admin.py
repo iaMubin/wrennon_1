@@ -99,7 +99,7 @@ def create_agent(
     if agent_in.role not in ["agent", "manager", "admin"]:
         raise HTTPException(status_code=400, detail="Invalid role.")
         
-    if manager.role == "manager" and agent_in.role != "agent":
+    if not manager.has_permission("manage_managers") and agent_in.role != "agent":
         raise HTTPException(status_code=403, detail="Managers can only create standard Agent accounts.")
         
     if db.query(Agent).filter_by(employee_id=agent_in.employee_id).first():
@@ -139,7 +139,7 @@ def delete_agent(
     if agent.username == manager.username:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
         
-    if manager.role == "manager" and agent.role != "agent":
+    if not manager.has_permission("manage_managers") and agent.role != "agent":
         raise HTTPException(status_code=403, detail="Managers can only delete standard Agent accounts.")
         
     db.delete(agent)
@@ -169,7 +169,7 @@ def update_agent(
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
         
-    if manager.role == "manager" and agent.role != "agent":
+    if not manager.has_permission("manage_managers") and agent.role != "agent":
         if agent.username != manager.username:
             raise HTTPException(status_code=403, detail="Managers can only update standard Agent accounts.")
             
@@ -197,7 +197,7 @@ def reset_password(
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
         
-    if manager.role == "manager" and agent.role != "agent":
+    if not manager.has_permission("manage_managers") and agent.role != "agent":
         raise HTTPException(status_code=403, detail="Managers can only reset passwords for standard Agent accounts.")
         
     validate_password(payload.new_password)

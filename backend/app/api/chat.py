@@ -8,7 +8,7 @@ WebSocket connection takes over for everything that happens next.
 import datetime
 import uuid
 
-from fastapi import APIRouter, Depends, Request, Header, HTTPException, status, UploadFile, File, Body
+from fastapi import APIRouter, Depends, Request, Header, HTTPException, status, UploadFile, File, Body, BackgroundTasks, BackgroundTasks
 from sqlalchemy.orm import Session
 import shutil
 import os
@@ -200,6 +200,7 @@ async def upload_file(
 def submit_csat(
     request: Request,
     session_id: str,
+    background_tasks: BackgroundTasks,
     rating: int = Body(..., embed=True),
     comment: str | None = Body(None, embed=True),
     db: Session = Depends(get_db),
@@ -226,4 +227,19 @@ def submit_csat(
         db.add(CSATResponse(conversation_id=conversation.id, rating=rating, comment=comment))
 
     db.commit()
+
+    if rating <= 2:
+        from app.services.connection_manager import manager
+        import asyncio
+        
+        async def send_low_csat_alert():
+            await manager.broadcast_to_agents({
+                "type": "low_csat_alert",
+                "session_id": session_id,
+                "rating": rating,
+                "comment": comment
+            })
+            
+        background_tasks.add_task(send_low_csat_alert)
+
     return {"status": "success"}
