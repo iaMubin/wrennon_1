@@ -21,6 +21,31 @@ const inputEl = document.getElementById("message-input");
 const sendBtn = document.getElementById("send-btn");
 const wsStatus = document.getElementById("ws-status");
 
+function applyWidgetTheme() {
+  const theme = localStorage.getItem("wrennon_widget_theme") || "widget-default";
+  const widget = document.getElementById("wrennon-widget");
+  const defaultHeader = document.getElementById("panel-header");
+  const crispHeader = document.getElementById("panel-header-crisp");
+  
+  if (!widget) return;
+
+  if (theme === "widget-crisp") {
+    widget.classList.add("theme-crisp");
+    if (defaultHeader) defaultHeader.style.display = "none";
+    if (crispHeader) crispHeader.style.display = "flex";
+  } else {
+    widget.classList.remove("theme-crisp");
+    if (defaultHeader) defaultHeader.style.display = "flex";
+    if (crispHeader) crispHeader.style.display = "none";
+  }
+}
+applyWidgetTheme();
+window.addEventListener("storage", (e) => {
+  if (e.key === "wrennon_widget_theme") {
+    applyWidgetTheme();
+  }
+});
+
 // Create scroll-to-bottom button dynamically
 const scrollToBottomBtn = document.createElement("button");
 scrollToBottomBtn.id = "scroll-to-bottom-btn";

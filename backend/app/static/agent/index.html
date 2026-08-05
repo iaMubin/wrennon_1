@@ -108,42 +108,69 @@
         <button id="nav-conversations-btn" class="global-nav-btn active" title="Conversations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg></button>
         <button id="nav-customers-btn" class="global-nav-btn" title="Customers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></button>
         <button id="nav-analytics-btn" class="global-nav-btn" title="Analytics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M3 3v18h18"></path><rect width="4" height="7" x="7" y="14" rx="1"></rect><rect width="4" height="12" x="15" y="9" rx="1"></rect></svg></button>
-        <button id="global-bulk-select-btn" class="global-nav-btn" title="Bulk Select">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22" style="margin: 0 auto; display: block;">
-            <path d="M4 12h.01"></path><path d="M4 18h.01"></path><path d="M4 6h.01"></path><path d="M8 12h12"></path><path d="M8 18h12"></path><path d="M8 6h12"></path>
-          </svg>
-        </button>
+
         <div style="position: relative; width: 100%;">
-          <button id="global-filter-btn" class="global-nav-btn" title="Filters" aria-haspopup="true">
+          <button id="global-filter-btn" class="global-nav-btn" title="Filters" aria-haspopup="true" style="position: relative;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22" style="margin: 0 auto; display: block;">
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+              <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"></path>
             </svg>
+            <span id="filter-active-badge" style="display: none; position: absolute; top: 4px; right: 8px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--accent) 85%, black);"></span>
           </button>
-          <div id="global-filter-dropdown" class="hidden" style="position: absolute; left: 100%; top: 0; margin-left: 8px; width: 260px; padding: 16px; background: var(--bg-surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 1000; display: flex; flex-direction: column; gap: 12px; color: var(--ink); text-align: left;">
-            <h3 style="margin: 0; font-size: 14px; color: var(--ink);">Filters</h3>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <select id="filter-priority" style="padding: 6px; font-size: 13px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-base); color: var(--ink);">
-                <option value="">Priority: All</option>
-                <option value="urgent">Urgent</option>
-                <option value="high">High</option>
-                <option value="normal">Normal</option>
-                <option value="low">Low</option>
-              </select>
-              <select id="filter-assignee" style="padding: 6px; font-size: 13px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-base); color: var(--ink);">
-                <option value="">Assignee: All</option>
-                <option value="unassigned">Unassigned</option>
-                <!-- Agents will be populated by JS -->
-              </select>
-              <input type="text" id="filter-tag" placeholder="Tag..." style="padding: 6px; font-size: 13px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-base); color: var(--ink);">
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
-              <div style="display: flex; gap: 8px;">
-                <button id="apply-filters-btn" class="btn btn-sm" style="padding: 6px 12px;">Apply</button>
-                <button id="clear-filters-btn" class="btn btn-sm btn-secondary" style="padding: 6px 12px; display: none;">Clear</button>
+          <div id="global-filter-dropdown" class="hidden" style="position: absolute; left: 100%; top: 0; margin-left: 8px; width: 300px; background: var(--bg-surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.15); z-index: 1000; display: flex; flex-direction: column; color: var(--ink); text-align: left; overflow: hidden;">
+            
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line);">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16" style="opacity: 0.6;"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"></path></svg>
+                <span style="font-size: 14px; font-weight: 600; color: var(--ink);">Filters</span>
               </div>
-              <button id="save-view-btn" class="btn btn-sm btn-secondary" style="padding: 6px 12px;">Save</button>
+              <button id="clear-filters-btn" style="display: none; background: none; border: none; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--accent); padding: 2px 6px; border-radius: 4px; transition: background 0.15s;">Clear all</button>
             </div>
-            <div id="saved-views-container" style="display: none; gap: 4px; flex-wrap: wrap; margin-top: 4px;"></div>
+
+            <!-- Filter Fields -->
+            <div style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+              
+              <!-- Priority -->
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label for="filter-priority" style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); margin: 0;">Priority</label>
+                <select id="filter-priority" style="padding: 8px 10px; font-size: 13px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-base); color: var(--ink); cursor: pointer; transition: border-color 0.15s; outline: none; -webkit-appearance: none; appearance: none; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23999%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right 8px center;">
+                  <option value="">All priorities</option>
+                  <option value="urgent">🔴 Urgent</option>
+                  <option value="high">🟠 High</option>
+                  <option value="normal">🟢 Normal</option>
+                  <option value="low">⚪ Low</option>
+                </select>
+              </div>
+
+              <!-- Assignee -->
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label for="filter-assignee" style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); margin: 0;">Assignee</label>
+                <select id="filter-assignee" style="padding: 8px 10px; font-size: 13px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-base); color: var(--ink); cursor: pointer; transition: border-color 0.15s; outline: none; -webkit-appearance: none; appearance: none; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23999%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right 8px center;">
+                  <option value="">All agents</option>
+                  <option value="unassigned">Unassigned</option>
+                  <!-- Agents will be populated by JS -->
+                </select>
+              </div>
+
+              <!-- Tag -->
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label for="filter-tag" style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); margin: 0;">Tag</label>
+                <input type="text" id="filter-tag" placeholder="Search by tag..." style="padding: 8px 10px; font-size: 13px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-base); color: var(--ink); transition: border-color 0.15s; outline: none;">
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div style="padding: 0 16px 14px 16px; display: flex; gap: 8px;">
+              <button id="apply-filters-btn" class="btn btn-primary" style="flex: 1; padding: 8px 0; font-size: 13px; font-weight: 500; border-radius: 8px; cursor: pointer;">Apply Filters</button>
+              <button id="save-view-btn" style="padding: 8px 14px; font-size: 13px; font-weight: 500; border-radius: 8px; cursor: pointer; background: none; border: 1px solid var(--line); color: var(--ink); transition: background 0.15s;" title="Save current filters as a view">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="vertical-align: -2px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+              </button>
+            </div>
+
+            <!-- Saved Views -->
+            <div id="saved-views-container" style="display: none; padding: 0 16px 14px 16px; gap: 6px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 12px;">
+            </div>
+
           </div>
         </div>
         <div style="position: relative; width: 100%; display: flex; justify-content: center;">
@@ -157,14 +184,19 @@
           <div id="theme-dropdown" class="theme-dropdown-menu hidden" role="menu" style="left: 100%; top: auto; bottom: 0; margin-left: 8px; right: auto; transform: none; width: 220px;">
               <!-- Main Menu View -->
               <div id="menu-main-view">
-                <button id="btn-show-profile" class="theme-option" style="display:flex; justify-content:space-between; align-items:center;" role="menuitem">
-                  <span>Profile & QA</span>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                </button>
-                <div style="height: 1px; background: var(--line); margin: 4px 0;"></div>
                 <button id="btn-show-appearance" class="theme-option" style="display:flex; justify-content:space-between; align-items:center;" role="menuitem">
                   <span>Appearance</span>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+                <div style="height: 1px; background: var(--line); margin: 4px 0;"></div>
+                <button id="menu-bulk-select-btn" class="theme-option" style="display:flex; justify-content:space-between; align-items:center;" role="menuitem">
+                  <span>Select Messages</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h.01"></path><path d="M4 18h.01"></path><path d="M4 6h.01"></path><path d="M8 12h12"></path><path d="M8 18h12"></path><path d="M8 6h12"></path></svg>
+                </button>
+                <div style="height: 1px; background: var(--line); margin: 4px 0;"></div>
+                <button id="dev-settings-btn" class="theme-option" style="display:flex; justify-content:space-between; align-items:center;" role="menuitem">
+                  <span>Developer Settings</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
                 </button>
                 <div style="height: 1px; background: var(--line); margin: 4px 0;"></div>
                 <button id="logout-btn" class="theme-option" style="display:flex; justify-content:space-between; align-items:center;" role="menuitem">
@@ -185,6 +217,7 @@
                 <div class="theme-tabs">
                   <button class="theme-tab active" data-target="agent-light-themes">Light</button>
                   <button class="theme-tab" data-target="agent-dark-themes">Dark</button>
+                  <button class="theme-tab" data-target="agent-widget-themes">Widget</button>
                 </div>
                 <div id="agent-light-themes" class="theme-tab-content active">
                   <button class="theme-option" data-theme-value="light-brownish" role="menuitem">Brownish White</button>
@@ -200,6 +233,10 @@
                   <button class="theme-option" data-theme-value="dark-corporate-blue" role="menuitem">Corporate Blue</button>
                   <button class="theme-option" data-theme-value="dark-slate-teal" role="menuitem">Slate Teal</button>
                   <button class="theme-option" data-theme-value="dark-graphite" role="menuitem">Graphite Monochrome</button>
+                </div>
+                <div id="agent-widget-themes" class="theme-tab-content hidden">
+                  <button class="theme-option" data-theme-value="widget-default" role="menuitem">Default Style</button>
+                  <button class="theme-option" data-theme-value="widget-crisp" role="menuitem">Crisp Style</button>
                 </div>
               </div>
           </div>
@@ -248,54 +285,33 @@
       </nav>
 
 
-
+      <div id="bulk-actions-bar" class="bulk-actions-toolbar" style="display: none; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--bg-surface); flex-direction: column; gap: 12px; z-index: 10;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--ink); margin: 0;">
+              <input type="checkbox" id="bulk-select-all-checkbox">
+            </label>
+            <span style="font-size: 13px; font-weight: 600; color: var(--ink);"><span id="bulk-selected-count">0</span> selected</span>
+          </div>
+          <button id="bulk-cancel-btn" style="background: none; border: none; cursor: pointer; color: var(--ink-soft); display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 4px;" title="Cancel">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div style="display: flex; gap: 8px; width: 100%;">
+          <select id="bulk-action-select" style="flex: 1; padding: 8px; font-size: 13px; border-radius: 6px; border: 1px solid var(--border-light); background: var(--bg-base); color: var(--ink); cursor: pointer;">
+            <option value="">Select Action...</option>
+            <option value="resolve">Mark Resolved</option>
+            <option value="assign">Assign To...</option>
+            <option value="priority">Set Priority...</option>
+          </select>
+          <button id="bulk-apply-btn" class="btn btn-primary" style="padding: 6px 12px; font-size: 13px; border-radius: 6px;">Apply</button>
+        </div>
+        <div id="bulk-action-value-container" style="display: none; width: 100%;">
+            <select id="bulk-action-value-select" style="width: 100%; padding: 8px; font-size: 13px; border-radius: 6px; border: 1px solid var(--border-light); background: var(--bg-base); color: var(--ink); cursor: pointer;">
+            </select>
+        </div>
+      </div>
       <div id="conversation-list"></div>
-      
-      <!-- Bulk Actions Bar -->
-      <div id="bulk-actions-bar" style="display: none; position: absolute; bottom: 16px; left: 16px; right: 16px; background: var(--bg-surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; box-shadow: var(--shadow-lg); z-index: 100; flex-direction: column; gap: 8px;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-size: 13px; font-weight: 600; color: var(--ink);"><span id="bulk-selected-count">0</span> selected</span>
-          <button id="bulk-cancel-btn" style="background: none; border: none; cursor: pointer; color: var(--ink-soft); display: flex; align-items: center; justify-content: center; padding: 0;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </button>
-        </div>
-        <div style="display: flex; gap: 8px;">
-          <select id="bulk-action-select" style="flex: 1; padding: 6px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--ink);">
-            <option value="">Select Action...</option>
-            <option value="resolve">Mark Resolved</option>
-            <option value="assign">Assign To...</option>
-            <option value="priority">Set Priority...</option>
-          </select>
-          <button id="bulk-apply-btn" class="btn btn-sm btn-primary">Apply</button>
-        </div>
-        <div id="bulk-action-value-container" style="display: none; margin-top: 4px;">
-            <select id="bulk-action-value-select" style="width: 100%; padding: 6px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--ink);">
-            </select>
-        </div>
-      </div>
-      
-      <!-- Bulk Actions Bar -->
-      <div id="bulk-actions-bar" style="display: none; position: absolute; bottom: 16px; left: 16px; right: 16px; background: var(--bg-surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; box-shadow: var(--shadow-lg); z-index: 100; flex-direction: column; gap: 8px;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-size: 13px; font-weight: 600; color: var(--ink);"><span id="bulk-selected-count">0</span> selected</span>
-          <button id="bulk-cancel-btn" style="background: none; border: none; cursor: pointer; color: var(--ink-soft); display: flex; align-items: center; justify-content: center; padding: 0;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </button>
-        </div>
-        <div style="display: flex; gap: 8px;">
-          <select id="bulk-action-select" style="flex: 1; padding: 6px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--ink);">
-            <option value="">Select Action...</option>
-            <option value="resolve">Mark Resolved</option>
-            <option value="assign">Assign To...</option>
-            <option value="priority">Set Priority...</option>
-          </select>
-          <button id="bulk-apply-btn" class="btn btn-sm btn-primary">Apply</button>
-        </div>
-        <div id="bulk-action-value-container" style="display: none; margin-top: 4px;">
-            <select id="bulk-action-value-select" style="width: 100%; padding: 6px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--ink);">
-            </select>
-        </div>
-      </div>
     </aside>
 
     <div id="resizer"></div>
@@ -364,19 +380,9 @@
             <button id="customer-sidebar-toggle" class="icon-action-btn" aria-label="Customer Details" title="Customer Details" style="border: 1px solid var(--line); background: var(--bg-surface);">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
             </button>
-            <div style="position:relative;">
-              <button id="conv-overflow-btn" class="icon-action-btn" aria-label="More Actions" title="More Actions" style="border: 1px solid var(--line); background: var(--bg-surface);">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
-              </button>
-              <div id="conv-overflow-menu" class="hidden" style="position:absolute; top:100%; right:0; margin-top:4px; background:var(--bg-main); border:1px solid var(--line); border-radius:6px; box-shadow:var(--shadow-lg); z-index:100; min-width:160px; padding:4px;">
-                <button id="merge-ticket-btn" style="width:100%; text-align:left; background:none; border:none; padding:8px 12px; cursor:pointer; color:var(--text-main); font-size:13px; display:flex; align-items:center; gap:8px;">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> Merge with...
-                </button>
-              </div>
-            </div>
           </div>
         </header>
-        <div id="merge-banner-container" style="display:none; padding: 12px 16px; background: var(--surface-2); border-bottom: 1px solid var(--line); font-size: 13px;"></div>
+
         <div style="display: flex; flex: 1; overflow: hidden; background: var(--bg-base);">
           <div style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
             <!-- Ticket Properties Bar: priority / assignee / tags, always visible so
@@ -514,12 +520,7 @@
           <div style="display: flex; flex-direction: column; gap: 24px;">
               <div class="activity-feed-panel">
                 <h3 style="margin: 0 0 16px 0;">Live Team Status</h3>
-                <div class="team-status-list" id="team-status-list" style="margin-bottom: 24px;"></div>
-                
-                <h3 style="margin: 0 0 16px 0;">Agent Workload</h3>
-                <div id="agent-chat-counts-list">
-                    <!-- Populated by JS -->
-                </div>
+                <div class="team-status-list" id="team-status-list"></div>
               </div>
               <div class="activity-feed-panel">
                 <h3 style="margin: 0 0 16px 0;">Today's Volume</h3>
@@ -580,13 +581,7 @@
         <div class="view-header">
           <h2>Analytics & Reporting</h2>
           <div class="header-actions">
-            <select id="analytics-date-range" class="form-select" onchange="loadAnalytics()" style="padding: 8px 12px; font-weight: 500; border-radius: 8px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--text-main);">
-                <option value="all">All time</option>
-                <option value="7d">Last 7 Days</option>
-                <option value="30d">Last 30 Days</option>
-                <option value="quarter">This Quarter</option>
-                <option value="ytd">Year to Date</option>
-            </select>
+            <span style="padding: 8px 12px; font-weight: 500;">All time</span>
             <!-- Download PDF intentionally left dead for this phase or hidden -->
             <button class="btn btn-secondary" style="display:none;">Download PDF</button>
           </div>
@@ -605,31 +600,6 @@
             </div>
           </div>
         </div>
-        <div class="analytics-grid" style="margin-top: 24px;">
-            <div class="chart-card">
-                <h3>Agent Leaderboard</h3>
-                <div style="overflow-x: auto;">
-                    <table style="width: 100%; border-collapse: collapse; text-align: left;">
-                        <thead>
-                            <tr style="border-bottom: 1px solid var(--line);">
-                                <th style="padding: 8px;">Agent</th>
-                                <th style="padding: 8px;">Resolved</th>
-                                <th style="padding: 8px;">Avg Time</th>
-                            </tr>
-                        </thead>
-                        <tbody id="analytics-leaderboard-body">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="chart-card">
-                <h3>Tag Breakdown</h3>
-                <div class="chart-container" style="position: relative; height: 300px; width: 100%; display: flex; justify-content: center; align-items: center;">
-                    <canvas id="tagsChart"></canvas>
-                </div>
-            </div>
-        </div>
         <div class="analytics-grid" style="margin-top: 24px; grid-template-columns: 1fr;">
             <div class="stats-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div class="stat-item">
@@ -647,15 +617,49 @@
                 <span class="stat-value" id="analytics-one-touch">—</span>
                 <!-- trend removed -->
                 </div>
-                <div class="stat-item">
-                <span class="stat-label">7-Day Rolling CSAT</span>
-                <span class="stat-value" id="analytics-rolling-csat">—</span>
+                <div class="stat-item" style="display:none;">
+                <span class="stat-label">Agent Utilization</span>
+                <span class="stat-value">74%</span>
+                <span class="trend trend-up">↑ 4% vs last period</span>
                 </div>
             </div>
         </div>
       </div>
     </div>
 
+  </div>
+
+  <!-- Developer Settings Modal -->
+  <div id="dev-settings-modal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 1000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
+    <div style="background: var(--bg-glass); border: 1px solid var(--line); border-radius: var(--radius-lg); width: 650px; max-width: 90vw; padding: 24px; box-shadow: var(--shadow-xl); color: var(--ink);">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); padding-bottom: 16px; margin-bottom: 16px;">
+        <h2 style="margin: 0; font-size: 1.25rem;">Developer Settings</h2>
+        <button id="dev-settings-close-btn" style="background: none; border: none; cursor: pointer; color: var(--ink-soft);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+      </div>
+      
+      <div style="margin-bottom: 24px;">
+        <p style="margin: 0 0 16px 0; color: var(--ink-soft); font-size: 0.9rem;">Manage API keys for programmatic access to the Public API. Keep your keys secure and do not share them publicly.</p>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="new-api-key-name" placeholder="Key Name (e.g., Zapier Integration)" style="flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg-body); color: var(--ink);">
+          <button id="create-api-key-btn" style="background: var(--accent-main); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500;">Generate Key</button>
+        </div>
+        <div id="new-api-key-result" style="display: none; margin-top: 12px; padding: 12px; background: var(--bg-body); border: 1px dashed var(--accent-main); border-radius: 6px;">
+          <div style="font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 4px;">Make sure to copy your API key now. You won't be able to see it again!</div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <code id="new-api-key-value" style="flex: 1; padding: 8px; background: var(--bg-base); border-radius: 4px; border: 1px solid var(--line); user-select: all; font-size: 0.9rem; word-break: break-all;"></code>
+            <button id="copy-api-key-btn" style="background: var(--bg-glass); border: 1px solid var(--line); padding: 8px; border-radius: 4px; cursor: pointer;" title="Copy">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <h3 style="margin: 0 0 12px 0; font-size: 1rem; color: var(--ink);">Active API Keys</h3>
+      <div id="api-keys-list" style="display: flex; flex-direction: column; gap: 12px; max-height: 250px; overflow-y: auto;">
+        <!-- API Keys will be loaded here -->
+        <div style="padding: 12px; text-align: center; color: var(--ink-soft); font-size: 0.9rem;">Loading API keys...</div>
+      </div>
+    </div>
   </div>
 
   <script src="/agent/agent.js?v=80"></script>

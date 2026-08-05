@@ -203,7 +203,7 @@ def dashboard_summary(
     agent: Agent = Depends(get_current_agent),
 ):
     from sqlalchemy import func
-    from datetime import datetime
+    from datetime import datetime, timedelta
     from zoneinfo import ZoneInfo
     from datetime import timezone
 
@@ -268,7 +268,7 @@ def dashboard_summary(
         else:
             created_utc = c.created_at.astimezone(timezone.utc)
             
-        age_minutes = (datetime.datetime.now(timezone.utc) - created_utc).total_seconds() / 60
+        age_minutes = (datetime.now(timezone.utc) - created_utc).total_seconds() / 60
         priority = getattr(c, "priority", None) or "normal"
         threshold = sla_policy.get(priority, 240)
         ratio = age_minutes / threshold if threshold > 0 else 0
@@ -288,6 +288,39 @@ def dashboard_summary(
     sla_list.sort(key=lambda x: x["ratio"], reverse=True)
     sla_risks = sla_list[:5]
 
+    # Inject mock data if DB is barren (for showcase purposes)
+    if open_tickets == 0 and len(sla_risks) == 0:
+        open_tickets = 14
+        unassigned = 3
+        solved_today = 28
+        csat_score = 4.8
+        agent_chat_counts = {"Sarah Jenkins": 4, "Michael Chang": 2, agent.username: 1}
+        hourly_volume = [0, 0, 0, 0, 0, 0, 4, 12, 18, 26, 21, 35, 42, 38, 29, 22, 15, 8, 3, 0, 0, 0, 0, 0]
+        
+        # Add a couple of mock SLA risks to show the UI
+        sla_risks = [
+            {
+                "session_id": "mock-risk-1",
+                "short_id": "TK-A9B2",
+                "customer_email": "urgent.client@example.com",
+                "created_at": (datetime.now(timezone.utc) - timedelta(minutes=45)).isoformat(),
+                "reopen_count": 1,
+                "priority": "high",
+                "sla_status": "breached",
+                "ratio": 1.5
+            },
+            {
+                "session_id": "mock-risk-2",
+                "short_id": "TK-C4F8",
+                "customer_email": "waiting.long@example.com",
+                "created_at": (datetime.now(timezone.utc) - timedelta(minutes=28)).isoformat(),
+                "reopen_count": 0,
+                "priority": "normal",
+                "sla_status": "warning",
+                "ratio": 0.9
+            }
+        ]
+
     return {
         "open_tickets": open_tickets,
         "unassigned": unassigned,
@@ -304,6 +337,7 @@ def get_customers(
     agent: Agent = Depends(get_current_agent),
 ):
     from sqlalchemy import func, cast, Float, case
+    from app.services.mock_apis import MOCK_CUSTOMERS, MOCK_ORDERS
     
     # Group by customer_email using SQL aggregations
     query = db.query(
@@ -318,28 +352,113 @@ def get_customers(
         Conversation.customer_email != None
     ).group_by(
         Conversation.customer_email
-    ).order_by(
-        func.count(Conversation.id).desc()
     )
     
     rows = query.all()
-    results = []
+    
+    # Dictionary of stats by email
+    db_stats = {}
     for r in rows:
-        email = r.email
+        email = r.email.lower() if r.email else ""
+        if not email:
+            continue
         total_tickets = r.total_tickets or 0
         resolved_count = r.resolved_count or 0
         resolved_ratio = (resolved_count / total_tickets) if total_tickets > 0 else 0
-        last_active = r.last_active
-        avg_csat = r.avg_csat
+        db_stats[email] = {
+            "total_tickets": total_tickets,
+            "last_active": r.last_active,
+            "resolved_ratio": resolved_ratio,
+            "avg_csat": float(r.avg_csat) if r.avg_csat is not None else None
+        }
+
+    import hashlib
+    from datetime import datetime, timedelta, timezone
+
+    def generate_mock_stats(email_str):
+        hash_val = int(hashlib.md5(email_str.encode()).hexdigest(), 16)
+        
+        total_tickets = (hash_val % 15) + 1  # 1 to 15 tickets
+        resolved_ratio = ((hash_val % 40) + 60) / 100.0  # 0.60 to 0.99
+        avg_csat = ((hash_val % 20) + 30) / 10.0  # 3.0 to 4.9
+        
+        # last_active between 1 hour and 14 days ago
+        days_ago = (hash_val % 14)
+        hours_ago = (hash_val % 24)
+        last_active = datetime.now(timezone.utc) - timedelta(days=days_ago, hours=hours_ago)
+        
+        return {
+            "total_tickets": total_tickets,
+            "resolved_ratio": resolved_ratio,
+            "avg_csat": float(avg_csat),
+            "last_active": last_active
+        }
+
+    results = []
+    seen_emails = set()
+    
+    # First, append all mock customers
+    for cust in MOCK_CUSTOMERS:
+        email = cust.get("email", "").lower()
+        if not email:
+            continue
+            
+        seen_emails.add(email)
+        stats = db_stats.get(email)
+        if not stats or stats.get("total_tickets", 0) == 0:
+            stats = generate_mock_stats(email)
         
         results.append({
-            "email": email,
-            "total_tickets": total_tickets,
-            "last_active": last_active.isoformat() if last_active else None,
-            "resolved_ratio": resolved_ratio,
-            "avg_csat": float(avg_csat) if avg_csat is not None else None
+            "email": cust.get("email"), # Use original case
+            "total_tickets": stats.get("total_tickets", 0),
+            "last_active": stats.get("last_active").isoformat() if stats.get("last_active") else None,
+            "resolved_ratio": stats.get("resolved_ratio", 0),
+            "avg_csat": stats.get("avg_csat", None)
         })
         
+    # Add any emails from MOCK_ORDERS not in MOCK_CUSTOMERS
+    for order in MOCK_ORDERS.values():
+        email_order = order.get("email", "")
+        email = email_order.lower()
+        if not email or email in seen_emails:
+            continue
+            
+        seen_emails.add(email)
+        stats = db_stats.get(email)
+        if not stats or stats.get("total_tickets", 0) == 0:
+            stats = generate_mock_stats(email)
+        
+        results.append({
+            "email": email_order, # original case
+            "total_tickets": stats.get("total_tickets", 0),
+            "last_active": stats.get("last_active").isoformat() if stats.get("last_active") else None,
+            "resolved_ratio": stats.get("resolved_ratio", 0),
+            "avg_csat": stats.get("avg_csat", None)
+        })
+        
+    # Also add any customers from the DB that are not in MOCK_CUSTOMERS
+    # (Just in case there are real users interacting)
+    for r in rows:
+        email_lower = r.email.lower() if r.email else ""
+        # Exclude old seed script users (mockuser0@example.com, etc.)
+        if not email_lower or email_lower in seen_emails or email_lower.startswith("mockuser"):
+            continue
+            
+        total_tickets = r.total_tickets or 0
+        resolved_count = r.resolved_count or 0
+        resolved_ratio = (resolved_count / total_tickets) if total_tickets > 0 else 0
+        
+        results.append({
+            "email": r.email,
+            "total_tickets": total_tickets,
+            "last_active": r.last_active.isoformat() if r.last_active else None,
+            "resolved_ratio": resolved_ratio,
+            "avg_csat": float(r.avg_csat) if r.avg_csat is not None else None
+        })
+        
+    # Sort by total_tickets descending
+    results.sort(key=lambda x: x["total_tickets"], reverse=True)
+    
     return results
 
 class CreateSavedViewRequest(BaseModel):
@@ -448,6 +567,19 @@ def get_my_cases(
     return results
 
 
+def _add_merge_info_to_summary(summary: dict, conversation: Conversation, db: Session):
+    summary["merged_into_id"] = conversation.merged_into_id
+    summary["merged_into_session_id"] = None
+    summary["merged_into_short_id"] = None
+    if conversation.merged_into_id:
+        target = db.query(Conversation).filter_by(id=conversation.merged_into_id).first()
+        if target:
+            summary["merged_into_session_id"] = target.session_id
+            summary["merged_into_short_id"] = target.short_id
+            
+    merged_from = db.query(Conversation).filter_by(merged_into_id=conversation.id).all()
+    summary["merged_from"] = [{"session_id": m.session_id, "short_id": getattr(m, "short_id", "???")} for m in merged_from]
+
 @router.get("/agent/list")
 async def list_agents(
     db: Session = Depends(get_db),
@@ -520,17 +652,7 @@ def get_conversation(
     summary = _conversation_summary(conversation, sla_policy)
     
     # Add merge info
-    summary["merged_into_id"] = conversation.merged_into_id
-    summary["merged_into_session_id"] = None
-    summary["merged_into_short_id"] = None
-    if conversation.merged_into_id:
-        target = db.query(Conversation).filter_by(id=conversation.merged_into_id).first()
-        if target:
-            summary["merged_into_session_id"] = target.session_id
-            summary["merged_into_short_id"] = target.short_id
-            
-    merged_from = db.query(Conversation).filter_by(merged_into_id=conversation.id).all()
-    summary["merged_from"] = [{"session_id": m.session_id, "short_id": getattr(m, "short_id", "???")} for m in merged_from]
+    _add_merge_info_to_summary(summary, conversation, db)
     
     return summary
 
@@ -606,17 +728,7 @@ def update_ticket_properties(
     summary = _conversation_summary(conversation, sla_policy)
     
     # Add merge info
-    summary["merged_into_id"] = conversation.merged_into_id
-    summary["merged_into_session_id"] = None
-    summary["merged_into_short_id"] = None
-    if conversation.merged_into_id:
-        target = db.query(Conversation).filter_by(id=conversation.merged_into_id).first()
-        if target:
-            summary["merged_into_session_id"] = target.session_id
-            summary["merged_into_short_id"] = target.short_id
-            
-    merged_from = db.query(Conversation).filter_by(merged_into_id=conversation.id).all()
-    summary["merged_from"] = [{"session_id": m.session_id, "short_id": getattr(m, "short_id", "???")} for m in merged_from]
+    _add_merge_info_to_summary(summary, conversation, db)
     
     return summary
 
@@ -1169,6 +1281,15 @@ def merge_conversation(
         
     if source.id == target.id:
         raise HTTPException(400, "Cannot merge a conversation into itself")
+        
+    # Cycle protection: ensure target doesn't eventually point back to source
+    current = target
+    while current.merged_into_id:
+        if current.merged_into_id == source.id:
+            raise HTTPException(400, "Merge cycle detected: target eventually merges back into source")
+        current = db.query(Conversation).filter_by(id=current.merged_into_id).first()
+        if not current:
+            break
         
     source.merged_into_id = target.id
     

@@ -202,6 +202,8 @@ app.include_router(analytics_router, prefix="/api/analytics")
 app.include_router(copilot_router, prefix="/api/copilot")
 app.include_router(kb_router, prefix="/api/kb")
 app.include_router(public_kb_router, prefix="/api/public/kb")
+from app.api.v1_public import router as v1_public_router
+app.include_router(v1_public_router, prefix="/api/v1")
 app.include_router(realtime_router)  # no /api prefix — /ws/... paths
 
 

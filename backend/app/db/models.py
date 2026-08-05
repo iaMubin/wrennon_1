@@ -17,7 +17,7 @@ from __future__ import annotations
 import datetime
 import uuid
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -153,7 +153,7 @@ class Agent(Base):
         if not perms:
             # Fallback for backwards compatibility with existing rows that haven't been updated
             if self.role == "manager":
-                perms = ["manage_agents", "manage_managers", "view_analytics", "manage_canned_responses"]
+                perms = ["manage_agents", "manage_managers", "view_analytics", "manage_canned_responses", "manage_api_keys"]
             else:
                 perms = []
                 
@@ -261,3 +261,16 @@ class SavedView(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
     )
+
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+    
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    key_hash: Mapped[str] = mapped_column(String, nullable=False)
+    prefix: Mapped[str] = mapped_column(String, nullable=False)  # Store prefix (e.g. wk_live_abcd...) to identify the key
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_used_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by_username: Mapped[str] = mapped_column(String, ForeignKey("agents.username"))

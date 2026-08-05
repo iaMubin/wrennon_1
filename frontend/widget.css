@@ -408,3 +408,130 @@
   padding: 4px;
 }
 .remove-attachment-btn:hover { color: var(--text); }
+
+/* --- Crisp Theme Overrides --- */
+.theme-crisp #launcher {
+  background: #1b74e4;
+}
+.theme-crisp .chat-card {
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  background: #fff;
+  border: 1px solid #e5e7eb;
+}
+.theme-crisp .crisp-head {
+  background: #1b74e4;
+  flex-direction: column;
+  padding: 0;
+  color: #fff;
+  border-bottom: none;
+}
+.theme-crisp .crisp-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px 16px 0;
+}
+.theme-crisp .crisp-tab {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.7);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 20px 20px 0 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+.theme-crisp .crisp-tab:hover {
+  color: #fff;
+}
+.theme-crisp .crisp-tab.active {
+  background: #fff;
+  color: #1b74e4;
+}
+.theme-crisp .crisp-profile {
+  padding: 16px;
+  text-align: center;
+  position: relative;
+}
+.theme-crisp .crisp-avatar-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #fff;
+  margin: 0 auto 8px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.theme-crisp .crisp-status-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background: #10b981;
+  border: 2px solid #1b74e4;
+  border-radius: 50%;
+}
+.theme-crisp .crisp-name {
+  font-weight: 600;
+  font-size: 16px;
+}
+.theme-crisp .crisp-connect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  margin-top: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.theme-crisp .crisp-connect-btn:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+.theme-crisp .chat-body {
+  background: #f9fafb;
+}
+.theme-crisp .bubble {
+  border-radius: 18px;
+  padding: 12px 16px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.theme-crisp .bubble-user {
+  background: #1b74e4;
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.theme-crisp .bubble-agent, .theme-crisp .bubble-bot {
+  background: #fff;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  border-bottom-left-radius: 4px;
+}
+.theme-crisp .chat-input {
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  padding: 12px 16px;
+}
+.theme-crisp .chat-send {
+  color: #1b74e4;
+}
+.theme-crisp .chat-send:hover {
+  color: #155bb5;
+}
+.theme-crisp .date-separator {
+  color: #9ca3af;
+  font-size: 11px;
+}

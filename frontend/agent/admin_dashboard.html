@@ -92,6 +92,7 @@
                             <div class="theme-tabs">
                                 <button class="theme-tab active" data-target="admin-light-themes">Light</button>
                                 <button class="theme-tab" data-target="admin-dark-themes">Dark</button>
+                                <button class="theme-tab" data-target="admin-widget-themes">Widget</button>
                             </div>
                             <div id="admin-light-themes" class="theme-tab-content active">
                                 <button class="theme-option" data-theme-value="light-brownish" role="menuitem">Brownish White</button>
@@ -107,6 +108,10 @@
                                 <button class="theme-option" data-theme-value="dark-corporate-blue" role="menuitem">Corporate Blue</button>
                                 <button class="theme-option" data-theme-value="dark-slate-teal" role="menuitem">Slate Teal</button>
                                 <button class="theme-option" data-theme-value="dark-graphite" role="menuitem">Graphite Monochrome</button>
+                            </div>
+                            <div id="admin-widget-themes" class="theme-tab-content hidden">
+                                <button class="theme-option" data-theme-value="widget-default" role="menuitem">Default Style</button>
+                                <button class="theme-option" data-theme-value="widget-crisp" role="menuitem">Crisp Style</button>
                             </div>
                         </div>
                     </div>
@@ -971,17 +976,25 @@
             const btnBackAppearance = document.getElementById("btn-back-appearance");
 
             function applyTheme(themeValue) {
-                localStorage.setItem("wrennon_theme", themeValue);
-                if (themeValue === "system") {
-                    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    document.documentElement.setAttribute("data-theme", isDark ? "dark-matte" : "light-offwhite");
+                if (themeValue.startsWith("widget-")) {
+                    localStorage.setItem("wrennon_widget_theme", themeValue);
                 } else {
-                    document.documentElement.setAttribute("data-theme", themeValue);
+                    localStorage.setItem("wrennon_theme", themeValue);
+                    if (themeValue === "system") {
+                        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                        document.documentElement.setAttribute("data-theme", isDark ? "dark-matte" : "light-offwhite");
+                    } else {
+                        document.documentElement.setAttribute("data-theme", themeValue);
+                    }
                 }
 
                 options.forEach(opt => {
                     if (opt.dataset.themeValue) {
-                        opt.classList.toggle("active", opt.dataset.themeValue === themeValue);
+                        const isWidgetOpt = opt.dataset.themeValue.startsWith("widget-");
+                        const isWidgetTheme = themeValue.startsWith("widget-");
+                        if (isWidgetOpt === isWidgetTheme) {
+                            opt.classList.toggle("active", opt.dataset.themeValue === themeValue);
+                        }
                     }
                 });
             }
@@ -1045,7 +1058,9 @@
             });
 
             const currentTheme = localStorage.getItem("wrennon_theme") || "system";
+            const currentWidgetTheme = localStorage.getItem("wrennon_widget_theme") || "widget-default";
             applyTheme(currentTheme);
+            applyTheme(currentWidgetTheme);
 
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
                 if (localStorage.getItem("wrennon_theme") === "system") {

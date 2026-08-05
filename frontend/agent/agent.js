@@ -89,17 +89,25 @@ function setupThemeDropdown() {
   const btnBackAppearance = document.getElementById("btn-back-appearance");
 
   function applyTheme(themeValue) {
-    localStorage.setItem("wrennon_theme", themeValue);
-    if (themeValue === "system") {
-      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      document.documentElement.setAttribute("data-theme", isDark ? "dark-matte" : "light-offwhite");
+    if (themeValue.startsWith("widget-")) {
+      localStorage.setItem("wrennon_widget_theme", themeValue);
     } else {
-      document.documentElement.setAttribute("data-theme", themeValue);
+      localStorage.setItem("wrennon_theme", themeValue);
+      if (themeValue === "system") {
+        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute("data-theme", isDark ? "dark-matte" : "light-offwhite");
+      } else {
+        document.documentElement.setAttribute("data-theme", themeValue);
+      }
     }
     
     options.forEach(opt => {
       if (opt.dataset.themeValue) {
-        opt.classList.toggle("active", opt.dataset.themeValue === themeValue);
+        const isWidgetOpt = opt.dataset.themeValue.startsWith("widget-");
+        const isWidgetTheme = themeValue.startsWith("widget-");
+        if (isWidgetOpt === isWidgetTheme) {
+          opt.classList.toggle("active", opt.dataset.themeValue === themeValue);
+        }
       }
     });
   }
@@ -163,11 +171,13 @@ function setupThemeDropdown() {
   });
 
   const currentTheme = localStorage.getItem("wrennon_theme") || "system";
+  const currentWidgetTheme = localStorage.getItem("wrennon_widget_theme") || "widget-default";
   applyTheme(currentTheme);
+  applyTheme(currentWidgetTheme);
 
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
     if (localStorage.getItem("wrennon_theme") === "system") {
-      document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", e.matches ? "dark-matte" : "light-offwhite");
     }
   });
 }
@@ -626,7 +636,7 @@ function renderConversationList(conversations) {
     item.innerHTML = `
       <div class="conv-item-header" style="display: flex; justify-content: space-between;">
         <div style="display: flex; gap: 10px; align-items: center; overflow: hidden;">
-            <input type="checkbox" class="conv-checkbox" data-session-id="${conv.session_id}" onclick="event.stopPropagation(); toggleBulkSelection(this, '${conv.session_id}')" style="cursor: pointer; flex-shrink: 0; display: none;">
+            <input type="checkbox" class="conv-checkbox" data-session-id="${conv.session_id}" onclick="event.stopPropagation(); toggleBulkSelection(this, '${conv.session_id}')" style="cursor: pointer; flex-shrink: 0;">
             <span class="conv-item-email" style="display:flex; align-items:center; gap:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size: 14px; font-weight: 500;">
                 ${avatarHtml}
                 <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(customerDisplayName)}</span>
@@ -654,8 +664,10 @@ function renderConversationList(conversations) {
 
 // --- Opening and viewing a conversation ---
 async function fetchAndRenderMessages(sessionId) {
+  console.log("[DEBUG] fetchAndRenderMessages called for:", sessionId);
   const responseData = await authedFetch(`/agent/conversations/${sessionId}/messages`);
-  if (sessionId !== activeSessionId) return null; // agent switched conversations while this was in flight
+  console.log("[DEBUG] responseData:", responseData);
+  if (sessionId !== activeSessionId) { console.log("[DEBUG] session changed, aborting"); return null; }
 
   agentMessages.innerHTML = "";
   lastMsgSender = null;
@@ -664,10 +676,12 @@ async function fetchAndRenderMessages(sessionId) {
 
   if (responseData) {
     const messages = responseData.messages || [];
+    console.log("[DEBUG] messages count:", messages.length);
     const pinnedMessages = messages.filter(m => m.is_pinned);
 
     let lastDateStr = null;
     for (const msg of messages) {
+      console.log("[DEBUG] rendering msg:", msg.sender, msg.content?.substring(0, 30));
       const dateObj = new Date(msg.created_at);
       const dateStr = dateObj.toLocaleDateString();
       if (dateStr !== lastDateStr) {
@@ -690,6 +704,8 @@ async function fetchAndRenderMessages(sessionId) {
     }
 
     updatePinnedMessageUI(pinnedMessages);
+  } else {
+    console.log("[DEBUG] responseData is null/falsy - auth failed or network error");
   }
   return responseData;
 }
@@ -2828,12 +2844,34 @@ document.addEventListener("DOMContentLoaded", () => {
   const mobileToggle = document.getElementById("mobile-sidebar-toggle");
   const sidebar = document.getElementById("sidebar");
   if (mobileToggle && sidebar) {
+    function updateSidebarToggleIcon() {
+      let isOpen = false;
+      if (window.innerWidth <= 800) {
+        isOpen = sidebar.classList.contains("sidebar-open");
+      } else {
+        isOpen = !sidebar.classList.contains("sidebar-hidden");
+      }
+      
+      if (isOpen) {
+        mobileToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><path d="M9 3v18"></path><path d="m16 15-3-3 3-3"></path></svg>';
+        mobileToggle.setAttribute("title", "Close Sidebar");
+        mobileToggle.setAttribute("aria-label", "Close Sidebar");
+        mobileToggle.classList.add("sidebar-is-open");
+      } else {
+        mobileToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><path d="M9 3v18"></path><path d="m14 9 3 3-3 3"></path></svg>';
+        mobileToggle.setAttribute("title", "Open Sidebar");
+        mobileToggle.setAttribute("aria-label", "Open Sidebar");
+        mobileToggle.classList.remove("sidebar-is-open");
+      }
+    }
+
     mobileToggle.addEventListener("click", () => {
       if (window.innerWidth <= 800) {
         sidebar.classList.toggle("sidebar-open");
       } else {
         sidebar.classList.toggle("sidebar-hidden");
       }
+      updateSidebarToggleIcon();
     });
     
     // Auto-close sidebar on mobile when a conversation is selected
@@ -2841,9 +2879,13 @@ document.addEventListener("DOMContentLoaded", () => {
     window.openConversation = async function(...args) {
       if (window.innerWidth <= 800) {
         sidebar.classList.remove("sidebar-open");
+        updateSidebarToggleIcon();
       }
       return originalOpenConv.apply(this, args);
     };
+
+    updateSidebarToggleIcon();
+    window.addEventListener("resize", updateSidebarToggleIcon);
   }
 });
 
@@ -2907,6 +2949,8 @@ function renderSavedViews() {
            document.getElementById("filter-tag").value = filterObj.tag || "";
            loadConversations();
            document.getElementById("clear-filters-btn").style.display = "inline-block";
+           const badge = document.getElementById("filter-active-badge");
+           if (badge) badge.style.display = "block";
         };
         const delBtn = document.createElement("span");
         delBtn.innerHTML = "&times;";
@@ -2968,22 +3012,26 @@ if (globalFilterBtn && globalFilterDropdown) {
   });
 }
 
-const globalBulkSelectBtn = document.getElementById("global-bulk-select-btn");
-if (globalBulkSelectBtn) {
-  globalBulkSelectBtn.addEventListener("click", () => {
+const menuBulkSelectBtn = document.getElementById("menu-bulk-select-btn");
+if (menuBulkSelectBtn) {
+  menuBulkSelectBtn.addEventListener("click", () => {
     const sidebar = document.getElementById("sidebar");
-    const isActive = sidebar.classList.toggle("bulk-mode-active");
-    globalBulkSelectBtn.classList.toggle("active", isActive);
-    if (!isActive) {
-      document.querySelectorAll(".conv-checkbox").forEach(cb => cb.checked = false);
-      selectedConversations.clear();
-      updateBulkActionBar();
+    sidebar.classList.add("bulk-mode-active");
+    const themeDropdown = document.getElementById("theme-dropdown");
+    if (themeDropdown) {
+      themeDropdown.classList.add("hidden");
     }
   });
 }
 
 document.getElementById("apply-filters-btn")?.addEventListener("click", () => {
-  document.getElementById("clear-filters-btn").style.display = "inline-block";
+  const pri = document.getElementById("filter-priority").value;
+  const ass = document.getElementById("filter-assignee").value;
+  const tag = document.getElementById("filter-tag").value;
+  const hasFilters = pri || ass || tag;
+  document.getElementById("clear-filters-btn").style.display = hasFilters ? "inline-block" : "none";
+  const badge = document.getElementById("filter-active-badge");
+  if (badge) badge.style.display = hasFilters ? "block" : "none";
   loadConversations();
 });
 document.getElementById("clear-filters-btn")?.addEventListener("click", () => {
@@ -2991,6 +3039,8 @@ document.getElementById("clear-filters-btn")?.addEventListener("click", () => {
   document.getElementById("filter-assignee").value = "";
   document.getElementById("filter-tag").value = "";
   document.getElementById("clear-filters-btn").style.display = "none";
+  const badge = document.getElementById("filter-active-badge");
+  if (badge) badge.style.display = "none";
   loadConversations();
 });
 loadSavedViews();
@@ -3000,20 +3050,28 @@ const selectedConversations = new Set();
 function toggleBulkSelection(cb, sessionId) {
     if (cb.checked) {
         selectedConversations.add(sessionId);
+        document.getElementById("sidebar").classList.add("bulk-mode-active");
     } else {
         selectedConversations.delete(sessionId);
+        if (selectedConversations.size === 0) {
+            document.getElementById("sidebar").classList.remove("bulk-mode-active");
+        }
     }
     updateBulkActionBar();
 }
 
 function updateBulkActionBar() {
-    const bar = document.getElementById("bulk-actions-bar");
-    if (!bar) return;
-    if (selectedConversations.size > 0) {
-        bar.style.display = "flex";
-        document.getElementById("bulk-selected-count").textContent = selectedConversations.size;
-    } else {
-        bar.style.display = "none";
+    const selectAllCheckbox = document.getElementById("bulk-select-all-checkbox");
+    const countSpan = document.getElementById("bulk-selected-count");
+    if (countSpan) countSpan.textContent = selectedConversations.size;
+    
+    if (selectAllCheckbox) {
+        const visibleCheckboxes = document.querySelectorAll(".conv-checkbox");
+        const allChecked = visibleCheckboxes.length > 0 && Array.from(visibleCheckboxes).every(cb => cb.checked);
+        selectAllCheckbox.checked = allChecked;
+    }
+
+    if (selectedConversations.size === 0) {
         document.getElementById("bulk-action-value-container").style.display = "none";
         document.getElementById("bulk-action-select").value = "";
     }
@@ -3022,6 +3080,33 @@ function updateBulkActionBar() {
 document.getElementById("bulk-cancel-btn")?.addEventListener("click", () => {
     selectedConversations.clear();
     document.querySelectorAll(".conv-checkbox").forEach(cb => cb.checked = false);
+    document.getElementById("sidebar").classList.remove("bulk-mode-active");
+    updateBulkActionBar();
+});
+
+document.getElementById("bulk-select-header-cancel")?.addEventListener("click", () => {
+    selectedConversations.clear();
+    document.querySelectorAll(".conv-checkbox").forEach(cb => cb.checked = false);
+    document.getElementById("sidebar").classList.remove("bulk-mode-active");
+    updateBulkActionBar();
+});
+
+document.getElementById("bulk-select-all-checkbox")?.addEventListener("change", (e) => {
+    const isChecked = e.target.checked;
+    document.querySelectorAll(".conv-checkbox").forEach(cb => {
+        cb.checked = isChecked;
+        const sessionId = cb.getAttribute("data-session-id");
+        if (isChecked) {
+            selectedConversations.add(sessionId);
+        } else {
+            selectedConversations.delete(sessionId);
+        }
+    });
+    if (selectedConversations.size === 0 && !isChecked) {
+        document.getElementById("sidebar").classList.remove("bulk-mode-active");
+    } else {
+        document.getElementById("sidebar").classList.add("bulk-mode-active");
+    }
     updateBulkActionBar();
 });
 
@@ -3052,18 +3137,16 @@ document.getElementById("bulk-apply-btn")?.addEventListener("click", async () =>
     if (!action) return;
     const val = document.getElementById("bulk-action-value-select").value;
     
-    let updates = {};
-    if (action === "resolve") updates.resolved = true;
-    if (action === "assign") updates.handled_by = val || null;
-    if (action === "priority") updates.priority = val;
-    
     const session_ids = Array.from(selectedConversations);
     try {
         const response = await fetch(`${API_BASE}/agent/conversations/bulk`, {
             method: "PATCH",
             credentials: "include",
-            headers: { "Content-Type": "application/json", ...authHeaders },
-            body: JSON.stringify({ session_ids, updates })
+            headers: { 
+                "Content-Type": "application/json",
+                "X-Wrennon-Client": "agent-dashboard"
+            },
+            body: JSON.stringify({ session_ids, action: action, value: val })
         });
         if (response.ok) {
             selectedConversations.clear();
@@ -3079,7 +3162,8 @@ document.getElementById("bulk-apply-btn")?.addEventListener("click", async () =>
             alert("Bulk action failed: " + (err.detail || ""));
         }
     } catch (e) {
-        alert("Network error");
+        console.error("Bulk apply fetch error:", e);
+        alert("Network error: " + e.message);
     }
 });
 
@@ -3416,21 +3500,21 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Resolution Chart (Analytics)
-        const ctxRes = document.getElementById('resolutionChart');
-        if(ctxRes && !resolutionChart) {
-            resolutionChart = new Chart(ctxRes, {
+        // Tags Chart (Analytics)
+        const ctxTags = document.getElementById('tagsChart');
+        if(ctxTags && !window.tagsChart) {
+            window.tagsChart = new Chart(ctxTags, {
                 type: 'bar',
                 data: {
-                    labels: ['Email', 'Chat', 'Social', 'Phone'],
+                    labels: [],
                     datasets: [{
-                        label: 'Avg Hours',
-                        data: [12, 1.5, 4, 0.5],
+                        label: 'Count',
+                        data: [],
                         backgroundColor: accentColor,
                         borderRadius: 4
                     }]
                 },
-                options: commonOptions
+                options: { ...commonOptions, indexAxis: 'y' }
             });
         }
     }
@@ -3513,8 +3597,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         tbody.innerHTML = sorted.map(c => {
-            const initial = c.email ? c.email.charAt(0).toUpperCase() : '?';
-            const color = c.email ? stringToColor(c.email) : '#94a3b8';
+            const avatarUrl = c.email ? `https://i.pravatar.cc/150?u=${encodeURIComponent(c.email)}` : '/agent/images/default-avatar.png?v=2';
             const resRatio = c.resolved_ratio != null ? (c.resolved_ratio * 100).toFixed(0) + '%' : '—';
             const avgCsat = c.avg_csat != null ? c.avg_csat.toFixed(1) + ' ★' : '—';
             const lastActive = formatAgo(c.last_active);
@@ -3523,7 +3606,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <tr>
                 <td>
                     <div class="customer-cell">
-                    <div class="avatar" style="background: ${color};">${initial}</div>
+                    <img src="${avatarUrl}" class="avatar" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-light);" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">
                     <div>
                         <div class="name">${escapeHtml(c.email || 'Unknown')}</div>
                         <div class="email">${escapeHtml(c.email || 'Unknown')}</div>
@@ -3685,4 +3768,180 @@ document.addEventListener('DOMContentLoaded', () => {
           }
       });
   }
+});
+
+// ==========================================
+// DEVELOPER SETTINGS (API KEYS)
+// ==========================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    const devSettingsBtn = document.getElementById('dev-settings-btn');
+    const devSettingsModal = document.getElementById('dev-settings-modal');
+    const devSettingsCloseBtn = document.getElementById('dev-settings-close-btn');
+    const apiKeysList = document.getElementById('api-keys-list');
+    const createApiKeyBtn = document.getElementById('create-api-key-btn');
+    const newApiKeyName = document.getElementById('new-api-key-name');
+    const newApiKeyResult = document.getElementById('new-api-key-result');
+    const newApiKeyValue = document.getElementById('new-api-key-value');
+    const copyApiKeyBtn = document.getElementById('copy-api-key-btn');
+
+    if (!devSettingsBtn || !devSettingsModal) return;
+
+    devSettingsBtn.addEventListener('click', () => {
+        // Hide theme dropdown if open
+        const themeDropdown = document.getElementById('theme-dropdown');
+        if (themeDropdown) themeDropdown.classList.add('hidden');
+        
+        devSettingsModal.style.display = 'flex';
+        loadApiKeys();
+        
+        // Reset new key result state
+        newApiKeyName.value = '';
+        newApiKeyResult.style.display = 'none';
+    });
+
+    devSettingsCloseBtn.addEventListener('click', () => {
+        devSettingsModal.style.display = 'none';
+    });
+
+    // Close on click outside
+    devSettingsModal.addEventListener('click', (e) => {
+        if (e.target === devSettingsModal) {
+            devSettingsModal.style.display = 'none';
+        }
+    });
+
+    async function loadApiKeys() {
+        try {
+            apiKeysList.innerHTML = '<div style="padding: 12px; text-align: center; color: var(--ink-soft); font-size: 0.9rem;">Loading API keys...</div>';
+            
+            const response = await fetch(`${API_BASE}/agent/api-keys`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            
+            if (!response.ok) {
+                if (response.status === 403) {
+                    apiKeysList.innerHTML = '<div style="padding: 12px; text-align: center; color: var(--danger); font-size: 0.9rem;">You do not have permission to manage API keys.</div>';
+                    return;
+                }
+                throw new Error('Failed to load API keys');
+            }
+            
+            const keys = await response.json();
+            
+            if (keys.length === 0) {
+                apiKeysList.innerHTML = '<div style="padding: 12px; text-align: center; color: var(--ink-soft); font-size: 0.9rem;">No API keys generated yet.</div>';
+                return;
+            }
+            
+            apiKeysList.innerHTML = '';
+            keys.forEach(key => {
+                const el = document.createElement('div');
+                el.style.display = 'flex';
+                el.style.justifyContent = 'space-between';
+                el.style.alignItems = 'center';
+                el.style.padding = '12px';
+                el.style.background = 'var(--bg-body)';
+                el.style.border = '1px solid var(--line)';
+                el.style.borderRadius = '6px';
+                
+                const createdDate = new Date(key.created_at).toLocaleDateString();
+                
+                el.innerHTML = `
+                    <div>
+                        <div style="font-weight: 600; font-size: 0.95rem; color: var(--ink);">${escapeHtml(key.name)}</div>
+                        <div style="font-size: 0.8rem; color: var(--ink-soft); margin-top: 4px;">Created: ${createdDate}</div>
+                    </div>
+                    <button class="revoke-key-btn" data-id="${key.id}" style="background: none; border: 1px solid var(--danger); color: var(--danger); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Revoke</button>
+                `;
+                apiKeysList.appendChild(el);
+            });
+            
+            // Bind revoke buttons
+            document.querySelectorAll('.revoke-key-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    if (!confirm('Are you sure you want to revoke this API key? It will immediately stop working.')) return;
+                    
+                    const id = e.target.getAttribute('data-id');
+                    try {
+                        const res = await fetch(`${API_BASE}/agent/api-keys/${id}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                        });
+                        
+                        if (res.ok) {
+                            loadApiKeys();
+                        } else {
+                            alert('Failed to revoke API key');
+                        }
+                    } catch (err) {
+                        console.error('Error revoking API key:', err);
+                        alert('Error revoking API key');
+                    }
+                });
+            });
+        } catch (err) {
+            console.error('Error loading API keys:', err);
+            apiKeysList.innerHTML = '<div style="padding: 12px; text-align: center; color: var(--danger); font-size: 0.9rem;">Failed to load API keys.</div>';
+        }
+    }
+
+    createApiKeyBtn.addEventListener('click', async () => {
+        const name = newApiKeyName.value.trim();
+        if (!name) {
+            alert('Please enter a name for the API key');
+            return;
+        }
+        
+        try {
+            createApiKeyBtn.disabled = true;
+            createApiKeyBtn.textContent = 'Generating...';
+            
+            const response = await fetch(`${API_BASE}/agent/api-keys`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ name })
+            });
+            
+            if (!response.ok) {
+                if (response.status === 403) {
+                    alert('You do not have permission to manage API keys.');
+                } else {
+                    alert('Failed to generate API key');
+                }
+                return;
+            }
+            
+            const result = await response.json();
+            
+            // Show result
+            newApiKeyValue.textContent = result.raw_key;
+            newApiKeyResult.style.display = 'block';
+            newApiKeyName.value = '';
+            
+            // Reload list
+            loadApiKeys();
+            
+        } catch (err) {
+            console.error('Error generating API key:', err);
+            alert('Error generating API key');
+        } finally {
+            createApiKeyBtn.disabled = false;
+            createApiKeyBtn.textContent = 'Generate Key';
+        }
+    });
+
+    copyApiKeyBtn.addEventListener('click', () => {
+        const key = newApiKeyValue.textContent;
+        navigator.clipboard.writeText(key).then(() => {
+            const originalIcon = copyApiKeyBtn.innerHTML;
+            copyApiKeyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--success);"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+            setTimeout(() => {
+                copyApiKeyBtn.innerHTML = originalIcon;
+            }, 2000);
+        });
+    });
 });
