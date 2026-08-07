@@ -3670,12 +3670,42 @@ th.sort-desc .sort-icon::after {
 }
 
 .filter-select {
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: 1px solid var(--line);
+    padding: 10px 36px 10px 16px;
+    border-radius: 10px;
+    border: 1.5px solid color-mix(in srgb, var(--line) 80%, var(--accent));
     background: var(--bg-surface);
     color: var(--ink);
+    font-family: var(--font-body);
+    font-weight: 600;
     font-size: 14px;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url('data:image/svg+xml;utf8,<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>');
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.filter-select:hover {
+    border-color: var(--accent);
+    background-color: var(--bg-hover);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.filter-select option {
+    background: var(--bg-surface);
+    color: var(--ink);
+    font-weight: 500;
+    padding: 12px;
 }
 .btn-icon {
     background: none;
@@ -3689,3 +3719,150 @@ th.sort-desc .sort-icon::after {
     background: var(--line);
     color: var(--ink);
 }
+
+/* ============================================================
+   Admin Layout Re-implementations for Analytics
+   ============================================================ */
+
+.section-block {
+  margin-top: 18px;
+  background: var(--bg-surface);
+  padding: 28px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12), 0 8px 20px rgba(0, 0, 0, 0.18);
+  transition: border-color 0.3s;
+}
+.section-block:hover { 
+  border-color: color-mix(in srgb, var(--accent) 20%, var(--line)); 
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  margin-bottom: 6px;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-title svg { color: var(--accent); }
+.section-subtitle {
+  color: var(--ink-soft);
+  font-size: var(--fs-sm);
+  margin-bottom: 22px;
+  line-height: 1.5;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.stat-card {
+  padding: 20px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--bg-surface) 95%, var(--accent)), var(--bg-surface));
+  border: 1px solid var(--line);
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 50%, transparent));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.stat-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.stat-card:hover::before {
+  opacity: 1;
+}
+.stat-label {
+  color: var(--ink-soft);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+}
+.stat-value {
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--ink);
+  font-family: var(--font-display);
+  letter-spacing: -0.04em;
+}
+.stat-value--accent { color: var(--success); }
+.stat-value--success { color: color-mix(in srgb, var(--success) 75%, var(--ink)); }
+.stat-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.stat-sub {
+  color: var(--ink-soft);
+  font-size: var(--fs-sm);
+}
+
+.panel {
+  background: var(--bg-base);
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  padding: 24px;
+}
+.panel-heading {
+  margin-bottom: 16px;
+  font-size: 20px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.panel-placeholder {
+  color: var(--ink-soft);
+  font-size: var(--fs-base);
+  opacity: 0.7;
+}
+
+.section-block table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-top: 4px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.section-block th, .section-block td {
+  text-align: left;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.section-block th {
+  font-size: var(--fs-xs);
+  color: var(--ink-soft);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: var(--bg-base);
+}
+.section-block tbody tr {
+  transition: var(--transition);
+  cursor: pointer;
+  background: var(--bg-surface);
+}
+.section-block tbody tr:hover { background: var(--bg-hover); }
+.section-block tbody tr:nth-child(even) { background: color-mix(in srgb, var(--bg-base) 30%, var(--bg-surface)); }

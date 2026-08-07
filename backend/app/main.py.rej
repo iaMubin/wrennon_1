@@ -1,0 +1,24 @@
+diff a/backend/app/main.py b/backend/app/main.py	(rejected hunks)
+@@ -105,6 +105,13 @@ async def add_security_headers(request, call_next):
+     silently broke every custom font across the app (visible as headings/
+     logo text rendering in a generic fallback font) without throwing any
+     visible error, just a CSP violation in the browser console.
++
++    script-src explicitly allows cdn.jsdelivr.net because agent/index.html
++    loads Chart.js from there. Same failure mode as the font issue above:
++    omitting it doesn't error visibly on the page, it just silently blocks
++    the script tag, so `Chart` is undefined, initCharts() throws, and every
++    chart on the Home and Analytics views stays blank even though the
++    underlying API calls succeed.
+     """
+     response = await call_next(request)
+     response.headers["X-Content-Type-Options"] = "nosniff"
+@@ -115,7 +122,7 @@ async def add_security_headers(request, call_next):
+         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+     response.headers["Content-Security-Policy"] = (
+         "default-src 'self'; "
+-        "script-src 'self' 'unsafe-inline'; "
++        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+         "font-src 'self' https://fonts.gstatic.com; "
+         "img-src 'self' data: https:; "

@@ -9,7 +9,7 @@ import json
 router = APIRouter()
 
 @router.get("/stats")
-async def analytics_stats(manager: Agent = Depends(get_current_manager)):
+async def analytics_stats(agent: Agent = Depends(get_current_agent)):
     """Returns outcome-based analytics and revenue tracking data."""
     return get_stats()
 
@@ -188,7 +188,7 @@ def get_dashboard_metrics(
     top_tags = sorted([{"tag": k, "count": v} for k, v in tag_counts.items()], key=lambda x: x["count"], reverse=True)[:10]
 
     # Inject mock data if DB is barren (for showcase purposes)
-    if valid_res_count == 0 or avg_res_time == 0:
+    if valid_res_count < 5 or avg_res_time == 0:
         avg_res_time = 14 * 60  # 14m
         one_touch_pct = 82.5
         avg_first_resp = 2 * 60 + 15  # 2m 15s
@@ -198,7 +198,7 @@ def get_dashboard_metrics(
         volume_labels = ["Aug 1", "Aug 2", "Aug 3", "Aug 4", "Aug 5", "Aug 6", "Aug 7"]
         hourly_volume = [120, 145, 130, 160, 155, 180, 140]
         
-        csat_dist = {5: 145, 4: 40, 3: 10, 2: 3, 1: 2}
+        csat_dist = {1: 2, 2: 3, 3: 10, 4: 40, 5: 145}
         
         leaderboard = [
             {"handled_by": "Sarah J.", "resolved_count": 145, "avg_res_time_seconds": 12*60},

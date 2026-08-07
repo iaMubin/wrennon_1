@@ -181,7 +181,97 @@ function setupThemeDropdown() {
     }
   });
 }
+
+function setupProfileDropdown() {
+  const profileBtn = document.getElementById("agent-profile-btn");
+  const dropdown = document.getElementById("profile-dropdown");
+  const logoutBtn = document.getElementById("profile-logout-btn");
+  
+  if (!profileBtn || !dropdown) return;
+  
+  profileBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isExpanded = profileBtn.getAttribute("aria-expanded") === "true";
+    profileBtn.setAttribute("aria-expanded", !isExpanded);
+    
+    // Update name, role, and DP dynamically
+    const nameEl = document.getElementById("profile-dropdown-name");
+    const roleEl = document.getElementById("profile-dropdown-role");
+    const dpMenuEl = document.getElementById("profile-dropdown-dp");
+    if (nameEl) {
+      const fullName = localStorage.getItem("agent_full_name");
+      const username = localStorage.getItem("agent_username");
+      if (fullName && fullName !== "null") nameEl.textContent = fullName;
+      else if (username) nameEl.textContent = username;
+    }
+    if (roleEl) {
+      const role = localStorage.getItem("agent_role");
+      if (role) roleEl.textContent = role;
+    }
+    if (dpMenuEl) {
+      const dp = localStorage.getItem("agent_dp_url");
+      if (dp) dpMenuEl.src = dp;
+      else dpMenuEl.src = "/agent/images/default-avatar.png?v=2";
+    }
+    
+    dropdown.classList.toggle("hidden");
+  });
+  
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("#profile-dropdown") && !e.target.closest("#agent-profile-btn")) {
+      dropdown.classList.add("hidden");
+      profileBtn.setAttribute("aria-expanded", "false");
+    }
+  });
+  
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      dropdown.classList.add("hidden");
+      profileBtn.setAttribute("aria-expanded", "false");
+    }
+  });
+  
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => {
+      dropdown.classList.add("hidden");
+      if (typeof logout === "function") logout();
+    });
+  }
+  
+  const statusOptions = dropdown.querySelectorAll(".status-option");
+  const connectionDot = document.getElementById("connection-dot");
+  
+  statusOptions.forEach(opt => {
+    opt.addEventListener("click", () => {
+      const status = opt.dataset.status;
+      
+      // Update checkmarks
+      statusOptions.forEach(otherOpt => {
+        otherOpt.classList.remove("active");
+        const svg = otherOpt.querySelector(".status-check");
+        if (svg) svg.style.display = "none";
+      });
+      opt.classList.add("active");
+      const checkSvg = opt.querySelector(".status-check");
+      if (checkSvg) checkSvg.style.display = "block";
+      
+      // Update dot
+      if (connectionDot) {
+        connectionDot.className = "dot";
+        connectionDot.style.backgroundColor = "";
+        if (status === "online") connectionDot.classList.add("dot--online");
+        else if (status === "offline") connectionDot.classList.add("dot--offline");
+        else if (status === "away") connectionDot.style.backgroundColor = "var(--warning)";
+      }
+      
+      dropdown.classList.add("hidden");
+      profileBtn.setAttribute("aria-expanded", "false");
+    });
+  });
+}
+
 setupThemeDropdown();
+setupProfileDropdown();
 
 if (logoutBtn) {
   logoutBtn.addEventListener("click", logout);
@@ -262,12 +352,17 @@ loginForm.addEventListener("submit", async (e) => {
     _agentToken = data.access_token;
     localStorage.setItem("agent_username", username); // Save username to identify self
     localStorage.setItem("agent_role", data.role); // Save role to show admin btn
+    if (data.full_name) {
+      localStorage.setItem("agent_full_name", data.full_name);
+    } else {
+      localStorage.removeItem("agent_full_name");
+    }
     if (data.dp_url) {
       localStorage.setItem("agent_dp_url", data.dp_url);
       document.getElementById("agent-profile-dp").src = data.dp_url;
     } else {
       localStorage.removeItem("agent_dp_url");
-      document.getElementById("agent-profile-dp").src = "/agent/images/default-avatar.svg";
+      document.getElementById("agent-profile-dp").src = "/agent/images/default-avatar.png?v=2";
     }
     
     if (data.role === "manager" || data.role === "admin") {
@@ -3378,12 +3473,84 @@ document.addEventListener('DOMContentLoaded', () => {
               }
           }
       } catch (e) { console.error("Failed to load analytics", e); }
+      
+      // Fetch additional sections
+      window.fetchSystemAnalytics();
+      window.fetchScorecards();
+  };
+  
+  window.fetchSystemAnalytics = async function() {
+      try {
+          const res = await fetch(`${API_BASE}/analytics/stats`, {
+              headers: { 'X-Wrennon-Client': 'agent-dashboard' },
+              credentials: 'include'
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          const tTickets = document.getElementById('analytics-total-tickets');
+          if (tTickets) tTickets.innerText = data.total_tickets;
+          const defRate = document.getElementById('analytics-deflection-rate');
+          if (defRate) defRate.innerText = data.deflection_rate + "%";
+          const aiRes = document.getElementById('analytics-ai-resolved');
+          if (aiRes) aiRes.innerText = `(${data.resolved_by_ai} resolved by AI)`;
+          const rev = document.getElementById('analytics-revenue');
+          if (rev) rev.innerText = `$${data.revenue_generated.toFixed(2)}`;
+          const upsells = document.getElementById('analytics-upsells');
+          if (upsells) upsells.innerText = data.upsell_count;
+      } catch (err) {
+          console.error("Failed to fetch system analytics:", err);
+      }
+  };
+  
+  window.fetchScorecards = async function() {
+      try {
+          const res = await fetch(`${API_BASE}/agent/my-scorecards`, {
+              headers: { 'X-Wrennon-Client': 'agent-dashboard' },
+              credentials: 'include'
+          });
+          if (res.ok) {
+              const data = await res.json();
+              const tbody = document.getElementById('qa-scorecards-list');
+              if (!tbody) return;
+              if (data.length === 0) {
+                  tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--ink-soft);">No scorecards yet. Resolve a conversation to generate one.</td></tr>';
+                  return;
+              }
+              tbody.innerHTML = '';
+              data.forEach(card => {
+                  const date = new Date(card.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                  tbody.innerHTML += `
+                      <tr>
+                          <td style="padding: 12px; border-bottom: 1px solid var(--line);">${date}</td>
+                          <td style="padding: 12px; border-bottom: 1px solid var(--line); font-family: 'JetBrains Mono', monospace; font-size: 13px;">${card.short_id || card.conversation_id.substring(0, 8)}...</td>
+                          <td style="padding: 12px; border-bottom: 1px solid var(--line); text-align: center;">${card.empathy_score}/10</td>
+                          <td style="padding: 12px; border-bottom: 1px solid var(--line); text-align: center;">${card.accuracy_score}/10</td>
+                          <td style="padding: 12px; border-bottom: 1px solid var(--line); text-align: center;">${card.resolution_score}/10</td>
+                          <td style="padding: 12px; border-bottom: 1px solid var(--line); text-align: center; color: var(--accent); font-weight: 600;">${card.csat_prediction}/5</td>
+                          <td style="padding: 12px; border-bottom: 1px solid var(--line);">
+                              <textarea readonly style="width: 100%; height: 60px; padding: 8px; border-radius: 4px; border: 1px solid var(--border-light); background: transparent; color: inherit; font-family: 'Inter', sans-serif; resize: vertical; font-size: 13px;">${card.feedback_notes}</textarea>
+                          </td>
+                      </tr>
+                  `;
+              });
+          }
+      } catch (err) {
+          console.error("Failed to fetch scorecards:", err);
+      }
   };
 
-  if(btns['dashboard']) btns['dashboard'].addEventListener('click', () => switchView('dashboard'));
-  if(btns['conversations']) btns['conversations'].addEventListener('click', () => switchView('conversations'));
-  if(btns['customers']) btns['customers'].addEventListener('click', () => switchView('customers'));
-  if(btns['analytics']) btns['analytics'].addEventListener('click', () => switchView('analytics'));
+  if(btns['dashboard']) btns['dashboard'].addEventListener('click', () => { window.location.hash = 'dashboard'; switchView('dashboard'); });
+  if(btns['conversations']) btns['conversations'].addEventListener('click', () => { window.location.hash = 'conversations'; switchView('conversations'); });
+  if(btns['customers']) btns['customers'].addEventListener('click', () => { window.location.hash = 'customers'; switchView('customers'); });
+  if(btns['analytics']) btns['analytics'].addEventListener('click', () => { window.location.hash = 'analytics'; switchView('analytics'); });
+
+  // Check hash on load
+  if (window.location.hash) {
+      const hash = window.location.hash.substring(1);
+      if (['dashboard', 'conversations', 'customers', 'analytics'].includes(hash)) {
+          switchView(hash);
+      }
+  }
 });
 
 
@@ -3414,7 +3581,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Mini Volume Chart (Dashboard)
         const ctxMini = document.getElementById('miniVolumeChart');
-        if(ctxMini && !miniVolumeChart) {
+        if(ctxMini && !window.miniVolumeChart) {
             let gradientMini;
             if (ctxMini.getContext) {
                 const ctx = ctxMini.getContext('2d');
@@ -3422,7 +3589,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 gradientMini.addColorStop(0, accentColor + '40');
                 gradientMini.addColorStop(1, accentColor + '00');
             }
-            miniVolumeChart = new Chart(ctxMini, {
+            window.miniVolumeChart = new Chart(ctxMini, {
                 type: 'line',
                 data: {
                     labels: ['8am', '10am', '12pm', '2pm', '4pm', '6pm'],

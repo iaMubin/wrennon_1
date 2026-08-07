@@ -50,4 +50,9 @@ slowapi==0.1.9
 # Testing
 pytest==9.0.3
 httpx==0.28.1
-pytz==2024.1
+
+# zoneinfo (stdlib) needs this on platforms with no system IANA tz
+# database — notably Windows, where ZoneInfo('Asia/Dhaka') otherwise
+# raises ZoneInfoNotFoundError. Linux/Render/Docker usually have system
+# tzdata already, so this is mainly for local Windows dev.
+tzdata==2025.2

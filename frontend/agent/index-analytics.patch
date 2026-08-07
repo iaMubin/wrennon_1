@@ -1,0 +1,132 @@
+--- a/frontend/agent/index.html
++++ b/frontend/agent/index.html
+@@ -740,43 +740,105 @@
+             <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr);">
+                 <div class="stat-card">
+                     <div class="stat-label">First Response Time (Avg)</div>
+                     <div class="stat-value" id="analytics-first-response">—</div>
+                 </div>
+                 <div class="stat-card">
+                     <div class="stat-label">Avg Resolution Time</div>
+                     <div class="stat-value" id="analytics-avg-resolution-time">—</div>
+                 </div>
+                 <div class="stat-card">
+                     <div class="stat-label">One-Touch Resolutions</div>
+                     <div class="stat-value" id="analytics-one-touch">—</div>
+                 </div>
+             </div>
+-          </div>
+-          <div class="chart-card">
+-            <h3>Customer Satisfaction (CSAT)</h3>
+-            <div class="chart-container" style="position: relative; height: 300px; width: 100%; display: flex; justify-content: center; align-items: center;">
+-                <canvas id="csatChart"></canvas>
++        </div>
++
++        <!-- Charts Section -->
++        <div class="section-block">
++            <h3 class="section-title">
++                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="m19 9-5 5-4-4-3 3"></path></svg>
++                Trends & Satisfaction
++            </h3>
++            <p class="section-subtitle">Visual breakdown of volume and CSAT distribution.</p>
++            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
++                <div class="panel">
++                    <h4 class="panel-heading" style="font-size: 16px;">Ticket Volume Over Time</h4>
++                    <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
++                        <canvas id="volumeChart"></canvas>
++                    </div>
++                </div>
++                <div class="panel">
++                    <h4 class="panel-heading" style="font-size: 16px;">Customer Satisfaction (CSAT)</h4>
++                    <div class="chart-container" style="position: relative; height: 300px; width: 100%; display: flex; justify-content: center; align-items: center;">
++                        <canvas id="csatChart"></canvas>
++                    </div>
++                </div>
+             </div>
+-          </div>
+         </div>
+-        <div class="analytics-grid" style="margin-top: 24px; grid-template-columns: 1fr;">
+-            <div class="stats-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+-                <div class="stat-item">
+-                <span class="stat-label">First Response Time (Avg)</span>
+-                <span class="stat-value" id="analytics-first-response">—</span>
+-                <!-- trend removed -->
++
++        <!-- Analytics & Copilot Section -->
++        <div class="section-block">
++            <h3 class="section-title">
++                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
++                System Analytics & Copilot Insights
++            </h3>
++            <p class="section-subtitle">Real-time performance metrics and recent AI assistant actions.</p>
++
++            <div class="stat-grid">
++                <div class="stat-card">
++                    <div class="stat-label">Total Support Tickets</div>
++                    <div id="analytics-total-tickets" class="stat-value">0</div>
++                </div>
++                <div class="stat-card">
++                    <div class="stat-label">AI Resolution Rate</div>
++                    <div class="stat-row">
++                        <div id="analytics-deflection-rate" class="stat-value stat-value--accent">0%</div>
++                        <div id="analytics-ai-resolved" class="stat-sub">(0 resolved)</div>
++                    </div>
+                 </div>
+-                <div class="stat-item">
+-                <span class="stat-label">Avg Resolution Time</span>
+-                <span class="stat-value" id="analytics-avg-resolution-time">—</span>
+-                <!-- trend removed -->
++                <div class="stat-card">
++                    <div class="stat-label">Revenue Generated</div>
++                    <div id="analytics-revenue" class="stat-value stat-value--success">$0.00</div>
+                 </div>
+-                <div class="stat-item">
+-                <span class="stat-label">One-Touch Resolutions</span>
+-                <span class="stat-value" id="analytics-one-touch">—</span>
+-                <!-- trend removed -->
++                <div class="stat-card">
++                    <div class="stat-label">Total Upsells</div>
++                    <div id="analytics-upsells" class="stat-value">0</div>
+                 </div>
+-                <div class="stat-item" style="display:none;">
+-                <span class="stat-label">Agent Utilization</span>
+-                <span class="stat-value">74%</span>
+-                <span class="trend trend-up">↑ 4% vs last period</span>
++            </div>
++
++            <div class="panel">
++                <h4 class="panel-heading">Recent Copilot Activity</h4>
++                <div id="copilot-activity-list" style="display: flex; flex-direction: column; gap: 16px;">
++                    <!-- Populated by JS -->
++                    <textarea readonly class="panel-placeholder" style="width: 100%; height: 80px; padding: 12px; border-radius: 8px; border: 1px solid var(--border-light); background: transparent; color: var(--ink-soft); font-family: 'Inter', sans-serif; resize: vertical; text-align: center;">Fetching latest copilot actions...</textarea>
+                 </div>
+             </div>
+         </div>
++
++        <div class="section-block">
++            <h3 class="section-title">
++                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M9 15l2 2 4-4"></path></svg>
++                Automated QA & CSAT Scorecards
++            </h3>
++            <p class="section-subtitle">AI-generated evaluations of recent human-handled and AI-handled conversations.</p>
++            <div style="overflow-x: auto;">
++                <table style="width: 100%; border-collapse: collapse;">
++                    <thead>
++                        <tr>
++                            <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--line);">Time</th>
++                            <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--line);">Conv ID</th>
++                            <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line);">Empathy</th>
++                            <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line);">Accuracy</th>
++                            <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line);">Resolution</th>
++                            <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line);">Pred. CSAT</th>
++                            <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--line); min-width: 250px;">AI Feedback</th>
++                        </tr>
++                    </thead>
++                    <tbody id="qa-scorecards-list">
++                        <tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--ink-soft);">No scorecards yet. Resolve a conversation to generate one.</td></tr>
++                    </tbody>
++                </table>
++            </div>
++        </div>
+       </div>
+     </div>

@@ -141,8 +141,7 @@ async def login(
         max_age=60 * 60 * 24 * 7 # 7 days
     )
     
-    return {"access_token": token, "token_type": "bearer", "role": agent.role, "dp_url": agent.dp_url}  # nosec B105
-
+    return {"access_token": token, "token_type": "bearer", "role": agent.role, "dp_url": agent.dp_url, "full_name": agent.full_name}
 
 @router.post("/agent/logout")
 def logout(
@@ -289,7 +288,7 @@ def dashboard_summary(
     sla_risks = sla_list[:5]
 
     # Inject mock data if DB is barren (for showcase purposes)
-    if open_tickets == 0 and len(sla_risks) == 0:
+    if open_tickets < 5 and len(sla_risks) == 0:
         open_tickets = 14
         unassigned = 3
         solved_today = 28
@@ -1130,15 +1129,30 @@ def get_sla_policy(db: Session) -> dict:
 def get_sla_status(c: Conversation, sla_policy: dict) -> str:
     if c.resolved or not getattr(c, "handoff_active", False):
         return "ok"
-    if c.created_at.tzinfo is None:
-        import datetime
-        created_utc = c.created_at.replace(tzinfo=datetime.timezone.utc)
-    else:
-        import datetime
-        created_utc = c.created_at.astimezone(datetime.timezone.utc)
         
     import datetime
-    age_minutes = (datetime.datetime.now(datetime.timezone.utc) - created_utc).total_seconds() / 60
+    
+    target_time = c.created_at
+    customer_waiting = True
+    
+    if hasattr(c, "messages") and c.messages:
+        for msg in reversed(c.messages):
+            if msg.sender == "agent":
+                customer_waiting = False
+                break
+            if msg.sender == "human":
+                target_time = msg.created_at
+                break
+                
+    if not customer_waiting:
+        return "ok"
+
+    if target_time.tzinfo is None:
+        target_utc = target_time.replace(tzinfo=datetime.timezone.utc)
+    else:
+        target_utc = target_time.astimezone(datetime.timezone.utc)
+        
+    age_minutes = (datetime.datetime.now(datetime.timezone.utc) - target_utc).total_seconds() / 60
     priority = getattr(c, "priority", None) or "normal"
     threshold = sla_policy.get(priority, 240)
     

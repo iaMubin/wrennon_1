@@ -81,7 +81,7 @@ def list_agents(
         "role": "ai",
         "created_at": "",
         "resolved_count": ai_count,
-        "dp_url": None
+        "dp_url": "/agent/images/wren-mark.svg"
     })
     
     return directory

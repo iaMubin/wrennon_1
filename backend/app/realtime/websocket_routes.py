@@ -175,6 +175,7 @@ def _sync_update_summary(session_id: str, new_summary: str):
 
 
 def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None, my_generation: int, turn_generation_ref: dict) -> dict | None:
+    just_resolved = False
     with SessionLocal() as db:
         conversation = db.query(Conversation).filter_by(session_id=session_id).first()
         if not conversation:
@@ -232,6 +233,7 @@ def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None, m
             conversation.resolved_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
             conversation.handoff_active = False
             conversation.handled_by = None
+            just_resolved = True
             
             audit = AuditLog(
                 actor_username="AI Agent",
@@ -239,10 +241,6 @@ def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None, m
                 target_username=session_id
             )
             db.add(audit)
-            
-            import asyncio
-            from app.services.qa import process_resolved_conversation_tasks
-            asyncio.create_task(process_resolved_conversation_tasks(conversation.id))
             db.commit()
             
             events.append({
@@ -254,7 +252,9 @@ def _sync_phase3(session_id: str, reply_text: str, updated_state: dict | None, m
         return {
             "resolved": conversation.resolved,
             "events": events,
-            "message_id": msg.id
+            "message_id": msg.id,
+            "just_resolved": just_resolved,
+            "conversation_id": conversation.id
         }
 
 
@@ -598,6 +598,10 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
 
         phase3_duration = time.time() - phase3_start
         logger.info(f"[TIMING] Phase 3 (DB Post-processing) took {phase3_duration:.3f}s")
+
+        if phase3_data.get("just_resolved") and phase3_data.get("conversation_id"):
+            from app.services.qa import process_resolved_conversation_tasks
+            asyncio.create_task(process_resolved_conversation_tasks(phase3_data["conversation_id"]))
 
         await websocket.send_json({"reply": reply_text, "sender": "bot"})
 
