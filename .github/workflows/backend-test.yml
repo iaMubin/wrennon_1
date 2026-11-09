@@ -47,7 +47,10 @@ jobs:
         # Entire langchain/langgraph/langsmith stack is pinned to 0.x/0.2.x/0.3.x.
         # All fixes require a coordinated bump to langchain-core 1.x + langgraph 1.x
         # (breaking API changes in app/graph/) — tracked as a separate migration task.
+        # This specific SDK advisory affects server auth decorators; the app uses an
+        # in-process StateGraph, and langgraph 0.2.62 requires langgraph-sdk <0.2.0.
         pip-audit \
+          --ignore-vuln PYSEC-2026-4240 \
           --ignore-vuln PYSEC-2026-373 \
           --ignore-vuln PYSEC-2026-1518 \
           --ignore-vuln PYSEC-2026-2193 \
