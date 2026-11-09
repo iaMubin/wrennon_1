@@ -21,6 +21,12 @@ const inputEl = document.getElementById("message-input");
 const sendBtn = document.getElementById("send-btn");
 const wsStatus = document.getElementById("ws-status");
 
+function setPanelOpen(isOpen) {
+  panel.classList.toggle("hidden", !isOpen);
+  panel.setAttribute("aria-hidden", String(!isOpen));
+  launcher.setAttribute("aria-expanded", String(isOpen));
+}
+
 function applyWidgetTheme() {
   const theme = localStorage.getItem("wrennon_widget_theme") || "widget-default";
   const widget = document.getElementById("wrennon-widget");
@@ -138,7 +144,7 @@ async function resolveSessionId() {
 launcher.addEventListener("click", async (e) => {
   e.stopPropagation();
   if (panel.classList.contains("hidden")) {
-    panel.classList.remove("hidden");
+    setPanelOpen(true);
     clearUnreadIndicator();
     scrollToBottom(true);
     if (!hasLoadedHistory) {
@@ -148,18 +154,28 @@ launcher.addEventListener("click", async (e) => {
       hasLoadedHistory = true;
     }
   } else {
-    panel.classList.add("hidden");
+    setPanelOpen(false);
   }
 });
 
 closeBtn.addEventListener("click", (e) => {
   e.stopPropagation();
-  panel.classList.add("hidden");
+  setPanelOpen(false);
+  launcher.focus();
+});
+
+document.addEventListener("keydown", (e) => {
+  const lightbox = document.getElementById("chat-lightbox-overlay");
+  const lightboxOpen = lightbox && lightbox.style.display !== "none";
+  if (e.key === "Escape" && !lightboxOpen && !panel.classList.contains("hidden")) {
+    setPanelOpen(false);
+    launcher.focus();
+  }
 });
 
 document.addEventListener("click", (e) => {
   if (!panel.classList.contains("hidden") && !panel.contains(e.target) && !launcher.contains(e.target)) {
-    panel.classList.add("hidden");
+    setPanelOpen(false);
   }
 });
 

@@ -109,6 +109,8 @@ MOCK_CUSTOMERS = [   {   'id': 'CUST-1001',
 MOCK_ORDERS = {
     "1001": {
         "order_id": "1001",
+        "invoice_url": "https://wrennon.com/invoice/1001",
+        "items_count": 1,
         "email": "eleanor.v@example.com",
         "status": "delivered",
         "order_date": "2026-08-01",
@@ -143,6 +145,8 @@ MOCK_ORDERS = {
     },
     "1002": {
         "order_id": "1002",
+        "invoice_url": "https://wrennon.com/invoice/1002",
+        "items_count": 1,
         "email": "mchang.tech@example.com",
         "status": "shipped",
         "order_date": "2026-08-02",
@@ -172,6 +176,8 @@ MOCK_ORDERS = {
     },
     "1003": {
         "order_id": "1003",
+        "invoice_url": "https://wrennon.com/invoice/1003",
+        "items_count": 1,
         "email": "sjenkins88@example.com",
         "status": "processing",
         "order_date": "2026-08-03",
@@ -196,6 +202,8 @@ MOCK_ORDERS = {
     },
     "1004": {
         "order_id": "1004",
+        "invoice_url": "https://wrennon.com/invoice/1004",
+        "items_count": 2,
         "email": "drodriguez@example.com",
         "status": "placed",
         "order_date": "2026-08-04",
@@ -215,6 +223,8 @@ MOCK_ORDERS = {
     },
     "1005": {
         "order_id": "1005",
+        "invoice_url": "https://wrennon.com/invoice/1005",
+        "items_count": 1,
         "email": "emily.c@example.com",
         "status": "cancelled",
         "order_date": "2026-08-05",
@@ -239,6 +249,8 @@ MOCK_ORDERS = {
     },
     "1006": {
         "order_id": "1006",
+        "invoice_url": "https://wrennon.com/invoice/1006",
+        "items_count": 2,
         "email": "jwilson@example.com",
         "status": "delivered",
         "order_date": "2026-08-06",
@@ -273,6 +285,8 @@ MOCK_ORDERS = {
     },
     "1007": {
         "order_id": "1007",
+        "invoice_url": "https://wrennon.com/invoice/1007",
+        "items_count": 4,
         "email": "omartinez99@example.com",
         "status": "shipped",
         "order_date": "2026-08-07",
@@ -302,6 +316,8 @@ MOCK_ORDERS = {
     },
     "1008": {
         "order_id": "1008",
+        "invoice_url": "https://wrennon.com/invoice/1008",
+        "items_count": 2,
         "email": "wtaylor.biz@example.com",
         "status": "processing",
         "order_date": "2026-08-08",
@@ -326,6 +342,8 @@ MOCK_ORDERS = {
     },
     "1009": {
         "order_id": "1009",
+        "invoice_url": "https://wrennon.com/invoice/1009",
+        "items_count": 4,
         "email": "sanderson@example.com",
         "status": "placed",
         "order_date": "2026-08-09",
@@ -345,6 +363,8 @@ MOCK_ORDERS = {
     },
     "1010": {
         "order_id": "1010",
+        "invoice_url": "https://wrennon.com/invoice/1010",
+        "items_count": 4,
         "email": "athomas.design@example.com",
         "status": "cancelled",
         "order_date": "2026-08-10",

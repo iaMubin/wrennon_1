@@ -2,30 +2,103 @@
    WRENNON — Shared Design System
    ============================================ */
 
-:root{
-  --bg:#FAF7F2;
-  --bg-raised:#F2EBE1;
-  --bg-raised-2:#EAE0D1;
-  --text:#2A1B10;
-  --text-dim:#7C6952;
-  --accent:#9C4A1F;
-  --accent-dim:rgba(156,74,31,0.10);
-  --accent-vivid:#C2571F;
-  --gold:#C68C53;
-  --gold-dim:rgba(198,140,83,0.18);
-  --redline:#C2571F;
-  --redline-dim:rgba(194,87,31,0.14);
-  --espresso:#3B2415;
-  --espresso-2:#2A1810;
-  --cream:#F3E6D2;
-  --ok:#6B7A3F;
-  --line:#E3D2B0;
-  --glass-bg:rgba(250,247,242,0.6);
-  --glass-bg-strong:rgba(250,247,242,0.78);
-  --glass-border:rgba(227,210,176,0.65);
-  --shadow-soft:0 10px 28px -16px rgba(42,24,16,0.16);
-  --shadow-lift:0 26px 52px -20px rgba(42,24,16,0.26);
-  --gradient-brand:linear-gradient(135deg, var(--accent) 0%, var(--accent-vivid) 55%, var(--gold) 130%);
+:root {
+  /* --- Agent Dashboard Design System --- */
+  
+  /* Primary (Blue) */
+  --primary-50: #EFF6FF;
+  --primary-100: #DBEAFE;
+  --primary-200: #BFDBFE;
+  --primary-300: #93C5FD;
+  --primary-400: #60A5FA;
+  --primary-500: #3B82F6;
+  --primary-600: #2563EB;
+  --primary-700: #1D4ED8;
+  --primary-800: #1E40AF;
+  --primary-900: #1E3A8A;
+  --primary-950: #172554;
+
+  /* Secondary (Violet) */
+  --secondary-50: #F5F3FF;
+  --secondary-100: #EDE9FE;
+  --secondary-200: #DDD6FE;
+  --secondary-300: #C4B5FD;
+  --secondary-400: #A78BFA;
+  --secondary-500: #8B5CF6;
+  --secondary-600: #7C3AED;
+  --secondary-700: #6D28D9;
+  --secondary-800: #5B21B6;
+  --secondary-900: #4C1D95;
+  --secondary-950: #2E1065;
+
+  /* Neutral (Slate) */
+  --slate-50: #F8FAFC;
+  --slate-100: #F1F5F9;
+  --slate-200: #E2E8F0;
+  --slate-300: #CBD5E1;
+  --slate-400: #94A3B8;
+  --slate-500: #64748B;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1E293B;
+  --slate-900: #0F172A;
+  --slate-950: #020617;
+
+  /* Semantic (Success, Warning, Error) */
+  --success-50: #ECFDF5;
+  --success-100: #D1FAE5;
+  --success-500: #10B981;
+  --success-600: #059669;
+  --success-900: #064E3B;
+
+  --warning-50: #FFFBEB;
+  --warning-100: #FEF3C7;
+  --warning-500: #F59E0B;
+  --warning-600: #D97706;
+  --warning-900: #78350F;
+
+  --error-50: #FFF1F2;
+  --error-100: #FFE4E6;
+  --error-500: #F43F5E;
+  --error-600: #E11D48;
+  --error-900: #881337;
+
+  /* --- Mapped Functional Variables --- */
+  
+  --bg: var(--slate-50);
+  --bg-raised: var(--slate-100);
+  --bg-raised-2: var(--slate-200);
+  
+  --text: var(--slate-800);
+  --text-dim: var(--slate-500);
+  
+  --accent: var(--primary-500);
+  --accent-dim: var(--primary-50);
+  --accent-vivid: var(--primary-600);
+  
+  --gold: var(--secondary-500);
+  --gold-dim: var(--secondary-50);
+  
+  --redline: var(--error-500);
+  --redline-dim: var(--error-50);
+  
+  --espresso: var(--slate-900);
+  --espresso-2: var(--slate-950);
+  --cream: var(--slate-100);
+  
+  --ok: var(--success-500);
+  --line: var(--slate-200);
+  
+  /* Semi-transparent variations */
+  --glass-bg: rgba(248, 250, 252, 0.6);       
+  --glass-bg-strong: rgba(248, 250, 252, 0.78); 
+  --glass-border: rgba(226, 232, 240, 0.65);    
+  
+  --shadow-soft: 0 10px 28px -16px rgba(15, 23, 42, 0.16);
+  --shadow-lift: 0 26px 52px -20px rgba(15, 23, 42, 0.26);
+  
+  --gradient-brand: linear-gradient(135deg, var(--accent) 0%, var(--accent-vivid) 55%, var(--gold) 130%);
+  
   --mono: 'JetBrains Mono', monospace;
   --serif: 'Big Shoulders Display', sans-serif;
   --sans: 'IBM Plex Sans', sans-serif;
@@ -52,16 +125,16 @@ body::before{
   content:"";
   position:fixed; inset:0;
   background:
-    radial-gradient(680px circle at 12% 8%, rgba(198,140,83,0.14), transparent 60%),
-    radial-gradient(620px circle at 88% 28%, rgba(156,74,31,0.10), transparent 60%),
-    radial-gradient(560px circle at 30% 92%, rgba(194,87,31,0.08), transparent 60%);
+    radial-gradient(680px circle at 12% 8%, rgba(139,92,246,0.14), transparent 60%),
+    radial-gradient(620px circle at 88% 28%, rgba(59,130,246,0.10), transparent 60%),
+    radial-gradient(560px circle at 30% 92%, rgba(37,99,235,0.08), transparent 60%);
   pointer-events:none;
   z-index:0;
 }
 body::after{
   content:"";
   position:fixed; inset:0;
-  background-image: radial-gradient(rgba(110,97,85,0.10) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(100,116,139,0.10) 1px, transparent 1px);
   background-size: 26px 26px;
   -webkit-mask-image: linear-gradient(180deg, transparent, #000 8%, #000 70%, transparent);
   mask-image: linear-gradient(180deg, transparent, #000 8%, #000 70%, transparent);

@@ -5,9 +5,12 @@ Only accessible by agents with role='manager'.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+import os
+import shutil
+import uuid
 
 from sqlalchemy import func
 from app.auth.dependencies import get_current_manager
@@ -42,6 +45,24 @@ class AgentCreate(BaseModel):
 
 class PasswordReset(BaseModel):
     new_password: str
+
+@router.post("/admin/upload-dp")
+async def upload_agent_dp(
+    file: UploadFile = File(...),
+    manager: Agent = Depends(get_current_manager)
+):
+    upload_dir = os.path.join("app", "static", "agent", "images", "uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    ext = os.path.splitext(file.filename)[1]
+    new_filename = f"{uuid.uuid4().hex}{ext}"
+    file_path = os.path.join(upload_dir, new_filename)
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    dp_url = f"/agent/images/uploads/{new_filename}"
+    return {"status": "success", "dp_url": dp_url}
 
 @router.get("/admin/agents")
 def list_agents(

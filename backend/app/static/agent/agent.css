@@ -95,7 +95,7 @@ body {
   text-align: left;
   border: none;
   background: none;
-  color: var(--ink-main);
+  color: var(--ink);
   border-radius: var(--radius-xs);
   cursor: pointer;
   font-size: var(--fs-base);

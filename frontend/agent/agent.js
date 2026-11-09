@@ -99,6 +99,11 @@ function setupThemeDropdown() {
       } else {
         document.documentElement.setAttribute("data-theme", themeValue);
       }
+      
+      // Update charts to reflect new theme accent colors
+      if (window.refreshCharts) {
+        setTimeout(window.refreshCharts, 50);
+      }
     }
     
     options.forEach(opt => {
@@ -368,7 +373,7 @@ loginForm.addEventListener("submit", async (e) => {
     if (data.role === "manager" || data.role === "admin") {
       document.getElementById("admin-dashboard-btn").classList.remove("hidden");
       document.getElementById("admin-dashboard-btn").addEventListener("click", () => {
-        window.location.href = "/agent/admin_dashboard.html";
+        window.location.href = "/agent/admin_dashboard.html?v=" + new Date().getTime();
       });
     }
 
@@ -604,7 +609,8 @@ function formatPreview(conv) {
 }
 
 async function loadConversations() {
-  const endpoints = {
+    if (window.currentView && window.currentView !== 'conversations') return;
+    const endpoints = {
     "my_cases": "/agent/conversations/my-cases",
     "attention": "/agent/conversations/needs-attention",
     "active": "/agent/conversations/active",
@@ -657,8 +663,14 @@ function renderConversationList(conversations) {
   for (const conv of conversations) {
     const item = document.createElement("div");
     item.className = "conv-item";
+    item.setAttribute("role", "group");
+    item.tabIndex = 0;
+    item.setAttribute("aria-label", `Conversation with ${conv.customer_name || conv.customer_email || "unknown customer"}`);
     if (conv.handoff_active && !conv.resolved) item.classList.add("conv-item--urgent");
-    if (conv.session_id === activeSessionId) item.classList.add("conv-item--selected");
+    if (conv.session_id === activeSessionId) {
+      item.classList.add("conv-item--selected");
+      item.setAttribute("aria-current", "true");
+    }
 
     let badgeClass = "badge--ai";
     let stageText = "AI";
@@ -753,6 +765,12 @@ function renderConversationList(conversations) {
     `;
 
     item.addEventListener("click", () => openConversation(conv.session_id, conv.customer_email, conv.short_id, conv.resolved, conv.updated_at));
+    item.addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === " ") && e.target === item) {
+        e.preventDefault();
+        openConversation(conv.session_id, conv.customer_email, conv.short_id, conv.resolved, conv.updated_at);
+      }
+    });
     conversationList.appendChild(item);
   }
 }
@@ -1917,12 +1935,14 @@ function showOrderPopup(order, customer) {
 
   const availableFields = [];
   
-  if (customer && customer.name) {
-      availableFields.push({ label: 'Customer', value: escapeHtml(customer.name) });
-  }
-  
   availableFields.push({ label: 'Order ID', value: `#${escapeHtml(order.order_id)}` });
   availableFields.push({ label: 'Status', value: `<span class="order-status-badge ${statusClass}">${escapeHtml(order.status)}</span>` });
+  
+  if (order.items_count) {
+      availableFields.push({ label: 'Items', value: `${escapeHtml(order.items_count)} items` });
+  } else if (order.items && order.items.length) {
+      availableFields.push({ label: 'Items', value: `${order.items.length} items` });
+  }
   
   if (order.order_date) availableFields.push({ label: 'Date', value: escapeHtml(order.order_date) });
   if (order.total_amount) availableFields.push({ label: 'Total', value: escapeHtml(order.total_amount) });
@@ -1948,10 +1968,24 @@ function showOrderPopup(order, customer) {
       availableFields.push({ label: 'ETA', value: escapeHtml(order.eta) });
   }
   
-  if (order.payment_method) availableFields.push({ label: 'Payment', value: escapeHtml(order.payment_method) });
+  if (order.payment_method) {
+      let paymentBadge = `<span style="margin-left: 6px; padding: 2px 4px; background: color-mix(in srgb, var(--ink) 8%, transparent); border-radius: 4px; font-family: var(--font-sans); font-size: 10px; font-weight: 600; color: var(--ink); text-transform: none; letter-spacing: normal;">${escapeHtml(order.payment_method)}</span>`;
+      let labelHtml = `<span style="display:flex; align-items:center;">Payment ${paymentBadge}</span>`;
+      let valueHtml = '';
+      if (order.invoice_url) {
+          valueHtml = `<div style="display: flex; align-items: center; gap: 4px; line-height: 1;"><a href="${escapeHtml(order.invoice_url)}" target="_blank" rel="noopener noreferrer" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">View Invoice</a><button class="icon-action-btn" style="padding: 2px; height: 18px; width: 18px; margin: 0; min-height: 0; min-width: 0;" onclick="navigator.clipboard.writeText('${escapeHtml(order.invoice_url)}')" title="Copy invoice URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>`;
+      } else {
+          valueHtml = `<span style="color: var(--text-muted);">No invoice link</span>`;
+      }
+      availableFields.push({ 
+          label: labelHtml, 
+          value: valueHtml,
+          span: 2
+      });
+  }
   if (order.shipping_method) availableFields.push({ label: 'Shipping', value: escapeHtml(order.shipping_method) });
 
-  const fieldsToShow = availableFields.slice(0, 5);
+  const fieldsToShow = availableFields.slice(0, 8);
   
   const fieldsHtml = fieldsToShow.map(f => {
       return `<div class="order-popup__field" ${f.span ? `style="grid-column: span ${f.span};"` : ''}><span class="order-popup__label">${f.label}</span><span class="order-popup__value">${f.value}</span></div>`;
@@ -2269,7 +2303,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (adminBtn) {
           adminBtn.classList.remove("hidden");
           adminBtn.addEventListener("click", () => {
-            window.location.href = "/agent/admin_dashboard.html";
+            window.location.href = "/agent/admin_dashboard.html?v=" + new Date().getTime();
           });
         }
       }
@@ -2692,6 +2726,12 @@ function clearCustomerSidebar() {
     });
   }
   
+  // Auto-hide customer sidebar when screen becomes too small
+  window.addEventListener("resize", () => {
+    if (window.innerWidth <= 820) {
+      hideCustomerSidebar();
+    }
+  });
   if (closeBtn) {
     closeBtn.addEventListener("click", hideCustomerSidebar);
   }
@@ -2941,7 +2981,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (mobileToggle && sidebar) {
     function updateSidebarToggleIcon() {
       let isOpen = false;
-      if (window.innerWidth <= 800) {
+      if (window.innerWidth <= 1200) {
         isOpen = sidebar.classList.contains("sidebar-open");
       } else {
         isOpen = !sidebar.classList.contains("sidebar-hidden");
@@ -2951,17 +2991,19 @@ document.addEventListener("DOMContentLoaded", () => {
         mobileToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><path d="M9 3v18"></path><path d="m16 15-3-3 3-3"></path></svg>';
         mobileToggle.setAttribute("title", "Close Sidebar");
         mobileToggle.setAttribute("aria-label", "Close Sidebar");
+        mobileToggle.setAttribute("aria-expanded", "true");
         mobileToggle.classList.add("sidebar-is-open");
       } else {
         mobileToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><path d="M9 3v18"></path><path d="m14 9 3 3-3 3"></path></svg>';
         mobileToggle.setAttribute("title", "Open Sidebar");
         mobileToggle.setAttribute("aria-label", "Open Sidebar");
+        mobileToggle.setAttribute("aria-expanded", "false");
         mobileToggle.classList.remove("sidebar-is-open");
       }
     }
 
     mobileToggle.addEventListener("click", () => {
-      if (window.innerWidth <= 800) {
+      if (window.innerWidth <= 1200) {
         sidebar.classList.toggle("sidebar-open");
       } else {
         sidebar.classList.toggle("sidebar-hidden");
@@ -2972,7 +3014,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Auto-close sidebar on mobile when a conversation is selected
     const originalOpenConv = openConversation;
     window.openConversation = async function(...args) {
-      if (window.innerWidth <= 800) {
+      if (window.innerWidth <= 1200) {
         sidebar.classList.remove("sidebar-open");
         updateSidebarToggleIcon();
       }
@@ -3294,6 +3336,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   function switchView(viewName) {
+    window.currentView = viewName;
     // Hide all views and remove active class from all buttons
     Object.keys(views).forEach(key => {
       if(views[key]) views[key].classList.add('hidden');
@@ -3549,7 +3592,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const hash = window.location.hash.substring(1);
       if (['dashboard', 'conversations', 'customers', 'analytics'].includes(hash)) {
           switchView(hash);
+      } else {
+          switchView('conversations');
       }
+  } else {
+      switchView('conversations');
   }
 });
 
@@ -3685,6 +3732,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
+
+    // Expose a method to rebuild charts when theme changes
+    window.refreshCharts = function() {
+        if (window.miniVolumeChart) { window.miniVolumeChart.destroy(); window.miniVolumeChart = null; }
+        if (window.volumeChart) { window.volumeChart.destroy(); window.volumeChart = null; }
+        if (window.csatChart) { window.csatChart.destroy(); window.csatChart = null; }
+        if (window.tagsChart) { window.tagsChart.destroy(); window.tagsChart = null; }
+        initCharts();
+    };
 
     // Call initCharts when Analytics view is shown, or just initialize immediately if Chart.js is loaded
     if(typeof Chart !== 'undefined') {
