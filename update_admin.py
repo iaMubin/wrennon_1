@@ -11,7 +11,7 @@ if import_target in content:
 
 endpoints = """
 class ApiKeyCreate(BaseModel):
-    name: str
+    name: str 
 
 @router.get("/api-keys")
 def list_api_keys(
