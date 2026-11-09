@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch
 from datetime import datetime
-import pytz
+from zoneinfo import ZoneInfo
 
 from app.main import app
 from app.db.session import SessionLocal
@@ -31,7 +31,7 @@ def setup_test_data():
     db.commit()
     
     # Create some conversations
-    tz = pytz.timezone('Asia/Dhaka')
+    tz = ZoneInfo('Asia/Dhaka')
     now = datetime.now(tz)
     
     c1 = Conversation(session_id="session1", resolved=False, customer_email="alice@example.com")
