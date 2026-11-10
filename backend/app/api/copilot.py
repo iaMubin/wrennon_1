@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.db.models import Conversation, Agent
 from app.auth.dependencies import get_current_agent
-from app.services.llm import _safe_llm_call
+from app.services.llm import _safe_llm_call, LIGHT_MODEL
 import json
 
 router = APIRouter()
@@ -44,7 +44,13 @@ async def copilot_suggest(request: CopilotRequest, db: Session = Depends(get_db)
     {transcript}
     """
     try:
-        result = await _safe_llm_call([{"role": "user", "content": prompt}], temperature=0.2, max_tokens=300, is_json=True)
+        result = await _safe_llm_call(
+            [{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=800,
+            is_json=True,
+            model_override=LIGHT_MODEL
+        )
         data = json.loads(result)
         return data
     except Exception as e:

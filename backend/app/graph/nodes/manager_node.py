@@ -29,7 +29,7 @@ import json
 import time
 
 from app.graph.state import ConversationState
-from app.services.llm import _safe_llm_call, mask_pii
+from app.services.llm import _safe_llm_call, mask_pii, LIGHT_MODEL
 from app.logger import logger
 
 MAX_ITERATIONS = 2  # tool_executor rounds allowed per user turn — see builder.py
@@ -187,7 +187,8 @@ async def manager_node(state: ConversationState) -> ConversationState:
 
     llm_messages = [{"role": "system", "content": system_content}]
 
-    recent_messages = state["messages"][-6:] if len(state["messages"]) > 6 else state["messages"]
+    # Trim to recent 4 messages to stay well within Groq TPM limits
+    recent_messages = state["messages"][-4:] if len(state["messages"]) > 4 else state["messages"]
     for msg in recent_messages:
         if msg.type == "human":
             role = "user"
@@ -201,11 +202,31 @@ async def manager_node(state: ConversationState) -> ConversationState:
 
         llm_messages.append({"role": role, "content": content})
 
+    # Dynamic model selection: Use light model (openai/gpt-oss-20b) for simple greetings or short early turns
+    model_override = None
+    last_human_text = ""
+    for m in reversed(state.get("messages", [])):
+        if m.type == "human":
+            last_human_text = m.content.strip().lower()
+            break
+
+    GREETING_WORDS = {"hi", "hello", "hey", "hello sir", "good morning", "good evening", "good afternoon", "hola", "yo"}
+    is_simple_greeting = last_human_text in GREETING_WORDS or (len(last_human_text.split()) <= 3 and any(w in last_human_text for w in ["hi", "hello", "hey"]))
+
+    if is_simple_greeting or (state.get("turn_count", 0) <= 1 and iteration == 0 and len(last_human_text.split()) <= 8):
+        model_override = LIGHT_MODEL
+
     decision = None
     last_error = None
     for attempt in range(2):  # one retry on malformed JSON before falling back safely
         try:
-            result_str = await _safe_llm_call(llm_messages, temperature=0.1, max_tokens=1000, is_json=True)
+            result_str = await _safe_llm_call(
+                llm_messages,
+                temperature=0.1,
+                max_tokens=600,
+                is_json=True,
+                model_override=model_override
+            )
             decision = json.loads(result_str)
             break
         except (json.JSONDecodeError, TypeError, ValueError) as e:

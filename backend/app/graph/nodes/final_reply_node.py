@@ -14,7 +14,7 @@ import time
 from langchain_core.messages import AIMessage
 
 from app.graph.state import ConversationState
-from app.services.llm import _safe_llm_call, mask_pii
+from app.services.llm import _safe_llm_call, mask_pii, LIGHT_MODEL
 from app.logger import logger
 
 SYSTEM_INSTRUCTION = (
@@ -123,7 +123,14 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
     db.close()
 
     llm_messages = [{"role": "system", "content": system_instruction}]
+    
+    # Use lightweight model for early greeting/smalltalk turns without complex tool results
     model_override = None
+    if (
+        (state.get("turn_count", 0) <= 2 and not state.get("gathered_context") and not state.get("handoff_requested"))
+        or state.get("intent_category") in ("greeting", "smalltalk", "off-topic")
+    ):
+        model_override = LIGHT_MODEL
 
     recent_messages = state["messages"][-6:]
     for msg in recent_messages[:-1]:
@@ -144,7 +151,7 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
     final_prompt = f"Context:\n{context_text}\n\nCustomer's message: {last_human_content}"
     llm_messages.append({"role": "user", "content": final_prompt})
 
-    reply = await _safe_llm_call(llm_messages, temperature=0.3, max_tokens=1000)
+    reply = await _safe_llm_call(llm_messages, temperature=0.3, max_tokens=1000, model_override=model_override)
     if not reply:
         reply = "I'm sorry, I couldn't process that right now. Could you please try again?"
 

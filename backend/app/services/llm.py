@@ -16,9 +16,9 @@ import asyncio
 import os
 import re
 import base64
-from groq import AsyncGroq
+from groq import AsyncGroq, BadRequestError
 import openai
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_not_exception_type
 
 from app.config import settings
 from app.logger import logger
@@ -86,7 +86,8 @@ def mask_pii(text: str) -> str:
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=10),
-    reraise=True
+    reraise=True,
+    retry=retry_if_not_exception_type(BadRequestError)
 )
 async def _safe_groq_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, model_override: str = None) -> str:
     """Wrapper around Groq API calls with retry logic."""
@@ -108,7 +109,8 @@ async def _safe_groq_call(messages: list, temperature: float = 0.2, max_tokens: 
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=10),
-    reraise=True
+    reraise=True,
+    retry=retry_if_not_exception_type(BadRequestError)
 )
 async def _safe_groq_json_call(messages: list, temperature: float = 0.2, max_tokens: int = 1000, model_override: str = None) -> str:
     """Wrapper around Groq API calls specifically for JSON output."""
@@ -251,16 +253,19 @@ async def _safe_openrouter_json_call(messages: list, temperature: float = 0.2, m
     raise ValueError("OpenRouter returned empty JSON response")
 
 
+# OpenAI fallback disabled temporarily (no active credits; skips directly to OpenRouter)
+ENABLE_OPENAI_FALLBACK = False
+
 async def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, is_json: bool = False, model_override: str = None) -> str:
-    """Calls Groq, falls back to OpenAI, and then falls back to OpenRouter if both fail."""
+    """Calls Groq, falls back to OpenAI (if enabled), and then falls back to OpenRouter if previous fail."""
     try:
         if is_json:
             return await _safe_groq_json_call(messages, temperature, max_tokens, model_override)
         return await _safe_groq_call(messages, temperature, max_tokens, model_override)
     except Exception as e:
-        logger.error(f"Groq API completely failed after retries: {e}. Falling back to OpenAI...")
+        logger.error(f"Groq API completely failed after retries: {e}. Falling back to {'OpenAI' if ENABLE_OPENAI_FALLBACK else 'OpenRouter'}...")
         
-    if _openai_client:
+    if ENABLE_OPENAI_FALLBACK and _openai_client:
         try:
             return await _safe_openai_call(messages, temperature, max_tokens, is_json)
         except Exception as oe:
@@ -388,7 +393,7 @@ async def describe_image_if_present(text: str) -> str:
                     [{"role": "user", "content": content_list}], 
                     temperature=0.2, 
                     max_tokens=1024, 
-                    model_override="qwen/qwen3.6-27b"
+                    model_override="qwen/qwen3.8-27b"
                 )
                 if desc:
                     # Strip <think> blocks even if unclosed
@@ -406,6 +411,7 @@ async def describe_image_if_present(text: str) -> str:
 
 
 MODEL = "openai/gpt-oss-120b"
+LIGHT_MODEL = "openai/gpt-oss-20b"
 # Groq deprecated meta-llama/llama-4-scout-17b-16e-instruct on June 17,
 # 2026 (free/developer tier) and recommends this model as the direct
 # replacement. If Groq changes their lineup again, check
@@ -451,7 +457,7 @@ async def generate_conversation_summary(messages: list, escalation_reason: str |
         {"role": "user", "content": f"Transcript:\n{transcript_text}"}
     ]
 
-    result = await _safe_llm_call(messages=llm_messages, temperature=0.1, max_tokens=1024)
+    result = await _safe_llm_call(messages=llm_messages, temperature=0.1, max_tokens=1024, model_override=LIGHT_MODEL)
     return result or "Customer requested to speak with a human agent."
 
 
@@ -475,7 +481,7 @@ async def update_conversation_summary(messages: list, current_summary: str | Non
         role = "user" if msg.type == "human" else "assistant"
         llm_messages.append({"role": role, "content": msg.content})
 
-    result = await _safe_llm_call(messages=llm_messages, temperature=0.2, max_tokens=250)
+    result = await _safe_llm_call(messages=llm_messages, temperature=0.2, max_tokens=250, model_override=LIGHT_MODEL)
     return result or current_summary or ""
 
 async def validate_security_intent(text: str) -> bool:

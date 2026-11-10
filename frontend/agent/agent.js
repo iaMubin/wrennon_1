@@ -61,7 +61,7 @@ window.WRENNON_DEMO = false;
 function customerAvatarUrl(key) {
   return window.WRENNON_DEMO
     ? `https://i.pravatar.cc/150?u=${encodeURIComponent(key)}`
-    : '/agent/images/default-avatar.png?v=2';
+    : 'images/default-avatar.png?v=2';
 }
 let activeSessionId = null;
 let _agentToken = null; // stored on login for WebSocket auth
@@ -226,7 +226,7 @@ function setupProfileDropdown() {
     if (dpMenuEl) {
       const dp = localStorage.getItem("agent_dp_url");
       if (dp) dpMenuEl.src = dp;
-      else dpMenuEl.src = "/agent/images/default-avatar.png?v=2";
+      else dpMenuEl.src = "images/default-avatar.png?v=2";
     }
     
     dropdown.classList.toggle("hidden");
@@ -377,13 +377,13 @@ loginForm.addEventListener("submit", async (e) => {
       document.getElementById("agent-profile-dp").src = data.dp_url;
     } else {
       localStorage.removeItem("agent_dp_url");
-      document.getElementById("agent-profile-dp").src = "/agent/images/default-avatar.png?v=2";
+      document.getElementById("agent-profile-dp").src = "images/default-avatar.png?v=2";
     }
     
     if (data.role === "manager" || data.role === "admin") {
       document.getElementById("admin-dashboard-btn").classList.remove("hidden");
       document.getElementById("admin-dashboard-btn").addEventListener("click", () => {
-        window.location.href = "/agent/admin_dashboard.html?v=" + new Date().getTime();
+        window.location.href = "admin_dashboard.html?v=" + new Date().getTime();
       });
     }
 
@@ -741,10 +741,10 @@ function renderConversationList(conversations) {
     const customerDisplayName = conv.customer_name || conv.customer_email || "Unknown Customer";
     let avatarHtml = "";
     if (!conv.customer_name && !conv.customer_email) {
-      avatarHtml = `<img src="/agent/images/default-avatar.png?v=2" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border-light); box-shadow: 0 1px 3px rgba(0,0,0,0.1);" alt="Avatar">`;
+      avatarHtml = `<img src="images/default-avatar.png?v=2" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border-light); box-shadow: 0 1px 3px rgba(0,0,0,0.1);" alt="Avatar">`;
     } else {
       const dpId = conv.customer_email || conv.customer_id || conv.session_id || hash;
-      avatarHtml = `<img src="https://i.pravatar.cc/150?u=${encodeURIComponent(dpId)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border-light); box-shadow: 0 1px 3px rgba(0,0,0,0.1);" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">`;
+      avatarHtml = `<img src="https://i.pravatar.cc/150?u=${encodeURIComponent(dpId)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border-light); box-shadow: 0 1px 3px rgba(0,0,0,0.1);" alt="Avatar" onerror="this.src='images/default-avatar.png?v=2'">`;
     }
 
     const shortIdForBadge = conv.short_id || conv.session_id;
@@ -2314,7 +2314,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (adminBtn) {
           adminBtn.classList.remove("hidden");
           adminBtn.addEventListener("click", () => {
-            window.location.href = "/agent/admin_dashboard.html?v=" + new Date().getTime();
+            window.location.href = "admin_dashboard.html?v=" + new Date().getTime();
           });
         }
       }
@@ -2615,7 +2615,7 @@ function showCustomerSidebar(customer, isDemo = false) {
     <div class="customer-details-box">
       <div class="customer-profile-compact">
         <div class="customer-profile__avatar-small">
-          <img src="${customerAvatarUrl(customer.email || customer.id)}" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">
+          <img src="${customerAvatarUrl(customer.email || customer.id)}" alt="Avatar" onerror="this.src='images/default-avatar.png?v=2'">
         </div>
         <div class="customer-profile-info">
           <div style="display:flex; flex-direction:column; gap:2px; flex:1; overflow:hidden;">
@@ -2696,7 +2696,7 @@ function showCustomerSidebar(customer, isDemo = false) {
   const toggleBtn = document.getElementById("customer-sidebar-toggle");
   if (toggleBtn) {
     const avatarUrl = customerAvatarUrl(customer.email || customer.id);
-    toggleBtn.innerHTML = `<img src="${avatarUrl}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" alt="Customer Details" onerror="this.src='/agent/images/default-avatar.png?v=2'">`;
+    toggleBtn.innerHTML = `<img src="${avatarUrl}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" alt="Customer Details" onerror="this.src='images/default-avatar.png?v=2'">`;
     toggleBtn.style.padding = "2px";
     toggleBtn.style.borderRadius = "50%";
   }
@@ -3836,7 +3836,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         tbody.innerHTML = sorted.map(c => {
-            const avatarUrl = c.email ? customerAvatarUrl(c.email) : '/agent/images/default-avatar.png?v=2';
+            const avatarUrl = c.email ? customerAvatarUrl(c.email) : 'images/default-avatar.png?v=2';
             const resRatio = c.resolved_ratio != null ? (c.resolved_ratio * 100).toFixed(0) + '%' : '—';
             const avgCsat = c.avg_csat != null ? c.avg_csat.toFixed(1) + ' ★' : '—';
             const lastActive = formatAgo(c.last_active);
@@ -3845,7 +3845,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <tr>
                 <td>
                     <div class="customer-cell">
-                    <img src="${avatarUrl}" class="avatar" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-light);" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">
+                    <img src="${avatarUrl}" class="avatar" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-light);" alt="Avatar" onerror="this.src='images/default-avatar.png?v=2'">
                     <div>
                         <div class="name">${escapeHtml(c.email || 'Unknown')}</div>
                         <div class="email">${escapeHtml(c.email || 'Unknown')}</div>

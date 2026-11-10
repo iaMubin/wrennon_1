@@ -2281,7 +2281,7 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   display: block;
   width: 72px;
   height: 72px;
-  background: url('/agent/images/wren-mark.svg') no-repeat center center;
+  background: url('images/wren-mark.svg') no-repeat center center;
   background-size: contain;
   opacity: 0.15;
   filter: grayscale(100%);
