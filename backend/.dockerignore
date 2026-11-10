@@ -13,3 +13,4 @@ requirements-dev.txt
 ruff.toml
 .pytest_cache/
 .coverage
+evals/

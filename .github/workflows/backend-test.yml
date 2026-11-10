@@ -40,7 +40,7 @@ jobs:
         pip install -r requirements-dev.txt
 
     - name: Lint (ruff)
-      run: ruff check app tests scripts
+      run: ruff check app tests scripts evals
 
     - name: Dependency audit (no ignores)
       # Fails the build on ANY known vulnerability in production dependencies.

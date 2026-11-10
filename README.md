@@ -11,6 +11,17 @@ An AI-first, web-chat customer support platform built on a LangGraph state backb
 - **Order Context:** Parses messages for Order IDs and emails to retrieve and display customer/order data to agents (web chat channel only; Shopify/Zendesk integrations are stubs, demo data is used when `USE_MOCK_INTEGRATIONS=true`).
 - **Multimedia Support:** Supports image uploads and parsing for enhanced issue diagnosis.
 
+## Evals
+
+`backend/evals/cases.yaml` holds the agent's regression cases (order lookup + identity checks, prompt-injection vs. money tools, escalation, PII masking). Add one case for every production failure.
+
+```bash
+cd backend && pytest tests/test_evals.py      # CI: scripted LLM, deterministic, free
+python -m evals.run_live --dry-run            # check the live runner itself, no API calls
+python -m evals.run_live                      # REAL model, billable (needs GROQ_API_KEY + `alembic upgrade head`)
+```
+Stub mode proves the code *around* the model (routing, tool gating, masking). Only `run_live` tells you how the model itself behaves.
+
 ## Architecture Stack
 
 - **Backend:** Python 3.12, FastAPI, WebSockets, SQLAlchemy (PostgreSQL in production, SQLite for local dev), LangChain / LangGraph.

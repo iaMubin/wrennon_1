@@ -1,0 +1,36 @@
+name: Live evals (real LLM)
+
+# Manual only: these make real, billable calls to the LLM provider.
+# Add GROQ_API_KEY under Settings -> Secrets and variables -> Actions first.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-evals:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - run: pip install -r requirements-dev.txt
+    - name: Run live evals
+      env:
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        COHERE_API_KEY: "dummy"
+        PINECONE_API_KEY: "dummy"
+        PINECONE_HOST: "dummy"
+        DATABASE_URL: "sqlite:///./evals.db"
+        JWT_SECRET_KEY: "test-secret"
+        AGENT_USERNAME: "eval_admin"
+        AGENT_PASSWORD_HASH: "test-hash"
+        PYTHONPATH: "."
+      run: |
+        alembic upgrade head
+        python -m evals.run_live

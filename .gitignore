@@ -54,3 +54,6 @@ cookies.txt
 .coverage
 *.log
 backend/data/*.log
+.ruff_cache/
+.pytest_cache/
+*.db
