@@ -43,3 +43,14 @@ backend/check.py
 *.tmp
 *.temp
 scratch/
+
+# One-off fix artifacts: use git commits/branches, not patch files or credentials dumps
+*.patch
+*.rej
+*.orig
+cookies.txt
+.benchmarks/
+
+.coverage
+*.log
+backend/data/*.log

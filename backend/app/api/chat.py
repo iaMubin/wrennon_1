@@ -5,12 +5,12 @@ already happened (if this session_id has been seen before) before the
 WebSocket connection takes over for everything that happens next.
 """
 
+import asyncio
 import datetime
 import uuid
 
-from fastapi import APIRouter, Depends, Request, Header, HTTPException, status, UploadFile, File, Body, BackgroundTasks, BackgroundTasks
+from fastapi import APIRouter, Depends, Request, Header, HTTPException, status, UploadFile, File, Body, BackgroundTasks
 from sqlalchemy.orm import Session
-import shutil
 import os
 import re
 
@@ -160,6 +160,11 @@ ALLOWED_EXTENSIONS = {
 }
 MAX_FILE_SIZE = 2 * 1024 * 1024  # 2 MB
 
+
+def _write_bytes(path: str, data: bytes) -> None:
+    with open(path, "wb") as f:
+        f.write(data)
+
 @router.post("/chat/upload/{session_id}")
 @limiter.limit("20/minute")
 async def upload_file(
@@ -188,8 +193,7 @@ async def upload_file(
     safe_filename = f"{file_id}{ext}"
     
     file_path = os.path.join(UPLOAD_DIR, safe_filename)
-    with open(file_path, "wb") as buffer:
-        buffer.write(contents)
+    await asyncio.to_thread(_write_bytes, file_path, contents)
         
     file_url = f"{request.base_url}uploads/{safe_filename}"
     return {"url": file_url, "filename": safe_filename, "type": file.content_type}
@@ -230,7 +234,6 @@ def submit_csat(
 
     if rating <= 2:
         from app.realtime.connection_manager import manager
-        import asyncio
         
         async def send_low_csat_alert():
             await manager.broadcast_to_agents({

@@ -275,3 +275,11 @@ def test_logout_revokes_the_cookie_token(setup_csrf_test_agent, https_client):
         headers={"Authorization": f"Bearer {old_token}"},
     )
     assert replay_resp.status_code == 401
+
+
+def test_login_lockout_actually_returns_429(mock_redis):
+    # Regression: the 429 used to be raised inside a try/except Exception and
+    # swallowed, so brute-force lockout never fired.
+    mock_redis.get.return_value = b"5"
+    response = client.post("/api/agent/login", data={"username": "test_admin", "password": "wrong"})
+    assert response.status_code == 429

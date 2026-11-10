@@ -7,10 +7,8 @@ WebSocket endpoints. Two endpoints:
 from __future__ import annotations
 
 import datetime
-import re
 import asyncio
 import time
-import redis.asyncio as redis
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Cookie
 from langchain_core.messages import AIMessage, HumanMessage
@@ -24,7 +22,7 @@ from app.graph.state import initial_state
 from app.logger import logger
 from app.realtime.connection_manager import manager
 from app.config import settings
-from app.services.llm import mask_pii, update_conversation_summary, transcribe_audio_if_present, describe_image_if_present, auto_translate_if_needed
+from app.services.llm import mask_pii, update_conversation_summary, transcribe_audio_if_present, describe_image_if_present
 from app.services.cache import get_cache, set_cache
 from app.api.agent import get_redis
 

@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from app.main import app
-from app.db.models import Agent, ApiKey, Conversation, Message
+from app.db.models import ApiKey, Conversation, Message
 from app.auth.security import hash_password
 
 client = TestClient(app)

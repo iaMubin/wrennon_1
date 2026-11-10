@@ -1,4 +1,3 @@
-import pytest
 from app.services.llm import mask_pii
 
 def test_mask_emails():
@@ -58,3 +57,25 @@ def test_mask_empty_and_malformed():
     assert mask_pii("") == ""
     assert mask_pii("   ") == "   "
     assert mask_pii("None of your business") == "None of your business"
+
+
+def test_benign_phrases_are_not_masked_as_names():
+    # Regression: a global (?i) flag made [A-Z][a-z]+ match any word, so
+    # "i'm checking" became "i'm [NAME HIDDEN]" and the bot hallucinated that
+    # the customer had given their name.
+    from app.services.llm import mask_pii
+    for text in ["ok i'm checking", "I am looking for a jacket", "this is annoying"]:
+        assert mask_pii(text) == text
+
+
+def test_order_numbers_are_not_masked_as_ssn():
+    from app.services.llm import mask_pii
+    assert mask_pii("my order 123456789 is late") == "my order 123456789 is late"
+    assert "[SSN HIDDEN]" in mask_pii("ssn 123-45-6789")
+    assert "[NAME HIDDEN]" in mask_pii("My name is John Smith")
+
+
+def test_money_moving_tools_not_reachable_by_llm():
+    from app.services.tools import TOOL_EXECUTORS
+    assert "process_refund" not in TOOL_EXECUTORS
+    assert "update_subscription" not in TOOL_EXECUTORS

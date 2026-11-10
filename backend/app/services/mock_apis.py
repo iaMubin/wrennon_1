@@ -13,7 +13,6 @@ docstring's "Returns" shape untouched, or downstream nodes will break.
 
 from __future__ import annotations
 from typing import Optional
-import json
 
 MOCK_CUSTOMERS = [   {   'id': 'CUST-1001',
         'name': 'Eleanor Vance',

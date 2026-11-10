@@ -4,8 +4,8 @@ pydantic==2.10.4
 pydantic-settings==2.7.1
 
 # Orchestration
-langgraph==0.2.62
-langchain-core==0.3.28
+langgraph==1.2.20
+langchain-core==1.7.7
 
 # LLM
 groq==0.15.0
@@ -13,14 +13,13 @@ openai==2.41.0
 
 # Embeddings + vector store
 pinecone==9.1.0
-posthog==3.7.4
 
 # Reranking
 cohere==5.13.4
 
 # PDF ingestion (policy docs)
 pymupdf==1.25.1
-langchain-text-splitters==0.3.4
+langchain-text-splitters==1.1.3
 
 # Environment
 python-dotenv==1.2.2
@@ -37,18 +36,17 @@ passlib[bcrypt]==1.7.4
 python-multipart==0.0.31
 
 # Realtime
-websockets==14.1
+# websockets comes in via uvicorn[standard]; do not pin it here
 redis==8.0.1
 broadcaster==0.3.1
 
 # Utilities
 tenacity==9.1.2
-langsmith
+langsmith==0.14.17
 sentry-sdk==2.8.0
 slowapi==0.1.9
 
-# Testing
-pytest==9.0.3
+# HTTP client (Shopify integration)
 httpx==0.28.1
 
 # zoneinfo (stdlib) needs this on platforms with no system IANA tz

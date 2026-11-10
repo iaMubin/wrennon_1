@@ -4,7 +4,6 @@ import sys
 # Add backend directory to sys.path so we can import app modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from passlib.context import CryptContext
 from app.db.session import SessionLocal
 from app.db.models import Agent
 from app.config import settings

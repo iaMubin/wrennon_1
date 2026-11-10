@@ -8,7 +8,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/agent/theme.css?v=91">
-<link rel="stylesheet" href="/agent/agent.css?v=91">
+<link rel="stylesheet" href="/agent/agent.css?v=92">
+<link rel="stylesheet" href="/ui-polish.css?v=1">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   (function() {
@@ -49,6 +50,7 @@
   }
   .theme-dropdown-menu button, .theme-dropdown-menu div, .theme-option {
     background-color: var(--bg-surface, #ffffff) !important;
+    color: var(--ink, #000000) !important;
     opacity: 1 !important;
   }
   .theme-option:hover {
@@ -98,7 +100,7 @@
   <div id="dashboard" class="hidden">
     <nav id="global-nav">
       <div class="global-nav-top">
-        <button id="mobile-sidebar-toggle" class="global-nav-btn" aria-label="Toggle Sidebar" title="Toggle Sidebar">
+        <button id="mobile-sidebar-toggle" class="global-nav-btn" aria-label="Toggle Sidebar" aria-controls="sidebar" aria-expanded="true" title="Toggle Sidebar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
             <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
             <path d="M9 3v18"></path>
@@ -173,6 +175,8 @@
 
           </div>
         </div>
+      </div>
+      <div class="global-nav-bottom">
         <div style="position: relative; width: 100%; display: flex; justify-content: center;">
           <button id="theme-menu-btn" class="global-nav-btn" aria-haspopup="true" aria-expanded="false" title="Settings">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22" style="margin: 0 auto; display: block;">
@@ -220,19 +224,18 @@
                   <button class="theme-tab" data-target="agent-widget-themes">Widget</button>
                 </div>
                 <div id="agent-light-themes" class="theme-tab-content active">
-                  <button class="theme-option" data-theme-value="light-brownish" role="menuitem">Brownish White</button>
                   <button class="theme-option" data-theme-value="light-neutral-gray" role="menuitem">Neutral Gray</button>
                   <button class="theme-option" data-theme-value="light-corporate-blue" role="menuitem">Corporate Blue</button>
                   <button class="theme-option" data-theme-value="light-slate-teal" role="menuitem">Slate Teal</button>
                   <button class="theme-option" data-theme-value="light-graphite" role="menuitem">Graphite Monochrome</button>
+                  <button class="theme-option" data-theme-value="light-pure-white" role="menuitem">Pure White</button>
                 </div>
                 <div id="agent-dark-themes" class="theme-tab-content hidden">
                   <button class="theme-option" data-theme-value="dark-matte" role="menuitem">Matte Black</button>
                   <button class="theme-option" data-theme-value="dark-navy" role="menuitem">Black Navy</button>
                   <button class="theme-option" data-theme-value="dark-charcoal" role="menuitem">Charcoal</button>
                   <button class="theme-option" data-theme-value="dark-corporate-blue" role="menuitem">Corporate Blue</button>
-                  <button class="theme-option" data-theme-value="dark-slate-teal" role="menuitem">Slate Teal</button>
-                  <button class="theme-option" data-theme-value="dark-graphite" role="menuitem">Graphite Monochrome</button>
+                  <button class="theme-option" data-theme-value="dark-pure-black" role="menuitem">Pure Black</button>
                 </div>
                 <div id="agent-widget-themes" class="theme-tab-content hidden">
                   <button class="theme-option" data-theme-value="widget-default" role="menuitem">Default Style</button>
@@ -241,13 +244,61 @@
               </div>
           </div>
         </div>
-      </div>
-      <div class="global-nav-bottom">
         <button id="admin-dashboard-btn" class="global-nav-btn hidden" title="Admin Panel">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
             <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path>
           </svg>
         </button>
+        <div class="theme-dropdown-container" style="display: flex; justify-content: center; width: 100%; margin-bottom: 8px; position: relative;">
+          <div id="agent-profile-btn" style="padding: 4px; cursor: pointer; position: relative; display: inline-block;" aria-haspopup="true" aria-expanded="false">
+            <img id="agent-profile-dp" src="/agent/images/default-avatar.png" alt="Profile" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; display: block;" onerror="this.onerror=null; this.style.display='none';">
+            <span id="connection-dot" class="dot dot--offline" title="Connecting..." style="position: absolute; bottom: 2px; right: 2px; border: 2px solid var(--bg-base); width: 8px; height: 8px; box-sizing: content-box; z-index: 10;"></span>
+          </div>
+          
+          <div id="profile-dropdown" class="theme-dropdown-menu hidden" role="menu" style="left: 100%; top: auto; bottom: 0; margin-left: 12px; transform: none; width: 220px; z-index: 100; text-align: left;">
+             <div style="padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px;">
+               <img id="profile-dropdown-dp" src="/agent/images/default-avatar.png" alt="Profile" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+               <div style="display: flex; flex-direction: column;">
+                 <div id="profile-dropdown-name" style="font-weight: 600; color: var(--ink); line-height: 1.2;">Agent</div>
+                 <div id="profile-dropdown-role" style="font-size: 12px; color: var(--ink-soft); text-transform: capitalize; margin-top: 2px;">agent</div>
+               </div>
+             </div>
+             
+             <div style="padding: 8px 0;">
+                <div style="padding: 4px 16px; font-size: 11px; text-transform: uppercase; color: var(--ink-muted); font-weight: 600; letter-spacing: 0.05em;">Status</div>
+                <button class="theme-option status-option active" data-status="online" style="display:flex; align-items:center; justify-content: space-between; gap: 8px;">
+                  <div style="display:flex; align-items:center; gap: 8px;"><span class="dot dot--online" style="position: static; box-shadow: none; width: 8px; height: 8px; animation: none;"></span> Online</div>
+                  <svg class="status-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: block;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
+                <button class="theme-option status-option" data-status="away" style="display:flex; align-items:center; justify-content: space-between; gap: 8px;">
+                  <div style="display:flex; align-items:center; gap: 8px;"><span class="dot" style="position: static; background-color: var(--warning); box-shadow: none; width: 8px; height: 8px;"></span> Away</div>
+                  <svg class="status-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
+                <button class="theme-option status-option" data-status="offline" style="display:flex; align-items:center; justify-content: space-between; gap: 8px;">
+                  <div style="display:flex; align-items:center; gap: 8px;"><span class="dot dot--offline" style="position: static; box-shadow: none; width: 8px; height: 8px;"></span> Offline</div>
+                  <svg class="status-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
+             </div>
+             
+             <div style="height: 1px; background: var(--line); margin: 4px 0;"></div>
+             
+             <button class="theme-option" style="display:flex; align-items:center; gap: 8px;">
+               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+               Profile Settings
+             </button>
+             <button class="theme-option" style="display:flex; align-items:center; gap: 8px;">
+               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+               Help & Support
+             </button>
+             
+             <div style="height: 1px; background: var(--line); margin: 4px 0;"></div>
+             
+             <button id="profile-logout-btn" class="theme-option" style="display:flex; align-items:center; gap: 8px; color: var(--danger);">
+               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+               Logout
+             </button>
+          </div>
+        </div>
         <div class="global-nav-logo bottom">
            <img src="/agent/images/wren-mark.svg" alt="Wrennon" style="width: 28px; height: 28px; opacity: 1;">
         </div>
@@ -262,14 +313,7 @@
             <span class="brand-name">Wrennon</span>
           </span>
         </div>
-        <div class="icon-btn-group">
-          <span id="connection-dot" class="dot dot--offline" title="Connecting..."></span>
-          <div class="theme-dropdown-container">
-            <div style="padding: 4px;">
-              <img id="agent-profile-dp" src="/agent/images/default-avatar.png" alt="Profile" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;" onerror="this.onerror=null; this.style.display='none';">
-            </div>
-          </div>
-        </div>
+
       </div>
 
       <nav id="section-tabs">
@@ -312,14 +356,15 @@
             </select>
         </div>
       </div>
-      <div id="conversation-list"></div>
+      <div id="conversation-list" role="list" aria-label="Conversations"></div>
     </aside>
 
     <div id="resizer"></div>
 
     <main id="conversation-view">
       <div id="empty-state">
-        <p>Select a conversation to view it here.</p>
+        <h2>Your inbox is ready</h2>
+        <p>Select a conversation from the list to read and reply.</p>
       </div>
 
       <div id="active-conversation" class="hidden">
@@ -492,19 +537,19 @@
         <div class="dashboard-grid">
           <div class="metric-card">
             <h3>Open Tickets</h3>
-            <div class="metric-value" id="metric-open-tickets">—</div>
+            <div class="metric-value" id="metric-open-tickets" style="color: #22c55e;">—</div>
           </div>
           <div class="metric-card">
             <h3>Unassigned</h3>
-            <div class="metric-value" id="metric-unassigned">—</div>
+            <div class="metric-value" id="metric-unassigned" style="color: #16a34a;">—</div>
           </div>
           <div class="metric-card">
             <h3>Solved Today</h3>
-            <div class="metric-value" id="metric-solved-today">—</div>
+            <div class="metric-value" id="metric-solved-today" style="color: #15803d;">—</div>
           </div>
           <div class="metric-card">
             <h3>CSAT Score</h3>
-            <div class="metric-value" id="metric-csat">—</div>
+            <div class="metric-value" id="metric-csat" style="color: #10b981;">—</div>
           </div>
         </div>
         <div class="dashboard-main-area">
@@ -582,7 +627,14 @@
         <div class="view-header">
           <h2>Analytics & Reporting</h2>
           <div class="header-actions">
-            <span style="padding: 8px 12px; font-weight: 500;">All time</span>
+            <div class="filter-select-wrapper" data-value="All time">
+              <select id="analytics-date-range" class="filter-select" onchange="this.parentElement.setAttribute('data-value', this.options[this.selectedIndex].text); if(window.loadAnalytics) window.loadAnalytics()">
+                <option value="today">Today</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="all" selected>All time</option>
+              </select>
+            </div>
             <!-- Download PDF intentionally left dead for this phase or hidden -->
             <button class="btn btn-secondary" style="display:none;">Download PDF</button>
           </div>
@@ -605,17 +657,17 @@
             <div class="stats-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div class="stat-item">
                 <span class="stat-label">First Response Time (Avg)</span>
-                <span class="stat-value" id="analytics-first-response">—</span>
+                <span class="stat-value" id="analytics-first-response" style="color: #22c55e;">—</span>
                 <!-- trend removed -->
                 </div>
                 <div class="stat-item">
                 <span class="stat-label">Avg Resolution Time</span>
-                <span class="stat-value" id="analytics-avg-resolution-time">—</span>
+                <span class="stat-value" id="analytics-avg-resolution-time" style="color: #16a34a;">—</span>
                 <!-- trend removed -->
                 </div>
                 <div class="stat-item">
                 <span class="stat-label">One-Touch Resolutions</span>
-                <span class="stat-value" id="analytics-one-touch">—</span>
+                <span class="stat-value" id="analytics-one-touch" style="color: #15803d;">—</span>
                 <!-- trend removed -->
                 </div>
                 <div class="stat-item" style="display:none;">
@@ -624,9 +676,66 @@
                 <span class="trend trend-up">↑ 4% vs last period</span>
                 </div>
             </div>
+          
+          <!-- Analytics & Copilot Section -->
+          <div class="section-block" style="margin-top: 24px;">
+              <h3 class="section-title">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                  System Analytics & Copilot Insights
+              </h3>
+              <p class="section-subtitle">Real-time performance metrics and recent AI assistant actions.</p>
+  
+              <div class="stat-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 16px;">
+                  <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 8px; border: 1px solid var(--border-light);">
+                      <div class="stat-label" style="font-size: 13px; color: var(--ink-soft); margin-bottom: 8px;">Total Support Tickets</div>
+                      <div id="analytics-total-tickets" class="stat-value" style="font-size: 24px; font-weight: 700; color: var(--ink);">0</div>
+                  </div>
+                  <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 8px; border: 1px solid var(--border-light);">
+                      <div class="stat-label" style="font-size: 13px; color: var(--ink-soft); margin-bottom: 8px;">AI Resolution Rate</div>
+                      <div class="stat-row" style="display: flex; align-items: baseline; gap: 8px;">
+                          <div id="analytics-deflection-rate" class="stat-value stat-value--accent" style="font-size: 24px; font-weight: 700; color: #10b981;">0%</div>
+                          <div id="analytics-ai-resolved" class="stat-sub" style="font-size: 12px; color: var(--ink-muted);">(0 resolved)</div>
+                      </div>
+                  </div>
+                  <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 8px; border: 1px solid var(--border-light);">
+                      <div class="stat-label" style="font-size: 13px; color: var(--ink-soft); margin-bottom: 8px;">Revenue Generated</div>
+                      <div id="analytics-revenue" class="stat-value stat-value--success" style="font-size: 24px; font-weight: 700; color: var(--success);">$0.00</div>
+                  </div>
+                  <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 8px; border: 1px solid var(--border-light);">
+                      <div class="stat-label" style="font-size: 13px; color: var(--ink-soft); margin-bottom: 8px;">Total Upsells</div>
+                      <div id="analytics-upsells" class="stat-value" style="font-size: 24px; font-weight: 700; color: #059669;">0</div>
+                  </div>
+              </div>
+          </div>
+  
+          <div class="section-block" style="margin-top: 24px;">
+              <h3 class="section-title">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M9 15l2 2 4-4"></path></svg>
+                  Automated QA & CSAT Scorecards
+              </h3>
+              <p class="section-subtitle">AI-generated evaluations of recent human-handled and AI-handled conversations.</p>
+              <div style="overflow-x: auto; background: var(--bg-surface); border: 1px solid var(--border-light); border-radius: 8px; margin-top: 16px;">
+                  <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                      <thead>
+                          <tr>
+                              <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--line); color: var(--ink-soft);">Time</th>
+                              <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--line); color: var(--ink-soft);">Conv ID</th>
+                              <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line); color: var(--ink-soft);">Empathy</th>
+                              <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line); color: var(--ink-soft);">Accuracy</th>
+                              <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line); color: var(--ink-soft);">Resolution</th>
+                              <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line); color: var(--ink-soft);">Pred. CSAT</th>
+                              <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--line); min-width: 250px; color: var(--ink-soft);">AI Feedback</th>
+                          </tr>
+                      </thead>
+                      <tbody id="qa-scorecards-list">
+                          <tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--ink-soft);">No scorecards yet. Resolve a conversation to generate one.</td></tr>
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+
         </div>
       </div>
-    </div>
 
   </div>
 
@@ -663,7 +772,7 @@
     </div>
   </div>
 
-  <script src="/agent/agent.js?v=80"></script>
+  <script src="/agent/agent.js?v=81"></script>
 </body>
 </html>
 

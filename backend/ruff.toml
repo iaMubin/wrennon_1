@@ -1,0 +1,14 @@
+# Correctness-focused rule set. Style rules (import order, pyupgrade, ...) are
+# deliberately NOT enabled: they would rewrite hundreds of lines for no
+# behavioural gain. Widen this list gradually, one rule family per PR.
+target-version = "py312"
+extend-exclude = ["alembic/versions"]
+
+[lint]
+select = [
+  "E9", "F63", "F7", "F82",   # syntax errors, undefined names
+  "F401", "F811",              # unused / duplicate imports
+  "E722",                      # bare except
+  "ASYNC230",                  # blocking open() inside async code
+  "B006",                      # mutable default arguments
+]

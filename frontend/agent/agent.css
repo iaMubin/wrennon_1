@@ -3966,3 +3966,33 @@ th.sort-desc .sort-icon::after {
   #conversation-header .conv-header-info > div { flex-wrap: wrap; }
   #conversation-header .ticket-properties-bar { flex-wrap: wrap; }
 }
+
+/* Collision + CSAT badges (restored: markup and JS existed, styles were lost) */
+.collision-badge {
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  animation: collisionPulse 2s ease-in-out infinite;
+}
+.collision-badge.hidden { display: none; }
+
+.csat-badge {
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: #f5b400;
+  background: color-mix(in srgb, #f5b400 12%, transparent);
+  border: 1px solid color-mix(in srgb, #f5b400 35%, transparent);
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  cursor: default;
+}
+.csat-badge.hidden { display: none; }
+
+@keyframes collisionPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}

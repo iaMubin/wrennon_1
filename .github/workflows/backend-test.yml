@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -34,41 +37,23 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pip-audit bandit
+        pip install -r requirements-dev.txt
 
-    # - name: Security Scanning
-    #   run: |
-    #     pip-audit
-    #     bandit -r app/
+    - name: Lint (ruff)
+      run: ruff check app tests scripts
 
-    - name: Security Scanning
-      run: |
-        # Entire langchain/langgraph/langsmith stack is pinned to 0.x/0.2.x/0.3.x.
-        # All fixes require a coordinated bump to langchain-core 1.x + langgraph 1.x
-        # (breaking API changes in app/graph/) — tracked as a separate migration task.
-        # This specific SDK advisory affects server auth decorators; the app uses an
-        # in-process StateGraph, and langgraph 0.2.62 requires langgraph-sdk <0.2.0.
-        pip-audit \
-          --ignore-vuln PYSEC-2026-4240 \
-          --ignore-vuln PYSEC-2026-373 \
-          --ignore-vuln PYSEC-2026-1518 \
-          --ignore-vuln PYSEC-2026-2193 \
-          --ignore-vuln PYSEC-2026-2562 \
-          --ignore-vuln PYSEC-2026-2564 \
-          --ignore-vuln PYSEC-2026-2563 \
-          --ignore-vuln PYSEC-2026-77 \
-          --ignore-vuln PYSEC-2026-1520 \
-          --ignore-vuln PYSEC-2026-83 \
-          --ignore-vuln PYSEC-2026-2194 \
-          --ignore-vuln PYSEC-2026-1527 \
-          --ignore-vuln PYSEC-2026-2573 \
-          --ignore-vuln PYSEC-2026-2574 \
-          --ignore-vuln PYSEC-2026-2575 \
-          --ignore-vuln PYSEC-2026-2582 \
-          --ignore-vuln PYSEC-2026-2583 \
-          --ignore-vuln GHSA-f4xh-w4cj-qxq8
-        bandit -r app/
+    - name: Dependency audit (no ignores)
+      # Fails the build on ANY known vulnerability in production dependencies.
+      # If a finding is a verified false positive, add a single --ignore-vuln
+      # here WITH a comment explaining why and an expiry date.
+      run: pip-audit -r requirements.txt --progress-spinner off
+
+    - name: Static analysis (bandit)
+      run: bandit -q -r app/
+
+    - name: Static mirror in sync with frontend/
+      working-directory: .
+      run: python scripts/sync_static.py --check
 
     - name: Run Pytest
       env:
@@ -85,4 +70,11 @@ jobs:
         PYTHONPATH: "."
       run: |
         alembic upgrade head
-        pytest tests/
+        pytest tests/ --cov=app --cov-fail-under=47
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build production image (no push)
+      run: docker build ./backend

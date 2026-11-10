@@ -5,6 +5,7 @@ services:
     rootDir: backend
     dockerfilePath: ./Dockerfile
     preDeployCommand: ./pre_deploy.sh
+    healthCheckPath: /ready
     envVars:
       - key: GROQ_API_KEY
         sync: false
@@ -20,6 +21,8 @@ services:
         sync: false
       - key: APP_ENV
         value: production
+      - key: USE_MOCK_INTEGRATIONS
+        value: "true"  # demo data; set to "false" only once real Shopify is wired
       - key: PINECONE_API_KEY
         sync: false
       - key: PINECONE_HOST

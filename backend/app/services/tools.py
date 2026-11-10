@@ -1,5 +1,6 @@
-from typing import Dict, Any, List
-from app.services.integrations import get_ecommerce_provider, get_crm_provider
+import asyncio
+from typing import Dict, Any
+from app.services.integrations import get_ecommerce_provider
 from app.services.vectorstore import retrieve_and_rerank
 import json
 
@@ -10,6 +11,24 @@ async def execute_get_order_status(args: Dict[str, Any]) -> str:
     if not order_id:
         return "Missing order_id. Please ask the user to provide it."
     
+    if getattr(ecommerce, "requires_verification", False):
+        # Identity check: only reveal an order if the customer has told us the email
+        # on it. _claimed_emails is injected by tool_executor from the customer's own
+        # raw messages and always overwritten, so the LLM cannot supply or forge it.
+        claimed = args.get("_claimed_emails") or []
+        if not claimed:
+            return ("Cannot look up this order yet: ask the customer for the email address used at checkout. "
+                    "Do not reveal any order details until they provide it.")
+        result = None
+        for email in claimed:
+            result = await asyncio.to_thread(ecommerce.get_order_status, order_id, verify_email=email)
+            if result:
+                break
+        if not result:
+            # Identical wording for "no such order" and "email mismatch" (no enumeration).
+            return ("No order found matching that order number and email. "
+                    "Ask the customer to double-check both, or offer to escalate to a human agent.")
+        return f"Order Status for {order_id}: {result}"
     result = ecommerce.get_order_status(order_id=order_id)
     if not result:
         return f"Order {order_id} not found."
@@ -55,17 +74,16 @@ async def execute_track_purchase(args: Dict[str, Any]) -> str:
     result = ecommerce.track_purchase(product_id)
     return f"Purchase tracked: {json.dumps(result)}"
 
-from app.services.tools_l3_l4 import execute_check_refund_policy, execute_send_otp, execute_verify_otp
 
 # Map tool names to their execution functions
 TOOL_EXECUTORS = {
     "get_order_status": execute_get_order_status,
     "search_knowledge_base": execute_search_knowledge_base,
-    "process_refund": execute_process_refund,
-    "update_subscription": execute_update_subscription,
+    # process_refund / update_subscription are deliberately NOT registered:
+    # money-moving actions must not be reachable from LLM output (prompt
+    # injection). Re-add only behind a deterministic policy gate + identity check.
     "recommend_product": execute_recommend_product,
     "track_purchase": execute_track_purchase,
-    "check_refund_policy": execute_check_refund_policy,
-    "send_otp": execute_send_otp,
-    "verify_otp": execute_verify_otp,
+    # check_refund_policy / send_otp / verify_otp were unregistered: they are stubs
+    # (eligibility always True, any 4-6 digit OTP accepted) and no prompt exposes them.
 }

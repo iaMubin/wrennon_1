@@ -10,7 +10,6 @@ alone would consume ~500 MB before any application code even loads.
 
 from __future__ import annotations
 
-import uuid
 from pinecone import Pinecone
 import cohere
 import time

@@ -67,7 +67,6 @@ def test_message_arriving_mid_flight_cancels_and_merges_into_one_reply():
 
             # Confirm nothing else arrives afterward (i.e. truly ONE reply,
             # not one now and a stale one trickling in later)
-            import queue
             try:
                 second = ws.receive_json(timeout=1.5)
                 print("UNEXPECTED SECOND REPLY:", second)

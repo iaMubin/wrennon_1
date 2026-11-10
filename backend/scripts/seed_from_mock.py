@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app.db.session import SessionLocal
 from app.db.models import Conversation, CSATResponse, Message
-from app.services.mock_apis import MOCK_CUSTOMERS, MOCK_ORDERS
+from app.services.mock_apis import MOCK_CUSTOMERS
 
 def clear_db(db):
     db.query(CSATResponse).delete()

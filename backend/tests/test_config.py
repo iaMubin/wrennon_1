@@ -1,7 +1,5 @@
 import pytest
 from pydantic import ValidationError
-import os
-from unittest.mock import patch
 from app.config import Settings
 
 def test_development_defaults_are_valid():

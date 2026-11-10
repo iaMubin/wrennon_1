@@ -52,3 +52,11 @@ def test_alembic_schema_matches_models(engine):
         db_columns = {col['name'] for col in inspector.get_columns(table_name)}
         model_columns = {col.name for col in Base.metadata.tables[table_name].columns}
         assert model_columns == db_columns, f"Column mismatch in {table_name}! Models: {model_columns}, DB: {db_columns}"
+
+
+def test_query_indexes_exist_after_migration(engine):
+    insp = inspect(engine)
+    conv = {i["name"] for i in insp.get_indexes("conversations")}
+    msg = {i["name"] for i in insp.get_indexes("messages")}
+    assert {"ix_conversations_queue", "ix_conversations_assigned_agent"} <= conv
+    assert "ix_messages_conversation_created" in msg

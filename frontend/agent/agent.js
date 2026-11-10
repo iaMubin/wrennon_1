@@ -53,6 +53,16 @@ if (!document.getElementById('toast-styles')) {
 }
 
 let socket = null;
+// True only when the backend says it is serving demo/mock data (see /order-context "demo").
+// Safe by default: anything synthetic or third-party-keyed-by-customer stays off until proven demo.
+window.WRENNON_DEMO = false;
+// Customer avatars come from a third-party service keyed by the customer's email, so that
+// is demo-only. Real customers get the local default avatar (no PII leaves the browser).
+function customerAvatarUrl(key) {
+  return window.WRENNON_DEMO
+    ? `https://i.pravatar.cc/150?u=${encodeURIComponent(key)}`
+    : '/agent/images/default-avatar.png?v=2';
+}
 let activeSessionId = null;
 let _agentToken = null; // stored on login for WebSocket auth
 let activeSection = "active"; // "attention" | "active" | "all"
@@ -1854,7 +1864,8 @@ async function fetchOrderContext(sessionId) {
     }
     
     if (result.customer) {
-      showCustomerSidebar(result.customer);
+      window.WRENNON_DEMO = result.demo === true;
+      showCustomerSidebar(result.customer, result.demo === true);
       if (sessionId === activeSessionId && result.customer.name) {
         conversationEmail.textContent = result.customer.name;
       }
@@ -2466,7 +2477,7 @@ function extractAndShowCustomerDetails(text) {
   // Handled entirely by the backend now; UI auto-updates on fetchOrderContext.
 }
 
-function showCustomerSidebar(customer) {
+function showCustomerSidebar(customer, isDemo = false) {
   currentlyShowingCustomerId = customer.id;
   const sidebar = document.getElementById("customer-sidebar");
   const content = document.getElementById("customer-sidebar-content");
@@ -2522,7 +2533,10 @@ function showCustomerSidebar(customer) {
   let currentPastOrderId = (recentOrderNum * 10000) + Math.floor(prng() * 9000);
   const currentDate = new Date(2026, 7, 8, 9, 5); // Aug 08, 9:05 AM
   
-  if (totalOrders > 0) {
+  if (!isDemo) {
+    // Real store: show only what we actually know. The generated history below is demo-only.
+    if (customer.recent_order) interactions.push({ action: `Most recent order #${customer.recent_order}`, time: '', status: 'empty' });
+  } else if (totalOrders > 0) {
     interactions.push({ action: `Ordered #${recentOrderStr}`, time: formatDate(currentDate), status: 'empty' });
     
     for (let i = 1; i < totalOrders; i++) {
@@ -2543,8 +2557,10 @@ function showCustomerSidebar(customer) {
     }
   }
 
-  currentDate.setDate(currentDate.getDate() - (30 + Math.floor(prng() * 60)));
-  interactions.push({ action: 'Account created / Sign up', time: formatDate(currentDate), status: 'S' });
+  if (isDemo) {
+    currentDate.setDate(currentDate.getDate() - (30 + Math.floor(prng() * 60)));
+    interactions.push({ action: 'Account created / Sign up', time: formatDate(currentDate), status: 'S' });
+  }
 
   window.addCustomerNote = function(inputElem, event) {
     if (event.key !== 'Enter') return;
@@ -2599,7 +2615,7 @@ function showCustomerSidebar(customer) {
     <div class="customer-details-box">
       <div class="customer-profile-compact">
         <div class="customer-profile__avatar-small">
-          <img src="https://i.pravatar.cc/150?u=${encodeURIComponent(customer.email || customer.id)}" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">
+          <img src="${customerAvatarUrl(customer.email || customer.id)}" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">
         </div>
         <div class="customer-profile-info">
           <div style="display:flex; flex-direction:column; gap:2px; flex:1; overflow:hidden;">
@@ -2621,11 +2637,11 @@ function showCustomerSidebar(customer) {
       </div>
       <div class="contact-item">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-        <span class="value">${escapeHtml(customer.phone || '+1 (415) 123-2399')}</span>
+        <span class="value">${escapeHtml(customer.phone || (isDemo ? '+1 (415) 123-2399' : 'Not available'))}</span>
       </div>
       <div class="contact-item">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-        <span class="value">United States</span>
+        <span class="value">${isDemo ? 'United States' : 'Not available'}</span>
       </div>
       <div class="contact-item">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
@@ -2634,7 +2650,7 @@ function showCustomerSidebar(customer) {
       <div class="contact-item tags">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
         <div class="customer-tags-inline">
-          ${(customer.tags || ['premium', 'priority shopping']).map(tag => `<span class="customer-tag">${escapeHtml(tag.toLowerCase())}</span>`).join('')}
+          ${(customer.tags || (isDemo ? ['premium', 'priority shopping'] : [])).map(tag => `<span class="customer-tag">${escapeHtml(tag.toLowerCase())}</span>`).join('')}
         </div>
       </div>
       <div class="contact-item note" style="flex-direction: column; align-items: flex-start; margin-top: -4px; width: 100%;">
@@ -2679,7 +2695,7 @@ function showCustomerSidebar(customer) {
   
   const toggleBtn = document.getElementById("customer-sidebar-toggle");
   if (toggleBtn) {
-    const avatarUrl = `https://i.pravatar.cc/150?u=${encodeURIComponent(customer.email || customer.id)}`;
+    const avatarUrl = customerAvatarUrl(customer.email || customer.id);
     toggleBtn.innerHTML = `<img src="${avatarUrl}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" alt="Customer Details" onerror="this.src='/agent/images/default-avatar.png?v=2'">`;
     toggleBtn.style.padding = "2px";
     toggleBtn.style.borderRadius = "50%";
@@ -3820,7 +3836,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         tbody.innerHTML = sorted.map(c => {
-            const avatarUrl = c.email ? `https://i.pravatar.cc/150?u=${encodeURIComponent(c.email)}` : '/agent/images/default-avatar.png?v=2';
+            const avatarUrl = c.email ? customerAvatarUrl(c.email) : '/agent/images/default-avatar.png?v=2';
             const resRatio = c.resolved_ratio != null ? (c.resolved_ratio * 100).toFixed(0) + '%' : '—';
             const avgCsat = c.avg_csat != null ? c.avg_csat.toFixed(1) + ' ★' : '—';
             const lastActive = formatAgo(c.last_active);

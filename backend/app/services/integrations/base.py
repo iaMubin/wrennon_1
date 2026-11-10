@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
 
 class EcommerceProvider(ABC):
+    # True => the bot must verify the requester (email match) before revealing an order.
+    requires_verification = False
+
     @abstractmethod
     def get_order_status(self, order_id: str) -> Optional[Dict[str, Any]]:
         pass

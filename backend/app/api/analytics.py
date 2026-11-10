@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from app.services.analytics import get_stats
-from app.auth.dependencies import get_current_manager, get_current_agent
+from app.auth.dependencies import get_current_agent
 from app.db.models import Agent
 from sqlalchemy.orm import Session
 from app.db.session import get_db
@@ -182,7 +182,7 @@ def get_dashboard_metrics(
                 tags = json.loads(c.tags)
                 for t in tags:
                     tag_counts[t] = tag_counts.get(t, 0) + 1
-            except:
+            except (ValueError, TypeError):  # nosec B110 - skip rows with malformed tag JSON
                 pass
     
     top_tags = sorted([{"tag": k, "count": v} for k, v in tag_counts.items()], key=lambda x: x["count"], reverse=True)[:10]

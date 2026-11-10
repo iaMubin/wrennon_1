@@ -1,6 +1,5 @@
 import datetime
 import uuid
-import httpx
 from typing import Optional, Dict, Any
 from .base import CRMProvider
 

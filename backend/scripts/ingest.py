@@ -23,7 +23,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import uuid
 from pinecone import Pinecone
 import fitz
 from langchain_text_splitters import RecursiveCharacterTextSplitter

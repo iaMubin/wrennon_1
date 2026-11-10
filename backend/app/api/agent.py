@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Body, status, Response, Form, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, HTTPException, Body, status, Response, Form, BackgroundTasks, Request
 from fastapi.security import OAuth2PasswordRequestForm
 import pyotp
 from app.services.qa import process_resolved_conversation_tasks
@@ -27,10 +27,22 @@ from app.services.mock_apis import get_order_status, get_order_by_email, get_cus
 from app.db.models import Agent, Conversation, Message, AuditLog, CSATResponse, CannedResponse, SavedView, SystemSetting
 from app.db.session import get_db
 from app.realtime.connection_manager import manager
-from app.config import settings
-import re
-from app.services.mock_apis import get_order_status, get_order_by_email
 import redis.asyncio as redis
+from app.services.integrations import USE_MOCK, get_ecommerce_provider
+
+if not USE_MOCK:
+    # Dashboard lookups used to import mock_apis directly, so agents saw fake orders
+    # and customers even with real integrations enabled. Agents are trusted: include email.
+    _shop = get_ecommerce_provider()
+
+    def get_order_status(order_id):
+        return _shop.get_order_status(order_id, include_email=True)
+
+    def get_order_by_email(email):
+        return _shop.get_order_by_email(email, include_email=True)
+
+    def get_customer_info(email=None, phone=None, customer_id=None):
+        return _shop.get_customer_info(email=email, phone=phone, customer_id=customer_id)
 
 # Create a Redis client for rate limiting
 _redis_client = None
@@ -57,21 +69,22 @@ router = APIRouter()
 
 @router.post("/agent/login")
 async def login(
+    request: Request,
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     totp_code: str | None = Form(None),
     db: Session = Depends(get_db)
 ) -> dict:
     # Rate Limiting
-    rate_key = f"login_attempts:{form_data.username}"
+    # Keyed by IP + username so an attacker can only lock out their own IP,
+    # not the real admin (username alone = trivial lockout DoS).
+    client_ip = request.client.host if request.client else "unknown"
+    rate_key = f"login_attempts:{client_ip}:{form_data.username.lower()}"
+    locked = False
     try:
         r = get_redis()
         attempts = await r.get(rate_key)
-        if attempts and int(attempts) >= 5:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many failed login attempts. Please try again later.",
-            )
+        locked = bool(attempts) and int(attempts) >= 5
     except Exception as e:
         # If Redis is down, brute-force lockout silently fails OPEN — an
         # attacker can hammer this endpoint unthrottled until Redis comes
@@ -80,6 +93,13 @@ async def login(
         # rather than DEBUG (which would make this failure mode invisible
         # exactly when it matters most).
         logger.warning(f"Redis unavailable during login rate-limit check for {form_data.username}: {e}")
+    # Raised OUTSIDE the try block: previously this 429 was raised inside
+    # `except Exception`'s scope and got swallowed, so lockout never fired.
+    if locked:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed login attempts. Please try again later.",
+        )
 
     agent = db.query(Agent).filter(
         or_(Agent.username == form_data.username, Agent.employee_id == form_data.username)
@@ -88,8 +108,8 @@ async def login(
     if not agent or not verify_password(form_data.password, agent.password_hash):
         try:
             r = get_redis()
-            await r.incr(rate_key)
-            await r.expire(rate_key, 60)
+            if await r.incr(rate_key) == 1:
+                await r.expire(rate_key, 300)  # fixed 5-min window, not refreshed per attempt
         except Exception as e:
             logger.warning(f"Redis unavailable while recording a failed login attempt for {form_data.username}: {e}")
             
@@ -141,7 +161,8 @@ async def login(
         max_age=60 * 60 * 24 * 7 # 7 days
     )
     
-    return {"access_token": token, "token_type": "bearer", "role": agent.role, "dp_url": agent.dp_url, "full_name": agent.full_name}
+    return {"access_token": token, "token_type": "bearer",  # nosec B105 - OAuth token type label, not a secret
+            "role": agent.role, "dp_url": agent.dp_url, "full_name": agent.full_name}
 
 @router.post("/agent/logout")
 def logout(
@@ -335,7 +356,7 @@ def get_customers(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
 ):
-    from sqlalchemy import func, cast, Float, case
+    from sqlalchemy import func, case
     from app.services.mock_apis import MOCK_CUSTOMERS, MOCK_ORDERS
     
     # Group by customer_email using SQL aggregations
@@ -375,7 +396,7 @@ def get_customers(
     from datetime import datetime, timedelta, timezone
 
     def generate_mock_stats(email_str):
-        hash_val = int(hashlib.md5(email_str.encode()).hexdigest(), 16)
+        hash_val = int(hashlib.md5(email_str.encode(), usedforsecurity=False).hexdigest(), 16)
         
         total_tickets = (hash_val % 15) + 1  # 1 to 15 tickets
         resolved_ratio = ((hash_val % 40) + 60) / 100.0  # 0.60 to 0.99
@@ -397,7 +418,7 @@ def get_customers(
     seen_emails = set()
     
     # First, append all mock customers
-    for cust in MOCK_CUSTOMERS:
+    for cust in (MOCK_CUSTOMERS if USE_MOCK else []):
         email = cust.get("email", "").lower()
         if not email:
             continue
@@ -416,7 +437,7 @@ def get_customers(
         })
         
     # Add any emails from MOCK_ORDERS not in MOCK_CUSTOMERS
-    for order in MOCK_ORDERS.values():
+    for order in (MOCK_ORDERS.values() if USE_MOCK else []):
         email_order = order.get("email", "")
         email = email_order.lower()
         if not email or email in seen_emails:
@@ -556,9 +577,9 @@ def get_my_cases(
         )
     ).distinct().order_by(Conversation.updated_at.desc()).all()
     
+    sla_policy = get_sla_policy(db)
     results = []
     for c in convs:
-        sla_policy = get_sla_policy(db) if 'sla_policy' not in locals() else sla_policy
         summary = _conversation_summary(c, sla_policy)
         summary["is_mentioned"] = (c.handled_by != agent.username)
         results.append(summary)
@@ -859,7 +880,7 @@ def get_order_context(
     
     # helper
     def build_response(order, source):
-        resp = {"source": source}
+        resp = {"source": source, "demo": USE_MOCK}
         if order:
             resp["order"] = order
             # Always ensure the customer info matches the order's email if possible
@@ -1122,7 +1143,7 @@ def get_sla_policy(db: Session) -> dict:
         import json
         try:
             return json.loads(setting.value)
-        except:
+        except ValueError:  # nosec B110 - malformed setting falls back to defaults below
             pass
     return {"urgent": 15, "high": 60, "normal": 240, "low": 1440}
 

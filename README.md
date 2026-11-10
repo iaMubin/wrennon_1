@@ -1,6 +1,6 @@
 # Wrennon Customer Support Platform
 
-An omnichannel, AI-first customer support platform built on a LangGraph state backbone. It seamlessly routes customer queries to an autonomous AI agent for immediate resolution, with real-time handoff to human agents when complex intervention is required.
+An AI-first, web-chat customer support platform built on a LangGraph state backbone. It seamlessly routes customer queries to an autonomous AI agent for immediate resolution, with real-time handoff to human agents when complex intervention is required.
 
 ## Key Features
 
@@ -8,12 +8,12 @@ An omnichannel, AI-first customer support platform built on a LangGraph state ba
 - **Seamless Human Handoff:** Real-time WebSockets ensure that when an AI reaches its limits, the conversation is instantly transferred to a live human agent without the customer experiencing dropped context.
 - **Live Agent Dashboard:** A secure portal for agents to handle escalated tickets, view customer history and order details dynamically, communicate via internal notes, and manage SLAs.
 - **Admin Control Panel:** Role-based access control (RBAC) allowing Admins to manage agent accounts, monitor performance, and enforce security policies.
-- **Omnichannel Context:** Automatically parses messages for Order IDs and emails to retrieve and display context-rich customer data instantly to agents.
+- **Order Context:** Parses messages for Order IDs and emails to retrieve and display customer/order data to agents (web chat channel only; Shopify/Zendesk integrations are stubs, demo data is used when `USE_MOCK_INTEGRATIONS=true`).
 - **Multimedia Support:** Supports image uploads and parsing for enhanced issue diagnosis.
 
 ## Architecture Stack
 
-- **Backend:** Python 3.12, FastAPI, WebSockets, SQLAlchemy (SQLite), LangChain / LangGraph.
+- **Backend:** Python 3.12, FastAPI, WebSockets, SQLAlchemy (PostgreSQL in production, SQLite for local dev), LangChain / LangGraph.
 - **Frontend:** Vanilla HTML, CSS, JavaScript (zero-build, highly optimized widget).
 - **AI & Data:** Groq (LLM), Pinecone (Vector Database), Cohere (Reranking).
 
@@ -62,7 +62,7 @@ Alternatively, if running the frontend separately via a static server, ensure it
 ## Project Structure
 
 ```text
-wrennon-showcase/
+wrennon_1/
 ├── backend/
 │   ├── app/
 │   │   ├── api/            # REST API endpoints (Admin, Agent, Chat)
@@ -71,10 +71,11 @@ wrennon-showcase/
 │   │   ├── graph/          # LangGraph Nodes & State Management (AI Logic)
 │   │   ├── realtime/       # WebSocket routing and connection manager
 │   │   ├── services/       # Mock APIs, LLM clients, Analytics
-│   │   └── static/         # Served frontend assets
+│   │   └── static/         # GENERATED mirror of frontend/ — never edit by hand
 │   ├── data/               # Vector db storage / temporary files
 │   └── tests/              # Pytest suite
-└── frontend/               # UI Source code (Widget, Agent, Admin dashboards)
+└── frontend/               # UI source of truth (Widget, Agent, Admin). After editing run:
+                            #   python scripts/sync_static.py   (CI fails if the mirror drifts)
 ```
 
 ## Deployment

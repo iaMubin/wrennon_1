@@ -53,6 +53,16 @@ if (!document.getElementById('toast-styles')) {
 }
 
 let socket = null;
+// True only when the backend says it is serving demo/mock data (see /order-context "demo").
+// Safe by default: anything synthetic or third-party-keyed-by-customer stays off until proven demo.
+window.WRENNON_DEMO = false;
+// Customer avatars come from a third-party service keyed by the customer's email, so that
+// is demo-only. Real customers get the local default avatar (no PII leaves the browser).
+function customerAvatarUrl(key) {
+  return window.WRENNON_DEMO
+    ? `https://i.pravatar.cc/150?u=${encodeURIComponent(key)}`
+    : '/agent/images/default-avatar.png?v=2';
+}
 let activeSessionId = null;
 let _agentToken = null; // stored on login for WebSocket auth
 let activeSection = "active"; // "attention" | "active" | "all"
@@ -98,6 +108,11 @@ function setupThemeDropdown() {
         document.documentElement.setAttribute("data-theme", isDark ? "dark-matte" : "light-offwhite");
       } else {
         document.documentElement.setAttribute("data-theme", themeValue);
+      }
+      
+      // Update charts to reflect new theme accent colors
+      if (window.refreshCharts) {
+        setTimeout(window.refreshCharts, 50);
       }
     }
     
@@ -181,7 +196,97 @@ function setupThemeDropdown() {
     }
   });
 }
+
+function setupProfileDropdown() {
+  const profileBtn = document.getElementById("agent-profile-btn");
+  const dropdown = document.getElementById("profile-dropdown");
+  const logoutBtn = document.getElementById("profile-logout-btn");
+  
+  if (!profileBtn || !dropdown) return;
+  
+  profileBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isExpanded = profileBtn.getAttribute("aria-expanded") === "true";
+    profileBtn.setAttribute("aria-expanded", !isExpanded);
+    
+    // Update name, role, and DP dynamically
+    const nameEl = document.getElementById("profile-dropdown-name");
+    const roleEl = document.getElementById("profile-dropdown-role");
+    const dpMenuEl = document.getElementById("profile-dropdown-dp");
+    if (nameEl) {
+      const fullName = localStorage.getItem("agent_full_name");
+      const username = localStorage.getItem("agent_username");
+      if (fullName && fullName !== "null") nameEl.textContent = fullName;
+      else if (username) nameEl.textContent = username;
+    }
+    if (roleEl) {
+      const role = localStorage.getItem("agent_role");
+      if (role) roleEl.textContent = role;
+    }
+    if (dpMenuEl) {
+      const dp = localStorage.getItem("agent_dp_url");
+      if (dp) dpMenuEl.src = dp;
+      else dpMenuEl.src = "/agent/images/default-avatar.png?v=2";
+    }
+    
+    dropdown.classList.toggle("hidden");
+  });
+  
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("#profile-dropdown") && !e.target.closest("#agent-profile-btn")) {
+      dropdown.classList.add("hidden");
+      profileBtn.setAttribute("aria-expanded", "false");
+    }
+  });
+  
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      dropdown.classList.add("hidden");
+      profileBtn.setAttribute("aria-expanded", "false");
+    }
+  });
+  
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => {
+      dropdown.classList.add("hidden");
+      if (typeof logout === "function") logout();
+    });
+  }
+  
+  const statusOptions = dropdown.querySelectorAll(".status-option");
+  const connectionDot = document.getElementById("connection-dot");
+  
+  statusOptions.forEach(opt => {
+    opt.addEventListener("click", () => {
+      const status = opt.dataset.status;
+      
+      // Update checkmarks
+      statusOptions.forEach(otherOpt => {
+        otherOpt.classList.remove("active");
+        const svg = otherOpt.querySelector(".status-check");
+        if (svg) svg.style.display = "none";
+      });
+      opt.classList.add("active");
+      const checkSvg = opt.querySelector(".status-check");
+      if (checkSvg) checkSvg.style.display = "block";
+      
+      // Update dot
+      if (connectionDot) {
+        connectionDot.className = "dot";
+        connectionDot.style.backgroundColor = "";
+        if (status === "online") connectionDot.classList.add("dot--online");
+        else if (status === "offline") connectionDot.classList.add("dot--offline");
+        else if (status === "away") connectionDot.style.backgroundColor = "var(--warning)";
+      }
+      
+      dropdown.classList.add("hidden");
+      profileBtn.setAttribute("aria-expanded", "false");
+    });
+  });
+}
+
 setupThemeDropdown();
+setupProfileDropdown();
 
 if (logoutBtn) {
   logoutBtn.addEventListener("click", logout);
@@ -262,6 +367,11 @@ loginForm.addEventListener("submit", async (e) => {
     _agentToken = data.access_token;
     localStorage.setItem("agent_username", username); // Save username to identify self
     localStorage.setItem("agent_role", data.role); // Save role to show admin btn
+    if (data.full_name) {
+      localStorage.setItem("agent_full_name", data.full_name);
+    } else {
+      localStorage.removeItem("agent_full_name");
+    }
     if (data.dp_url) {
       localStorage.setItem("agent_dp_url", data.dp_url);
       document.getElementById("agent-profile-dp").src = data.dp_url;
@@ -273,7 +383,7 @@ loginForm.addEventListener("submit", async (e) => {
     if (data.role === "manager" || data.role === "admin") {
       document.getElementById("admin-dashboard-btn").classList.remove("hidden");
       document.getElementById("admin-dashboard-btn").addEventListener("click", () => {
-        window.location.href = "/agent/admin_dashboard.html";
+        window.location.href = "/agent/admin_dashboard.html?v=" + new Date().getTime();
       });
     }
 
@@ -509,7 +619,8 @@ function formatPreview(conv) {
 }
 
 async function loadConversations() {
-  const endpoints = {
+    if (window.currentView && window.currentView !== 'conversations') return;
+    const endpoints = {
     "my_cases": "/agent/conversations/my-cases",
     "attention": "/agent/conversations/needs-attention",
     "active": "/agent/conversations/active",
@@ -562,8 +673,14 @@ function renderConversationList(conversations) {
   for (const conv of conversations) {
     const item = document.createElement("div");
     item.className = "conv-item";
+    item.setAttribute("role", "group");
+    item.tabIndex = 0;
+    item.setAttribute("aria-label", `Conversation with ${conv.customer_name || conv.customer_email || "unknown customer"}`);
     if (conv.handoff_active && !conv.resolved) item.classList.add("conv-item--urgent");
-    if (conv.session_id === activeSessionId) item.classList.add("conv-item--selected");
+    if (conv.session_id === activeSessionId) {
+      item.classList.add("conv-item--selected");
+      item.setAttribute("aria-current", "true");
+    }
 
     let badgeClass = "badge--ai";
     let stageText = "AI";
@@ -658,6 +775,12 @@ function renderConversationList(conversations) {
     `;
 
     item.addEventListener("click", () => openConversation(conv.session_id, conv.customer_email, conv.short_id, conv.resolved, conv.updated_at));
+    item.addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === " ") && e.target === item) {
+        e.preventDefault();
+        openConversation(conv.session_id, conv.customer_email, conv.short_id, conv.resolved, conv.updated_at);
+      }
+    });
     conversationList.appendChild(item);
   }
 }
@@ -1741,7 +1864,8 @@ async function fetchOrderContext(sessionId) {
     }
     
     if (result.customer) {
-      showCustomerSidebar(result.customer);
+      window.WRENNON_DEMO = result.demo === true;
+      showCustomerSidebar(result.customer, result.demo === true);
       if (sessionId === activeSessionId && result.customer.name) {
         conversationEmail.textContent = result.customer.name;
       }
@@ -1822,12 +1946,14 @@ function showOrderPopup(order, customer) {
 
   const availableFields = [];
   
-  if (customer && customer.name) {
-      availableFields.push({ label: 'Customer', value: escapeHtml(customer.name) });
-  }
-  
   availableFields.push({ label: 'Order ID', value: `#${escapeHtml(order.order_id)}` });
   availableFields.push({ label: 'Status', value: `<span class="order-status-badge ${statusClass}">${escapeHtml(order.status)}</span>` });
+  
+  if (order.items_count) {
+      availableFields.push({ label: 'Items', value: `${escapeHtml(order.items_count)} items` });
+  } else if (order.items && order.items.length) {
+      availableFields.push({ label: 'Items', value: `${order.items.length} items` });
+  }
   
   if (order.order_date) availableFields.push({ label: 'Date', value: escapeHtml(order.order_date) });
   if (order.total_amount) availableFields.push({ label: 'Total', value: escapeHtml(order.total_amount) });
@@ -1853,10 +1979,24 @@ function showOrderPopup(order, customer) {
       availableFields.push({ label: 'ETA', value: escapeHtml(order.eta) });
   }
   
-  if (order.payment_method) availableFields.push({ label: 'Payment', value: escapeHtml(order.payment_method) });
+  if (order.payment_method) {
+      let paymentBadge = `<span style="margin-left: 6px; padding: 2px 4px; background: color-mix(in srgb, var(--ink) 8%, transparent); border-radius: 4px; font-family: var(--font-sans); font-size: 10px; font-weight: 600; color: var(--ink); text-transform: none; letter-spacing: normal;">${escapeHtml(order.payment_method)}</span>`;
+      let labelHtml = `<span style="display:flex; align-items:center;">Payment ${paymentBadge}</span>`;
+      let valueHtml = '';
+      if (order.invoice_url) {
+          valueHtml = `<div style="display: flex; align-items: center; gap: 4px; line-height: 1;"><a href="${escapeHtml(order.invoice_url)}" target="_blank" rel="noopener noreferrer" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">View Invoice</a><button class="icon-action-btn" style="padding: 2px; height: 18px; width: 18px; margin: 0; min-height: 0; min-width: 0;" onclick="navigator.clipboard.writeText('${escapeHtml(order.invoice_url)}')" title="Copy invoice URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>`;
+      } else {
+          valueHtml = `<span style="color: var(--text-muted);">No invoice link</span>`;
+      }
+      availableFields.push({ 
+          label: labelHtml, 
+          value: valueHtml,
+          span: 2
+      });
+  }
   if (order.shipping_method) availableFields.push({ label: 'Shipping', value: escapeHtml(order.shipping_method) });
 
-  const fieldsToShow = availableFields.slice(0, 5);
+  const fieldsToShow = availableFields.slice(0, 8);
   
   const fieldsHtml = fieldsToShow.map(f => {
       return `<div class="order-popup__field" ${f.span ? `style="grid-column: span ${f.span};"` : ''}><span class="order-popup__label">${f.label}</span><span class="order-popup__value">${f.value}</span></div>`;
@@ -2174,7 +2314,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (adminBtn) {
           adminBtn.classList.remove("hidden");
           adminBtn.addEventListener("click", () => {
-            window.location.href = "/agent/admin_dashboard.html";
+            window.location.href = "/agent/admin_dashboard.html?v=" + new Date().getTime();
           });
         }
       }
@@ -2337,7 +2477,7 @@ function extractAndShowCustomerDetails(text) {
   // Handled entirely by the backend now; UI auto-updates on fetchOrderContext.
 }
 
-function showCustomerSidebar(customer) {
+function showCustomerSidebar(customer, isDemo = false) {
   currentlyShowingCustomerId = customer.id;
   const sidebar = document.getElementById("customer-sidebar");
   const content = document.getElementById("customer-sidebar-content");
@@ -2393,7 +2533,10 @@ function showCustomerSidebar(customer) {
   let currentPastOrderId = (recentOrderNum * 10000) + Math.floor(prng() * 9000);
   const currentDate = new Date(2026, 7, 8, 9, 5); // Aug 08, 9:05 AM
   
-  if (totalOrders > 0) {
+  if (!isDemo) {
+    // Real store: show only what we actually know. The generated history below is demo-only.
+    if (customer.recent_order) interactions.push({ action: `Most recent order #${customer.recent_order}`, time: '', status: 'empty' });
+  } else if (totalOrders > 0) {
     interactions.push({ action: `Ordered #${recentOrderStr}`, time: formatDate(currentDate), status: 'empty' });
     
     for (let i = 1; i < totalOrders; i++) {
@@ -2414,8 +2557,10 @@ function showCustomerSidebar(customer) {
     }
   }
 
-  currentDate.setDate(currentDate.getDate() - (30 + Math.floor(prng() * 60)));
-  interactions.push({ action: 'Account created / Sign up', time: formatDate(currentDate), status: 'S' });
+  if (isDemo) {
+    currentDate.setDate(currentDate.getDate() - (30 + Math.floor(prng() * 60)));
+    interactions.push({ action: 'Account created / Sign up', time: formatDate(currentDate), status: 'S' });
+  }
 
   window.addCustomerNote = function(inputElem, event) {
     if (event.key !== 'Enter') return;
@@ -2470,7 +2615,7 @@ function showCustomerSidebar(customer) {
     <div class="customer-details-box">
       <div class="customer-profile-compact">
         <div class="customer-profile__avatar-small">
-          <img src="https://i.pravatar.cc/150?u=${encodeURIComponent(customer.email || customer.id)}" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">
+          <img src="${customerAvatarUrl(customer.email || customer.id)}" alt="Avatar" onerror="this.src='/agent/images/default-avatar.png?v=2'">
         </div>
         <div class="customer-profile-info">
           <div style="display:flex; flex-direction:column; gap:2px; flex:1; overflow:hidden;">
@@ -2492,11 +2637,11 @@ function showCustomerSidebar(customer) {
       </div>
       <div class="contact-item">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-        <span class="value">${escapeHtml(customer.phone || '+1 (415) 123-2399')}</span>
+        <span class="value">${escapeHtml(customer.phone || (isDemo ? '+1 (415) 123-2399' : 'Not available'))}</span>
       </div>
       <div class="contact-item">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-        <span class="value">United States</span>
+        <span class="value">${isDemo ? 'United States' : 'Not available'}</span>
       </div>
       <div class="contact-item">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
@@ -2505,7 +2650,7 @@ function showCustomerSidebar(customer) {
       <div class="contact-item tags">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
         <div class="customer-tags-inline">
-          ${(customer.tags || ['premium', 'priority shopping']).map(tag => `<span class="customer-tag">${escapeHtml(tag.toLowerCase())}</span>`).join('')}
+          ${(customer.tags || (isDemo ? ['premium', 'priority shopping'] : [])).map(tag => `<span class="customer-tag">${escapeHtml(tag.toLowerCase())}</span>`).join('')}
         </div>
       </div>
       <div class="contact-item note" style="flex-direction: column; align-items: flex-start; margin-top: -4px; width: 100%;">
@@ -2550,7 +2695,7 @@ function showCustomerSidebar(customer) {
   
   const toggleBtn = document.getElementById("customer-sidebar-toggle");
   if (toggleBtn) {
-    const avatarUrl = `https://i.pravatar.cc/150?u=${encodeURIComponent(customer.email || customer.id)}`;
+    const avatarUrl = customerAvatarUrl(customer.email || customer.id);
     toggleBtn.innerHTML = `<img src="${avatarUrl}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" alt="Customer Details" onerror="this.src='/agent/images/default-avatar.png?v=2'">`;
     toggleBtn.style.padding = "2px";
     toggleBtn.style.borderRadius = "50%";
@@ -2597,6 +2742,12 @@ function clearCustomerSidebar() {
     });
   }
   
+  // Auto-hide customer sidebar when screen becomes too small
+  window.addEventListener("resize", () => {
+    if (window.innerWidth <= 820) {
+      hideCustomerSidebar();
+    }
+  });
   if (closeBtn) {
     closeBtn.addEventListener("click", hideCustomerSidebar);
   }
@@ -2846,7 +2997,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (mobileToggle && sidebar) {
     function updateSidebarToggleIcon() {
       let isOpen = false;
-      if (window.innerWidth <= 800) {
+      if (window.innerWidth <= 1200) {
         isOpen = sidebar.classList.contains("sidebar-open");
       } else {
         isOpen = !sidebar.classList.contains("sidebar-hidden");
@@ -2856,17 +3007,19 @@ document.addEventListener("DOMContentLoaded", () => {
         mobileToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><path d="M9 3v18"></path><path d="m16 15-3-3 3-3"></path></svg>';
         mobileToggle.setAttribute("title", "Close Sidebar");
         mobileToggle.setAttribute("aria-label", "Close Sidebar");
+        mobileToggle.setAttribute("aria-expanded", "true");
         mobileToggle.classList.add("sidebar-is-open");
       } else {
         mobileToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><path d="M9 3v18"></path><path d="m14 9 3 3-3 3"></path></svg>';
         mobileToggle.setAttribute("title", "Open Sidebar");
         mobileToggle.setAttribute("aria-label", "Open Sidebar");
+        mobileToggle.setAttribute("aria-expanded", "false");
         mobileToggle.classList.remove("sidebar-is-open");
       }
     }
 
     mobileToggle.addEventListener("click", () => {
-      if (window.innerWidth <= 800) {
+      if (window.innerWidth <= 1200) {
         sidebar.classList.toggle("sidebar-open");
       } else {
         sidebar.classList.toggle("sidebar-hidden");
@@ -2877,7 +3030,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Auto-close sidebar on mobile when a conversation is selected
     const originalOpenConv = openConversation;
     window.openConversation = async function(...args) {
-      if (window.innerWidth <= 800) {
+      if (window.innerWidth <= 1200) {
         sidebar.classList.remove("sidebar-open");
         updateSidebarToggleIcon();
       }
@@ -3199,6 +3352,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   function switchView(viewName) {
+    window.currentView = viewName;
     // Hide all views and remove active class from all buttons
     Object.keys(views).forEach(key => {
       if(views[key]) views[key].classList.add('hidden');
@@ -3378,12 +3532,88 @@ document.addEventListener('DOMContentLoaded', () => {
               }
           }
       } catch (e) { console.error("Failed to load analytics", e); }
+      
+      // Fetch additional sections
+      window.fetchSystemAnalytics();
+      window.fetchScorecards();
+  };
+  
+  window.fetchSystemAnalytics = async function() {
+      try {
+          const res = await fetch(`${API_BASE}/analytics/stats`, {
+              headers: { 'X-Wrennon-Client': 'agent-dashboard' },
+              credentials: 'include'
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          const tTickets = document.getElementById('analytics-total-tickets');
+          if (tTickets) tTickets.innerText = data.total_tickets;
+          const defRate = document.getElementById('analytics-deflection-rate');
+          if (defRate) defRate.innerText = data.deflection_rate + "%";
+          const aiRes = document.getElementById('analytics-ai-resolved');
+          if (aiRes) aiRes.innerText = `(${data.resolved_by_ai} resolved by AI)`;
+          const rev = document.getElementById('analytics-revenue');
+          if (rev) rev.innerText = `$${data.revenue_generated.toFixed(2)}`;
+          const upsells = document.getElementById('analytics-upsells');
+          if (upsells) upsells.innerText = data.upsell_count;
+      } catch (err) {
+          console.error("Failed to fetch system analytics:", err);
+      }
+  };
+  
+  window.fetchScorecards = async function() {
+      try {
+          const res = await fetch(`${API_BASE}/agent/my-scorecards`, {
+              headers: { 'X-Wrennon-Client': 'agent-dashboard' },
+              credentials: 'include'
+          });
+          if (res.ok) {
+              const data = await res.json();
+              const tbody = document.getElementById('qa-scorecards-list');
+              if (!tbody) return;
+              if (data.length === 0) {
+                  tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--ink-soft);">No scorecards yet. Resolve a conversation to generate one.</td></tr>';
+                  return;
+              }
+              tbody.innerHTML = '';
+              data.forEach(card => {
+                  const date = new Date(card.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                  tbody.innerHTML += `
+                      <tr>
+                          <td style="padding: 12px; border-bottom: 1px solid var(--line);">${date}</td>
+                          <td style="padding: 12px; border-bottom: 1px solid var(--line); font-family: 'JetBrains Mono', monospace; font-size: 13px;">${card.short_id || card.conversation_id.substring(0, 8)}...</td>
+                          <td style="padding: 12px; border-bottom: 1px solid var(--line); text-align: center;">${card.empathy_score}/10</td>
+                          <td style="padding: 12px; border-bottom: 1px solid var(--line); text-align: center;">${card.accuracy_score}/10</td>
+                          <td style="padding: 12px; border-bottom: 1px solid var(--line); text-align: center;">${card.resolution_score}/10</td>
+                          <td style="padding: 12px; border-bottom: 1px solid var(--line); text-align: center; color: var(--accent); font-weight: 600;">${card.csat_prediction}/5</td>
+                          <td style="padding: 12px; border-bottom: 1px solid var(--line);">
+                              <textarea readonly style="width: 100%; height: 60px; padding: 8px; border-radius: 4px; border: 1px solid var(--border-light); background: transparent; color: inherit; font-family: 'Inter', sans-serif; resize: vertical; font-size: 13px;">${card.feedback_notes}</textarea>
+                          </td>
+                      </tr>
+                  `;
+              });
+          }
+      } catch (err) {
+          console.error("Failed to fetch scorecards:", err);
+      }
   };
 
-  if(btns['dashboard']) btns['dashboard'].addEventListener('click', () => switchView('dashboard'));
-  if(btns['conversations']) btns['conversations'].addEventListener('click', () => switchView('conversations'));
-  if(btns['customers']) btns['customers'].addEventListener('click', () => switchView('customers'));
-  if(btns['analytics']) btns['analytics'].addEventListener('click', () => switchView('analytics'));
+  if(btns['dashboard']) btns['dashboard'].addEventListener('click', () => { window.location.hash = 'dashboard'; switchView('dashboard'); });
+  if(btns['conversations']) btns['conversations'].addEventListener('click', () => { window.location.hash = 'conversations'; switchView('conversations'); });
+  if(btns['customers']) btns['customers'].addEventListener('click', () => { window.location.hash = 'customers'; switchView('customers'); });
+  if(btns['analytics']) btns['analytics'].addEventListener('click', () => { window.location.hash = 'analytics'; switchView('analytics'); });
+
+  // Check hash on load
+  if (window.location.hash) {
+      const hash = window.location.hash.substring(1);
+      if (['dashboard', 'conversations', 'customers', 'analytics'].includes(hash)) {
+          switchView(hash);
+      } else {
+          switchView('conversations');
+      }
+  } else {
+      switchView('conversations');
+  }
 });
 
 
@@ -3414,7 +3644,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Mini Volume Chart (Dashboard)
         const ctxMini = document.getElementById('miniVolumeChart');
-        if(ctxMini && !miniVolumeChart) {
+        if(ctxMini && !window.miniVolumeChart) {
             let gradientMini;
             if (ctxMini.getContext) {
                 const ctx = ctxMini.getContext('2d');
@@ -3422,7 +3652,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 gradientMini.addColorStop(0, accentColor + '40');
                 gradientMini.addColorStop(1, accentColor + '00');
             }
-            miniVolumeChart = new Chart(ctxMini, {
+            window.miniVolumeChart = new Chart(ctxMini, {
                 type: 'line',
                 data: {
                     labels: ['8am', '10am', '12pm', '2pm', '4pm', '6pm'],
@@ -3519,6 +3749,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Expose a method to rebuild charts when theme changes
+    window.refreshCharts = function() {
+        if (window.miniVolumeChart) { window.miniVolumeChart.destroy(); window.miniVolumeChart = null; }
+        if (window.volumeChart) { window.volumeChart.destroy(); window.volumeChart = null; }
+        if (window.csatChart) { window.csatChart.destroy(); window.csatChart = null; }
+        if (window.tagsChart) { window.tagsChart.destroy(); window.tagsChart = null; }
+        initCharts();
+    };
+
     // Call initCharts when Analytics view is shown, or just initialize immediately if Chart.js is loaded
     if(typeof Chart !== 'undefined') {
         initCharts();
@@ -3597,7 +3836,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         tbody.innerHTML = sorted.map(c => {
-            const avatarUrl = c.email ? `https://i.pravatar.cc/150?u=${encodeURIComponent(c.email)}` : '/agent/images/default-avatar.png?v=2';
+            const avatarUrl = c.email ? customerAvatarUrl(c.email) : '/agent/images/default-avatar.png?v=2';
             const resRatio = c.resolved_ratio != null ? (c.resolved_ratio * 100).toFixed(0) + '%' : '—';
             const avgCsat = c.avg_csat != null ? c.avg_csat.toFixed(1) + ' ★' : '—';
             const lastActive = formatAgo(c.last_active);

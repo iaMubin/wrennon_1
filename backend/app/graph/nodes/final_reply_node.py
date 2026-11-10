@@ -14,7 +14,7 @@ import time
 from langchain_core.messages import AIMessage
 
 from app.graph.state import ConversationState
-from app.services.llm import _safe_llm_call, mask_pii, parse_image_urls, _url_to_base64
+from app.services.llm import _safe_llm_call, mask_pii
 from app.logger import logger
 
 SYSTEM_INSTRUCTION = (

@@ -1,0 +1,9 @@
+# Dev / CI only. Production image installs requirements.txt alone.
+-r requirements.txt
+pytest==9.0.3
+pytest-cov==7.1.0
+pytz==2024.1
+websockets>=14
+ruff==0.17.4
+bandit==1.9.4
+pip-audit==2.10.1

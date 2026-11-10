@@ -1,9 +1,7 @@
-import os
 
 from fastapi.testclient import TestClient
 import pytest
 from app.main import app
-from app.db.session import SessionLocal
 
 client = TestClient(app)
 

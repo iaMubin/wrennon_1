@@ -15,7 +15,10 @@ from app.graph.state import ConversationState
 from app.services.tools import TOOL_EXECUTORS
 from app.logger import logger
 import json
+import re
 import time
+
+_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 
 
 async def tool_executor_node(state: ConversationState) -> ConversationState:
@@ -26,9 +29,18 @@ async def tool_executor_node(state: ConversationState) -> ConversationState:
     gathered_context = list(state.get("gathered_context", []))
     tool_call_history = list(state.get("tool_call_history", []))
 
+    # Emails the customer themself typed (raw messages, before PII masking).
+    claimed_emails: list[str] = []
+    for m in state.get("messages", []):
+        if getattr(m, "type", "") == "human":
+            for e in _EMAIL_RE.findall(str(m.content)):
+                if e.lower() not in (c.lower() for c in claimed_emails):
+                    claimed_emails.append(e)
+
     for tool_call in planned_tools:
         tool_name = tool_call.get("name")
-        tool_args = tool_call.get("args", {})
+        # Strip any LLM-supplied private "_" args, then add the trusted ones.
+        tool_args = {k: v for k, v in (tool_call.get("args") or {}).items() if not str(k).startswith("_")}
         signature = f"{tool_name}:{json.dumps(tool_args, sort_keys=True)}"
 
         if tool_name in TOOL_EXECUTORS:
@@ -39,7 +51,7 @@ async def tool_executor_node(state: ConversationState) -> ConversationState:
                 state["last_order_id"] = str(tool_args["order_id"])
                 
             try:
-                result = str(await TOOL_EXECUTORS[tool_name](tool_args))
+                result = str(await TOOL_EXECUTORS[tool_name]({**tool_args, "_claimed_emails": claimed_emails}))
                 if len(result) > 1500:
                     from app.services.llm import _safe_llm_call
                     summary_prompt = f"Summarize this tool output concisely, focusing on key facts and policy details. Do not omit important data. \n\nOutput:\n{result}"

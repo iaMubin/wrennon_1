@@ -8,3 +8,8 @@ data/chroma_store/
 data/*.db
 .git/
 *.log
+tests/
+requirements-dev.txt
+ruff.toml
+.pytest_cache/
+.coverage

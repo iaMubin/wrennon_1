@@ -12,10 +12,10 @@ harder to reason about, so it's gone rather than commented out.
 
 from __future__ import annotations
 
+import asyncio
+import os
 import re
 import base64
-import os
-import httpx
 from groq import AsyncGroq
 import openai
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -23,17 +23,31 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from app.config import settings
 from app.logger import logger
 
-_client = AsyncGroq(api_key=settings.groq_api_key, max_retries=0)
-_openai_client = openai.AsyncOpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
+# Explicit timeouts: a hung provider must fail fast so the fallback chain can run,
+# instead of leaving the customer waiting for the SDK default.
+LLM_TIMEOUT_SECONDS = float(os.environ.get("LLM_TIMEOUT_SECONDS", "30"))
+
+_client = AsyncGroq(api_key=settings.groq_api_key, max_retries=0, timeout=LLM_TIMEOUT_SECONDS)
+_openai_client = (
+    openai.AsyncOpenAI(api_key=settings.openai_api_key, max_retries=0, timeout=LLM_TIMEOUT_SECONDS)
+    if settings.openai_api_key else None
+)
 _openrouter_client = openai.AsyncOpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=settings.openrouter_api_key,
+    max_retries=0,
+    timeout=LLM_TIMEOUT_SECONDS,
     default_headers={
         "HTTP-Referer": "http://localhost:3000",
         "X-Title": "Wrennon Showcase",
     }
 ) if settings.openrouter_api_key else None
 OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
+
+
+def _read_bytes(path: str) -> bytes:
+    with open(path, "rb") as f:
+        return f.read()
 
 
 def mask_pii(text: str) -> str:
@@ -49,7 +63,7 @@ def mask_pii(text: str) -> str:
     text = re.sub(r'\b(?:\+\d{1,3}[- ]?)?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}\b', '[PHONE HIDDEN]', text)
 
     # 4. Social Security Numbers (SSN)
-    text = re.sub(r'\b\d{3}[-]?\d{2}[-]?\d{4}\b', '[SSN HIDDEN]', text)
+    text = re.sub(r'\b\d{3}-\d{2}-\d{4}\b', '[SSN HIDDEN]', text)
 
     # 5. IP Addresses (IPv4)
     text = re.sub(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', '[IP HIDDEN]', text)
@@ -63,7 +77,7 @@ def mask_pii(text: str) -> str:
 
     # 8. Contextual Names
     # Matches: "My name is John Doe", "I am John", "Shipping to John", "Deliver to John Smith"
-    name_trigger_pattern = r'(?i)\b(my\s+name\s+is|i\s+am|i\'m|this\s+is|shipping\s+to|deliver\s+to|account\s+under|name:)\s+(?:[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b'
+    name_trigger_pattern = r"\b((?i:my\s+name\s+is|i\s+am|i'm|this\s+is|shipping\s+to|deliver\s+to|account\s+under|name:))\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b"
     text = re.sub(name_trigger_pattern, r'\1 [NAME HIDDEN]', text)
 
     return text
@@ -284,8 +298,7 @@ async def transcribe_audio_if_present(text: str) -> str:
         if not os.path.exists(file_path):
             return text + "\n\n(Transcript: [Audio file not found])"
 
-        with open(file_path, "rb") as f:
-            content = f.read()
+        content = await asyncio.to_thread(_read_bytes, file_path)
 
         if "." not in filename:
             filename += ".mp3"
@@ -336,8 +349,7 @@ async def _url_to_base64(url: str) -> str:
         if not os.path.exists(file_path):
             return None
 
-        with open(file_path, "rb") as f:
-            content = f.read()
+        content = await asyncio.to_thread(_read_bytes, file_path)
 
         b64 = base64.b64encode(content).decode("utf-8")
 

@@ -5,11 +5,10 @@ Only accessible by agents with role='manager'.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import os
-import shutil
 import uuid
 
 from sqlalchemy import func
@@ -46,20 +45,32 @@ class AgentCreate(BaseModel):
 class PasswordReset(BaseModel):
     new_password: str
 
+ALLOWED_DP_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+MAX_DP_BYTES = 2 * 1024 * 1024  # 2 MB
+
+
 @router.post("/admin/upload-dp")
-async def upload_agent_dp(
+def upload_agent_dp(
     file: UploadFile = File(...),
     manager: Agent = Depends(get_current_manager)
 ):
+    # Sync def on purpose: FastAPI runs it in a threadpool, so the blocking
+    # file write below does not stall the event loop.
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_DP_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Only png, jpg, jpeg, webp or gif images are allowed")
+
     upload_dir = os.path.join("app", "static", "agent", "images", "uploads")
     os.makedirs(upload_dir, exist_ok=True)
-    
-    ext = os.path.splitext(file.filename)[1]
+
     new_filename = f"{uuid.uuid4().hex}{ext}"
     file_path = os.path.join(upload_dir, new_filename)
-    
+
+    data = file.file.read(MAX_DP_BYTES + 1)
+    if len(data) > MAX_DP_BYTES:
+        raise HTTPException(status_code=413, detail="Image must be 2 MB or smaller")
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        buffer.write(data)
         
     dp_url = f"/agent/images/uploads/{new_filename}"
     return {"status": "success", "dp_url": dp_url}

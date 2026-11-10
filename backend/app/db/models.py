@@ -17,7 +17,7 @@ from __future__ import annotations
 import datetime
 import uuid
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -35,6 +35,11 @@ def _generate_short_id() -> str:
 
 class Conversation(Base):
     __tablename__ = "conversations"
+    __table_args__ = (
+        # "needs attention" / open-ticket queues filter on these and sort by updated_at
+        Index("ix_conversations_queue", "resolved", "handoff_active", "updated_at"),
+        Index("ix_conversations_assigned_agent", "assigned_agent"),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     session_id: Mapped[str] = mapped_column(String, unique=True, index=True)
@@ -95,6 +100,10 @@ class Conversation(Base):
 
 class Message(Base):
     __tablename__ = "messages"
+    __table_args__ = (
+        # history loads fetch one conversation's messages in time order
+        Index("ix_messages_conversation_created", "conversation_id", "created_at"),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id"), index=True)
@@ -147,7 +156,7 @@ class Agent(Base):
         import json
         try:
             perms = json.loads(self.permissions)
-        except:
+        except Exception:
             perms = []
             
         if not perms:

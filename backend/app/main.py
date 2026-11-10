@@ -22,9 +22,8 @@ from app.api.copilot import router as copilot_router
 from app.api.kb import router as kb_router
 from app.api.public_kb import router as public_kb_router
 from app.config import settings
-from app.db.models import Base, Agent
-from app.db.session import engine, SessionLocal
-from app.auth.security import hash_password
+from app.db.models import Agent
+from app.db.session import SessionLocal
 from app.logger import logger
 from app.realtime.websocket_routes import router as realtime_router
 from app.realtime.connection_manager import broadcast
@@ -216,7 +215,47 @@ app.include_router(realtime_router)  # no /api prefix — /ws/... paths
 
 @app.get("/health")
 def health() -> dict:
+    """Liveness: the process is up. Deliberately checks nothing external."""
     return {"status": "ok"}
+
+
+@app.get("/ready")
+async def ready():
+    """Readiness: can this instance serve traffic? The database is required;
+    Redis is optional (the app degrades gracefully without it), so a Redis
+    outage reports "degraded" but does not take the instance out of rotation."""
+    import asyncio
+    from fastapi.responses import JSONResponse
+    from sqlalchemy import text
+    from app.api.agent import get_redis
+
+    checks = {}
+
+    def _db_ping():
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+
+    try:
+        await asyncio.wait_for(asyncio.to_thread(_db_ping), timeout=3)
+        checks["database"] = "ok"
+    except Exception as e:
+        logger.error(f"Readiness: database check failed: {type(e).__name__}")
+        checks["database"] = "down"
+
+    try:
+        ping = getattr(get_redis(), "ping", None)
+        if ping is not None:
+            await asyncio.wait_for(ping(), timeout=2)
+        checks["redis"] = "ok"
+    except Exception as e:
+        logger.warning(f"Readiness: redis check failed: {type(e).__name__}")
+        checks["redis"] = "degraded"
+
+    healthy = checks["database"] == "ok"
+    return JSONResponse(
+        status_code=200 if healthy else 503,
+        content={"status": "ready" if healthy else "unavailable", "checks": checks},
+    )
 
 
 
