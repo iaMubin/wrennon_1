@@ -563,6 +563,102 @@ function renderMarkdown(text) {
   return html;
 }
 
+function formatLinkTitle(url, existingText = '') {
+  const cleanExisting = (existingText || '').trim();
+  const isRawUrl = /^https?:\/\//i.test(cleanExisting) || 
+                   /^www\./i.test(cleanExisting) || 
+                   /^[a-z0-9-]+(\.[a-z0-9-]+)+([\/?#].*)?$/i.test(cleanExisting) ||
+                   cleanExisting.toLowerCase() === url.trim().toLowerCase();
+
+  if (cleanExisting && !isRawUrl) {
+    return cleanExisting;
+  }
+
+  try {
+    const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    const path = parsed.pathname.toLowerCase();
+
+    // 1. Tracking links
+    if (path.includes('track') || host.includes('fedex') || host.includes('ups') || host.includes('dhl') || host.includes('usps') || host.includes('courier')) {
+      if (host.includes('fedex')) return 'Track on FedEx';
+      if (host.includes('ups')) return 'Track on UPS';
+      if (host.includes('dhl')) return 'Track on DHL';
+      if (host.includes('usps')) return 'Track on USPS';
+      return 'Track Shipment';
+    }
+
+    // 2. Invoices & Receipts
+    if (path.includes('invoice') || path.includes('receipt') || path.includes('bill')) {
+      const match = path.match(/(?:invoice|receipt)[\/-]?(\d+)/i);
+      return match ? `View Invoice #${match[1]}` : 'View Invoice';
+    }
+
+    // 3. Orders
+    if (path.includes('order')) {
+      const match = path.match(/orders?[\/-]?(\d+)/i);
+      return match ? `Order Details #${match[1]}` : 'Order Details';
+    }
+
+    // 4. Returns & Refunds
+    if (path.includes('return') || path.includes('refund') || path.includes('rma')) {
+      return 'Return & Refund Policy';
+    }
+
+    // 5. Help / FAQ / Support / Knowledge base
+    if (path.includes('help') || path.includes('faq') || path.includes('support') || path.includes('kb') || path.includes('knowledge')) {
+      return 'Help Center';
+    }
+
+    // 6. Products
+    if (path.includes('/product') || path.includes('/item')) {
+      const segments = path.split('/').filter(Boolean);
+      const lastSeg = segments[segments.length - 1];
+      if (lastSeg && lastSeg !== 'product' && lastSeg !== 'products') {
+        const title = lastSeg
+          .replace(/[-_]+/g, ' ')
+          .replace(/\b\w/g, c => c.toUpperCase());
+        return title.length <= 30 ? title : 'View Product';
+      }
+      return 'View Product';
+    }
+
+    // 7. Store / Brand domain
+    if (host.includes('wrennon')) {
+      const cleanPath = path.replace(/^\/|\/$/g, '').replace(/[-_]+/g, ' ');
+      if (cleanPath) {
+        return cleanPath.replace(/\b\w/g, c => c.toUpperCase());
+      }
+      return 'Wrennon Store';
+    }
+
+    // 8. General domain fallback
+    const domainParts = host.split('.');
+    const mainName = domainParts.length >= 2 ? domainParts[domainParts.length - 2] : host;
+    const capitalized = mainName.charAt(0).toUpperCase() + mainName.slice(1);
+    return `Visit ${capitalized}`;
+  } catch (e) {
+    return 'View Link';
+  }
+}
+
+function linkifyRawUrls(html) {
+  return html.replace(/(<a\b[^>]*>.*?<\/a>|<[^>]+>)|((?:https?:\/\/|www\.)[^\s<)"']+)/gi, (match, tag, url) => {
+    if (tag) return tag;
+    let fullUrl = url;
+    if (/^www\./i.test(fullUrl)) fullUrl = 'https://' + fullUrl;
+    let trailing = '';
+    const punctMatch = fullUrl.match(/[.,;:!?)]+$/);
+    if (punctMatch) {
+      trailing = punctMatch[0];
+      fullUrl = fullUrl.slice(0, -trailing.length);
+      url = url.slice(0, -trailing.length);
+    }
+    const maskedTitle = formatLinkTitle(fullUrl, '');
+    return `<a href="${escapeAttr(fullUrl)}" target="_blank" rel="noopener noreferrer" title="${escapeAttr(fullUrl)}" style="color: var(--accent); text-decoration: underline;">${escapeHtml(maskedTitle)}</a>${trailing}`;
+  });
+}
+
 function inlineMarkdown(text) {
   let escaped = escapeHtml(text);
   escaped = escaped.replace(/\[Audio\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
@@ -584,11 +680,13 @@ function inlineMarkdown(text) {
     return `<video controls src="${escapeAttr(url)}" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;"></video>`;
   });
   escaped = escaped.replace(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
-    return `<img src="${escapeAttr(url)}" class="chat-lightbox-image" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px; cursor: pointer;" onclick="openLightbox(this.src)" />`;
+    return `<img src="${escapeAttr(url)}" class="chat-lightbox-image" alt="Image" loading="lazy" onclick="openLightbox(this.src)" />`;
   });
   escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, (match, linkText, url) => {
-    return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline;">${linkText}</a>`;
+    const maskedTitle = formatLinkTitle(url, linkText);
+    return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer" title="${escapeAttr(url)}" style="color: var(--accent); text-decoration: underline;">${escapeHtml(maskedTitle)}</a>`;
   });
+  escaped = linkifyRawUrls(escaped);
   escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   return escaped;
 }
@@ -787,7 +885,8 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   lastMsgTime = timestamp;
   
   const wrapper = document.createElement("div");
-  wrapper.className = `bubble bubble-${uiRole} bubble-enter`;
+  const isImageOnly = /^\s*!\[.*?\]\([^\)]+\)\s*$/.test((text || '').trim());
+  wrapper.className = `bubble bubble-${uiRole} bubble-enter${isImageOnly ? ' bubble-image-only' : ''}`;
   wrapper.setAttribute("role", "listitem");
   
   let displayText = text || "";
@@ -893,12 +992,152 @@ setTimeout(() => {
 // --- Lightbox Logic ---
 let lightboxImages = [];
 let currentLightboxIndex = 0;
+let lightboxZoom = 1;
+let lightboxRotation = 0;
+let lightboxTranslate = { x: 0, y: 0 };
+let isLightboxDragging = false;
+let lightboxDragStart = { x: 0, y: 0 };
+
+function applyLightboxTransform() {
+  const imgEl = document.getElementById('chat-lightbox-img');
+  const zoomText = document.getElementById('chat-lightbox-zoom-val');
+  if (imgEl) {
+    imgEl.style.transform = `translate(${lightboxTranslate.x}px, ${lightboxTranslate.y}px) scale(${lightboxZoom}) rotate(${lightboxRotation}deg)`;
+    imgEl.style.cursor = lightboxZoom > 1 ? (isLightboxDragging ? 'grabbing' : 'grab') : 'zoom-in';
+  }
+  if (zoomText) {
+    zoomText.textContent = `${Math.round(lightboxZoom * 100)}%`;
+  }
+}
+
+function resetLightboxTransform() {
+  lightboxZoom = 1;
+  lightboxRotation = 0;
+  lightboxTranslate = { x: 0, y: 0 };
+  applyLightboxTransform();
+}
+
+window.lightboxZoomIn = function(e) {
+  if (e) e.stopPropagation();
+  lightboxZoom = Math.min(lightboxZoom + 0.25, 4.0);
+  applyLightboxTransform();
+};
+
+window.lightboxZoomOut = function(e) {
+  if (e) e.stopPropagation();
+  lightboxZoom = Math.max(lightboxZoom - 0.25, 0.5);
+  if (lightboxZoom <= 1) lightboxTranslate = { x: 0, y: 0 };
+  applyLightboxTransform();
+};
+
+window.lightboxResetZoom = function(e) {
+  if (e) e.stopPropagation();
+  resetLightboxTransform();
+};
+
+window.lightboxRotate = function(e) {
+  if (e) e.stopPropagation();
+  lightboxRotation = (lightboxRotation + 90) % 360;
+  applyLightboxTransform();
+};
+
+window.lightboxDownload = async function(e) {
+  if (e) e.stopPropagation();
+  const currentSrc = lightboxImages[currentLightboxIndex];
+  if (!currentSrc) return;
+  try {
+    const res = await fetch(currentSrc, { mode: 'cors' });
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    const parts = currentSrc.split('/');
+    let filename = parts[parts.length - 1].split('?')[0] || 'image.jpg';
+    if (!/\.(jpg|jpeg|png|webp|gif|svg)$/i.test(filename)) filename += '.jpg';
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    showLightboxToast('Image download started');
+  } catch (err) {
+    const a = document.createElement('a');
+    a.href = currentSrc;
+    a.target = '_blank';
+    a.download = 'image.jpg';
+    a.click();
+  }
+};
+
+window.lightboxShare = async function(e) {
+  if (e) e.stopPropagation();
+  const currentSrc = lightboxImages[currentLightboxIndex];
+  if (!currentSrc) return;
+
+  // 1. Try Web Share API (native OS share dialog: WhatsApp, Messenger, AirDrop, etc.)
+  if (navigator.share) {
+    try {
+      let fileToShare = null;
+      try {
+        const res = await fetch(currentSrc, { mode: 'cors' });
+        const blob = await res.blob();
+        const parts = currentSrc.split('/');
+        let filename = parts[parts.length - 1].split('?')[0] || 'shared-image.jpg';
+        if (!/\.(jpg|jpeg|png|webp|gif|svg)$/i.test(filename)) filename += '.jpg';
+        fileToShare = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+      } catch (_) {}
+
+      if (fileToShare && navigator.canShare && navigator.canShare({ files: [fileToShare] })) {
+        await navigator.share({
+          title: 'Shared Image',
+          files: [fileToShare]
+        });
+        return;
+      } else {
+        await navigator.share({
+          title: 'Shared Image',
+          url: currentSrc
+        });
+        return;
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') return; // User closed the native share menu
+    }
+  }
+
+  // 2. Fallback: Copy direct image URL to clipboard
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(currentSrc);
+      showLightboxToast('Image link copied to clipboard');
+      return;
+    } catch (_) {}
+  }
+  showLightboxToast('Image: ' + currentSrc);
+};
+
+function showLightboxToast(msg) {
+  const lightbox = document.getElementById('chat-lightbox-overlay');
+  if (!lightbox) return;
+  let toast = lightbox.querySelector('.chat-lightbox-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.className = 'chat-lightbox-toast';
+    lightbox.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2200);
+}
 
 window.openLightbox = function(src) {
   const imgs = Array.from(document.querySelectorAll('.chat-lightbox-image'));
-  if (imgs.length === 0) return;
-  
-  lightboxImages = imgs.map(img => img.src);
+  if (imgs.length === 0 && src) {
+    lightboxImages = [src];
+  } else {
+    lightboxImages = imgs.map(img => img.src);
+    if (src && !lightboxImages.includes(src)) lightboxImages.unshift(src);
+  }
   currentLightboxIndex = lightboxImages.indexOf(src);
   if (currentLightboxIndex === -1) currentLightboxIndex = 0;
   
@@ -908,41 +1147,117 @@ window.openLightbox = function(src) {
     lightbox.id = 'chat-lightbox-overlay';
     lightbox.className = 'chat-lightbox-overlay';
     lightbox.innerHTML = `
-      <div class="chat-lightbox-close" onclick="closeLightbox()">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      <div class="chat-lightbox-topbar" onclick="event.stopPropagation()">
+        <div class="chat-lightbox-counter" id="chat-lightbox-counter">1 / 1</div>
+        <div class="chat-lightbox-tools">
+          <button class="chat-lightbox-btn" onclick="lightboxZoomIn(event)" title="Zoom in (+)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
+          <button class="chat-lightbox-btn" onclick="lightboxZoomOut(event)" title="Zoom out (-)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
+          <button class="chat-lightbox-btn" onclick="lightboxResetZoom(event)" title="Fit to screen">
+            <span id="chat-lightbox-zoom-val" style="font-size:12px; font-weight:600;">100%</span>
+          </button>
+          <button class="chat-lightbox-btn" onclick="lightboxRotate(event)" title="Rotate clockwise">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          </button>
+          <button class="chat-lightbox-btn" onclick="lightboxShare(event)" title="Share / Copy link">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          </button>
+          <button class="chat-lightbox-btn" onclick="lightboxDownload(event)" title="Download image">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
+          <button class="chat-lightbox-btn chat-lightbox-btn--close" onclick="closeLightbox(event)" title="Close (Esc)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
       </div>
       <div class="chat-lightbox-nav prev" onclick="lightboxPrev(event)">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
       </div>
-      <div class="chat-lightbox-img-wrapper">
-        <img id="chat-lightbox-img" src="" />
+      <div class="chat-lightbox-stage">
+        <div class="chat-lightbox-img-wrapper">
+          <img id="chat-lightbox-img" src="" alt="Preview" draggable="false" />
+        </div>
       </div>
       <div class="chat-lightbox-nav next" onclick="lightboxNext(event)">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </div>
     `;
     
     lightbox.addEventListener('click', (e) => {
-      if (e.target === lightbox || e.target.classList.contains('chat-lightbox-img-wrapper')) closeLightbox();
+      if (e.target === lightbox || e.target.classList.contains('chat-lightbox-stage') || e.target.classList.contains('chat-lightbox-img-wrapper')) {
+        closeLightbox();
+      }
+    });
+
+    const imgEl = lightbox.querySelector('#chat-lightbox-img');
+    imgEl.addEventListener('mousedown', (e) => {
+      if (lightboxZoom > 1) {
+        isLightboxDragging = true;
+        lightboxDragStart = { x: e.clientX - lightboxTranslate.x, y: e.clientY - lightboxTranslate.y };
+        imgEl.style.cursor = 'grabbing';
+        e.preventDefault();
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (isLightboxDragging) {
+        lightboxTranslate = {
+          x: e.clientX - lightboxDragStart.x,
+          y: e.clientY - lightboxDragStart.y
+        };
+        applyLightboxTransform();
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isLightboxDragging) {
+        isLightboxDragging = false;
+        applyLightboxTransform();
+      }
+    });
+
+    lightbox.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (e.deltaY < 0) {
+        lightboxZoom = Math.min(lightboxZoom + 0.15, 4.0);
+      } else {
+        lightboxZoom = Math.max(lightboxZoom - 0.15, 0.5);
+        if (lightboxZoom <= 1) lightboxTranslate = { x: 0, y: 0 };
+      }
+      applyLightboxTransform();
+    }, { passive: false });
+
+    imgEl.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      if (lightboxZoom > 1) {
+        resetLightboxTransform();
+      } else {
+        lightboxZoom = 2;
+        applyLightboxTransform();
+      }
     });
     
-    const container = document.getElementById('panel') || document.body;
-    container.appendChild(lightbox);
+    document.body.appendChild(lightbox);
     document.addEventListener('keydown', handleLightboxKeydown);
   }
   
+  resetLightboxTransform();
   updateLightbox();
   lightbox.style.display = 'flex';
-  // Small timeout to allow display:flex to apply before setting opacity for transition
   setTimeout(() => lightbox.style.opacity = '1', 10);
 };
 
-window.closeLightbox = function() {
+window.closeLightbox = function(e) {
+  if (e) e.stopPropagation();
   const lightbox = document.getElementById('chat-lightbox-overlay');
   if (lightbox) {
     lightbox.style.opacity = '0';
     setTimeout(() => {
       lightbox.style.display = 'none';
+      resetLightboxTransform();
     }, 200);
   }
 };
@@ -951,6 +1266,7 @@ window.lightboxNext = function(e) {
   if (e) e.stopPropagation();
   if (currentLightboxIndex < lightboxImages.length - 1) {
     currentLightboxIndex++;
+    resetLightboxTransform();
     updateLightbox();
   }
 };
@@ -959,6 +1275,7 @@ window.lightboxPrev = function(e) {
   if (e) e.stopPropagation();
   if (currentLightboxIndex > 0) {
     currentLightboxIndex--;
+    resetLightboxTransform();
     updateLightbox();
   }
 };
@@ -966,8 +1283,13 @@ window.lightboxPrev = function(e) {
 function updateLightbox() {
   const imgEl = document.getElementById('chat-lightbox-img');
   if (!imgEl) return;
-  imgEl.src = lightboxImages[currentLightboxIndex];
+  imgEl.src = lightboxImages[currentLightboxIndex] || '';
   
+  const counter = document.getElementById('chat-lightbox-counter');
+  if (counter) {
+    counter.textContent = `${currentLightboxIndex + 1} / ${Math.max(lightboxImages.length, 1)}`;
+  }
+
   const prevBtn = document.querySelector('.chat-lightbox-nav.prev');
   const nextBtn = document.querySelector('.chat-lightbox-nav.next');
   if (prevBtn) prevBtn.style.visibility = (currentLightboxIndex > 0) ? 'visible' : 'hidden';
@@ -978,7 +1300,57 @@ function handleLightboxKeydown(e) {
   const lightbox = document.getElementById('chat-lightbox-overlay');
   if (!lightbox || lightbox.style.display === 'none') return;
   
-  if (e.key === 'Escape') closeLightbox();
-  if (e.key === 'ArrowRight') lightboxNext();
-  if (e.key === 'ArrowLeft') lightboxPrev();
+  if (e.key === 'Escape') {
+    closeLightbox();
+    return;
+  }
+  if (e.key === 'ArrowRight') {
+    lightboxNext();
+    return;
+  }
+  if (e.key === 'ArrowLeft') {
+    lightboxPrev();
+    return;
+  }
+
+  // Intercept zoom shortcuts: + / = / - / _ / 0 (with or without Ctrl / Cmd)
+  // Prevent browser page zoom when lightbox is active!
+  if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal') {
+    e.preventDefault();
+    e.stopPropagation();
+    lightboxZoomIn();
+    return;
+  }
+  if (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus') {
+    e.preventDefault();
+    e.stopPropagation();
+    lightboxZoomOut();
+    return;
+  }
+  if (e.key === '0' || e.code === 'Numpad0' || e.code === 'Digit0') {
+    if (e.ctrlKey || e.metaKey || (!e.ctrlKey && !e.metaKey)) {
+      e.preventDefault();
+      e.stopPropagation();
+      resetLightboxTransform();
+      return;
+    }
+  }
+  if (e.key === 'r' || e.key === 'R') {
+    if (!e.ctrlKey && !e.metaKey) {
+      lightboxRotate();
+      return;
+    }
+  }
 }
+
+// ── Suggested questions in the welcome block ───────────────────────
+// Each chip sends its data-message as if the customer had typed it.
+// (CSS hides the chips once the customer has sent anything.)
+document.querySelectorAll(".chat-suggestion").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const text = btn.dataset.message;
+    if (!text) return;
+    inputEl.value = text;
+    sendMessage();
+  });
+});

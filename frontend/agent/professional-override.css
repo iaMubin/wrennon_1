@@ -1,0 +1,524 @@
+/* ==========================================================================
+   WRENNON — COMPLETE PROFESSIONAL SUITE OVERRIDES
+   Scoped to [data-theme="light-professional"] & [data-theme="dark-professional"]
+   
+   Transforms BOTH:
+   1. The Main Agent Workspace (Dashboard Overview, Inbox/Chat, Customers, Analytics)
+   2. The Admin Panel (Directory, Forms, Canned Responses, KB)
+   into a cohesive, world-class SaaS product (Linear / Intercom / Stripe aesthetic).
+   ========================================================================== */
+
+/* ── 1. GLOBAL RESETS & TYPOGRAPHY ── */
+[data-theme$="-professional"] {
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+[data-theme$="-professional"] body,
+[data-theme$="-professional"] button,
+[data-theme$="-professional"] input,
+[data-theme$="-professional"] select,
+[data-theme$="-professional"] textarea {
+  font-family: var(--font-body) !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+/* ── 2. GLOBAL NAV RAIL (HIGH CONTRAST DOCK) ── */
+[data-theme="light-professional"] #global-nav {
+  width: 58px !important;
+  min-width: 58px !important;
+  background-color: #0F172A !important; /* Deep Slate-900 rail */
+  border-right: 1px solid #1E293B !important;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="dark-professional"] #global-nav {
+  width: 58px !important;
+  min-width: 58px !important;
+  background-color: #090B10 !important; /* Pure onyx rail */
+  border-right: 1px solid #1C202E !important;
+  box-shadow: 2px 0 16px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme$="-professional"] .global-nav-btn {
+  width: 42px !important;
+  height: 42px !important;
+  margin: 4px auto !important;
+  border-radius: 10px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: none !important;
+  color: #94A3B8 !important;
+  opacity: 0.75 !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+[data-theme$="-professional"] .global-nav-btn:hover {
+  color: #FFFFFF !important;
+  opacity: 1 !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  transform: translateY(-1px) !important;
+}
+
+[data-theme$="-professional"] .global-nav-btn.active {
+  color: #FFFFFF !important;
+  opacity: 1 !important;
+  background: var(--accent) !important;
+  box-shadow: 0 0 16px var(--accent-glow) !important;
+  border-left: none !important;
+}
+
+/* ── 3. MAIN DASHBOARD VIEW (HOME OVERVIEW) ── */
+[data-theme$="-professional"] .view-content {
+  padding: 36px 44px !important;
+  background: var(--bg-base) !important;
+}
+
+[data-theme$="-professional"] .view-header {
+  margin-bottom: 28px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+[data-theme$="-professional"] .view-header h2 {
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.03em !important;
+  color: var(--ink) !important;
+  margin: 0 !important;
+}
+
+/* ── Metric Cards (Home Overview) ── */
+[data-theme$="-professional"] .dashboard-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 18px !important;
+  margin-bottom: 32px !important;
+}
+
+@media (max-width: 1024px) {
+  [data-theme$="-professional"] .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+[data-theme$="-professional"] .metric-card {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 14px !important;
+  padding: 22px 24px !important;
+  box-shadow: var(--shadow-xs) !important;
+  position: relative !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+}
+
+[data-theme$="-professional"] .metric-card::before {
+  display: none !important; /* Remove dated top gradient bar */
+}
+
+[data-theme$="-professional"] .metric-card:hover {
+  transform: translateY(-2px) !important;
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line)) !important;
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme$="-professional"] .metric-card h3 {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  color: var(--ink-soft) !important;
+  margin: 0 !important;
+}
+
+[data-theme$="-professional"] .metric-card .metric-value {
+  font-size: 32px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.04em !important;
+  line-height: 1.1 !important;
+  color: var(--ink) !important;
+}
+
+/* ── Dashboard Panels (Activity Feed, Team Status, Volume) ── */
+[data-theme$="-professional"] .dashboard-main-area {
+  display: grid !important;
+  grid-template-columns: 1.6fr 1fr !important;
+  gap: 24px !important;
+}
+
+@media (max-width: 900px) {
+  [data-theme$="-professional"] .dashboard-main-area {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+[data-theme$="-professional"] .activity-feed-panel {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 16px !important;
+  padding: 26px !important;
+  box-shadow: var(--shadow-xs) !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+[data-theme$="-professional"] .activity-feed-panel:hover {
+  border-color: color-mix(in srgb, var(--accent) 25%, var(--line)) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+[data-theme$="-professional"] .activity-feed-panel h3 {
+  font-size: 15px !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.015em !important;
+  color: var(--ink) !important;
+  margin-bottom: 18px !important;
+}
+
+/* ── 4. CONVERSATIONS VIEW (AGENT TICKET WORKSPACE) ── */
+[data-theme$="-professional"] #sidebar {
+  width: 360px !important;
+  background: var(--bg-surface) !important;
+  border-right: 1px solid var(--line) !important;
+}
+
+[data-theme$="-professional"] #sidebar-header {
+  padding: 16px 20px !important;
+  background: var(--bg-surface) !important;
+  border-bottom: 1px solid var(--line) !important;
+  height: 64px !important;
+}
+
+[data-theme$="-professional"] #section-tabs {
+  padding: 8px 12px !important;
+  gap: 6px !important;
+  background: var(--bg-base) !important;
+  border-bottom: 1px solid var(--line) !important;
+}
+
+[data-theme$="-professional"] .tab {
+  border-radius: 8px !important;
+  padding: 7px 12px !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  color: var(--ink-soft) !important;
+  transition: all 0.15s ease !important;
+}
+
+[data-theme$="-professional"] .tab:hover {
+  background: var(--bg-hover) !important;
+  color: var(--ink) !important;
+}
+
+[data-theme$="-professional"] .tab--active {
+  background: var(--bg-surface) !important;
+  color: var(--accent) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+  border-color: transparent !important;
+}
+
+/* ── Conversation Items ── */
+[data-theme$="-professional"] .conv-item {
+  padding: 14px 16px !important;
+  margin-bottom: 8px !important;
+  border-radius: 10px !important;
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--line) !important;
+  box-shadow: none !important;
+  transition: all 0.15s ease !important;
+}
+
+[data-theme$="-professional"] .conv-item:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line)) !important;
+  background: var(--bg-hover) !important;
+  transform: none !important;
+  box-shadow: var(--shadow-xs) !important;
+}
+
+[data-theme$="-professional"] .conv-item--selected {
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-surface)) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 1px var(--accent) !important;
+}
+
+[data-theme$="-professional"] .conv-item-email {
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  color: var(--ink) !important;
+}
+
+[data-theme$="-professional"] .conv-item-time {
+  font-size: 11px !important;
+  color: var(--ink-soft) !important;
+}
+
+[data-theme$="-professional"] .conv-item-preview {
+  font-size: 12.5px !important;
+  color: var(--ink-soft) !important;
+  margin-top: 4px !important;
+}
+
+/* ── Chat Messages & Thread ── */
+[data-theme$="-professional"] #conversation-header {
+  height: 64px !important;
+  background: var(--bg-surface) !important;
+  border-bottom: 1px solid var(--line) !important;
+  padding: 0 24px !important;
+}
+
+[data-theme$="-professional"] #agent-messages {
+  background: var(--bg-base) !important;
+  padding: 28px !important;
+  gap: 16px !important;
+}
+
+[data-theme$="-professional"] .msg--human,
+[data-theme$="-professional"] .msg--user {
+  background: var(--bg-surface) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--line) !important;
+  border-left: 3px solid var(--accent) !important;
+  border-radius: 12px 12px 12px 3px !important;
+  box-shadow: var(--shadow-xs) !important;
+  padding: 12px 16px !important;
+  font-size: 14px !important;
+  line-height: 1.55 !important;
+}
+
+[data-theme$="-professional"] .msg--agent {
+  background: var(--accent) !important;
+  color: var(--accent-ink) !important;
+  border: none !important;
+  border-radius: 12px 12px 3px 12px !important;
+  box-shadow: 0 2px 8px -2px var(--accent-glow) !important;
+  padding: 12px 16px !important;
+  font-size: 14px !important;
+  line-height: 1.55 !important;
+}
+
+[data-theme$="-professional"] .msg--image-only,
+[data-theme$="-professional"] .msg:has(> p:only-child > .chat-lightbox-image:only-child),
+[data-theme$="-professional"] .msg:has(> .chat-lightbox-image:only-child) {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+[data-theme$="-professional"] .msg--image-only::before {
+  display: none !important;
+}
+
+[data-theme$="-professional"] .chat-input-center-pill {
+  border-radius: 10px !important;
+  border: 1.5px solid var(--line) !important;
+  background: var(--bg-surface) !important;
+  transition: all 0.15s ease !important;
+}
+
+[data-theme$="-professional"] .chat-input-center-pill:focus-within {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-glow) !important;
+}
+
+/* ── Customer Details Sidebar ── */
+[data-theme$="-professional"] .customer-sidebar {
+  border-left: 1px solid var(--line) !important;
+  background: var(--bg-surface) !important;
+}
+
+[data-theme$="-professional"] .customer-sidebar__header {
+  height: 64px !important;
+  background: var(--bg-surface) !important;
+  border-bottom: 1px solid var(--line) !important;
+  padding: 0 20px !important;
+}
+
+[data-theme$="-professional"] .customer-sidebar__title {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: var(--ink) !important;
+}
+
+/* ── 5. ADMIN DASHBOARD PAGE (admin_dashboard.html) ── */
+[data-theme$="-professional"] .admin-container {
+  max-width: 1200px !important;
+  margin: 0 auto !important;
+  padding: 0 24px 48px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+[data-theme$="-professional"] .admin-header {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 50 !important;
+  margin: 0 0 24px 0 !important;
+  padding: 18px 24px !important;
+  background: var(--bg-glass) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-bottom: 1px solid var(--line) !important;
+  border-radius: 0 !important;
+  box-shadow: var(--shadow-xs) !important;
+}
+
+[data-theme$="-professional"] .admin-header h2 {
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.025em !important;
+  color: var(--ink) !important;
+}
+
+[data-theme$="-professional"] .admin-header h2::before {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  background: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-glow) !important;
+}
+
+[data-theme$="-professional"] .section-block {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 14px !important;
+  padding: 28px !important;
+  margin-top: 24px !important;
+  box-shadow: var(--shadow-xs) !important;
+  transition: all 0.2s ease !important;
+}
+
+[data-theme$="-professional"] .section-block:hover {
+  border-color: color-mix(in srgb, var(--accent) 25%, var(--line)) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+[data-theme$="-professional"] .section-block h3 {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.015em !important;
+  color: var(--ink) !important;
+}
+
+/* ── 6. TABLES (Sleek, Modern, Flat) ── */
+[data-theme$="-professional"] table,
+[data-theme$="-professional"] .data-table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  width: 100% !important;
+  box-shadow: none !important;
+}
+
+[data-theme$="-professional"] th {
+  background: var(--bg-header) !important;
+  color: var(--ink-soft) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  padding: 12px 18px !important;
+  border-bottom: 1px solid var(--line) !important;
+}
+
+[data-theme$="-professional"] td {
+  padding: 14px 18px !important;
+  border-bottom: 1px solid var(--line) !important;
+  font-size: 13.5px !important;
+  color: var(--ink) !important;
+}
+
+[data-theme$="-professional"] tbody tr,
+[data-theme$="-professional"] tbody tr:nth-child(even) {
+  background: var(--bg-surface) !important;
+  transition: background-color 0.15s ease !important;
+}
+
+[data-theme$="-professional"] tbody tr:hover,
+[data-theme$="-professional"] tbody tr:nth-child(even):hover {
+  background: var(--bg-hover) !important;
+}
+
+[data-theme$="-professional"] tbody tr:last-child td {
+  border-bottom: none !important;
+}
+
+/* ── 7. BUTTONS & CONTROLS ── */
+[data-theme$="-professional"] .btn-primary {
+  background: var(--accent) !important;
+  color: var(--accent-ink) !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  padding: 9px 18px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+  transition: all 0.15s ease !important;
+}
+
+[data-theme$="-professional"] .btn-primary:hover {
+  background: var(--accent-hover) !important;
+  filter: none !important;
+  box-shadow: 0 4px 12px -2px var(--accent-glow) !important;
+  transform: translateY(-1px) !important;
+}
+
+[data-theme$="-professional"] .btn-primary:active {
+  transform: scale(0.98) !important;
+}
+
+[data-theme$="-professional"] .btn-secondary,
+[data-theme$="-professional"] .btn:not(.btn-primary):not(.btn-danger) {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--line) !important;
+  color: var(--ink) !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+}
+
+[data-theme$="-professional"] .btn-secondary:hover,
+[data-theme$="-professional"] .btn:not(.btn-primary):not(.btn-danger):hover {
+  background: var(--bg-hover) !important;
+  border-color: var(--line) !important;
+  color: var(--accent) !important;
+}
+
+/* ── 8. FORM INPUTS & LABELS ── */
+[data-theme$="-professional"] .form-group label {
+  text-transform: none !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  color: var(--ink) !important;
+  margin-bottom: 6px !important;
+}
+
+[data-theme$="-professional"] .input-wrapper input,
+[data-theme$="-professional"] .form-group select,
+[data-theme$="-professional"] .search-input,
+[data-theme$="-professional"] textarea {
+  font-family: var(--font-body) !important;
+  font-size: 13.5px !important;
+  height: 42px !important;
+  border: 1.5px solid var(--line) !important;
+  background: var(--bg-base) !important;
+  color: var(--ink) !important;
+  border-radius: 8px !important;
+  padding: 8px 14px !important;
+  transition: all 0.15s ease !important;
+}
+
+[data-theme$="-professional"] .input-wrapper input:focus,
+[data-theme$="-professional"] .form-group select:focus,
+[data-theme$="-professional"] .search-input:focus,
+[data-theme$="-professional"] textarea:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-glow) !important;
+  outline: none !important;
+}

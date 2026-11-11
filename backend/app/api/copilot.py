@@ -34,6 +34,7 @@ async def copilot_suggest(request: CopilotRequest, db: Session = Depends(get_db)
     and on-topic: if the customer raised something unrelated to their order/shopping/support
     (politics, public figures, personal opinions, etc.), the suggested reply should redirect
     politely rather than answer it, and must never state a personal opinion or political view.
+    Never output bare or raw URLs in suggested replies. Always format any URL with descriptive markdown link text (e.g. [Track Shipment](url), [View Invoice](url), [Help Center](url)).
     Also, if applicable, suggest ONE quick action button the agent can click (e.g. "Apply 10% Discount", "Extend Subscription", "Process Refund").
     Output exactly JSON:
     {{

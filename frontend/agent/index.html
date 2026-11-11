@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="theme.css?v=91">
 <link rel="stylesheet" href="agent.css?v=92">
 <link rel="stylesheet" href="ui-polish.css?v=1">
+<link rel="stylesheet" href="professional-override.css?v=1">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   (function() {
@@ -224,6 +225,7 @@
                   <button class="theme-tab" data-target="agent-widget-themes">Widget</button>
                 </div>
                 <div id="agent-light-themes" class="theme-tab-content active">
+                  <button class="theme-option" data-theme-value="light-professional" role="menuitem" style="font-weight: 600; color: #4F46E5 !important;">✨ Professional Light</button>
                   <button class="theme-option" data-theme-value="light-neutral-gray" role="menuitem">Neutral Gray</button>
                   <button class="theme-option" data-theme-value="light-corporate-blue" role="menuitem">Corporate Blue</button>
                   <button class="theme-option" data-theme-value="light-slate-teal" role="menuitem">Slate Teal</button>
@@ -231,6 +233,7 @@
                   <button class="theme-option" data-theme-value="light-pure-white" role="menuitem">Pure White</button>
                 </div>
                 <div id="agent-dark-themes" class="theme-tab-content hidden">
+                  <button class="theme-option" data-theme-value="dark-professional" role="menuitem" style="font-weight: 600; color: #818CF8 !important;">✨ Professional Dark</button>
                   <button class="theme-option" data-theme-value="dark-matte" role="menuitem">Matte Black</button>
                   <button class="theme-option" data-theme-value="dark-navy" role="menuitem">Black Navy</button>
                   <button class="theme-option" data-theme-value="dark-charcoal" role="menuitem">Charcoal</button>
@@ -479,7 +482,7 @@
                   </div>
                   
                   <div class="chat-input-actions-right">
-                    <button id="agent-voice-btn" class="icon-action-btn" aria-label="Record voice" title="Voice message" style="margin-right: 8px;">
+                    <button id="agent-voice-btn" class="icon-action-btn" aria-label="Record voice" title="Voice message">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
                     </button>
                     
@@ -487,26 +490,49 @@
                       <option value="public">Reply</option>
                       <option value="internal">Internal Note</option>
                     </select>
-                    <div class="split-send-btn-group">
-                      <button id="agent-send-btn" class="btn btn-primary split-btn-main">Send</button>
-                      <button id="agent-send-toggle" class="btn btn-primary split-btn-toggle" aria-haspopup="true" aria-expanded="false">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    <div class="chat-send-suite split-send-btn-group">
+                      <button id="agent-send-toggle" class="send-mode-pill send-toggle-pill" aria-haspopup="true" aria-expanded="false" title="Switch message mode (Ctrl+L)">
+                        <span class="send-mode-indicator send-mode-dot"></span>
+                        <span class="send-mode-badge" id="send-mode-badge">Reply</span>
+                        <svg class="send-mode-chevron send-toggle-chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                      </button>
+                      <button id="agent-send-btn" class="modern-send-btn send-action-btn" aria-label="Send message" title="Send message (Enter)">
+                        <svg class="modern-send-icon send-action-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                          <line x1="12" y1="19" x2="12" y2="5"></line>
+                          <polyline points="5 12 12 5 19 12"></polyline>
+                        </svg>
                       </button>
                       <div id="send-type-menu" class="send-type-menu hidden" role="menu">
-                        <button class="send-type-option" data-type="public" role="menuitem">
-                          <span style="display:flex; align-items:center; gap:8px;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg>
-                            Public Reply
-                          </span>
-                          <svg class="check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        <div class="send-type-menu-header">Message Mode</div>
+                        <button class="send-type-option is-active" data-type="public" role="menuitem">
+                          <div class="send-type-option__main">
+                            <span class="send-type-avatar public-avatar">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                            </span>
+                            <div class="send-type-text">
+                              <span class="send-type-title">Public Reply</span>
+                              <span class="send-type-desc">Sends directly to customer</span>
+                            </div>
+                          </div>
+                          <span class="send-type-status-pill send-type-badge">Active</span>
                         </button>
                         <button class="send-type-option" data-type="internal" role="menuitem">
-                          <span style="display:flex; align-items:center; gap:8px;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                            Internal Note
-                          </span>
-                          <svg class="check-icon hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                          <div class="send-type-option__main">
+                            <span class="send-type-avatar internal-avatar">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            </span>
+                            <div class="send-type-text">
+                              <span class="send-type-title">Internal Note</span>
+                              <span class="send-type-desc">Visible only to team members</span>
+                            </div>
+                          </div>
+                          <span class="send-type-status-pill send-type-badge">Active</span>
                         </button>
+                        <div class="send-type-menu-footer">
+                          <span>Shortcut: <code>Ctrl + L</code></span>
+                        </div>
                       </div>
                     </div>
                   </div>

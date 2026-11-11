@@ -3,25 +3,363 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Storefront — Wrennon Showcase</title>
+<title>Northbound Goods — Outerwear, Footwear, Essentials &amp; Accessories</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400..800;1,6..72,400..800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400..800;1,6..72,400..800&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/agent/theme.css?v=65">
 <link rel="stylesheet" href="widget.css?v=67">
 <link rel="stylesheet" href="ui-polish.css?v=1">
+<link rel="stylesheet" href="storefront.css?v=4">
 </head>
 <body>
-  <!-- Placeholder storefront background so the widget has real context to sit on -->
-  <main class="storefront-mock">
-    <header class="storefront-mock__nav">
-      <span class="storefront-mock__logo">Northbound Goods</span>
+  <!-- Northbound Goods — static storefront. Display only: the chat widget below is the one interactive element. -->
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="knit" width="7" height="7" patternUnits="userSpaceOnUse"><path d="M0 1L3.5 6L7 1" fill="none" stroke="rgba(0,0,0,.13)" stroke-width="1"/></pattern>
+    <pattern id="weave" width="4" height="4" patternUnits="userSpaceOnUse"><path d="M0 .5H4M0 2.5H4" stroke="rgba(0,0,0,.10)" stroke-width=".7"/><path d="M.5 0V4M2.5 0V4" stroke="rgba(255,255,255,.10)" stroke-width=".7"/></pattern>
+
+    <symbol id="g-parka" viewBox="0 0 200 200">
+      <path class="f2" d="M66 52L36 66Q28 72 26 84L16 154Q15 160 21 162L44 168Q50 169 51 163L66 104Z"/>
+      <path class="f2" d="M134 52L164 66Q172 72 174 84L184 154Q185 160 179 162L156 168Q150 169 149 163L134 104Z"/>
+      <path class="sh" d="M134 52L164 66Q172 72 174 84L184 154Q185 160 179 162L156 168Q150 169 149 163L134 104Z"/>
+      <path class="sm" d="M30 90Q46 96 63 88M26 114Q44 120 65 112M22 138Q40 144 59 136M170 90Q154 96 137 88M174 114Q156 120 135 112M178 138Q160 144 141 136"/>
+      <path class="f3" d="M17 150L52 156L51 163Q50 169 44 168L21 162Q15 160 17 150ZM183 150L148 156L149 163Q150 169 156 168L179 162Q185 160 183 150Z"/>
+      <path class="f1" d="M66 50Q100 40 134 50L140 176Q100 184 60 176Z"/>
+      <path class="hl" d="M66 50Q80 46 94 44L86 181Q72 179 60 176Z"/>
+      <path class="sh" d="M112 46L134 50L140 176Q124 181 108 182Z"/>
+      <path class="sm" d="M62 82Q100 92 138 82M61 110Q100 120 139 110M60 138Q100 148 140 138M59 165Q100 175 141 165"/>
+      <path class="hs" d="M64 79Q100 89 136 79M63 107Q100 117 137 107M62 135Q100 145 138 135M61 162Q100 172 139 162"/>
+      <path class="f2" d="M70 54Q66 14 100 12Q134 14 130 54Q100 66 70 54Z"/>
+      <path class="dk" d="M80 50Q80 26 100 24Q120 26 120 50Q100 60 80 50Z"/>
+      <path class="f2" d="M72 54Q100 70 128 54L134 66Q100 84 66 66Z"/>
+      <path class="hl" d="M72 54Q100 70 128 54L130 58Q100 74 70 58Z"/>
+      <path class="zp" d="M100 70V181"/>
+      <rect class="f3" x="97.5" y="68" width="5" height="11" rx="1.5"/>
+      <path class="sm" d="M71 128L90 136M129 128L110 136"/>
+      <path class="f2" d="M60 172Q100 180 140 172L140 177Q100 185 60 177Z"/>
+    </symbol>
+
+    <symbol id="g-boot" viewBox="0 0 200 200">
+      <path class="f1" d="M60 36H112L114 96Q116 108 128 112L160 120Q188 126 188 152V158H56Z"/>
+      <path class="sh" d="M96 36H112L114 96Q116 108 128 112L160 120Q188 126 188 152V158H120Z"/>
+      <path class="hl" d="M60 36H76L72 158H56Z"/>
+      <path class="f2" opacity=".55" d="M150 118Q188 126 188 152V158H138Q150 142 150 118Z"/>
+      <path class="f2" opacity=".5" d="M96 36H112L114 96L102 90Z"/>
+      <path class="st" d="M62 150Q100 154 186 150M146 124Q166 130 172 150"/>
+      <path class="f3" d="M55 28Q63 20 71 28Q79 20 87 28Q95 20 103 28Q111 20 119 28L120 46H55Z"/>
+      <path class="sh" d="M55 40H120V46H55Z"/>
+      <g fill="#d8c9a6"><circle cx="76" cy="58" r="2.4"/><circle cx="76" cy="70" r="2.4"/><circle cx="76" cy="82" r="2.4"/><circle cx="76" cy="94" r="2.4"/><circle cx="100" cy="58" r="2.4"/><circle cx="101" cy="70" r="2.4"/><circle cx="102" cy="82" r="2.4"/><circle cx="103" cy="94" r="2.4"/></g>
+      <path class="wl" d="M76 58L100 70M100 58L76 70M76 70L101 82M101 70L76 82M76 82L102 94M102 82L76 94"/>
+      <path d="M52 152H190V160H52Z" fill="#e9dfc9"/>
+      <path d="M52 160H192V169Q192 173 188 173H56Q52 173 52 169Z" fill="#241a14"/>
+      <path d="M52 160H102V177H56Q52 177 52 173Z" fill="#241a14"/>
+      <path fill="#0f0a07" opacity=".7" d="M112 168h6v5h-6zM124 168h6v5h-6zM136 168h6v5h-6zM148 168h6v5h-6zM160 168h6v5h-6zM172 168h6v5h-6z"/>
+    </symbol>
+
+    <symbol id="g-knit" viewBox="0 0 200 200">
+      <path class="f1" d="M70 38Q100 54 130 38L162 50Q170 54 172 62L184 152Q185 158 179 159L158 163Q153 164 152 159L142 96V170Q100 178 58 170V96L48 159Q47 164 42 163L21 159Q15 158 16 152L28 62Q30 54 38 50Z"/>
+      <path fill="url(#knit)" d="M70 38Q100 54 130 38L162 50Q170 54 172 62L184 152Q185 158 179 159L158 163Q153 164 152 159L142 96V170Q100 178 58 170V96L48 159Q47 164 42 163L21 159Q15 158 16 152L28 62Q30 54 38 50Z"/>
+      <path class="hl" d="M70 38L38 50Q30 54 28 62L16 152Q15 158 21 159L42 163L58 96V170L70 172Z"/>
+      <path class="sh" d="M130 38L162 50Q170 54 172 62L184 152Q185 158 179 159L158 163L142 96V170L128 173Z"/>
+      <path class="f2" d="M16 146L50 154L48 159Q47 164 42 163L21 159Q15 158 16 152ZM184 146L150 154L152 159Q153 164 158 163L179 159Q185 158 184 152Z"/>
+      <path class="f2" d="M58 160H142V170Q100 178 58 170Z"/>
+      <path class="ln" d="M64 161V173M70 161V174M76 161V175M82 161V176M88 161V176M94 161V176M100 161V176M106 161V176M112 161V176M118 161V175M124 161V174M130 161V173M136 161V172"/>
+      <path class="f3" d="M58 84H142V89H58Z"/>
+      <path class="f2" d="M70 38Q100 54 130 38L126 33Q100 47 74 33Z"/>
+      <path class="dk" d="M74 33Q100 47 126 33Q100 27 74 33Z"/>
+    </symbol>
+
+    <symbol id="g-bag" viewBox="0 0 200 200">
+      <path class="hd" d="M66 88C64 46 86 38 100 38C114 38 136 46 134 88"/>
+      <path class="st" style="stroke:#e9dfc9" d="M66 88C64 46 86 38 100 38C114 38 136 46 134 88"/>
+      <path class="f1" d="M26 98Q26 82 42 82H158Q174 82 174 98V150Q174 162 160 162H40Q26 162 26 150Z"/>
+      <path fill="url(#weave)" d="M26 98Q26 82 42 82H158Q174 82 174 98V150Q174 162 160 162H40Q26 162 26 150Z"/>
+      <path class="f3" d="M26 98Q26 82 42 82H54V162H40Q26 162 26 150ZM174 98Q174 82 158 82H146V162H160Q174 162 174 150Z"/>
+      <path class="f3" d="M54 148H146V162H54Z"/>
+      <path class="sh" d="M54 148H146V162H54Z"/>
+      <path class="zp" d="M54 94H146"/>
+      <rect class="f3" x="97" y="90" width="7" height="12" rx="2"/>
+      <rect class="f2" x="68" y="110" width="64" height="32" rx="3"/>
+      <rect class="st" x="71" y="113" width="58" height="26" rx="2"/>
+      <path class="f3" d="M68 110H132V122Q100 128 68 122Z"/>
+      <rect x="96" y="116" width="8" height="12" rx="1.5" fill="#c9a24b"/>
+      <path class="hl" d="M26 98Q26 82 42 82H70L62 162H40Q26 162 26 150Z"/>
+      <path class="sh" d="M130 82H158Q174 82 174 98V150Q174 162 160 162H122Z"/>
+      <circle cx="54" cy="96" r="4" fill="none" stroke="#c9a24b" stroke-width="2"/><circle cx="146" cy="96" r="4" fill="none" stroke="#c9a24b" stroke-width="2"/>
+    </symbol>
+  </defs>
+</svg>
+  <div class="sf">
+    <div class="sf-top"><span>30-day return policy</span><span>Support replies in seconds</span><span>Autumn / Winter 2026</span></div>
+
+    <header class="sf-head">
+      <div class="sf-wrap sf-head__grid">
+        <nav class="sf-nav sf-nav--l" aria-label="Departments"><span>Outerwear</span><span>Footwear</span></nav>
+        <span class="sf-logo "><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M18 6.5L22.6 18H18Z" fill="currentColor"/><path d="M18 29.5L13.4 18H18Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M18 6.5L13.4 18H18Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg><span class="sf-logo__txt"><span class="sf-logo__word">Northbound</span><span class="sf-logo__sub">Goods</span></span></span>
+        <nav class="sf-nav sf-nav--r" aria-label="Departments"><span>Essentials</span><span>Accessories</span></nav>
+      </div>
     </header>
-    <section class="storefront-mock__hero">
-      <h1>Field jackets, built for weather that doesn't cooperate.</h1>
-      <p>Versatile layers for long days outside, built to keep moving when the forecast changes.</p>
-    </section>
-  </main>
+
+    <main>
+      <section class="sf-hero">
+        <svg class="sf-hero__bg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="h-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e3442"/><stop offset=".42" stop-color="#4b6b7a"/>
+      <stop offset=".72" stop-color="#c9a98a"/><stop offset="1" stop-color="#f0d4a6"/>
+    </linearGradient>
+    <radialGradient id="h-sun" cx="1160" cy="520" r="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff1cf" stop-opacity=".95"/><stop offset=".35" stop-color="#f6d9a4" stop-opacity=".45"/><stop offset="1" stop-color="#f6d9a4" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="h-r1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9eb2b6"/><stop offset="1" stop-color="#c3cdc6"/></linearGradient>
+    <linearGradient id="h-r2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6f8c95"/><stop offset="1" stop-color="#9db0ae"/></linearGradient>
+    <linearGradient id="h-r3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#46666d"/><stop offset="1" stop-color="#6e8a88"/></linearGradient>
+    <linearGradient id="h-r4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#27453f"/><stop offset="1" stop-color="#3b5c52"/></linearGradient>
+    <linearGradient id="h-mist" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3dcb8" stop-opacity="0"/><stop offset=".55" stop-color="#f3dcb8" stop-opacity=".42"/><stop offset="1" stop-color="#f3dcb8" stop-opacity="0"/></linearGradient>
+    <filter id="h-blur" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="22"/></filter>
+    <filter id="h-grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .07 0"/></filter>
+    <symbol id="tree" viewBox="0 0 60 120"><path d="M30 0L46 34H37L52 62H42L58 96H34V120H26V96H2L18 62H8L23 34H14Z"/></symbol>
+  </defs>
+  <rect width="1600" height="900" fill="url(#h-sky)"/>
+  <rect width="1600" height="900" fill="url(#h-sun)"/>
+  <g filter="url(#h-blur)" fill="#fbe7c4" opacity=".5"><ellipse cx="420" cy="360" rx="260" ry="16"/><ellipse cx="980" cy="300" rx="320" ry="14"/><ellipse cx="1350" cy="420" rx="240" ry="12"/></g>
+  <path d="M0 900 L0 494 L6 498 L12 500 L19 503 L25 509 L31 509 L38 511 L44 515 L50 519 L56 519 L62 516 L69 519 L75 520 L81 521 L88 523 L94 525 L100 522 L106 520 L112 520 L119 519 L125 522 L131 523 L138 525 L144 526 L150 528 L156 527 L162 530 L169 530 L175 533 L181 530 L188 527 L194 527 L200 526 L206 526 L212 530 L219 530 L225 532 L231 530 L238 525 L244 527 L250 524 L256 526 L262 526 L269 527 L275 525 L281 522 L288 519 L294 517 L300 518 L306 517 L312 520 L319 519 L325 523 L331 523 L338 521 L344 522 L350 523 L356 526 L362 525 L369 526 L375 531 L381 536 L388 541 L394 542 L400 544 L406 543 L412 541 L419 536 L425 533 L431 534 L438 530 L444 528 L450 530 L456 532 L462 533 L469 533 L475 531 L481 534 L488 533 L494 536 L500 538 L506 538 L512 536 L519 537 L525 536 L531 541 L538 543 L544 543 L550 545 L556 547 L562 549 L569 551 L575 551 L581 550 L588 547 L594 548 L600 549 L606 551 L612 551 L619 550 L625 545 L631 544 L638 542 L644 544 L650 544 L656 545 L662 548 L669 552 L675 556 L681 558 L688 559 L694 557 L700 559 L706 560 L712 560 L719 564 L725 565 L731 568 L738 567 L744 571 L750 573 L756 576 L762 580 L769 588 L775 594 L781 595 L788 595 L794 599 L800 603 L806 605 L812 604 L819 603 L825 605 L831 603 L838 599 L844 596 L850 597 L856 597 L862 597 L869 595 L875 594 L881 595 L888 598 L894 602 L900 604 L906 600 L912 596 L919 593 L925 589 L931 590 L938 588 L944 584 L950 581 L956 580 L962 583 L969 584 L975 586 L981 586 L988 584 L994 581 L1000 580 L1006 580 L1012 582 L1019 582 L1025 578 L1031 578 L1038 575 L1044 576 L1050 577 L1056 579 L1062 578 L1069 580 L1075 583 L1081 584 L1088 583 L1094 578 L1100 576 L1106 575 L1112 575 L1119 573 L1125 569 L1131 569 L1138 565 L1144 566 L1150 565 L1156 561 L1162 557 L1169 556 L1175 555 L1181 555 L1188 557 L1194 555 L1200 556 L1206 557 L1212 559 L1219 558 L1225 555 L1231 554 L1238 551 L1244 552 L1250 551 L1256 552 L1262 551 L1269 546 L1275 544 L1281 540 L1288 539 L1294 534 L1300 529 L1306 529 L1312 530 L1319 529 L1325 529 L1331 530 L1338 532 L1344 534 L1350 536 L1356 534 L1362 531 L1369 532 L1375 533 L1381 535 L1388 534 L1394 540 L1400 541 L1406 543 L1412 545 L1419 541 L1425 542 L1431 540 L1438 542 L1444 546 L1450 546 L1456 546 L1462 550 L1469 552 L1475 552 L1481 549 L1488 546 L1494 545 L1500 545 L1506 545 L1512 544 L1519 539 L1525 539 L1531 534 L1538 533 L1544 529 L1550 526 L1556 520 L1562 517 L1569 516 L1575 511 L1581 508 L1588 507 L1594 506 L1600 507 L1600 900 Z" fill="url(#h-r1)"/>
+  <g>
+    <path d="M700 700L860 470L930 400L1000 330L1062 250L1112 322L1172 392L1262 500L1440 700Z" fill="#5d7c87"/>
+    <path d="M1062 250L1112 322L1172 392L1262 500L1440 700L1210 700L1150 540L1098 420L1078 340Z" fill="#334f5b" opacity=".78"/>
+    <path d="M1062 250L1030 296L1048 290L1060 322L1076 292L1094 306L1112 322L1090 280Z" fill="#f2f6f4"/>
+    <path d="M1062 250L1112 322L1094 306L1076 292L1064 274Z" fill="#c2d3d8"/>
+  </g>
+  <path d="M0 900 L0 598 L6 601 L12 602 L19 601 L25 601 L31 601 L38 598 L44 598 L50 600 L56 599 L62 598 L69 597 L75 597 L81 595 L88 592 L94 592 L100 593 L106 592 L112 593 L119 593 L125 591 L131 591 L138 591 L144 591 L150 589 L156 591 L162 593 L169 592 L175 592 L181 592 L188 593 L194 591 L200 591 L206 591 L212 589 L219 584 L225 582 L231 582 L238 581 L244 581 L250 579 L256 580 L262 581 L269 580 L275 578 L281 580 L288 582 L294 582 L300 583 L306 582 L312 583 L319 584 L325 586 L331 588 L338 592 L344 591 L350 592 L356 594 L362 593 L369 594 L375 595 L381 593 L388 592 L394 592 L400 592 L406 593 L412 591 L419 593 L425 595 L431 597 L438 599 L444 600 L450 603 L456 602 L462 602 L469 601 L475 603 L481 606 L488 610 L494 610 L500 611 L506 614 L512 615 L519 614 L525 614 L531 615 L538 618 L544 621 L550 625 L556 622 L562 622 L569 623 L575 624 L581 626 L588 629 L594 632 L600 633 L606 631 L612 631 L619 633 L625 632 L631 633 L638 635 L644 637 L650 637 L656 638 L662 639 L669 637 L675 637 L681 637 L688 635 L694 635 L700 636 L706 640 L712 644 L719 647 L725 652 L731 657 L738 659 L744 659 L750 661 L756 663 L762 662 L769 663 L775 664 L781 666 L788 666 L794 667 L800 670 L806 667 L812 667 L819 665 L825 660 L831 659 L838 658 L844 654 L850 653 L856 653 L862 651 L869 649 L875 644 L881 643 L888 643 L894 640 L900 640 L906 640 L912 639 L919 638 L925 639 L931 642 L938 642 L944 642 L950 643 L956 644 L962 644 L969 644 L975 642 L981 642 L988 640 L994 639 L1000 636 L1006 636 L1012 636 L1019 637 L1025 638 L1031 637 L1038 638 L1044 637 L1050 639 L1056 638 L1062 640 L1069 641 L1075 641 L1081 642 L1088 645 L1094 646 L1100 647 L1106 646 L1112 645 L1119 645 L1125 643 L1131 644 L1138 645 L1144 647 L1150 647 L1156 648 L1162 650 L1169 649 L1175 649 L1181 647 L1188 644 L1194 645 L1200 644 L1206 646 L1212 644 L1219 643 L1225 642 L1231 642 L1238 638 L1244 639 L1250 636 L1256 637 L1262 635 L1269 632 L1275 632 L1281 630 L1288 629 L1294 627 L1300 622 L1306 620 L1312 617 L1319 614 L1325 614 L1331 614 L1338 615 L1344 613 L1350 610 L1356 609 L1362 607 L1369 608 L1375 608 L1381 607 L1388 607 L1394 606 L1400 605 L1406 604 L1412 605 L1419 605 L1425 605 L1431 602 L1438 599 L1444 599 L1450 597 L1456 598 L1462 599 L1469 600 L1475 601 L1481 601 L1488 602 L1494 602 L1500 603 L1506 604 L1512 605 L1519 605 L1525 607 L1531 605 L1538 605 L1544 604 L1550 601 L1556 599 L1562 597 L1569 599 L1575 598 L1581 598 L1588 598 L1594 600 L1600 600 L1600 900 Z" fill="url(#h-r2)"/>
+  <rect y="480" width="1600" height="150" fill="url(#h-mist)"/>
+  <path d="M0 900 L0 653 L6 653 L12 653 L19 654 L25 656 L31 657 L38 657 L44 657 L50 658 L56 657 L62 656 L69 657 L75 657 L81 656 L88 653 L94 651 L100 650 L106 650 L112 651 L119 651 L125 653 L131 654 L138 658 L144 661 L150 662 L156 663 L162 664 L169 663 L175 665 L181 664 L188 664 L194 664 L200 666 L206 665 L212 663 L219 662 L225 662 L231 662 L238 664 L244 665 L250 665 L256 666 L262 667 L269 669 L275 670 L281 672 L288 673 L294 673 L300 676 L306 676 L312 675 L319 674 L325 671 L331 669 L338 669 L344 669 L350 671 L356 672 L362 673 L369 674 L375 677 L381 678 L388 677 L394 678 L400 677 L406 678 L412 675 L419 677 L425 677 L431 677 L438 677 L444 675 L450 674 L456 675 L462 675 L469 677 L475 678 L481 678 L488 676 L494 675 L500 676 L506 674 L512 672 L519 671 L525 671 L531 671 L538 673 L544 671 L550 670 L556 670 L562 669 L569 670 L575 671 L581 672 L588 671 L594 669 L600 669 L606 669 L612 669 L619 668 L625 668 L631 667 L638 668 L644 665 L650 664 L656 663 L662 662 L669 661 L675 659 L681 657 L688 655 L694 655 L700 653 L706 653 L712 656 L719 657 L725 658 L731 657 L738 658 L744 657 L750 655 L756 653 L762 652 L769 652 L775 653 L781 654 L788 652 L794 651 L800 649 L806 648 L812 648 L819 647 L825 646 L831 645 L838 646 L844 647 L850 647 L856 648 L862 650 L869 649 L875 648 L881 647 L888 645 L894 645 L900 645 L906 644 L912 643 L919 645 L925 646 L931 645 L938 646 L944 647 L950 648 L956 647 L962 646 L969 645 L975 645 L981 644 L988 644 L994 646 L1000 647 L1006 648 L1012 649 L1019 650 L1025 651 L1031 651 L1038 652 L1044 651 L1050 653 L1056 652 L1062 652 L1069 651 L1075 652 L1081 654 L1088 656 L1094 656 L1100 657 L1106 656 L1112 656 L1119 655 L1125 653 L1131 653 L1138 654 L1144 651 L1150 650 L1156 652 L1162 654 L1169 655 L1175 654 L1181 656 L1188 657 L1194 656 L1200 656 L1206 655 L1212 655 L1219 652 L1225 650 L1231 650 L1238 652 L1244 650 L1250 651 L1256 649 L1262 650 L1269 650 L1275 649 L1281 647 L1288 645 L1294 645 L1300 644 L1306 643 L1312 640 L1319 637 L1325 637 L1331 636 L1338 637 L1344 637 L1350 636 L1356 636 L1362 638 L1369 637 L1375 637 L1381 637 L1388 636 L1394 635 L1400 635 L1406 634 L1412 634 L1419 634 L1425 633 L1431 633 L1438 632 L1444 632 L1450 634 L1456 634 L1462 633 L1469 631 L1475 630 L1481 630 L1488 630 L1494 632 L1500 635 L1506 632 L1512 630 L1519 630 L1525 629 L1531 625 L1538 621 L1544 619 L1550 616 L1556 616 L1562 614 L1569 613 L1575 610 L1581 613 L1588 613 L1594 612 L1600 611 L1600 900 Z" fill="url(#h-r3)"/>
+  <rect y="560" width="1600" height="150" fill="url(#h-mist)" opacity=".8"/>
+  <path d="M0 900 L0 718 L6 719 L12 720 L19 721 L25 721 L31 721 L38 722 L44 722 L50 722 L56 723 L62 723 L69 723 L75 723 L81 723 L88 722 L94 722 L100 722 L106 722 L112 722 L119 721 L125 721 L131 721 L138 719 L144 719 L150 719 L156 719 L162 720 L169 720 L175 720 L181 721 L188 721 L194 720 L200 721 L206 721 L212 721 L219 721 L225 721 L231 721 L238 721 L244 720 L250 719 L256 720 L262 720 L269 720 L275 720 L281 721 L288 721 L294 721 L300 721 L306 721 L312 721 L319 720 L325 720 L331 720 L338 720 L344 720 L350 721 L356 721 L362 722 L369 722 L375 722 L381 721 L388 721 L394 721 L400 720 L406 721 L412 721 L419 721 L425 721 L431 722 L438 722 L444 722 L450 722 L456 722 L462 721 L469 720 L475 720 L481 720 L488 720 L494 720 L500 720 L506 719 L512 719 L519 719 L525 718 L531 718 L538 718 L544 717 L550 716 L556 716 L562 716 L569 716 L575 716 L581 716 L588 716 L594 716 L600 717 L606 716 L612 714 L619 714 L625 713 L631 713 L638 713 L644 712 L650 712 L656 711 L662 711 L669 711 L675 710 L681 709 L688 708 L694 707 L700 706 L706 705 L712 703 L719 702 L725 701 L731 700 L738 700 L744 699 L750 699 L756 698 L762 698 L769 698 L775 697 L781 695 L788 694 L794 694 L800 693 L806 693 L812 694 L819 693 L825 694 L831 694 L838 694 L844 694 L850 694 L856 693 L862 693 L869 693 L875 692 L881 692 L888 692 L894 692 L900 692 L906 692 L912 692 L919 692 L925 693 L931 694 L938 695 L944 695 L950 695 L956 695 L962 694 L969 694 L975 694 L981 695 L988 694 L994 694 L1000 694 L1006 694 L1012 695 L1019 695 L1025 696 L1031 697 L1038 698 L1044 699 L1050 699 L1056 700 L1062 701 L1069 701 L1075 702 L1081 702 L1088 701 L1094 702 L1100 702 L1106 702 L1112 702 L1119 701 L1125 701 L1131 700 L1138 700 L1144 699 L1150 699 L1156 700 L1162 700 L1169 700 L1175 700 L1181 700 L1188 701 L1194 700 L1200 699 L1206 701 L1212 702 L1219 703 L1225 704 L1231 705 L1238 705 L1244 706 L1250 707 L1256 708 L1262 709 L1269 709 L1275 710 L1281 710 L1288 710 L1294 711 L1300 711 L1306 712 L1312 713 L1319 715 L1325 716 L1331 717 L1338 717 L1344 718 L1350 718 L1356 720 L1362 721 L1369 722 L1375 723 L1381 724 L1388 724 L1394 725 L1400 725 L1406 726 L1412 727 L1419 728 L1425 729 L1431 729 L1438 730 L1444 731 L1450 731 L1456 732 L1462 732 L1469 733 L1475 732 L1481 733 L1488 733 L1494 733 L1500 733 L1506 733 L1512 733 L1519 733 L1525 733 L1531 732 L1538 731 L1544 732 L1550 732 L1556 731 L1562 731 L1569 731 L1575 732 L1581 732 L1588 731 L1594 731 L1600 730 L1600 900 Z" fill="url(#h-r4)"/>
+  <use href="#tree" x="980" y="633" width="33" height="65" fill="#1c3631"/>
+<use href="#tree" x="1254" y="641" width="36" height="72" fill="#1c3631"/>
+<use href="#tree" x="1166" y="633" width="36" height="71" fill="#1c3631"/>
+<use href="#tree" x="32" y="670" width="28" height="56" fill="#1c3631"/>
+<use href="#tree" x="1494" y="675" width="31" height="62" fill="#1c3631"/>
+<use href="#tree" x="1430" y="691" width="22" height="44" fill="#1c3631"/>
+<use href="#tree" x="738" y="654" width="24" height="48" fill="#1c3631"/>
+<use href="#tree" x="855" y="637" width="30" height="60" fill="#1c3631"/>
+<use href="#tree" x="9" y="678" width="24" height="47" fill="#1c3631"/>
+<use href="#tree" x="429" y="655" width="36" height="71" fill="#1c3631"/>
+<use href="#tree" x="1214" y="663" width="23" height="45" fill="#1c3631"/>
+<use href="#tree" x="1264" y="669" width="22" height="45" fill="#1c3631"/>
+<use href="#tree" x="977" y="654" width="22" height="44" fill="#1c3631"/>
+<use href="#tree" x="-15" y="653" width="35" height="70" fill="#1c3631"/>
+<use href="#tree" x="323" y="676" width="24" height="47" fill="#1c3631"/>
+<use href="#tree" x="1554" y="666" width="35" height="70" fill="#1c3631"/>
+<use href="#tree" x="445" y="652" width="36" height="73" fill="#1c3631"/>
+<use href="#tree" x="847" y="634" width="32" height="63" fill="#1c3631"/>
+<use href="#tree" x="310" y="652" width="36" height="72" fill="#1c3631"/>
+<use href="#tree" x="1087" y="633" width="36" height="73" fill="#1c3631"/>
+<use href="#tree" x="1417" y="683" width="25" height="50" fill="#1c3631"/>
+<use href="#tree" x="566" y="674" width="23" height="46" fill="#1c3631"/>
+<use href="#tree" x="223" y="683" width="21" height="42" fill="#1c3631"/>
+<use href="#tree" x="467" y="664" width="30" height="61" fill="#1c3631"/>
+<use href="#tree" x="-10" y="660" width="32" height="63" fill="#1c3631"/>
+<use href="#tree" x="528" y="671" width="25" height="51" fill="#1c3631"/>
+<use href="#tree" x="1296" y="660" width="28" height="56" fill="#1c3631"/>
+<use href="#tree" x="491" y="667" width="28" height="56" fill="#1c3631"/>
+<use href="#tree" x="1117" y="663" width="21" height="42" fill="#1c3631"/>
+<use href="#tree" x="1550" y="694" width="20" height="41" fill="#1c3631"/>
+<use href="#tree" x="1182" y="635" width="34" height="69" fill="#1c3631"/>
+<use href="#tree" x="12" y="659" width="33" height="67" fill="#1c3631"/>
+<use href="#tree" x="571" y="661" width="30" height="60" fill="#1c3631"/>
+<use href="#tree" x="4" y="683" width="21" height="42" fill="#1c3631"/>
+<use href="#tree" x="271" y="653" width="36" height="72" fill="#1c3631"/>
+<use href="#tree" x="298" y="659" width="33" height="66" fill="#1c3631"/>
+<use href="#tree" x="1469" y="665" width="36" height="72" fill="#1c3631"/>
+<use href="#tree" x="538" y="668" width="26" height="52" fill="#1c3631"/>
+<use href="#tree" x="823" y="632" width="33" height="66" fill="#1c3631"/>
+<use href="#tree" x="157" y="659" width="33" height="65" fill="#1c3631"/>
+<use href="#tree" x="1258" y="645" width="35" height="69" fill="#1c3631"/>
+<use href="#tree" x="41" y="655" width="36" height="72" fill="#1c3631"/>
+<use href="#tree" x="133" y="671" width="26" height="52" fill="#1c3631"/>
+<use href="#tree" x="960" y="627" width="36" height="71" fill="#1c3631"/>
+<use href="#tree" x="526" y="650" width="36" height="71" fill="#1c3631"/>
+<use href="#tree" x="860" y="646" width="25" height="51" fill="#1c3631"/>
+  <path d="M0 900 L0 829 L6 829 L12 830 L19 830 L25 830 L31 830 L38 831 L44 830 L50 830 L56 831 L62 831 L69 831 L75 830 L81 830 L88 829 L94 829 L100 829 L106 829 L112 829 L119 829 L125 829 L131 829 L138 828 L144 828 L150 827 L156 827 L162 827 L169 827 L175 827 L181 827 L188 827 L194 828 L200 828 L206 827 L212 827 L219 827 L225 827 L231 827 L238 827 L244 827 L250 827 L256 827 L262 827 L269 827 L275 826 L281 827 L288 827 L294 828 L300 828 L306 828 L312 828 L319 827 L325 827 L331 827 L338 827 L344 826 L350 826 L356 826 L362 826 L369 826 L375 827 L381 827 L388 827 L394 827 L400 827 L406 827 L412 827 L419 827 L425 827 L431 827 L438 827 L444 827 L450 827 L456 827 L462 826 L469 826 L475 826 L481 826 L488 825 L494 825 L500 825 L506 825 L512 824 L519 824 L525 824 L531 823 L538 823 L544 823 L550 822 L556 821 L562 820 L569 820 L575 820 L581 819 L588 819 L594 818 L600 818 L606 817 L612 816 L619 815 L625 814 L631 814 L638 813 L644 813 L650 812 L656 812 L662 811 L669 811 L675 811 L681 810 L688 810 L694 809 L700 808 L706 808 L712 808 L719 807 L725 807 L731 806 L738 806 L744 806 L750 806 L756 806 L762 806 L769 806 L775 807 L781 806 L788 806 L794 806 L800 806 L806 806 L812 807 L819 807 L825 807 L831 807 L838 806 L844 806 L850 806 L856 807 L862 807 L869 807 L875 808 L881 808 L888 808 L894 808 L900 809 L906 809 L912 809 L919 808 L925 808 L931 807 L938 807 L944 806 L950 805 L956 805 L962 805 L969 805 L975 805 L981 805 L988 805 L994 804 L1000 804 L1006 804 L1012 803 L1019 803 L1025 803 L1031 803 L1038 803 L1044 802 L1050 802 L1056 801 L1062 801 L1069 801 L1075 801 L1081 800 L1088 800 L1094 800 L1100 799 L1106 799 L1112 799 L1119 799 L1125 799 L1131 799 L1138 799 L1144 799 L1150 799 L1156 799 L1162 799 L1169 799 L1175 799 L1181 799 L1188 799 L1194 799 L1200 799 L1206 799 L1212 800 L1219 800 L1225 800 L1231 800 L1238 800 L1244 801 L1250 802 L1256 802 L1262 802 L1269 803 L1275 803 L1281 803 L1288 802 L1294 802 L1300 803 L1306 802 L1312 801 L1319 801 L1325 801 L1331 801 L1338 801 L1344 801 L1350 801 L1356 801 L1362 801 L1369 801 L1375 801 L1381 801 L1388 801 L1394 801 L1400 802 L1406 802 L1412 803 L1419 803 L1425 803 L1431 804 L1438 804 L1444 805 L1450 806 L1456 806 L1462 807 L1469 807 L1475 807 L1481 807 L1488 807 L1494 808 L1500 808 L1506 809 L1512 810 L1519 811 L1525 812 L1531 812 L1538 812 L1544 813 L1550 813 L1556 814 L1562 814 L1569 814 L1575 813 L1581 814 L1588 814 L1594 815 L1600 815 L1600 900 Z" fill="#14282a"/>
+  <use href="#tree" x="715" y="710" width="51" height="102" fill="#0f211c"/>
+<use href="#tree" x="187" y="693" width="70" height="140" fill="#0f211c"/>
+<use href="#tree" x="-18" y="724" width="56" height="112" fill="#0f211c"/>
+<use href="#tree" x="1417" y="730" width="40" height="80" fill="#0f211c"/>
+<use href="#tree" x="857" y="693" width="60" height="121" fill="#0f211c"/>
+<use href="#tree" x="40" y="734" width="51" height="103" fill="#0f211c"/>
+<use href="#tree" x="1098" y="697" width="54" height="108" fill="#0f211c"/>
+<use href="#tree" x="1139" y="719" width="43" height="86" fill="#0f211c"/>
+<use href="#tree" x="360" y="750" width="41" height="82" fill="#0f211c"/>
+<use href="#tree" x="774" y="669" width="72" height="144" fill="#0f211c"/>
+<use href="#tree" x="911" y="679" width="66" height="133" fill="#0f211c"/>
+<use href="#tree" x="581" y="691" width="65" height="131" fill="#0f211c"/>
+<use href="#tree" x="139" y="737" width="48" height="96" fill="#0f211c"/>
+<use href="#tree" x="1046" y="677" width="65" height="129" fill="#0f211c"/>
+<use href="#tree" x="655" y="736" width="40" height="81" fill="#0f211c"/>
+<use href="#tree" x="404" y="743" width="45" height="90" fill="#0f211c"/>
+<use href="#tree" x="416" y="698" width="68" height="136" fill="#0f211c"/>
+<use href="#tree" x="284" y="692" width="71" height="141" fill="#0f211c"/>
+<use href="#tree" x="1387" y="730" width="39" height="78" fill="#0f211c"/>
+<use href="#tree" x="578" y="711" width="56" height="111" fill="#0f211c"/>
+<use href="#tree" x="11" y="730" width="53" height="106" fill="#0f211c"/>
+<use href="#tree" x="1430" y="730" width="41" height="83" fill="#0f211c"/>
+<use href="#tree" x="934" y="728" width="42" height="83" fill="#0f211c"/>
+<use href="#tree" x="890" y="672" width="71" height="142" fill="#0f211c"/>
+<use href="#tree" x="306" y="759" width="37" height="75" fill="#0f211c"/>
+<use href="#tree" x="105" y="720" width="58" height="115" fill="#0f211c"/>
+<use href="#tree" x="8" y="756" width="40" height="80" fill="#0f211c"/>
+<use href="#tree" x="759" y="668" width="72" height="144" fill="#0f211c"/>
+<use href="#tree" x="646" y="713" width="52" height="104" fill="#0f211c"/>
+<use href="#tree" x="1002" y="728" width="41" height="81" fill="#0f211c"/>
+  <path d="M0 900 L0 869 L6 869 L12 869 L19 869 L25 869 L31 869 L38 868 L44 868 L50 868 L56 868 L62 868 L69 868 L75 868 L81 868 L88 867 L94 867 L100 867 L106 867 L112 867 L119 866 L125 866 L131 866 L138 865 L144 865 L150 864 L156 864 L162 864 L169 863 L175 863 L181 863 L188 863 L194 863 L200 863 L206 862 L212 862 L219 862 L225 862 L231 862 L238 862 L244 862 L250 862 L256 862 L262 862 L269 862 L275 862 L281 862 L288 861 L294 861 L300 861 L306 861 L312 861 L319 861 L325 861 L331 861 L338 861 L344 861 L350 861 L356 861 L362 861 L369 861 L375 861 L381 861 L388 860 L394 860 L400 860 L406 860 L412 860 L419 860 L425 860 L431 859 L438 859 L444 859 L450 859 L456 859 L462 859 L469 859 L475 859 L481 859 L488 859 L494 859 L500 859 L506 859 L512 859 L519 859 L525 859 L531 859 L538 859 L544 859 L550 859 L556 859 L562 859 L569 859 L575 859 L581 859 L588 858 L594 858 L600 858 L606 858 L612 858 L619 858 L625 858 L631 858 L638 858 L644 858 L650 859 L656 859 L662 858 L669 858 L675 858 L681 858 L688 858 L694 858 L700 859 L706 859 L712 859 L719 859 L725 859 L731 859 L738 859 L744 859 L750 859 L756 859 L762 859 L769 859 L775 859 L781 859 L788 859 L794 858 L800 858 L806 858 L812 858 L819 858 L825 858 L831 858 L838 859 L844 859 L850 859 L856 859 L862 859 L869 859 L875 859 L881 859 L888 859 L894 860 L900 860 L906 860 L912 860 L919 860 L925 860 L931 861 L938 861 L944 861 L950 861 L956 862 L962 862 L969 862 L975 862 L981 862 L988 863 L994 863 L1000 863 L1006 863 L1012 863 L1019 863 L1025 863 L1031 863 L1038 864 L1044 864 L1050 864 L1056 864 L1062 864 L1069 865 L1075 865 L1081 865 L1088 865 L1094 866 L1100 866 L1106 866 L1112 866 L1119 866 L1125 865 L1131 865 L1138 865 L1144 865 L1150 865 L1156 865 L1162 865 L1169 865 L1175 865 L1181 865 L1188 865 L1194 866 L1200 866 L1206 865 L1212 865 L1219 866 L1225 866 L1231 865 L1238 865 L1244 865 L1250 865 L1256 865 L1262 865 L1269 865 L1275 865 L1281 865 L1288 865 L1294 865 L1300 865 L1306 865 L1312 866 L1319 866 L1325 866 L1331 866 L1338 866 L1344 866 L1350 867 L1356 866 L1362 866 L1369 866 L1375 866 L1381 866 L1388 866 L1394 866 L1400 866 L1406 866 L1412 866 L1419 866 L1425 866 L1431 866 L1438 866 L1444 866 L1450 866 L1456 866 L1462 866 L1469 866 L1475 866 L1481 866 L1488 866 L1494 866 L1500 866 L1506 865 L1512 865 L1519 865 L1525 865 L1531 866 L1538 866 L1544 866 L1550 866 L1556 866 L1562 866 L1569 866 L1575 866 L1581 866 L1588 866 L1594 866 L1600 866 L1600 900 Z" fill="#0b1815"/>
+  <use href="#tree" x="339" y="645" width="113" height="225" fill="#07110e"/>
+<use href="#tree" x="1048" y="632" width="122" height="243" fill="#07110e"/>
+<use href="#tree" x="228" y="697" width="88" height="175" fill="#07110e"/>
+<use href="#tree" x="164" y="698" width="87" height="175" fill="#07110e"/>
+<use href="#tree" x="1152" y="711" width="82" height="164" fill="#07110e"/>
+<use href="#tree" x="809" y="695" width="87" height="174" fill="#07110e"/>
+<use href="#tree" x="406" y="672" width="99" height="197" fill="#07110e"/>
+<use href="#tree" x="1313" y="659" width="108" height="217" fill="#07110e"/>
+<use href="#tree" x="-61" y="695" width="90" height="180" fill="#07110e"/>
+<use href="#tree" x="145" y="627" width="123" height="246" fill="#07110e"/>
+<use href="#tree" x="1261" y="637" width="119" height="239" fill="#07110e"/>
+<use href="#tree" x="1290" y="645" width="116" height="232" fill="#07110e"/>
+<use href="#tree" x="1496" y="638" width="119" height="237" fill="#07110e"/>
+<use href="#tree" x="330" y="627" width="122" height="243" fill="#07110e"/>
+<use href="#tree" x="720" y="636" width="117" height="233" fill="#07110e"/>
+<use href="#tree" x="858" y="673" width="99" height="197" fill="#07110e"/>
+  <rect width="1600" height="900" filter="url(#h-grain)"/>
+</svg>
+        <div class="sf-wrap sf-hero__inner">
+          <p class="sf-eyebrow sf-eyebrow--light">Autumn / Winter 2026 Collection</p>
+          <h1>Field jackets, built for weather that doesn&rsquo;t cooperate.</h1>
+          <p class="sf-lede">Versatile layers for long days outside, built to keep moving when the forecast changes.</p>
+        </div>
+      </section>
+
+      <section class="sf-statement">
+        <div class="sf-wrap">
+          <p class="sf-eyebrow">Our approach</p>
+          <p class="sf-statement__text">We make clothing for people who spend more time outside than in &mdash; considered fits, honest materials, and nothing you don&rsquo;t need.</p>
+        </div>
+      </section>
+
+      <section class="sf-sec sf-sec--tight">
+        <div class="sf-wrap">
+          <div class="sf-sec__head"><h2>Shop by category</h2><p>Four departments, one consistent standard of build.</p></div>
+          <div class="sf-cats">
+        <article class="sf-cat" style="--c1:#2f5d4b;--c2:#214536;--c3:#d9a441;--tile:linear-gradient(160deg,#e1e8e2,#c9d6cd)">
+          <div class="sf-cat__art"><svg viewBox="0 0 200 200" role="img" aria-label="Outerwear"><use href="#g-parka"/></svg></div>
+          <div class="sf-cat__txt"><h3>Outerwear</h3><p>Insulated, weather-ready layers for the cold months.</p></div>
+        </article>
+        <article class="sf-cat" style="--c1:#8a5a3b;--c2:#5e3a24;--c3:#eadfc8;--tile:linear-gradient(160deg,#ece3d6,#d9cbb6)">
+          <div class="sf-cat__art"><svg viewBox="0 0 200 200" role="img" aria-label="Footwear"><use href="#g-boot"/></svg></div>
+          <div class="sf-cat__txt"><h3>Footwear</h3><p>Boots and everyday shoes built for the long walk.</p></div>
+        </article>
+        <article class="sf-cat" style="--c1:#41576b;--c2:#2e4152;--c3:#d7c9a8;--tile:linear-gradient(160deg,#e3e8ec,#ccd5dc)">
+          <div class="sf-cat__art"><svg viewBox="0 0 200 200" role="img" aria-label="Essentials"><use href="#g-knit"/></svg></div>
+          <div class="sf-cat__txt"><h3>Essentials</h3><p>Knits, tees and layers you reach for every day.</p></div>
+        </article>
+        <article class="sf-cat" style="--c1:#7f8c62;--c2:#5f6c46;--c3:#7a4b2a;--tile:linear-gradient(160deg,#ebe7da,#d8d3bf)">
+          <div class="sf-cat__art"><svg viewBox="0 0 200 200" role="img" aria-label="Accessories"><use href="#g-bag"/></svg></div>
+          <div class="sf-cat__txt"><h3>Accessories</h3><p>Bags, hats and the small things that finish a kit.</p></div>
+        </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="sf-story">
+        <div class="sf-wrap sf-story__grid">
+          <figure class="sf-story__fig"><svg class="sf-story__img" viewBox="0 0 640 520" role="img" aria-label="A tent glowing at dusk beneath pine trees and mountains">
+  <defs>
+    <linearGradient id="c-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d1c28"/><stop offset=".6" stop-color="#27465a"/><stop offset="1" stop-color="#d08e62"/></linearGradient>
+    <radialGradient id="c-glow" cx="330" cy="392" r="150" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffcf7a" stop-opacity=".75"/><stop offset="1" stop-color="#ffcf7a" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="640" height="520" fill="url(#c-sky)"/>
+  <circle cx="251" cy="85" r="0.7" fill="#fff" opacity="0.80"/><circle cx="500" cy="47" r="0.7" fill="#fff" opacity="0.44"/><circle cx="421" cy="148" r="0.9" fill="#fff" opacity="0.84"/><circle cx="70" cy="64" r="1.2" fill="#fff" opacity="0.70"/><circle cx="293" cy="52" r="0.7" fill="#fff" opacity="0.54"/><circle cx="36" cy="172" r="0.9" fill="#fff" opacity="0.84"/><circle cx="208" cy="50" r="0.9" fill="#fff" opacity="0.56"/><circle cx="391" cy="30" r="1.2" fill="#fff" opacity="0.59"/><circle cx="407" cy="137" r="0.7" fill="#fff" opacity="0.50"/><circle cx="494" cy="79" r="0.7" fill="#fff" opacity="0.92"/><circle cx="570" cy="84" r="0.7" fill="#fff" opacity="0.90"/><circle cx="596" cy="188" r="0.9" fill="#fff" opacity="0.87"/><circle cx="530" cy="57" r="0.9" fill="#fff" opacity="0.63"/><circle cx="305" cy="118" r="0.9" fill="#fff" opacity="0.49"/><circle cx="322" cy="74" r="0.7" fill="#fff" opacity="0.44"/><circle cx="483" cy="168" r="0.9" fill="#fff" opacity="0.69"/><circle cx="492" cy="187" r="0.9" fill="#fff" opacity="0.48"/><circle cx="210" cy="25" r="0.9" fill="#fff" opacity="0.90"/><circle cx="461" cy="78" r="0.7" fill="#fff" opacity="0.60"/><circle cx="612" cy="90" r="1.2" fill="#fff" opacity="0.71"/><circle cx="341" cy="33" r="0.7" fill="#fff" opacity="0.79"/><circle cx="294" cy="157" r="1.2" fill="#fff" opacity="0.87"/><circle cx="135" cy="92" r="0.7" fill="#fff" opacity="0.56"/><circle cx="36" cy="18" r="0.9" fill="#fff" opacity="0.78"/><circle cx="302" cy="180" r="0.9" fill="#fff" opacity="0.41"/><circle cx="305" cy="90" r="0.7" fill="#fff" opacity="0.83"/><circle cx="430" cy="166" r="1.2" fill="#fff" opacity="0.85"/><circle cx="310" cy="166" r="0.7" fill="#fff" opacity="0.89"/><circle cx="309" cy="42" r="0.9" fill="#fff" opacity="0.61"/><circle cx="172" cy="92" r="1.2" fill="#fff" opacity="0.41"/><circle cx="55" cy="124" r="0.7" fill="#fff" opacity="0.60"/><circle cx="381" cy="82" r="1.2" fill="#fff" opacity="0.45"/><circle cx="222" cy="116" r="0.7" fill="#fff" opacity="0.46"/><circle cx="73" cy="22" r="1.2" fill="#fff" opacity="0.49"/><circle cx="163" cy="163" r="0.7" fill="#fff" opacity="0.70"/><circle cx="606" cy="71" r="0.9" fill="#fff" opacity="0.95"/><circle cx="135" cy="143" r="0.9" fill="#fff" opacity="0.83"/><circle cx="429" cy="174" r="0.7" fill="#fff" opacity="0.66"/><circle cx="257" cy="120" r="0.9" fill="#fff" opacity="0.67"/><circle cx="234" cy="115" r="0.9" fill="#fff" opacity="0.54"/><circle cx="448" cy="63" r="0.9" fill="#fff" opacity="0.50"/><circle cx="47" cy="73" r="0.9" fill="#fff" opacity="0.53"/><circle cx="223" cy="67" r="0.9" fill="#fff" opacity="0.88"/><circle cx="155" cy="91" r="0.7" fill="#fff" opacity="0.89"/><circle cx="332" cy="152" r="0.7" fill="#fff" opacity="0.94"/><circle cx="422" cy="175" r="1.2" fill="#fff" opacity="0.88"/>
+  <circle cx="500" cy="96" r="26" fill="#f6efd9" opacity=".95"/><circle cx="510" cy="90" r="24" fill="#1c3447"/>
+  <path d="M0 520 L0 300 L5 298 L10 297 L15 296 L20 296 L25 297 L30 295 L35 299 L40 302 L45 305 L50 305 L55 306 L60 310 L65 313 L70 314 L75 314 L80 312 L85 311 L90 312 L95 307 L100 305 L105 305 L110 303 L115 303 L120 302 L125 300 L130 299 L135 301 L140 302 L145 302 L150 304 L155 305 L160 308 L165 308 L170 311 L175 316 L180 321 L185 318 L190 319 L195 321 L200 320 L205 323 L210 322 L215 322 L220 321 L225 321 L230 325 L235 326 L240 326 L245 327 L250 331 L255 336 L260 342 L265 341 L270 344 L275 345 L280 345 L285 344 L290 345 L295 345 L300 347 L305 345 L310 345 L315 345 L320 345 L325 346 L330 342 L335 344 L340 345 L345 344 L350 341 L355 340 L360 338 L365 335 L370 332 L375 330 L380 332 L385 328 L390 328 L395 323 L400 322 L405 321 L410 320 L415 317 L420 316 L425 319 L430 319 L435 318 L440 319 L445 317 L450 318 L455 319 L460 318 L465 318 L470 318 L475 312 L480 311 L485 308 L490 306 L495 304 L500 303 L505 303 L510 301 L515 303 L520 303 L525 304 L530 301 L535 302 L540 302 L545 306 L550 306 L555 304 L560 303 L565 299 L570 298 L575 296 L580 297 L585 301 L590 302 L595 302 L600 302 L605 303 L610 303 L615 302 L620 297 L625 301 L630 303 L635 303 L640 304 L640 520 Z" fill="#2f4d5c"/>
+  <path d="M0 520 L0 391 L5 391 L10 391 L15 392 L20 393 L25 392 L30 389 L35 388 L40 388 L45 390 L50 390 L55 392 L60 391 L65 390 L70 390 L75 391 L80 392 L85 392 L90 394 L95 392 L100 392 L105 392 L110 393 L115 394 L120 397 L125 399 L130 400 L135 399 L140 399 L145 397 L150 395 L155 395 L160 394 L165 393 L170 393 L175 394 L180 395 L185 393 L190 392 L195 391 L200 389 L205 391 L210 393 L215 393 L220 393 L225 394 L230 396 L235 398 L240 398 L245 398 L250 400 L255 399 L260 400 L265 398 L270 397 L275 398 L280 397 L285 400 L290 401 L295 403 L300 402 L305 400 L310 400 L315 400 L320 401 L325 402 L330 401 L335 401 L340 402 L345 401 L350 401 L355 399 L360 397 L365 395 L370 395 L375 394 L380 394 L385 393 L390 393 L395 393 L400 395 L405 397 L410 396 L415 396 L420 396 L425 395 L430 396 L435 398 L440 400 L445 401 L450 402 L455 404 L460 405 L465 403 L470 404 L475 404 L480 404 L485 402 L490 402 L495 401 L500 399 L505 398 L510 397 L515 398 L520 397 L525 398 L530 397 L535 395 L540 393 L545 394 L550 394 L555 393 L560 392 L565 393 L570 393 L575 393 L580 393 L585 395 L590 396 L595 399 L600 401 L605 400 L610 401 L615 401 L620 403 L625 402 L630 400 L635 399 L640 400 L640 520 Z" fill="#1b3340"/>
+  <use href="#tree" x="74" y="305" width="63" height="125" fill="#06100d"/>
+<use href="#tree" x="379" y="309" width="54" height="108" fill="#06100d"/>
+<use href="#tree" x="105" y="291" width="67" height="133" fill="#06100d"/>
+<use href="#tree" x="489" y="322" width="55" height="111" fill="#06100d"/>
+<use href="#tree" x="301" y="332" width="44" height="89" fill="#06100d"/>
+<use href="#tree" x="-23" y="338" width="50" height="100" fill="#06100d"/>
+<use href="#tree" x="356" y="342" width="38" height="76" fill="#06100d"/>
+<use href="#tree" x="486" y="342" width="44" height="89" fill="#06100d"/>
+<use href="#tree" x="131" y="352" width="37" height="73" fill="#06100d"/>
+<use href="#tree" x="606" y="318" width="65" height="129" fill="#06100d"/>
+<use href="#tree" x="530" y="320" width="60" height="119" fill="#06100d"/>
+<use href="#tree" x="-2" y="338" width="48" height="96" fill="#06100d"/>
+<use href="#tree" x="299" y="342" width="40" height="79" fill="#06100d"/>
+<use href="#tree" x="584" y="344" width="50" height="99" fill="#06100d"/>
+<use href="#tree" x="65" y="297" width="68" height="135" fill="#06100d"/>
+<use href="#tree" x="44" y="290" width="72" height="144" fill="#06100d"/>
+<use href="#tree" x="261" y="307" width="57" height="114" fill="#06100d"/>
+<use href="#tree" x="192" y="310" width="54" height="109" fill="#06100d"/>
+<use href="#tree" x="101" y="354" width="36" height="73" fill="#06100d"/>
+<use href="#tree" x="532" y="350" width="44" height="89" fill="#06100d"/>
+  <rect y="430" width="640" height="90" fill="#0b1713"/>
+  <circle cx="330" cy="392" r="150" fill="url(#c-glow)"/>
+  <path d="M254 440L330 322L406 440Z" fill="#c9783a"/>
+  <path d="M330 322L406 440H368L330 322Z" fill="#a85f2b"/>
+  <path d="M312 440L330 366L348 440Z" fill="#ffd488"/>
+  <path d="M330 322V440" stroke="#8c4a20" stroke-width="2"/>
+  <path d="M254 440L214 452M406 440L446 452" stroke="#d9c7a4" stroke-width="1.2" opacity=".7"/>
+</svg></figure>
+          <div class="sf-story__copy">
+            <p class="sf-eyebrow sf-eyebrow--light">Built to be used</p>
+            <h2>Designed for the long way around.</h2>
+            <p class="sf-story__lede">Every department is held to the same brief: it has to be comfortable at the trailhead, still good at the end of the day, and easy to live with after that.</p>
+            <ul class="sf-story__list">
+              <li><span>01</span><div><b>Weather-ready</b><p>Layers and footwear chosen for rain, wind and cold &mdash; not just for how they look in the shop.</p></div></li>
+              <li><span>02</span><div><b>Made to last</b><p>Reinforced stress points and durable fabrics, so a piece earns its place season after season.</p></div></li>
+              <li><span>03</span><div><b>Considered fit</b><p>Room to layer and move, without the bulk. Cut for real days outdoors.</p></div></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="sf-services">
+        <div class="sf-wrap sf-services__grid">
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg><b>30-day returns</b><span>Not the right fit? Send it back.</span></div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg><b>Secure checkout</b><span>Your payment details stay protected.</span></div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5L12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5L12 12l8.5-4.5M12 12v9"/></svg><b>Order support</b><span>Questions about an order? Just ask.</span></div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.2 7.5L3 20.5l1.6-5.2A8.4 8.4 0 1 1 21 11.5z"/></svg><b>Support in seconds</b><span>Chat with us any time, right here.</span></div>
+        </div>
+      </section>
+
+      <section class="sf-quote">
+        <div class="sf-wrap">
+          <p class="sf-quote__text">&ldquo;Wore it through a week of sleet and never once felt it. It&rsquo;s the first piece I reach for when the forecast turns.&rdquo;</p>
+          <p class="sf-quote__by">Daniel R. &middot; Outerwear customer</p>
+        </div>
+      </section>
+
+      <section class="sf-help">
+        <div class="sf-wrap">
+          <div class="sf-help__box">
+            <div><h2>Questions about sizing or an order?</h2><p>Our support assistant can check an order, help you choose, and answer questions about shipping and returns.</p></div>
+            <span class="sf-help__hint">Chat is in the bottom-right corner &#8600;</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="sf-foot">
+      <div class="sf-wrap sf-foot__grid">
+        <div><span class="sf-logo sf-logo--light"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M18 6.5L22.6 18H18Z" fill="currentColor"/><path d="M18 29.5L13.4 18H18Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M18 6.5L13.4 18H18Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg><span class="sf-logo__txt"><span class="sf-logo__word">Northbound</span><span class="sf-logo__sub">Goods</span></span></span><p class="sf-foot__blurb">Outdoor-ready clothing, footwear and accessories for people who&rsquo;d rather be outside.</p></div>
+        <div><h4>Shop</h4><ul><li>Outerwear</li><li>Footwear</li><li>Essentials</li><li>Accessories</li></ul></div>
+        <div><h4>Support</h4><ul><li>Shipping &amp; delivery</li><li>Returns (30 days)</li><li>Order status</li><li>Size guide</li></ul></div>
+        <div><h4>Company</h4><ul><li>Our story</li><li>Materials</li><li>Careers</li><li>Contact</li></ul></div>
+        <div class="sf-foot__legal"><span>&copy; 2026 Northbound Goods. Customer support powered by Wrennon.</span><span>Privacy &middot; Terms &middot; Accessibility</span></div>
+      </div>
+    </footer>
+  </div>
 
   <!-- Chat widget -->
   <div id="wrennon-widget">
@@ -29,11 +367,11 @@
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
     </button>
 
-    <div id="panel" class="chat-card hidden" role="dialog" aria-label="Wrennon customer support chat" aria-modal="false" aria-hidden="true">
+    <div id="panel" class="chat-card hidden" role="dialog" aria-label="Northbound Goods customer support chat" aria-modal="false" aria-hidden="true">
       <header id="panel-header" class="chat-card-head">
-        <span class="chat-avatar"><img src="https://wrennon.com/images/wren-mark.svg" alt="Wrennon" width="18" height="18" aria-hidden="true"></span>
+        <span class="chat-avatar"><svg viewBox="0 0 36 36" width="18" height="18" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" stroke-width="2"/><path d="M18 6.5L22.6 18H18Z" fill="currentColor"/><path d="M18 29.5L13.4 18H18Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M18 6.5L13.4 18H18Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
         <div style="flex: 1;">
-          <div class="chat-name">Wrennon Agent</div>
+          <div class="chat-name">Northbound Support</div>
           <div class="chat-status"><span class="status-dot"></span>Online &mdash; replies in seconds</div>
           <a href="/help-center.html" target="_blank" style="font-size: 11px; color: var(--accent); text-decoration: underline; margin-top: 4px; display: inline-block;">Search our Help Center</a>
         </div>

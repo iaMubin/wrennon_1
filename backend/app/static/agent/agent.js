@@ -313,7 +313,7 @@ if (logoutBtn) {
 let typingTimeout;
 let isTyping = false;
 agentInput.addEventListener("input", (e) => {
-  agentInput.style.height = '44px';
+  agentInput.style.height = '28px';
   const newHeight = Math.min(agentInput.scrollHeight, 120);
   agentInput.style.height = newHeight + 'px';
   agentInput.style.overflowY = agentInput.scrollHeight > 120 ? 'auto' : 'hidden';
@@ -756,7 +756,7 @@ function renderConversationList(conversations) {
     const hash = conv.short_id ? conv.short_id.split('').reduce((a, b) => {a = ((a << 5) - a) + b.charCodeAt(0); return a & a}, 0) : 0;
     const platformIcon = platforms[Math.abs(hash) % platforms.length];
 
-    const customerDisplayName = conv.customer_name || conv.customer_email || "Unknown Customer";
+    const customerDisplayName = conv.customer_name || (conv.customer_email ? (conv.customer_email.split('@')[0].replace(/[._-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())) : "Customer");
     let avatarHtml = "";
     if (!conv.customer_name && !conv.customer_email) {
       avatarHtml = `<img src="images/default-avatar.png?v=2" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border-light); box-shadow: 0 1px 3px rgba(0,0,0,0.1);" alt="Avatar">`;
@@ -792,11 +792,11 @@ function renderConversationList(conversations) {
       </div>
     `;
 
-    item.addEventListener("click", () => openConversation(conv.session_id, conv.customer_email, conv.short_id, conv.resolved, conv.updated_at));
+    item.addEventListener("click", () => openConversation(conv.session_id, customerDisplayName, conv.short_id, conv.resolved, conv.updated_at));
     item.addEventListener("keydown", (e) => {
       if ((e.key === "Enter" || e.key === " ") && e.target === item) {
         e.preventDefault();
-        openConversation(conv.session_id, conv.customer_email, conv.short_id, conv.resolved, conv.updated_at);
+        openConversation(conv.session_id, customerDisplayName, conv.short_id, conv.resolved, conv.updated_at);
       }
     });
     conversationList.appendChild(item);
@@ -980,10 +980,13 @@ function scrollToBottom(force = false) {
   }, 50);
 }
 
+let currentPinnedMessages = [];
+
 function updatePinnedMessageUI(pinnedMessages) {
+  if (pinnedMessages) currentPinnedMessages = pinnedMessages;
   let pinnedContainer = document.getElementById("pinned-messages-wrapper");
   
-  if (!pinnedMessages || pinnedMessages.length === 0) {
+  if (!currentPinnedMessages || currentPinnedMessages.length === 0) {
     if (pinnedContainer) pinnedContainer.remove();
     return;
   }
@@ -1001,12 +1004,19 @@ function updatePinnedMessageUI(pinnedMessages) {
   }
   
   let html = '';
-  pinnedMessages.forEach((msg) => {
+  currentPinnedMessages.forEach((msg) => {
     let displayContent = msg.content || "";
     displayContent = displayContent.replace(/\[INTERNAL_IMAGE_DESC\][\s\S]*?\[\/INTERNAL_IMAGE_DESC\]/g, '');
     const isInternal = msg.sender === 'agent_internal' || displayContent.includes("INTERNAL NOTE");
     if (isInternal) displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
-    displayContent = displayContent.replace(/!\[.*?\]\(.*?\)/g, '[Image] '); // strip images
+    let firstImgSrc = null;
+    const imgMatch = (msg.content || "").match(/!\[.*?\]\(([^\)]+)\)/);
+    if (imgMatch) {
+      firstImgSrc = imgMatch[1];
+    }
+    const isImageOnly = /^\s*!\[.*?\]\([^\)]+\)\s*$/.test((msg.content || "").trim());
+
+    displayContent = displayContent.replace(/!\[.*?\]\(.*?\)/g, firstImgSrc ? '' : '[Image] '); // strip images
     displayContent = displayContent.replace(/\[(.*?)\]\(.*?\)/g, '$1'); // strip links
     displayContent = displayContent.replace(/[*_~`#>]/g, ''); // strip basic markdown
     displayContent = displayContent.replace(/<[^>]*>?/gm, '').trim().replace(/\s+/g, ' ');
@@ -1014,19 +1024,34 @@ function updatePinnedMessageUI(pinnedMessages) {
     let senderName = msg.author_username;
     if (!senderName) {
       if (msg.sender === "customer" || msg.sender === "human") {
-        senderName = document.getElementById("conversation-email").textContent || "Customer";
+        let rawHeaderName = (document.getElementById("conversation-email")?.textContent || "").trim();
+        // If header text contains an email address, extract clean customer name
+        if (rawHeaderName.includes('@')) {
+          const parts = rawHeaderName.split('@')[0].replace(/[._-]+/g, ' ').trim();
+          senderName = parts ? parts.replace(/\b\w/g, c => c.toUpperCase()) : "Customer";
+        } else {
+          senderName = rawHeaderName || "Customer";
+        }
       } else {
         senderName = "You";
       }
     }
+
+    const thumbHtml = firstImgSrc 
+      ? `<img src="${escapeAttr(firstImgSrc)}" class="pinned-message-thumb" alt="Pinned thumbnail" loading="lazy" />`
+      : '';
+    const textHtml = displayContent 
+      ? `<span class="pinned-message-text" style="display:inline; color: inherit; white-space:nowrap;">${escapeHtml(displayContent)}</span>`
+      : '';
     
     html += `
       <div class="pinned-message ${isInternal ? 'pinned-message--internal' : ''}" data-id="${msg.id}" onclick="if (event.target.closest('.unpin-btn')) return; const el = document.querySelector('.msg-content[data-msg-id=\\'${msg.id}\\']'); if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});">
         <div class="pinned-message-content" style="display:flex; flex-direction:row; align-items:center; gap:8px; overflow:hidden;">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
-          <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-            <strong style="margin-right: 4px; font-weight:600;">${escapeHtml(senderName)}:</strong>
-            <span class="pinned-message-text" style="display:inline; color: inherit; white-space:nowrap;">${escapeHtml(displayContent)}</span>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pinned-message-pin-icon" style="flex-shrink:0;"><path d="M16 3l1 1-4 4 3 3-1 1-4-4-5 5-2-2 5-5-4-4 1-1 3 3 4-4z"/><line x1="4" y1="20" x2="9" y2="15"/></svg>
+          <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:flex; align-items:center; gap:6px;">
+            <strong class="pinned-message-author" style="margin-right: 2px; font-weight:600; font-size:12.5px; white-space:nowrap;">${escapeHtml(senderName)}:</strong>
+            ${thumbHtml}
+            ${textHtml}
           </div>
         </div>
         <button class="unpin-btn" data-id="${msg.id}" title="Unpin" style="flex-shrink:0;">
@@ -1084,7 +1109,7 @@ function syncPinnedUIAfterToggle(messageId, isPinnedNow, pinnedMessages) {
     if (isPinnedNow && !existingIndicator) {
       bubble.insertAdjacentHTML("afterbegin", `
         <span class="msg-pin-indicator" title="Pinned">
-          <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" stroke="none"><path d="M12 2a1 1 0 0 1 1 1v5.764l3.447 1.723A2 2 0 0 1 17.55 12.5H18a1 1 0 1 1 0 2h-5v6a1 1 0 1 1-2 0v-6H6a1 1 0 1 1 0-2h.45a2 2 0 0 1 1.103-1.013L11 8.764V3a1 1 0 0 1 1-1z"/></svg>
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3l1 1-4 4 3 3-1 1-4-4-5 5-2-2 5-5-4-4 1-1 3 3 4-4z"/><line x1="4" y1="20" x2="9" y2="15"/></svg>
         </span>
       `);
     } else if (!isPinnedNow && existingIndicator) {
@@ -1187,6 +1212,11 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
     return '';
   });
 
+  const isImageOnly = /^\s*!\[.*?\]\([^\)]+\)\s*$/.test(displayContent.trim());
+  if (isImageOnly) {
+    div.classList.add("msg--image-only");
+  }
+
   if (isInternal) {
     displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
     div.innerHTML = nameHtml + replyHtml + renderMarkdown(displayContent) + transcriptHtml;
@@ -1198,7 +1228,7 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
     div.classList.add("msg--pinned");
     div.insertAdjacentHTML("afterbegin", `
       <span class="msg-pin-indicator" title="Pinned">
-        <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" stroke="none"><path d="M12 2a1 1 0 0 1 1 1v5.764l3.447 1.723A2 2 0 0 1 17.55 12.5H18a1 1 0 1 1 0 2h-5v6a1 1 0 1 1-2 0v-6H6a1 1 0 1 1 0-2h.45a2 2 0 0 1 1.103-1.013L11 8.764V3a1 1 0 0 1 1-1z"/></svg>
+        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3l1 1-4 4 3 3-1 1-4-4-5 5-2-2 5-5-4-4 1-1 3 3 4-4z"/><line x1="4" y1="20" x2="9" y2="15"/></svg>
       </span>
     `);
   }
@@ -1216,7 +1246,7 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy
         </div>
         <div class="msg-dropdown-item msg-action-pin" data-id="${msgId}" data-pinned="${isPinned ? "1" : "0"}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 11.24V6a3 3 0 0 0-6 0v5.24a2 2 0 0 1-1.11 1.31l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg> <span class="msg-action-pin__label">${isPinned ? "Unpin" : "Pin"}</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3l1 1-4 4 3 3-1 1-4-4-5 5-2-2 5-5-4-4 1-1 3 3 4-4z"/><line x1="4" y1="20" x2="9" y2="15"/></svg> <span class="msg-action-pin__label">${isPinned ? "Unpin" : "Pin"}</span>
         </div>
         <div class="msg-dropdown-item msg-action-copilot" data-content="${escapeHtml(displayContent)}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg> Ask Copilot
@@ -1682,12 +1712,14 @@ const sendTypeOptions = document.querySelectorAll(".send-type-option");
 if (sendToggleBtn && sendTypeMenu) {
   sendToggleBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    sendTypeMenu.classList.toggle("hidden");
+    const isHidden = sendTypeMenu.classList.toggle("hidden");
+    sendToggleBtn.setAttribute("aria-expanded", String(!isHidden));
   });
 
   document.addEventListener("click", (e) => {
     if (!sendTypeMenu.contains(e.target) && !sendToggleBtn.contains(e.target)) {
       sendTypeMenu.classList.add("hidden");
+      sendToggleBtn.setAttribute("aria-expanded", "false");
     }
   });
 
@@ -1697,27 +1729,33 @@ if (sendToggleBtn && sendTypeMenu) {
       noteTypeSelect.value = type;
       noteTypeSelect.dispatchEvent(new Event("change"));
       sendTypeMenu.classList.add("hidden");
+      sendToggleBtn.setAttribute("aria-expanded", "false");
       
-      // Update checkmarks
-      sendTypeOptions.forEach(opt => opt.querySelector(".check-icon").classList.add("hidden"));
-      option.querySelector(".check-icon").classList.remove("hidden");
+      // Update active highlight card
+      sendTypeOptions.forEach(opt => opt.classList.remove("is-active"));
+      option.classList.add("is-active");
     });
   });
 }
 
 if (noteTypeSelect && chatInputWrapper) {
   function updatePlaceholder() {
+    const sendBtn = document.getElementById("agent-send-btn");
+    const modeBadge = document.getElementById("send-mode-badge");
+
     if (noteTypeSelect.value === "internal") {
       chatInputWrapper.classList.add("internal-mode");
       // Use the actual width of the input to determine if we should show the full message
       agentInput.placeholder = agentInput.clientWidth > 380 
         ? "Type internal note... (Use @ to tag, / for cmds)" 
         : "Type internal note...";
-      document.getElementById("agent-send-btn").textContent = "Add Note";
+      if (modeBadge) modeBadge.textContent = "Note";
+      if (sendBtn) sendBtn.title = "Add internal note";
     } else {
       chatInputWrapper.classList.remove("internal-mode");
       agentInput.placeholder = "Type a message...";
-      document.getElementById("agent-send-btn").textContent = "Send";
+      if (modeBadge) modeBadge.textContent = "Reply";
+      if (sendBtn) sendBtn.title = "Send public reply";
     }
   }
 
@@ -1743,13 +1781,13 @@ document.addEventListener("keydown", (e) => {
       noteTypeSelect.value = noteTypeSelect.value === "internal" ? "public" : "internal";
       noteTypeSelect.dispatchEvent(new Event("change"));
       
-      // Update checkmarks visually for shortcut
+      // Update active highlight visually for shortcut
       if (sendTypeOptions) {
         sendTypeOptions.forEach(opt => {
           if (opt.getAttribute("data-type") === noteTypeSelect.value) {
-            opt.querySelector(".check-icon").classList.remove("hidden");
+            opt.classList.add("is-active");
           } else {
-            opt.querySelector(".check-icon").classList.add("hidden");
+            opt.classList.remove("is-active");
           }
         });
       }
@@ -1863,7 +1901,7 @@ function sendAgentReply() {
   
   agentInput.value = "";
   drafts[activeSessionId] = ""; 
-  agentInput.style.height = "44px";
+  agentInput.style.height = "28px";
   agentInput.style.overflowY = "hidden";
   document.getElementById("slash-command-popup")?.classList.remove("active");
 }
@@ -1883,6 +1921,10 @@ async function fetchOrderContext(sessionId) {
       showCustomerSidebar(result.customer, result.demo === true);
       if (sessionId === activeSessionId && result.customer.name) {
         conversationEmail.textContent = result.customer.name;
+        // Re-render pinned banner with the resolved customer name
+        if (currentPinnedMessages && currentPinnedMessages.length > 0) {
+          updatePinnedMessageUI();
+        }
       }
     } else {
       clearCustomerSidebar();
@@ -1975,17 +2017,17 @@ function showOrderPopup(order, customer) {
   
   if ((order.status || '').toLowerCase() === 'shipped' || (order.status || '').toLowerCase() === 'delivered') {
       if (order.tracking_url || order.carrier) {
-          let labelHtml = `<span style="display:flex; align-items:center;">Tracking ${order.carrier ? `<span style="margin-left: 6px; padding: 2px 4px; background: color-mix(in srgb, var(--ink) 8%, transparent); border-radius: 4px; font-family: var(--font-sans); font-size: 10px; font-weight: 600; color: var(--ink); text-transform: none; letter-spacing: normal;">${escapeHtml(order.carrier)}</span>` : ''}</span>`;
+          let labelHtml = `<span style="display:flex; align-items:center; gap: 4px;">Tracking ${order.carrier ? `<span style="padding: 1px 4px; background: color-mix(in srgb, var(--ink) 8%, transparent); border-radius: 4px; font-family: var(--font-sans); font-size: 10px; font-weight: 600; color: var(--ink); text-transform: none; letter-spacing: normal;">${escapeHtml(order.carrier)}</span>` : ''}</span>`;
           let valueHtml = '';
           if (order.tracking_url) {
-              valueHtml = `<div style="display: flex; align-items: center; gap: 4px; line-height: 1;"><a href="${escapeHtml(order.tracking_url)}" target="_blank" rel="noopener noreferrer" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${escapeHtml(order.tracking_url)}</a><button class="icon-action-btn" style="padding: 2px; height: 18px; width: 18px; margin: 0; min-height: 0; min-width: 0;" onclick="navigator.clipboard.writeText('${escapeHtml(order.tracking_url)}')" title="Copy tracking URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>`;
+              const trackingTitle = order.carrier ? `Track on ${order.carrier}` : 'Track Shipment';
+              valueHtml = `<div style="display: flex; align-items: center; gap: 4px; line-height: 1.2; min-width: 0;"><a href="${escapeHtml(order.tracking_url)}" target="_blank" rel="noopener noreferrer" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; display: inline-block;" title="${escapeHtml(order.tracking_url)}">${escapeHtml(trackingTitle)}</a><button class="icon-action-btn" style="padding: 2px; height: 18px; width: 18px; margin: 0; min-height: 0; min-width: 0; flex-shrink: 0;" onclick="navigator.clipboard.writeText('${escapeHtml(order.tracking_url)}')" title="Copy tracking URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>`;
           } else {
               valueHtml = `<span style="color: var(--text-muted);">No tracking link</span>`;
           }
           availableFields.push({ 
               label: labelHtml, 
-              value: valueHtml,
-              span: 2
+              value: valueHtml
           });
       }
   }
@@ -1995,26 +2037,23 @@ function showOrderPopup(order, customer) {
   }
   
   if (order.payment_method) {
-      let paymentBadge = `<span style="margin-left: 6px; padding: 2px 4px; background: color-mix(in srgb, var(--ink) 8%, transparent); border-radius: 4px; font-family: var(--font-sans); font-size: 10px; font-weight: 600; color: var(--ink); text-transform: none; letter-spacing: normal;">${escapeHtml(order.payment_method)}</span>`;
-      let labelHtml = `<span style="display:flex; align-items:center;">Payment ${paymentBadge}</span>`;
+      let paymentBadge = `<span style="padding: 1px 4px; background: color-mix(in srgb, var(--ink) 8%, transparent); border-radius: 4px; font-family: var(--font-sans); font-size: 10px; font-weight: 600; color: var(--ink); text-transform: none; letter-spacing: normal;">${escapeHtml(order.payment_method)}</span>`;
+      let labelHtml = `<span style="display:flex; align-items:center; gap: 4px;">Payment ${paymentBadge}</span>`;
       let valueHtml = '';
       if (order.invoice_url) {
-          valueHtml = `<div style="display: flex; align-items: center; gap: 4px; line-height: 1;"><a href="${escapeHtml(order.invoice_url)}" target="_blank" rel="noopener noreferrer" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">View Invoice</a><button class="icon-action-btn" style="padding: 2px; height: 18px; width: 18px; margin: 0; min-height: 0; min-width: 0;" onclick="navigator.clipboard.writeText('${escapeHtml(order.invoice_url)}')" title="Copy invoice URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>`;
+          valueHtml = `<div style="display: flex; align-items: center; gap: 4px; line-height: 1.2; min-width: 0;"><a href="${escapeHtml(order.invoice_url)}" target="_blank" rel="noopener noreferrer" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; display: inline-block;">View Invoice</a><button class="icon-action-btn" style="padding: 2px; height: 18px; width: 18px; margin: 0; min-height: 0; min-width: 0; flex-shrink: 0;" onclick="navigator.clipboard.writeText('${escapeHtml(order.invoice_url)}')" title="Copy invoice URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>`;
       } else {
           valueHtml = `<span style="color: var(--text-muted);">No invoice link</span>`;
       }
       availableFields.push({ 
-          label: labelHtml, 
-          value: valueHtml,
-          span: 2
+              label: labelHtml, 
+              value: valueHtml
       });
   }
   if (order.shipping_method) availableFields.push({ label: 'Shipping', value: escapeHtml(order.shipping_method) });
 
-  const fieldsToShow = availableFields.slice(0, 8);
-  
-  const fieldsHtml = fieldsToShow.map(f => {
-      return `<div class="order-popup__field" ${f.span ? `style="grid-column: span ${f.span};"` : ''}><span class="order-popup__label">${f.label}</span><span class="order-popup__value">${f.value}</span></div>`;
+  const fieldsHtml = availableFields.map(f => {
+      return `<div class="order-popup__field"${f.span ? ` style="grid-column: span ${f.span};"` : ''}><span class="order-popup__label">${f.label}</span><span class="order-popup__value">${f.value}</span></div>`;
   }).join('');
 
   body.innerHTML = `
@@ -2132,6 +2171,101 @@ function renderMarkdown(text) {
   return html;
 }
 
+function formatLinkTitle(url, existingText = '') {
+  const cleanExisting = (existingText || '').trim();
+  const isRawUrl = /^https?:\/\//i.test(cleanExisting) || 
+                   /^www\./i.test(cleanExisting) || 
+                   /^[a-z0-9-]+(\.[a-z0-9-]+)+([\/?#].*)?$/i.test(cleanExisting) ||
+                   cleanExisting.toLowerCase() === url.trim().toLowerCase();
+
+  if (cleanExisting && !isRawUrl) {
+    return cleanExisting;
+  }
+
+  try {
+    const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    const path = parsed.pathname.toLowerCase();
+
+    // 1. Tracking links
+    if (path.includes('track') || host.includes('fedex') || host.includes('ups') || host.includes('dhl') || host.includes('usps') || host.includes('courier')) {
+      if (host.includes('fedex')) return 'Track on FedEx';
+      if (host.includes('ups')) return 'Track on UPS';
+      if (host.includes('dhl')) return 'Track on DHL';
+      if (host.includes('usps')) return 'Track on USPS';
+      return 'Track Shipment';
+    }
+
+    // 2. Invoices & Receipts
+    if (path.includes('invoice') || path.includes('receipt') || path.includes('bill')) {
+      const match = path.match(/(?:invoice|receipt)[\/-]?(\d+)/i);
+      return match ? `View Invoice #${match[1]}` : 'View Invoice';
+    }
+
+    // 3. Orders
+    if (path.includes('order')) {
+      const match = path.match(/orders?[\/-]?(\d+)/i);
+      return match ? `Order Details #${match[1]}` : 'Order Details';
+    }
+
+    // 4. Returns & Refunds
+    if (path.includes('return') || path.includes('refund') || path.includes('rma')) {
+      return 'Return & Refund Policy';
+    }
+
+    // 5. Help / FAQ / Support / Knowledge base
+    if (path.includes('help') || path.includes('faq') || path.includes('support') || path.includes('kb') || path.includes('knowledge')) {
+      return 'Help Center';
+    }
+
+    // 6. Products
+    if (path.includes('/product') || path.includes('/item')) {
+      const segments = path.split('/').filter(Boolean);
+      const lastSeg = segments[segments.length - 1];
+      if (lastSeg && lastSeg !== 'product' && lastSeg !== 'products') {
+        const title = lastSeg
+          .replace(/[-_]+/g, ' ')
+          .replace(/\b\w/g, c => c.toUpperCase());
+        return title.length <= 30 ? title : 'View Product';
+      }
+      return 'View Product';
+    }
+
+    // 7. Store / Brand domain
+    if (host.includes('wrennon')) {
+      const cleanPath = path.replace(/^\/|\/$/g, '').replace(/[-_]+/g, ' ');
+      if (cleanPath) {
+        return cleanPath.replace(/\b\w/g, c => c.toUpperCase());
+      }
+      return 'Wrennon Store';
+    }
+
+    // 8. General domain fallback
+    const domainParts = host.split('.');
+    const mainName = domainParts.length >= 2 ? domainParts[domainParts.length - 2] : host;
+    const capitalized = mainName.charAt(0).toUpperCase() + mainName.slice(1);
+    return `Visit ${capitalized}`;
+  } catch (e) {
+    return 'View Link';
+  }
+}
+
+function linkifyRawUrls(html) {
+  return html.replace(/(<a\b[^>]*>.*?<\/a>|<[^>]+>)|((?:https?:\/\/|www\.)[^\s<)"']+)/gi, (match, tag, url) => {
+    if (tag) return tag;
+    let fullUrl = url;
+    if (/^www\./i.test(fullUrl)) fullUrl = 'https://' + fullUrl;
+    let trailing = '';
+    const punctMatch = fullUrl.match(/[.,;:!?)]+$/);
+    if (punctMatch) {
+      trailing = punctMatch[0];
+      fullUrl = fullUrl.slice(0, -trailing.length);
+    }
+    const maskedTitle = formatLinkTitle(fullUrl, '');
+    return `<a href="${escapeAttr(fullUrl)}" target="_blank" rel="noopener noreferrer" title="${escapeAttr(fullUrl)}" style="color: var(--accent); text-decoration: underline;">${escapeHtml(maskedTitle)}</a>${trailing}`;
+  });
+}
+
 function inlineMarkdown(text) {
   let escaped = escapeHtml(text);
   escaped = escaped.replace(/\[Audio\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
@@ -2153,11 +2287,13 @@ function inlineMarkdown(text) {
     return `<video controls src="${escapeAttr(url)}" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;"></video>`;
   });
   escaped = escaped.replace(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
-    return `<img src="${escapeAttr(url)}" class="chat-lightbox-image" style="max-width: 250px; max-height: 250px; object-fit: cover; display: block; margin: 8px 0; border-radius: 8px; cursor: pointer;" onclick="openLightbox(this.src)" />`;
+    return `<img src="${escapeAttr(url)}" class="chat-lightbox-image" alt="Image" loading="lazy" onclick="openLightbox(this.src)" />`;
   });
   escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, (match, linkText, url) => {
-    return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline;">${linkText}</a>`;
+    const maskedTitle = formatLinkTitle(url, linkText);
+    return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer" title="${escapeAttr(url)}" style="color: var(--accent); text-decoration: underline;">${escapeHtml(maskedTitle)}</a>`;
   });
+  escaped = linkifyRawUrls(escaped);
   escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   escaped = escaped.replace(/@([a-zA-Z0-9_]+)/g, '<span class="agent-mention" style="color: var(--accent); font-weight: 600; background: var(--accent-glow); padding: 0 4px; border-radius: 4px;">@$1</span>');
   return escaped;
@@ -2392,12 +2528,152 @@ document.querySelectorAll('.theme-tab').forEach(tab => {
 // --- Lightbox Logic ---
 let lightboxImages = [];
 let currentLightboxIndex = 0;
+let lightboxZoom = 1;
+let lightboxRotation = 0;
+let lightboxTranslate = { x: 0, y: 0 };
+let isLightboxDragging = false;
+let lightboxDragStart = { x: 0, y: 0 };
+
+function applyLightboxTransform() {
+  const imgEl = document.getElementById('chat-lightbox-img');
+  const zoomText = document.getElementById('chat-lightbox-zoom-val');
+  if (imgEl) {
+    imgEl.style.transform = `translate(${lightboxTranslate.x}px, ${lightboxTranslate.y}px) scale(${lightboxZoom}) rotate(${lightboxRotation}deg)`;
+    imgEl.style.cursor = lightboxZoom > 1 ? (isLightboxDragging ? 'grabbing' : 'grab') : 'zoom-in';
+  }
+  if (zoomText) {
+    zoomText.textContent = `${Math.round(lightboxZoom * 100)}%`;
+  }
+}
+
+function resetLightboxTransform() {
+  lightboxZoom = 1;
+  lightboxRotation = 0;
+  lightboxTranslate = { x: 0, y: 0 };
+  applyLightboxTransform();
+}
+
+window.lightboxZoomIn = function(e) {
+  if (e) e.stopPropagation();
+  lightboxZoom = Math.min(lightboxZoom + 0.25, 4.0);
+  applyLightboxTransform();
+};
+
+window.lightboxZoomOut = function(e) {
+  if (e) e.stopPropagation();
+  lightboxZoom = Math.max(lightboxZoom - 0.25, 0.5);
+  if (lightboxZoom <= 1) lightboxTranslate = { x: 0, y: 0 };
+  applyLightboxTransform();
+};
+
+window.lightboxResetZoom = function(e) {
+  if (e) e.stopPropagation();
+  resetLightboxTransform();
+};
+
+window.lightboxRotate = function(e) {
+  if (e) e.stopPropagation();
+  lightboxRotation = (lightboxRotation + 90) % 360;
+  applyLightboxTransform();
+};
+
+window.lightboxDownload = async function(e) {
+  if (e) e.stopPropagation();
+  const currentSrc = lightboxImages[currentLightboxIndex];
+  if (!currentSrc) return;
+  try {
+    const res = await fetch(currentSrc, { mode: 'cors' });
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    const parts = currentSrc.split('/');
+    let filename = parts[parts.length - 1].split('?')[0] || 'image.jpg';
+    if (!/\.(jpg|jpeg|png|webp|gif|svg)$/i.test(filename)) filename += '.jpg';
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    showLightboxToast('Image download started');
+  } catch (err) {
+    const a = document.createElement('a');
+    a.href = currentSrc;
+    a.target = '_blank';
+    a.download = 'image.jpg';
+    a.click();
+  }
+};
+
+window.lightboxShare = async function(e) {
+  if (e) e.stopPropagation();
+  const currentSrc = lightboxImages[currentLightboxIndex];
+  if (!currentSrc) return;
+
+  // 1. Try Web Share API (native OS share dialog: WhatsApp, Messenger, AirDrop, etc.)
+  if (navigator.share) {
+    try {
+      let fileToShare = null;
+      try {
+        const res = await fetch(currentSrc, { mode: 'cors' });
+        const blob = await res.blob();
+        const parts = currentSrc.split('/');
+        let filename = parts[parts.length - 1].split('?')[0] || 'shared-image.jpg';
+        if (!/\.(jpg|jpeg|png|webp|gif|svg)$/i.test(filename)) filename += '.jpg';
+        fileToShare = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+      } catch (_) {}
+
+      if (fileToShare && navigator.canShare && navigator.canShare({ files: [fileToShare] })) {
+        await navigator.share({
+          title: 'Shared Image',
+          files: [fileToShare]
+        });
+        return;
+      } else {
+        await navigator.share({
+          title: 'Shared Image',
+          url: currentSrc
+        });
+        return;
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') return; // User closed the native share menu
+    }
+  }
+
+  // 2. Fallback: Copy direct image URL to clipboard
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(currentSrc);
+      showLightboxToast('Image link copied to clipboard');
+      return;
+    } catch (_) {}
+  }
+  showLightboxToast('Image: ' + currentSrc);
+};
+
+function showLightboxToast(msg) {
+  const lightbox = document.getElementById('chat-lightbox-overlay');
+  if (!lightbox) return;
+  let toast = lightbox.querySelector('.chat-lightbox-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.className = 'chat-lightbox-toast';
+    lightbox.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2200);
+}
 
 window.openLightbox = function(src) {
   const imgs = Array.from(document.querySelectorAll('.chat-lightbox-image'));
-  if (imgs.length === 0) return;
-  
-  lightboxImages = imgs.map(img => img.src);
+  if (imgs.length === 0 && src) {
+    lightboxImages = [src];
+  } else {
+    lightboxImages = imgs.map(img => img.src);
+    if (src && !lightboxImages.includes(src)) lightboxImages.unshift(src);
+  }
   currentLightboxIndex = lightboxImages.indexOf(src);
   if (currentLightboxIndex === -1) currentLightboxIndex = 0;
   
@@ -2407,40 +2683,117 @@ window.openLightbox = function(src) {
     lightbox.id = 'chat-lightbox-overlay';
     lightbox.className = 'chat-lightbox-overlay';
     lightbox.innerHTML = `
-      <div class="chat-lightbox-close" onclick="closeLightbox()">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      <div class="chat-lightbox-topbar" onclick="event.stopPropagation()">
+        <div class="chat-lightbox-counter" id="chat-lightbox-counter">1 / 1</div>
+        <div class="chat-lightbox-tools">
+          <button class="chat-lightbox-btn" onclick="lightboxZoomIn(event)" title="Zoom in (+)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
+          <button class="chat-lightbox-btn" onclick="lightboxZoomOut(event)" title="Zoom out (-)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
+          <button class="chat-lightbox-btn" onclick="lightboxResetZoom(event)" title="Fit to screen">
+            <span id="chat-lightbox-zoom-val" style="font-size:12px; font-weight:600;">100%</span>
+          </button>
+          <button class="chat-lightbox-btn" onclick="lightboxRotate(event)" title="Rotate clockwise">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          </button>
+          <button class="chat-lightbox-btn" onclick="lightboxShare(event)" title="Share / Copy link">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          </button>
+          <button class="chat-lightbox-btn" onclick="lightboxDownload(event)" title="Download image">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
+          <button class="chat-lightbox-btn chat-lightbox-btn--close" onclick="closeLightbox(event)" title="Close (Esc)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
       </div>
       <div class="chat-lightbox-nav prev" onclick="lightboxPrev(event)">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
       </div>
-      <div class="chat-lightbox-img-wrapper">
-        <img id="chat-lightbox-img" src="" />
+      <div class="chat-lightbox-stage">
+        <div class="chat-lightbox-img-wrapper">
+          <img id="chat-lightbox-img" src="" alt="Preview" draggable="false" />
+        </div>
       </div>
       <div class="chat-lightbox-nav next" onclick="lightboxNext(event)">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </div>
     `;
     
     lightbox.addEventListener('click', (e) => {
-      if (e.target === lightbox || e.target.classList.contains('chat-lightbox-img-wrapper')) closeLightbox();
+      if (e.target === lightbox || e.target.classList.contains('chat-lightbox-stage') || e.target.classList.contains('chat-lightbox-img-wrapper')) {
+        closeLightbox();
+      }
+    });
+
+    const imgEl = lightbox.querySelector('#chat-lightbox-img');
+    imgEl.addEventListener('mousedown', (e) => {
+      if (lightboxZoom > 1) {
+        isLightboxDragging = true;
+        lightboxDragStart = { x: e.clientX - lightboxTranslate.x, y: e.clientY - lightboxTranslate.y };
+        imgEl.style.cursor = 'grabbing';
+        e.preventDefault();
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (isLightboxDragging) {
+        lightboxTranslate = {
+          x: e.clientX - lightboxDragStart.x,
+          y: e.clientY - lightboxDragStart.y
+        };
+        applyLightboxTransform();
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isLightboxDragging) {
+        isLightboxDragging = false;
+        applyLightboxTransform();
+      }
+    });
+
+    lightbox.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (e.deltaY < 0) {
+        lightboxZoom = Math.min(lightboxZoom + 0.15, 4.0);
+      } else {
+        lightboxZoom = Math.max(lightboxZoom - 0.15, 0.5);
+        if (lightboxZoom <= 1) lightboxTranslate = { x: 0, y: 0 };
+      }
+      applyLightboxTransform();
+    }, { passive: false });
+
+    imgEl.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      if (lightboxZoom > 1) {
+        resetLightboxTransform();
+      } else {
+        lightboxZoom = 2;
+        applyLightboxTransform();
+      }
     });
     
-    const container = document.getElementById('conversation-view') || document.body;
-    container.appendChild(lightbox);
+    document.body.appendChild(lightbox);
     document.addEventListener('keydown', handleLightboxKeydown);
   }
   
+  resetLightboxTransform();
   updateLightbox();
   lightbox.style.display = 'flex';
   setTimeout(() => lightbox.style.opacity = '1', 10);
 };
 
-window.closeLightbox = function() {
+window.closeLightbox = function(e) {
+  if (e) e.stopPropagation();
   const lightbox = document.getElementById('chat-lightbox-overlay');
   if (lightbox) {
     lightbox.style.opacity = '0';
     setTimeout(() => {
       lightbox.style.display = 'none';
+      resetLightboxTransform();
     }, 200);
   }
 };
@@ -2449,6 +2802,7 @@ window.lightboxNext = function(e) {
   if (e) e.stopPropagation();
   if (currentLightboxIndex < lightboxImages.length - 1) {
     currentLightboxIndex++;
+    resetLightboxTransform();
     updateLightbox();
   }
 };
@@ -2457,6 +2811,7 @@ window.lightboxPrev = function(e) {
   if (e) e.stopPropagation();
   if (currentLightboxIndex > 0) {
     currentLightboxIndex--;
+    resetLightboxTransform();
     updateLightbox();
   }
 };
@@ -2464,8 +2819,13 @@ window.lightboxPrev = function(e) {
 function updateLightbox() {
   const imgEl = document.getElementById('chat-lightbox-img');
   if (!imgEl) return;
-  imgEl.src = lightboxImages[currentLightboxIndex];
+  imgEl.src = lightboxImages[currentLightboxIndex] || '';
   
+  const counter = document.getElementById('chat-lightbox-counter');
+  if (counter) {
+    counter.textContent = `${currentLightboxIndex + 1} / ${Math.max(lightboxImages.length, 1)}`;
+  }
+
   const prevBtn = document.querySelector('.chat-lightbox-nav.prev');
   const nextBtn = document.querySelector('.chat-lightbox-nav.next');
   if (prevBtn) prevBtn.style.visibility = (currentLightboxIndex > 0) ? 'visible' : 'hidden';
@@ -2476,9 +2836,47 @@ function handleLightboxKeydown(e) {
   const lightbox = document.getElementById('chat-lightbox-overlay');
   if (!lightbox || lightbox.style.display === 'none') return;
   
-  if (e.key === 'Escape') closeLightbox();
-  if (e.key === 'ArrowRight') lightboxNext();
-  if (e.key === 'ArrowLeft') lightboxPrev();
+  if (e.key === 'Escape') {
+    closeLightbox();
+    return;
+  }
+  if (e.key === 'ArrowRight') {
+    lightboxNext();
+    return;
+  }
+  if (e.key === 'ArrowLeft') {
+    lightboxPrev();
+    return;
+  }
+
+  // Intercept zoom shortcuts: + / = / - / _ / 0 (with or without Ctrl / Cmd)
+  // Prevent browser page zoom when lightbox is active!
+  if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal') {
+    e.preventDefault();
+    e.stopPropagation();
+    lightboxZoomIn();
+    return;
+  }
+  if (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus') {
+    e.preventDefault();
+    e.stopPropagation();
+    lightboxZoomOut();
+    return;
+  }
+  if (e.key === '0' || e.code === 'Numpad0' || e.code === 'Digit0') {
+    if (e.ctrlKey || e.metaKey || (!e.ctrlKey && !e.metaKey)) {
+      e.preventDefault();
+      e.stopPropagation();
+      resetLightboxTransform();
+      return;
+    }
+  }
+  if (e.key === 'r' || e.key === 'R') {
+    if (!e.ctrlKey && !e.metaKey) {
+      lightboxRotate();
+      return;
+    }
+  }
 }
 
 // ── Customer Details Logic ──
