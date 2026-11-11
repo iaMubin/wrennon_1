@@ -64,7 +64,25 @@ function customerAvatarUrl(key) {
     : 'images/default-avatar.png?v=2';
 }
 let activeSessionId = null;
-let _agentToken = null; // stored on login for WebSocket auth
+let _agentToken = localStorage.getItem("agent_token") || null;
+
+function getAuthToken() {
+  const token = _agentToken || localStorage.getItem("agent_token");
+  return token ? `Bearer ${token}` : "";
+}
+
+function getAuthHeaders(extra = {}) {
+  const headers = {
+    "X-Wrennon-Client": "agent-dashboard",
+    ...extra,
+  };
+  const auth = getAuthToken();
+  if (auth) {
+    headers["Authorization"] = auth;
+  }
+  return headers;
+}
+
 let activeSection = "active"; // "attention" | "active" | "all"
 const drafts = {};
 
@@ -362,9 +380,8 @@ loginForm.addEventListener("submit", async (e) => {
     }
 
     const data = await response.json();
-    // Store the JWT for WebSocket auth (WS handshakes don't send httpOnly
-    // cookies reliably in cross-origin or some same-site scenarios).
     _agentToken = data.access_token;
+    localStorage.setItem("agent_token", data.access_token);
     localStorage.setItem("agent_username", username); // Save username to identify self
     localStorage.setItem("agent_role", data.role); // Save role to show admin btn
     if (data.full_name) {
@@ -419,7 +436,8 @@ function connectSocket() {
   // cookie path works. If the cookie is missing/expired/invalid, the
   // server closes with 4401 and onclose() below sends the agent back to
   // login — no client-side pre-check needed.
-  const wsUrl = _agentToken ? `${WS_URL}?token=${encodeURIComponent(_agentToken)}` : WS_URL;
+  const token = _agentToken || localStorage.getItem("agent_token");
+  const wsUrl = token ? `${WS_URL}?token=${encodeURIComponent(token)}` : WS_URL;
   socket = new WebSocket(wsUrl);
 
   socket.onopen = () => {
@@ -1031,7 +1049,7 @@ async function togglePinMessage(messageId, newState) {
     const response = await fetch(`${API_BASE}/agent/conversations/${activeSessionId}/pin`, {
       method: "POST",
       credentials: "include",
-      headers: { "Content-Type": "application/json", "X-Wrennon-Client": "agent-dashboard" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ message_id: messageId, is_pinned: newState }),
     });
     if (response.status === 401) { logout(); return null; }
@@ -1756,10 +1774,7 @@ if (agentCopilotBtn) {
       const res = await fetch(`${API_BASE}/copilot/suggest`, {
           method: 'POST',
           credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Wrennon-Client": "agent-dashboard",
-          },
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(req)
       });
       if (res.ok) {
@@ -2053,19 +2068,13 @@ resolveBtn.addEventListener("click", async () => {
 // --- Helpers ---
 async function authedFetch(path, method = "GET", body = null) {
   try {
+    const headers = getAuthHeaders(body ? { "Content-Type": "application/json" } : {});
     const options = {
       method,
-      credentials: "include", // send the httpOnly access_token cookie
-      headers: {
-        // Required by the backend's CSRF check for cookie-authenticated
-        // non-GET requests (see get_current_agent) — a cross-site form or
-        // fetch can't add this header, so its presence proves the request
-        // actually came from this app's own JS.
-        "X-Wrennon-Client": "agent-dashboard",
-      },
+      credentials: "include",
+      headers,
     };
     if (body) {
-      options.headers["Content-Type"] = "application/json";
       options.body = JSON.stringify(body);
     }
     const response = await fetch(`${API_BASE}${path}`, options);
@@ -2275,12 +2284,15 @@ function logout() {
   fetch(`${API_BASE}/agent/logout`, {
     method: "POST",
     credentials: "include",
-    headers: { "X-Wrennon-Client": "agent-dashboard" },
+    headers: getAuthHeaders(),
   }).catch(() => {});
 
+  _agentToken = null;
+  localStorage.removeItem("agent_token");
   localStorage.removeItem("agent_username");
   localStorage.removeItem("agent_role");
   localStorage.removeItem("agent_dp_url");
+  localStorage.removeItem("agent_full_name");
   
   const antiFlash = document.getElementById('anti-flash-style');
   if(antiFlash) antiFlash.remove();
@@ -3064,7 +3076,7 @@ const savedViews = [];
 async function loadSavedViews() {
     try {
         const res = await fetch(`${API_BASE}/agent/saved-views`, {
-            headers: { 'X-Wrennon-Client': 'agent-dashboard' },
+            headers: getAuthHeaders(),
             credentials: 'include'
         });
         if (res.ok) {
@@ -3114,7 +3126,7 @@ function renderSavedViews() {
            try {
                await fetch(`${API_BASE}/agent/saved-views/${view.id}`, {
                    method: 'DELETE',
-                   headers: { 'X-Wrennon-Client': 'agent-dashboard' },
+                   headers: getAuthHeaders(),
                    credentials: 'include'
                });
                loadSavedViews();
@@ -3139,10 +3151,7 @@ document.getElementById("save-view-btn")?.addEventListener("click", async () => 
     try {
         await fetch(`${API_BASE}/agent/saved-views`, {
             method: 'POST',
-            headers: { 
-                'X-Wrennon-Client': 'agent-dashboard',
-                'Content-Type': 'application/json'
-            },
+            headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ name: name, filter_json: filterJson }),
             credentials: 'include'
         });
@@ -3379,7 +3388,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.loadDashboard = async function() {
       try {
           const res = await fetch(`${API_BASE}/agent/dashboard-summary`, {
-              headers: { 'X-Wrennon-Client': 'agent-dashboard' },
+              headers: getAuthHeaders(),
               credentials: 'include'
           });
           if (res.ok) {
@@ -3464,7 +3473,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const rangeSelect = document.getElementById('analytics-date-range');
           const rangeVal = rangeSelect ? rangeSelect.value : 'all';
           const res = await fetch(`${API_BASE}/analytics/dashboard-metrics?range=${rangeVal}`, {
-              headers: { 'X-Wrennon-Client': 'agent-dashboard' },
+              headers: getAuthHeaders(),
               credentials: 'include'
           });
           if (res.ok) {
@@ -3541,7 +3550,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.fetchSystemAnalytics = async function() {
       try {
           const res = await fetch(`${API_BASE}/analytics/stats`, {
-              headers: { 'X-Wrennon-Client': 'agent-dashboard' },
+              headers: getAuthHeaders(),
               credentials: 'include'
           });
           if (!res.ok) return;
@@ -3564,7 +3573,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.fetchScorecards = async function() {
       try {
           const res = await fetch(`${API_BASE}/agent/my-scorecards`, {
-              headers: { 'X-Wrennon-Client': 'agent-dashboard' },
+              headers: getAuthHeaders(),
               credentials: 'include'
           });
           if (res.ok) {
@@ -3773,7 +3782,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.loadCustomers = async function() {
         try {
             const res = await fetch(`${API_BASE}/agent/customers`, {
-                headers: { 'X-Wrennon-Client': 'agent-dashboard' },
+                headers: getAuthHeaders(),
                 credentials: 'include'
             });
             if (res.ok) {
@@ -3992,7 +4001,7 @@ document.addEventListener('DOMContentLoaded', () => {
           try {
               const res = await fetch(`${API_BASE}/agent/conversations/${activeSessionId}/merge`, {
                   method: "POST",
-                  headers: { "Content-Type": "application/json", 'Authorization': getAuthToken() },
+                  headers: getAuthHeaders({ "Content-Type": "application/json" }),
                   body: JSON.stringify({ target_session_id: resolvedTargetId })
               });
               if (!res.ok) {
@@ -4055,7 +4064,8 @@ document.addEventListener('DOMContentLoaded', () => {
             apiKeysList.innerHTML = '<div style="padding: 12px; text-align: center; color: var(--ink-soft); font-size: 0.9rem;">Loading API keys...</div>';
             
             const response = await fetch(`${API_BASE}/agent/api-keys`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                headers: getAuthHeaders(),
+                credentials: 'include'
             });
             
             if (!response.ok) {
@@ -4105,7 +4115,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     try {
                         const res = await fetch(`${API_BASE}/agent/api-keys/${id}`, {
                             method: 'DELETE',
-                            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                            headers: getAuthHeaders(),
+                            credentials: 'include'
                         });
                         
                         if (res.ok) {
@@ -4138,10 +4149,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const response = await fetch(`${API_BASE}/agent/api-keys`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
+                headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+                credentials: 'include',
                 body: JSON.stringify({ name })
             });
             

@@ -794,7 +794,18 @@
         // credentials:'include' to actually send it cross-origin, and
         // mutating (non-GET) requests need this header too, since the
         // backend requires it as CSRF protection for cookie-only auth.
-        const authHeaders = { "X-Wrennon-Client": "agent-dashboard" };
+        function getAuthHeaders(extra = {}) {
+            const token = localStorage.getItem("agent_token");
+            const headers = {
+                "X-Wrennon-Client": "agent-dashboard",
+                ...extra
+            };
+            if (token) {
+                headers["Authorization"] = `Bearer ${token}`;
+            }
+            return headers;
+        }
+        const authHeaders = getAuthHeaders();
         // Toggle password logic
         const togglePwdBtn = document.getElementById("toggle-pwd");
         const pwdInput = document.getElementById("agent-password");
@@ -1536,10 +1547,13 @@
             fetch(`${API_BASE}/agent/logout`, {
                 method: "POST",
                 credentials: "include",
-                headers: { "X-Wrennon-Client": "agent-dashboard" },
+                headers: authHeaders,
             }).catch(() => {}).finally(() => {
+                localStorage.removeItem("agent_token");
                 localStorage.removeItem("agent_username");
                 localStorage.removeItem("agent_role");
+                localStorage.removeItem("agent_dp_url");
+                localStorage.removeItem("agent_full_name");
                 window.location.href = "index.html";
             });
         }

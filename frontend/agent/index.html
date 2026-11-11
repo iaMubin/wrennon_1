@@ -34,7 +34,7 @@
       }
     });
   })();
-  if (localStorage.getItem("agent_username")) {
+  if (localStorage.getItem("agent_token") && localStorage.getItem("agent_username")) {
     document.write('<style id="anti-flash-style">#login-screen { display: none !important; }</style>');
   }
 </script>
