@@ -313,15 +313,36 @@
 }
 
 [data-theme$="-professional"] .chat-input-center-pill {
-  border-radius: 10px !important;
-  border: 1.5px solid var(--line) !important;
-  background: var(--bg-surface) !important;
-  transition: all 0.15s ease !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
-[data-theme$="-professional"] .chat-input-center-pill:focus-within {
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px var(--accent-glow) !important;
+[data-theme$="-professional"] .chat-footer-wrapper {
+  margin: 0 !important;
+  background: var(--bg-base) !important;
+  border: none !important;
+  border-top: 1px solid color-mix(in srgb, var(--line) 35%, transparent) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 10px 16px 14px 16px !important;
+}
+
+[data-theme="dark-professional"] .chat-footer-wrapper {
+  border-top: 1px solid color-mix(in srgb, var(--ink) 7%, var(--bg-base)) !important;
+}
+
+[data-theme$="-professional"] .chat-composer-card,
+[data-theme$="-professional"] #agent-input-row {
+  border: none !important;
+}
+
+[data-theme$="-professional"] .surface-composer {
+  border-radius: 20px !important;
+}
+
+[data-theme$="-professional"] .surface-composer-card {
+  border-radius: 19px !important;
 }
 
 /* ── Customer Details Sidebar ── */

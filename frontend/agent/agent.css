@@ -2521,14 +2521,9 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
 }
 
 #agent-message-input {
-  min-height: 28px;
-  border-radius: 10px;
-  background: var(--bg-elevated);
-}
-
-#agent-message-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-glow);
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .icon-action-btn {
@@ -2824,68 +2819,7 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   color: var(--accent);
 }
 
-/* WhatsApp-style Horizontal Chat Input */
-.chat-input-wrapper-horizontal {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 12px 0px;
-  background: var(--bg-elevated);
-  border-top: 1px solid var(--border-light);
-  width: 100%;
-}
 
-.chat-input-actions-left {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
-  padding-left: 16px;
-}
-
-.chat-input-actions-right {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
-  padding-right: 16px;
-}
-
-.chat-input-center-pill {
-  flex: 1;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.chat-input-center-pill:focus-within {
-  border-color: transparent;
-  box-shadow: none;
-}
-.chat-input-wrapper-horizontal.internal-mode .chat-input-center-pill {
-  background: color-mix(in srgb, var(--accent) 5%, var(--bg-surface));
-  border-color: var(--accent);
-}
-
-.chat-input-textarea-horizontal {
-  width: 100%;
-  border: none;
-  background: transparent;
-  padding: 10px 16px;
-  min-height: 40px;
-  max-height: 150px;
-  resize: none;
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--ink);
-  outline: none;
-}
-.chat-input-textarea-horizontal::placeholder {
-  color: var(--text-muted);
-}
 
 /* Split Button */
 .btn {
@@ -3027,8 +2961,9 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.28) !important;
 }
 
-/* 2. Modern Circular Send Button (ChatGPT / Antigravity Style) */
+/* 2. Modern Circular Send Button (Google Antigravity Forward Arrow Button) */
 #agent-send-btn,
+.agy-send-button,
 .modern-send-btn,
 .send-action-btn {
   width: 28px !important;
@@ -3037,7 +2972,7 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   min-height: 28px !important;
   padding: 0 !important;
   margin: 0 !important;
-  border-radius: 50% !important;
+  border-radius: 9999px !important;
   border: none !important;
   outline: none !important;
   cursor: pointer;
@@ -3046,26 +2981,30 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   justify-content: center !important;
   background: var(--accent, #4f46e5) !important;
   color: #ffffff !important;
-  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.32), 0 1px 2px rgba(0, 0, 0, 0.08) !important;
-  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.16s ease, filter 0.16s ease, background 0.18s ease !important;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.32), inset 0 -1.5px 0 rgb(0 0 0 / 0.125), 0 1px 2px rgb(10 10 12 / 0.12), 0 4px 10px -2px rgb(10 10 12 / 0.11) !important;
+  transition: box-shadow 150ms cubic-bezier(0.22, 1, 0.36, 1), background-color 150ms ease, opacity 150ms ease, transform 150ms ease !important;
   position: relative;
   flex-shrink: 0;
 }
 
+[data-theme^="dark"] #agent-send-btn,
+[data-theme^="dark"] .agy-send-button {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28), inset 0 -1.5px 0 rgb(0 0 0 / 0.11), 0 1px 2px rgb(0 0 0 / 0.175), 0 4px 12px -4px rgb(0 0 0 / 0.225) !important;
+}
+
 #agent-send-btn:hover,
+.agy-send-button:hover,
 .modern-send-btn:hover,
 .send-action-btn:hover {
-  transform: scale(1.08) translateY(-1px) !important;
-  filter: brightness(1.1) !important;
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.45) !important;
+  opacity: 0.92 !important;
+  transform: translateY(-0.5px) !important;
 }
 
 #agent-send-btn:active,
+.agy-send-button:active,
 .modern-send-btn:active,
 .send-action-btn:active {
-  transform: scale(0.94) translateY(0) !important;
-  filter: brightness(0.96) !important;
-  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3) !important;
+  transform: translateY(0) scale(0.96) !important;
 }
 
 .modern-send-icon,
@@ -3074,13 +3013,7 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   height: 14px;
   stroke: currentColor;
   stroke-width: 2.5;
-  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1);
   display: block;
-}
-
-#agent-send-btn:hover .modern-send-icon,
-#agent-send-btn:hover .send-action-icon {
-  transform: translateY(-1px);
 }
 
 /* Send Button in Internal Mode */
@@ -3348,72 +3281,387 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   color: var(--accent);
 }
 
-/* WhatsApp-style Horizontal Chat Input */
+/* ═════════════════════════════════════════════════════════════════
+   EXPERT REDESIGN: ENTERPRISE CHAT COMPOSER BOTTOM SECTION
+   (Antigravity / Linear / Intercom Aesthetic)
+   ═════════════════════════════════════════════════════════════════ */
+
+/* ═════════════════════════════════════════════════════════════════
+   GOOGLE ANTIGRAVITY COMPOSER INPUT SECTION
+   (Exact Pixel-Perfect Antigravity Framework & Layout)
+   ═════════════════════════════════════════════════════════════════ */
+
+/* Outer Footer Wrapper: Theme-reactive whisper border matching Antigravity */
 .chat-footer-wrapper {
-  background: color-mix(in srgb, var(--bg-elevated) 95%, var(--accent)) !important;
-  border: 1px solid color-mix(in srgb, var(--line) 80%, var(--accent)) !important;
-  border-radius: var(--radius-md);
-  margin: 6px var(--chat-widget-margin) 0 var(--chat-widget-margin);
-  box-shadow: var(--shadow-lg) !important;
-  display: flex;
-  flex-direction: column;
+  margin: 0 !important;
+  background: var(--bg-base) !important;
+  border: none !important;
+  /* Light themes: whisper border */
+  border-top: 1px solid color-mix(in srgb, var(--line) 30%, transparent) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: visible !important;
+  position: relative !important;
+  padding: 10px 16px 14px 16px !important;
+  box-sizing: border-box !important;
+  transition: background 0.2s ease, border-color 0.2s ease !important;
 }
 
-.chat-input-wrapper-horizontal {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
-  background: transparent;
-  width: 100%;
+/* ALL DARK THEMES: Exact Matte Black / Antigravity whisper top border & styling
+   Matches dark-matte, dark-navy, dark-charcoal, dark-corporate-blue, dark-pure-black, dark-professional, and any [data-theme^="dark"] */
+[data-theme^="dark"] .chat-footer-wrapper {
+  background: var(--bg-base) !important;
+  /* Lighter shade on dark background: precisely 7% ink blended into the theme's background */
+  border-top: 1px solid color-mix(in srgb, var(--ink) 7%, var(--bg-base)) !important;
+  box-shadow: none !important;
 }
 
-.chat-input-actions-left,
-.chat-input-actions-right {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  margin-bottom: 0;
+/* Light themes: ultra-soft tone-matched border */
+[data-theme^="light"] .chat-footer-wrapper {
+  background: var(--bg-base) !important;
+  border-top: 1px solid color-mix(in srgb, var(--line) 35%, transparent) !important;
+  box-shadow: none !important;
 }
 
+/* Internal Note Active State Top Border */
+.chat-footer-wrapper.internal-mode {
+  border-top: 1px solid color-mix(in srgb, #f59e0b 22%, transparent) !important;
+}
+
+/* 1. Antigravity Outer Frame (.surface-composer) */
+.surface-composer {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  margin: 0 auto !important;
+  padding: 1px !important;
+  border-radius: 20px !important; /* var(--nux-composer-frame-radius) */
+  background-color: var(--color-card-border, #E2E8F0) !important;
+  box-shadow: 0 1px 2px rgb(10 10 12 / 0.015), 0 0 0 4px var(--onyx-frame, #F9F9F9), 0 0 0 5px rgb(10 10 12 / 0.065), 0 12px 28px -10px rgb(10 10 12 / 0.08) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-sizing: border-box !important;
+}
+
+/* ALL Dark Themes Outer Frame: Exact Matte Black elevation */
+[data-theme^="dark"] .surface-composer {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.275), 0 0 0 4px var(--onyx-frame, #0D0D11), 0 0 0 5px rgb(255 255 255 / 0.065), 0 18px 40px -12px rgb(0 0 0 / 0.45) !important;
+}
+
+/* Internal Note Active State on Outer Frame */
+.chat-footer-wrapper.internal-mode .surface-composer {
+  background-color: rgba(245, 158, 11, 0.5) !important;
+  box-shadow: 0 1px 2px rgb(10 10 12 / 0.015), 0 0 0 4px color-mix(in srgb, #f59e0b 6%, #F9F9F9), 0 0 0 5px rgba(245, 158, 11, 0.25), 0 12px 28px -10px rgba(245, 158, 11, 0.15) !important;
+}
+
+/* 2. Antigravity Inner Raised Card (.surface-composer-card) */
+.surface-composer-card,
+.chat-composer-card,
+#agent-input-row {
+  position: relative !important;
+  z-index: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  width: 100% !important;
+  border-radius: 19px !important; /* calc(20px - 1px) */
+  background-color: var(--onyx-raised, var(--bg-surface, #FFFFFF)) !important;
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgb(10 10 12 / 0.06) !important;
+  padding: 8px 10px 8px 12px !important;
+  box-sizing: border-box !important;
+  border: none !important;
+  margin: 0 !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.surface-composer:focus-within > .surface-composer-card,
+.surface-composer-card:focus-within {
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px color-mix(in srgb, var(--accent) 75%, transparent), 0 4px 14px -2px rgba(var(--accent-rgb, 79, 70, 229), 0.15), 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* ALL Dark Themes Inner Card: Exact Matte Black raised card surface */
+[data-theme^="dark"] .surface-composer-card,
+[data-theme^="dark"] .chat-composer-card,
+[data-theme^="dark"] #agent-input-row {
+  background-color: var(--onyx-raised, #15151A) !important;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 0 0 1px rgb(255 255 255 / 0.065) !important;
+}
+
+[data-theme^="dark"] .surface-composer:focus-within > .surface-composer-card,
+[data-theme^="dark"] .chat-composer-card:focus-within,
+[data-theme^="dark"] #agent-input-row:focus-within {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.11), 0 0 0 1px color-mix(in srgb, var(--accent) 70%, #ffffff), 0 6px 18px -3px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Internal Note Active State on Inner Card */
+.chat-footer-wrapper.internal-mode .surface-composer-card {
+  background-color: color-mix(in srgb, #f59e0b 2.5%, var(--bg-surface, #ffffff)) !important;
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(245, 158, 11, 0.3) !important;
+}
+
+.chat-footer-wrapper.internal-mode .surface-composer:focus-within > .surface-composer-card {
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1.5px #f59e0b, 0 4px 16px -2px rgba(245, 158, 11, 0.22) !important;
+}
+
+/* 3. Text Area Row (Top portion of card) */
+.chat-composer-text-area,
 .chat-input-center-pill {
-  flex: 1;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-light);
-  border-radius: 20px;
-  position: relative;
-  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
-  display: flex;
-  align-items: center;
-  min-height: 32px;
-}
-.chat-input-center-pill:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-glow);
-}
-.chat-input-wrapper-horizontal.internal-mode .chat-input-center-pill {
-  background: color-mix(in srgb, var(--accent) 5%, var(--bg-surface));
-  border-color: var(--accent);
+  width: 100% !important;
+  min-width: 0 !important;
+  position: relative !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: block !important;
 }
 
 .chat-input-textarea-horizontal {
-  width: 100%;
-  border: none;
-  background: transparent;
-  padding: 5px 12px;
-  min-height: 28px;
-  height: 28px;
-  max-height: 120px;
-  resize: none;
-  font-family: inherit;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--ink);
-  outline: none;
-  box-sizing: border-box;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  padding: 4px 2px 8px 2px !important;
+  min-height: 24px !important;
+  height: 24px !important;
+  max-height: 140px !important;
+  font-family: inherit !important;
+  font-size: 13.5px !important;
+  line-height: 20px !important;
+  color: var(--ink) !important;
+  resize: none !important;
+  display: block !important;
 }
+
 .chat-input-textarea-horizontal::placeholder {
-  color: var(--text-muted);
+  color: var(--ink-soft, #94a3b8) !important;
+  font-weight: 400 !important;
+  opacity: 0.75 !important;
+}
+
+/* 4. Antigravity Bottom Action Toolbar (.agy-composer-footer) */
+.agy-composer-footer,
+.chat-composer-row,
+.chat-composer-inner,
+.chat-input-wrapper-horizontal {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  padding: 4px 0 0 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+}
+
+/* Left Tools Container */
+.composer-tools-left,
+.chat-input-actions-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  flex-shrink: 0 !important;
+  height: 28px !important;
+}
+
+/* Right Tools Container */
+.composer-tools-right,
+.chat-input-actions-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  flex-shrink: 0 !important;
+  height: 28px !important;
+  margin-left: auto !important;
+}
+
+/* Antigravity Tool Buttons (Compact 26px pill buttons) */
+.composer-icon-btn,
+.composer-tool-btn,
+.icon-action-btn {
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+  min-height: 26px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 9999px !important; /* var(--nux-radius-pill) */
+  border: none !important;
+  background: transparent !important;
+  color: var(--ink-soft, #64748b) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  outline: none !important;
+  flex-shrink: 0 !important;
+  transition: all 0.15s ease !important;
+}
+
+.composer-icon-btn:hover,
+.composer-tool-btn:hover,
+.icon-action-btn:hover {
+  background: color-mix(in srgb, var(--ink) 8%, transparent) !important;
+  color: var(--ink, #0f172a) !important;
+}
+
+.composer-icon-btn:active,
+.composer-tool-btn:active,
+.icon-action-btn:active {
+  background: color-mix(in srgb, var(--ink) 12%, transparent) !important;
+  transform: scale(0.95) !important;
+}
+
+/* AI Copilot Sparkles Button */
+.composer-icon-btn--ai,
+.composer-tool-btn--ai {
+  color: var(--accent, #4f46e5) !important;
+}
+
+.composer-icon-btn--ai:hover,
+.composer-tool-btn--ai:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent) !important;
+  color: var(--accent, #4f46e5) !important;
+}
+
+/* 4. Internal Note Header Banner (Luminous amber ribbon) */
+.internal-note-banner {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 6px 14px !important;
+  background: rgba(245, 158, 11, 0.09) !important;
+  border-bottom: 1px solid rgba(245, 158, 11, 0.15) !important;
+  border-radius: 6px 6px 0 0 !important;
+  margin-bottom: 6px !important;
+  color: #b45309 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.01em !important;
+  transition: all 0.2s ease !important;
+}
+
+.internal-note-banner.hidden {
+  display: none !important;
+}
+
+[data-theme^="dark"] .internal-note-banner {
+  background: rgba(245, 158, 11, 0.14) !important;
+  color: #fbbf24 !important;
+  border-bottom-color: rgba(245, 158, 11, 0.25) !important;
+}
+
+.internal-note-banner__content {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+}
+
+.internal-note-banner__switch {
+  background: transparent !important;
+  border: none !important;
+  color: inherit !important;
+  font-family: inherit !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  opacity: 0.85 !important;
+  transition: opacity 0.15s ease !important;
+}
+
+.internal-note-banner__switch:hover {
+  opacity: 1 !important;
+}
+
+/* 5. Reply Preview Ribbon (Smooth Quote Header) */
+.reply-preview-container {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  padding: 6px 12px !important;
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface, #ffffff)) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, transparent) !important;
+  border-radius: 6px 6px 0 0 !important;
+  margin-bottom: 6px !important;
+  transition: all 0.2s ease !important;
+}
+
+.reply-preview-container.hidden {
+  display: none !important;
+}
+
+.reply-preview-main {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+  flex: 1 !important;
+}
+
+.reply-preview-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: var(--accent) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  margin-bottom: 2px !important;
+}
+
+.reply-preview-text {
+  font-size: 12px !important;
+  color: var(--ink) !important;
+  line-height: 1.35 !important;
+  opacity: 0.85 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.reply-preview-close {
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  color: var(--ink-soft, #94a3b8) !important;
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  flex-shrink: 0 !important;
+  transition: all 0.15s ease !important;
+}
+
+.reply-preview-close:hover {
+  background: color-mix(in srgb, var(--ink) 8%, transparent) !important;
+  color: var(--ink) !important;
+}
+
+@media (max-width: 600px) {
+  .chat-footer-wrapper {
+    margin: 0 !important;
+    padding: 6px 10px 10px 10px !important;
+  }
 }
 
 .pinned-message-content {

@@ -313,8 +313,8 @@ if (logoutBtn) {
 let typingTimeout;
 let isTyping = false;
 agentInput.addEventListener("input", (e) => {
-  agentInput.style.height = '28px';
-  const newHeight = Math.min(agentInput.scrollHeight, 120);
+  agentInput.style.height = '26px';
+  const newHeight = Math.min(Math.max(agentInput.scrollHeight, 26), 120);
   agentInput.style.height = newHeight + 'px';
   agentInput.style.overflowY = agentInput.scrollHeight > 120 ? 'auto' : 'hidden';
 
@@ -1739,23 +1739,37 @@ if (sendToggleBtn && sendTypeMenu) {
 }
 
 if (noteTypeSelect && chatInputWrapper) {
+  const chatFooterWrapper = document.getElementById("chat-footer-wrapper");
+  const internalNoteBanner = document.getElementById("internal-note-banner");
+  const switchToReplyBtn = document.getElementById("switch-to-reply-btn");
+
+  if (switchToReplyBtn) {
+    switchToReplyBtn.addEventListener("click", () => {
+      noteTypeSelect.value = "public";
+      noteTypeSelect.dispatchEvent(new Event("change"));
+    });
+  }
+
   function updatePlaceholder() {
     const sendBtn = document.getElementById("agent-send-btn");
     const modeBadge = document.getElementById("send-mode-badge");
 
     if (noteTypeSelect.value === "internal") {
       chatInputWrapper.classList.add("internal-mode");
-      // Use the actual width of the input to determine if we should show the full message
+      chatFooterWrapper?.classList.add("internal-mode");
+      internalNoteBanner?.classList.remove("hidden");
       agentInput.placeholder = agentInput.clientWidth > 380 
-        ? "Type internal note... (Use @ to tag, / for cmds)" 
-        : "Type internal note...";
+        ? "Add an internal note... (Use @ to tag, / for macros)" 
+        : "Add internal note...";
       if (modeBadge) modeBadge.textContent = "Note";
-      if (sendBtn) sendBtn.title = "Add internal note";
+      if (sendBtn) sendBtn.title = "Add internal note (Enter)";
     } else {
       chatInputWrapper.classList.remove("internal-mode");
-      agentInput.placeholder = "Type a message...";
+      chatFooterWrapper?.classList.remove("internal-mode");
+      internalNoteBanner?.classList.add("hidden");
+      agentInput.placeholder = "Type a message... (Enter to send, Shift+Enter for newline)";
       if (modeBadge) modeBadge.textContent = "Reply";
-      if (sendBtn) sendBtn.title = "Send public reply";
+      if (sendBtn) sendBtn.title = "Send public reply (Enter)";
     }
   }
 
@@ -1901,7 +1915,7 @@ function sendAgentReply() {
   
   agentInput.value = "";
   drafts[activeSessionId] = ""; 
-  agentInput.style.height = "28px";
+  agentInput.style.height = "26px";
   agentInput.style.overflowY = "hidden";
   document.getElementById("slash-command-popup")?.classList.remove("active");
 }
