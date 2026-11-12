@@ -52,6 +52,7 @@ def live_server():
     port = _find_free_port()
     env = os.environ.copy()
     env["DATABASE_URL"] = "sqlite:///./real_server_test.db"
+    env["TEST_DATABASE_URL"] = "sqlite:///./real_server_test.db"
 
     # Clean up stale DBs from previous failed runs before starting
     for f in ("real_server_test.db", "real_server_test.db-shm", "real_server_test.db-wal"):

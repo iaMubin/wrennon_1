@@ -718,7 +718,8 @@ def resolve_conversation(
         raise HTTPException(status_code=404, detail="Conversation not found")
     _do_resolve_conversation(conversation, agent.username, db, background_tasks)
     db.commit()
-    return {"status": "resolved", "session_id": session_id}
+    resolved_at_iso = conversation.resolved_at.isoformat() if conversation.resolved_at else datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat()
+    return {"status": "resolved", "session_id": session_id, "resolved_at": resolved_at_iso}
 
 
 VALID_PRIORITIES = {"low", "normal", "high", "urgent"}
@@ -1235,6 +1236,7 @@ def _conversation_summary(c: Conversation, sla_policy: dict = None) -> dict:
         "customer_name": customer_name,
         "handoff_active": c.handoff_active,
         "resolved": c.resolved,
+        "resolved_at": c.resolved_at.isoformat() if getattr(c, "resolved_at", None) else None,
         "reopen_count": getattr(c, "reopen_count", 0),
         "stage": stage,
         "handled_by": getattr(c, "handled_by", None),

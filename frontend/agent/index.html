@@ -7,17 +7,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css?v=91">
-<link rel="stylesheet" href="agent.css?v=92">
+<link rel="stylesheet" href="theme.css?v=96">
+<link rel="stylesheet" href="agent.css?v=109">
 <link rel="stylesheet" href="ui-polish.css?v=1">
-<link rel="stylesheet" href="professional-override.css?v=1">
+<link rel="stylesheet" href="professional-override.css?v=15">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   (function() {
     function applyTheme(theme) {
       if (theme === 'system') {
         var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        document.documentElement.setAttribute('data-theme', isDark ? 'dark-matte' : 'light-offwhite');
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark-professional' : 'light-professional');
       } else {
         document.documentElement.setAttribute('data-theme', theme);
       }
@@ -49,12 +49,14 @@
     backdrop-filter: none !important;
     box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
   }
-  .theme-dropdown-menu button, .theme-dropdown-menu div, .theme-option {
+  .theme-dropdown-menu > div:not(#menu-time-format-view) button,
+  .theme-dropdown-menu > div:not(#menu-time-format-view) div,
+  .theme-option:not(.time-format-option) {
     background-color: var(--bg-surface, #ffffff) !important;
     color: var(--ink, #000000) !important;
     opacity: 1 !important;
   }
-  .theme-option:hover {
+  .theme-option:not(.time-format-option):hover {
     background-color: var(--bg-hover, #f0f0f0) !important;
   }
 </style>
@@ -186,12 +188,23 @@
             </svg>
           </button>
           
-          <div id="theme-dropdown" class="theme-dropdown-menu hidden" role="menu" style="left: 100%; top: auto; bottom: 0; margin-left: 8px; right: auto; transform: none; width: 220px;">
+          <div id="theme-dropdown" class="theme-dropdown-menu hidden" role="menu" style="left: 100%; top: auto; bottom: 0; margin-left: 8px; right: auto; transform: none; width: 236px;">
               <!-- Main Menu View -->
               <div id="menu-main-view">
                 <button id="btn-show-appearance" class="theme-option" style="display:flex; justify-content:space-between; align-items:center;" role="menuitem">
                   <span>Appearance</span>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+                <div style="height: 1px; background: var(--line); margin: 4px 0;"></div>
+                <button id="btn-show-time-format" class="theme-option" style="display:flex; justify-content:space-between; align-items:center;" role="menuitem">
+                  <span class="settings-menu-item-left">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <span>Time Format</span>
+                  </span>
+                  <span class="settings-menu-item-right">
+                    <span id="current-time-format-pill" class="settings-format-pill">12-hour</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.6;"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                  </span>
                 </button>
                 <div style="height: 1px; background: var(--line); margin: 4px 0;"></div>
                 <button id="menu-bulk-select-btn" class="theme-option" style="display:flex; justify-content:space-between; align-items:center;" role="menuitem">
@@ -241,8 +254,52 @@
                   <button class="theme-option" data-theme-value="dark-pure-black" role="menuitem">Pure Black</button>
                 </div>
                 <div id="agent-widget-themes" class="theme-tab-content hidden">
-                  <button class="theme-option" data-theme-value="widget-default" role="menuitem">Default Style</button>
+                  <button class="theme-option" data-theme-value="widget-default" role="menuitem">Default (System Auto)</button>
+                  <button class="theme-option" data-theme-value="widget-dark" role="menuitem">Dark Style</button>
                   <button class="theme-option" data-theme-value="widget-crisp" role="menuitem">Crisp Style</button>
+                </div>
+              </div>
+
+              <!-- Time Format Submenu View -->
+              <div id="menu-time-format-view" class="hidden">
+                <div class="settings-submenu-header">
+                  <button id="btn-back-time-format" class="settings-back-btn" type="button" aria-label="Back to main settings">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    <span>Back</span>
+                  </button>
+                  <span class="settings-submenu-title">Time Format</span>
+                </div>
+                <div class="settings-section-divider"></div>
+
+                <div class="time-format-card-group">
+                  <!-- 12-Hour Option -->
+                  <div class="time-format-card time-format-option" data-time-format="12h" role="button" tabindex="0">
+                    <div class="time-format-radio-circle" aria-hidden="true">
+                      <div class="time-format-radio-dot"></div>
+                    </div>
+                    <div class="time-format-card__info">
+                      <span class="time-format-card__title">12-Hour Clock</span>
+                      <span class="time-format-card__sample">09:30 AM · 02:45 PM</span>
+                    </div>
+                    <span class="time-format-card__badge">12h</span>
+                  </div>
+
+                  <!-- 24-Hour Option -->
+                  <div class="time-format-card time-format-option" data-time-format="24h" role="button" tabindex="0">
+                    <div class="time-format-radio-circle" aria-hidden="true">
+                      <div class="time-format-radio-dot"></div>
+                    </div>
+                    <div class="time-format-card__info">
+                      <span class="time-format-card__title">24-Hour Clock</span>
+                      <span class="time-format-card__sample">09:30 · 14:45</span>
+                    </div>
+                    <span class="time-format-card__badge">24h</span>
+                  </div>
+                </div>
+
+                <div class="time-format-hint">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:1.5px; opacity:0.8;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                  <span>Applies to chat messages, sidebar lists, and resolved timestamps.</span>
                 </div>
               </div>
           </div>
@@ -372,15 +429,15 @@
 
       <div id="active-conversation" class="hidden">
         <header id="conversation-header">
-          <div class="conv-header-info" style="display:flex; flex-direction:column; justify-content:center; gap: 6px;">
-            <div style="display:flex; align-items:center; gap: 8px;">
-              <h2 id="conversation-email" style="margin:0;">Unknown Customer</h2>
-              <span id="ticket-id-badge" style="background: var(--bg-hover); color: var(--text-muted); padding: 2px 8px; border-radius: 4px; font-size: 12px; font-family: monospace; border: 1px solid var(--border-light);"></span>
+          <div class="conv-header-info">
+            <div class="conv-header-title-row">
+              <h2 id="conversation-email">Unknown Customer</h2>
+              <span id="ticket-id-badge"></span>
               <span id="collision-badge" class="collision-badge hidden"></span>
             </div>
-            <div style="display:flex; align-items:center; gap: 12px; flex-wrap:wrap;">
+            <div class="conv-header-meta-row">
               <span id="conversation-session" class="short-id">CUST-XXXX</span>
-              <div id="ticket-properties-bar" class="ticket-properties-bar" style="border: none; padding: 0; background: transparent; min-height: auto;">
+              <div id="ticket-properties-bar" class="ticket-properties-bar">
               <div class="tp-item tp-item--priority">
                 <button id="priority-badge" class="priority-badge priority-badge--normal" type="button" aria-haspopup="true" aria-expanded="false">
                   <span class="priority-dot"></span>
@@ -421,12 +478,12 @@
             </div>
           </div>
           </div>
-          <div class="conv-header-actions" style="flex-direction: row; align-items: center; gap: 12px; position: relative;">
-            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; position:relative;">
+          <div class="conv-header-actions">
+            <div class="conv-header-resolve-wrap">
               <button id="resolve-btn">Mark resolved</button>
-              <span id="resolve-time" class="hidden" style="position: absolute; top: 100%; right: 0; white-space: nowrap; margin-top: 4px;"></span>
+              <span id="resolve-time" class="hidden"></span>
             </div>
-            <button id="customer-sidebar-toggle" class="icon-action-btn" aria-label="Customer Details" title="Customer Details" style="border: 1px solid var(--line); background: var(--bg-surface);">
+            <button id="customer-sidebar-toggle" class="icon-action-btn" aria-label="Customer Details" title="Customer Details">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
             </button>
           </div>
@@ -487,7 +544,7 @@
                   <!-- Text Area Row -->
                   <div class="chat-input-center-pill chat-composer-text-area">
                     <div id="slash-command-popup" class="slash-popup"></div>
-                    <textarea id="agent-message-input" placeholder="Ask anything, @ to mention, / for actions" class="chat-input-textarea-horizontal" rows="1"></textarea>
+                    <textarea id="agent-message-input" placeholder="Type a message..." class="chat-input-textarea-horizontal" rows="1"></textarea>
                   </div>
 
                   <!-- Antigravity Composer Bottom Action Toolbar (.agy-composer-footer) -->
@@ -840,7 +897,7 @@
     </div>
   </div>
 
-  <script src="agent.js?v=81"></script>
+  <script src="agent.js?v=91"></script>
 </body>
 </html>
 

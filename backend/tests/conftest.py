@@ -17,6 +17,7 @@ from alembic import command
 
 # Set the database URL for all tests
 os.environ["DATABASE_URL"] = "sqlite:///./test.db"
+os.environ["TEST_DATABASE_URL"] = "sqlite:///./test.db"
 
 # Clean up old test db if it exists
 if os.path.exists("./test.db"):

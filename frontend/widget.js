@@ -27,15 +27,49 @@ function setPanelOpen(isOpen) {
   launcher.setAttribute("aria-expanded", String(isOpen));
 }
 
+function getWidgetThemePreference() {
+  return localStorage.getItem("wrennon_widget_theme") || "widget-default";
+}
+
+function getEffectiveThemeMode() {
+  const pref = getWidgetThemePreference();
+
+  if (pref === "widget-dark") return "dark";
+  if (pref === "widget-light") return "light";
+
+  // System preference by default ("widget-default" or unset)
+  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return prefersDark ? "dark" : "light";
+}
+
+function updateThemeMenuUI() {
+  const pref = getWidgetThemePreference();
+  let activeChoice = "system";
+  if (pref === "widget-light") activeChoice = "light";
+  else if (pref === "widget-dark") activeChoice = "dark";
+
+  document.querySelectorAll(".chat-menu-item[data-theme-choice]").forEach((btn) => {
+    const choice = btn.getAttribute("data-theme-choice");
+    if (choice === activeChoice) {
+      btn.classList.add("active");
+      btn.setAttribute("aria-checked", "true");
+    } else {
+      btn.classList.remove("active");
+      btn.setAttribute("aria-checked", "false");
+    }
+  });
+}
+
 function applyWidgetTheme() {
-  const theme = localStorage.getItem("wrennon_widget_theme") || "widget-default";
+  const widgetTheme = getWidgetThemePreference();
   const widget = document.getElementById("wrennon-widget");
   const defaultHeader = document.getElementById("panel-header");
   const crispHeader = document.getElementById("panel-header-crisp");
   
   if (!widget) return;
 
-  if (theme === "widget-crisp") {
+  // 1. Crisp vs Default layout
+  if (widgetTheme === "widget-crisp") {
     widget.classList.add("theme-crisp");
     if (defaultHeader) defaultHeader.style.display = "none";
     if (crispHeader) crispHeader.style.display = "flex";
@@ -44,8 +78,164 @@ function applyWidgetTheme() {
     if (defaultHeader) defaultHeader.style.display = "flex";
     if (crispHeader) crispHeader.style.display = "none";
   }
+
+  // 2. Light vs Dark Mode (Scoped strictly to widget — demo page is left untouched)
+  const mode = getEffectiveThemeMode();
+  if (mode === "dark") {
+    widget.classList.add("theme-dark");
+    widget.classList.remove("theme-light");
+    widget.setAttribute("data-theme", "dark");
+  } else {
+    widget.classList.remove("theme-dark");
+    widget.classList.add("theme-light");
+    widget.setAttribute("data-theme", "light");
+  }
+
+  updateThemeMenuUI();
 }
+
+function bindThemeMenuWrap(wrap) {
+  if (!wrap || wrap.dataset.menuBound === "true") return;
+  wrap.dataset.menuBound = "true";
+
+  const btn = wrap.querySelector(".widget-menu-btn");
+  const dropdown = wrap.querySelector(".chat-menu-dropdown");
+
+  if (!btn || !dropdown) return;
+
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const willOpen = dropdown.classList.contains("hidden");
+
+    // Close all other dropdowns
+    document.querySelectorAll(".chat-menu-dropdown").forEach((d) => d.classList.add("hidden"));
+    document.querySelectorAll(".widget-menu-btn").forEach((b) => b.setAttribute("aria-expanded", "false"));
+
+    if (willOpen) {
+      dropdown.classList.remove("hidden");
+      btn.setAttribute("aria-expanded", "true");
+    }
+  });
+
+  dropdown.querySelectorAll(".chat-menu-item").forEach((item) => {
+    item.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const choice = item.getAttribute("data-theme-choice");
+      if (choice === "system") {
+        localStorage.setItem("wrennon_widget_theme", "widget-default");
+      } else if (choice === "light") {
+        localStorage.setItem("wrennon_widget_theme", "widget-light");
+      } else if (choice === "dark") {
+        localStorage.setItem("wrennon_widget_theme", "widget-dark");
+      }
+      applyWidgetTheme();
+      dropdown.classList.add("hidden");
+      btn.setAttribute("aria-expanded", "false");
+    });
+  });
+}
+
+function initWidgetThemeMenu() {
+  const panel = document.getElementById("panel");
+  if (!panel) return;
+
+  // 1. Bind statically existing wraps
+  panel.querySelectorAll(".chat-menu-wrap").forEach((wrap) => {
+    bindThemeMenuWrap(wrap);
+  });
+
+  // 2. Ensure menu markup exists in any header that doesn't have it
+  const headers = panel.querySelectorAll("header");
+  headers.forEach((hdr) => {
+    if (hdr.querySelector(".chat-menu-wrap")) {
+      bindThemeMenuWrap(hdr.querySelector(".chat-menu-wrap"));
+      return;
+    }
+
+    const wrap = document.createElement("div");
+    wrap.className = "chat-menu-wrap";
+    wrap.innerHTML = `
+      <button type="button" class="chat-icon-btn widget-menu-btn" aria-label="Widget appearance & theme" aria-expanded="false" aria-haspopup="true" title="Theme options">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+          <circle cx="12" cy="5" r="1.75"/>
+          <circle cx="12" cy="12" r="1.75"/>
+          <circle cx="12" cy="19" r="1.75"/>
+        </svg>
+      </button>
+      <div class="chat-menu-dropdown hidden" role="menu" aria-label="Theme settings">
+        <div class="chat-menu-heading">Theme</div>
+        <button type="button" class="chat-menu-item" data-theme-choice="system" role="menuitemradio">
+          <span class="chat-menu-item__icon">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+          </span>
+          <span class="chat-menu-item__label">System Auto</span>
+          <span class="chat-menu-item__check">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+        </button>
+        <button type="button" class="chat-menu-item" data-theme-choice="light" role="menuitemradio">
+          <span class="chat-menu-item__icon">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"/>
+              <line x1="12" y1="1" x2="12" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1" y1="12" x2="3" y2="12"/>
+              <line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+          </span>
+          <span class="chat-menu-item__label">Light</span>
+          <span class="chat-menu-item__check">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+        </button>
+        <button type="button" class="chat-menu-item" data-theme-choice="dark" role="menuitemradio">
+          <span class="chat-menu-item__icon">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </span>
+          <span class="chat-menu-item__label">Dark</span>
+          <span class="chat-menu-item__check">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+        </button>
+      </div>
+    `;
+
+    const actionsEl = hdr.querySelector(".chat-head-actions");
+    const closeBtnEl = hdr.querySelector("#close-btn");
+    if (actionsEl) {
+      actionsEl.insertBefore(wrap, actionsEl.firstChild);
+    } else if (closeBtnEl && closeBtnEl.parentNode) {
+      closeBtnEl.parentNode.insertBefore(wrap, closeBtnEl);
+    }
+    bindThemeMenuWrap(wrap);
+  });
+
+  updateThemeMenuUI();
+}
+
 applyWidgetTheme();
+initWidgetThemeMenu();
+
+// Listen to system OS theme changes dynamically
+if (window.matchMedia) {
+  const colorSchemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  colorSchemeQuery.addEventListener("change", () => {
+    applyWidgetTheme();
+  });
+}
+
 window.addEventListener("storage", (e) => {
   if (e.key === "wrennon_widget_theme") {
     applyWidgetTheme();
@@ -167,13 +357,21 @@ closeBtn.addEventListener("click", (e) => {
 document.addEventListener("keydown", (e) => {
   const lightbox = document.getElementById("chat-lightbox-overlay");
   const lightboxOpen = lightbox && lightbox.style.display !== "none";
-  if (e.key === "Escape" && !lightboxOpen && !panel.classList.contains("hidden")) {
-    setPanelOpen(false);
-    launcher.focus();
+  if (e.key === "Escape") {
+    document.querySelectorAll(".chat-menu-dropdown:not(.hidden)").forEach((d) => d.classList.add("hidden"));
+    document.querySelectorAll(".widget-menu-btn").forEach((b) => b.setAttribute("aria-expanded", "false"));
+
+    if (!lightboxOpen && !panel.classList.contains("hidden")) {
+      setPanelOpen(false);
+      launcher.focus();
+    }
   }
 });
 
 document.addEventListener("click", (e) => {
+  document.querySelectorAll(".chat-menu-dropdown:not(.hidden)").forEach((d) => d.classList.add("hidden"));
+  document.querySelectorAll(".widget-menu-btn").forEach((b) => b.setAttribute("aria-expanded", "false"));
+
   if (!panel.classList.contains("hidden") && !panel.contains(e.target) && !launcher.contains(e.target)) {
     setPanelOpen(false);
   }
@@ -181,6 +379,10 @@ document.addEventListener("click", (e) => {
 
 panel.addEventListener("click", (e) => {
   e.stopPropagation();
+  if (!e.target.closest(".chat-menu-wrap")) {
+    document.querySelectorAll(".chat-menu-dropdown:not(.hidden)").forEach((d) => d.classList.add("hidden"));
+    document.querySelectorAll(".widget-menu-btn").forEach((b) => b.setAttribute("aria-expanded", "false"));
+  }
 });
 
 sendBtn.addEventListener("click", sendMessage);
@@ -311,7 +513,7 @@ if (voiceBtn) {
     } else {
       mediaRecorder.stop();
       isRecording = false;
-      voiceBtn.style.color = "#9CA3AF";
+      voiceBtn.style.color = "";
       voiceBtn.style.animation = "none";
     }
   });
@@ -334,9 +536,9 @@ function getLocalHistory() {
   }
 }
 
-function saveToHistory(role, text) {
+function saveToHistory(role, text, timestamp = Date.now(), name = null) {
   const history = getLocalHistory();
-  history.push({ role, text, timestamp: Date.now() });
+  history.push({ role, text, timestamp, name });
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
 }
 
@@ -385,7 +587,7 @@ async function loadHistory() {
       lastDateStr = dateStr;
     }
     
-    appendMessage(msg.role, msg.text, false, msg.timestamp); // false = don't re-save
+    appendMessage(msg.role, msg.text, false, msg.timestamp, msg.name); // false = don't re-save
   }
 }
 
@@ -673,6 +875,7 @@ function inlineMarkdown(text) {
         Array.from({length: 20}, (_, i) => `<span class="voice-player__bar" style="animation-delay:${i * 0.05}s; height:${Math.floor(Math.random() * 60) + 20}%"></span>`).join('') +
       `</div>` +
       `<span class="voice-player__time">0:00</span>` +
+      `<button class="voice-player__speed-btn" type="button" aria-label="Playback speed" onclick="cyclePlaybackRate(event, '${playerId}')" title="Playback speed" data-speed="1">1x</button>` +
       `<audio preload="metadata" src="${safeUrl}"></audio>` +
     `</div>`;
   });
@@ -759,6 +962,13 @@ function toggleVoicePlayer(playerId) {
   });
 
   if (audio.paused) {
+    const speedBtn = container.querySelector('.voice-player__speed-btn');
+    if (speedBtn) {
+      const desiredRate = parseFloat(speedBtn.getAttribute('data-speed')) || 1;
+      if (audio.playbackRate !== desiredRate) {
+        audio.playbackRate = desiredRate;
+      }
+    }
     audio.play().catch(err => {
       console.error("Audio playback error:", err);
       alert("Cannot play audio: " + err.message + "\nCheck if your browser supports playing this file.");
@@ -775,6 +985,28 @@ function toggleVoicePlayer(playerId) {
     pauseIcon.style.display = 'none';
     container.classList.remove('voice-player--playing');
   }
+}
+
+function cyclePlaybackRate(event, playerId) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  const container = document.getElementById(playerId);
+  if (!container) return;
+  const audio = container.querySelector('audio');
+  const btn = container.querySelector('.voice-player__speed-btn');
+  if (!audio || !btn) return;
+
+  const speeds = [1, 1.25, 1.5, 2];
+  const currentSpeed = parseFloat(btn.getAttribute('data-speed')) || audio.playbackRate || 1;
+  let nextIdx = speeds.findIndex(s => Math.abs(s - currentSpeed) < 0.05) + 1;
+  if (nextIdx >= speeds.length || nextIdx === -1) nextIdx = 0;
+
+  const newSpeed = speeds[nextIdx];
+  audio.playbackRate = newSpeed;
+  btn.textContent = `${newSpeed}x`;
+  btn.setAttribute('data-speed', newSpeed);
 }
 
 function formatTime(timestamp) {
@@ -866,6 +1098,13 @@ function showCsatPrompt() {
   });
 }
 
+function formatWidgetTime(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
 function appendMessage(role, text, save = true, timestamp = Date.now(), name = null) {
   const wasNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 100;
   const uiRole = role === "human" ? "user" : (role === "ai" ? "bot" : role);
@@ -883,11 +1122,6 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
       lastMsgName = name;
   }
   lastMsgTime = timestamp;
-  
-  const wrapper = document.createElement("div");
-  const isImageOnly = /^\s*!\[.*?\]\([^\)]+\)\s*$/.test((text || '').trim());
-  wrapper.className = `bubble bubble-${uiRole} bubble-enter${isImageOnly ? ' bubble-image-only' : ''}`;
-  wrapper.setAttribute("role", "listitem");
   
   let displayText = text || "";
   // Hide internal system annotations from the customer
@@ -909,7 +1143,53 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
     `;
   }
 
-  wrapper.innerHTML = replyHtml + renderMarkdown(displayText);
+  const trimmedDisplay = displayText.trim();
+  const isImageOnly = /^\s*!\[.*?\]\([^\)]+\)\s*$/.test(trimmedDisplay);
+  const isVoiceOnly = /^\s*\[Audio\]\([^\)]+\)\s*$/i.test(trimmedDisplay) ||
+                      (/\[Audio\]\([^\)]+\)/i.test(trimmedDisplay) && trimmedDisplay.replace(/\[Audio\]\([^\)]+\)/gi, '').trim() === '');
+
+  // Sender Name header for agent / bot (matching Agent UI)
+  let nameHtml = '';
+  if ((uiRole === "agent" || uiRole === "bot") && !isGrouped && !isImageOnly && !isVoiceOnly) {
+    const authorName = name || (uiRole === "agent" ? "Support Agent" : "AI Assistant");
+    const roleBadge = uiRole === "agent" ? "Agent" : "AI";
+    nameHtml = `<div class="msg-name"><span class="msg-author">${escapeHtml(authorName)}</span><span class="msg-role-badge">${roleBadge}</span></div>`;
+  }
+
+  // Time & delivery ticks (matching Agent UI)
+  let metaHtml = '';
+  if (uiRole !== "system") {
+    const timeStr = formatWidgetTime(timestamp);
+    const ticks = uiRole === "user" ? `<span class="msg-ticks" title="Delivered"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L7 17l-5-5"/><path d="M22 10l-7.5 7.5L13 16"/></svg></span>` : "";
+    if (timeStr) {
+      metaHtml = `<div class="msg-meta"><span class="msg-time">${timeStr}</span>${ticks}</div>`;
+    }
+  }
+
+  const wrapper = document.createElement("div");
+  wrapper.className = `bubble bubble-${uiRole} bubble-enter${isImageOnly ? ' bubble-image-only' : ''}${isVoiceOnly ? ' bubble-voice-only' : ''}`;
+  wrapper.setAttribute("role", "listitem");
+  wrapper.innerHTML = nameHtml + replyHtml + renderMarkdown(displayText) + metaHtml;
+
+  if (wrapper.querySelector('.voice-player')) {
+    const clone = wrapper.cloneNode(true);
+    clone.querySelectorAll('.voice-player, .msg-reply-bubble, .msg-meta, .msg-name').forEach(el => el.remove());
+    if (!clone.textContent.trim()) {
+      wrapper.classList.add('bubble-voice-only');
+      const nameEl = wrapper.querySelector('.msg-name');
+      if (nameEl) nameEl.remove();
+    }
+  }
+
+  if (wrapper.querySelector('.chat-lightbox-image')) {
+    const clone = wrapper.cloneNode(true);
+    clone.querySelectorAll('.chat-lightbox-image, .msg-reply-bubble, .msg-meta, .msg-name').forEach(el => el.remove());
+    if (!clone.textContent.trim()) {
+      wrapper.classList.add('bubble-image-only');
+      const nameEl = wrapper.querySelector('.msg-name');
+      if (nameEl) nameEl.remove();
+    }
+  }
   
   messagesEl.appendChild(wrapper);
   
@@ -920,7 +1200,7 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   }
   
   if (save && uiRole !== "system") {
-    saveToHistory(role, text);
+    saveToHistory(role, text, timestamp, name);
   }
 }
 

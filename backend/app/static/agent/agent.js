@@ -115,6 +115,10 @@ function setupThemeDropdown() {
   const menuAppearanceView = document.getElementById("menu-appearance-view");
   const btnShowAppearance = document.getElementById("btn-show-appearance");
   const btnBackAppearance = document.getElementById("btn-back-appearance");
+  const menuTimeFormatView = document.getElementById("menu-time-format-view");
+  const btnShowTimeFormat = document.getElementById("btn-show-time-format");
+  const btnBackTimeFormat = document.getElementById("btn-back-time-format");
+  const timeFormatOptions = document.querySelectorAll(".time-format-option");
 
   function applyTheme(themeValue) {
     if (themeValue.startsWith("widget-")) {
@@ -123,7 +127,7 @@ function setupThemeDropdown() {
       localStorage.setItem("wrennon_theme", themeValue);
       if (themeValue === "system") {
         const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        document.documentElement.setAttribute("data-theme", isDark ? "dark-matte" : "light-offwhite");
+        document.documentElement.setAttribute("data-theme", isDark ? "dark-professional" : "light-professional");
       } else {
         document.documentElement.setAttribute("data-theme", themeValue);
       }
@@ -151,9 +155,10 @@ function setupThemeDropdown() {
     menuBtn.setAttribute("aria-expanded", !isExpanded);
     dropdown.classList.toggle("hidden");
 
-    if (!dropdown.classList.contains("hidden") && menuMainView && menuAppearanceView) {
+    if (!dropdown.classList.contains("hidden") && menuMainView) {
       menuMainView.classList.remove("hidden");
-      menuAppearanceView.classList.add("hidden");
+      if (menuAppearanceView) menuAppearanceView.classList.add("hidden");
+      if (menuTimeFormatView) menuTimeFormatView.classList.add("hidden");
     }
 
     if (!isExpanded && options.length > 0) {
@@ -176,6 +181,39 @@ function setupThemeDropdown() {
       e.stopPropagation();
       menuAppearanceView.classList.add("hidden");
       menuMainView.classList.remove("hidden");
+    });
+  }
+
+  if (btnShowTimeFormat && menuMainView && menuTimeFormatView) {
+    btnShowTimeFormat.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      menuMainView.classList.add("hidden");
+      menuTimeFormatView.classList.remove("hidden");
+    });
+  }
+
+  if (btnBackTimeFormat && menuMainView && menuTimeFormatView) {
+    btnBackTimeFormat.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      menuTimeFormatView.classList.add("hidden");
+      menuMainView.classList.remove("hidden");
+    });
+  }
+
+  if (timeFormatOptions) {
+    timeFormatOptions.forEach(opt => {
+      opt.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const fmt = opt.dataset.timeFormat;
+        if (fmt) {
+          applyTimeFormat(fmt);
+          dropdown.classList.add("hidden");
+          menuBtn.setAttribute("aria-expanded", "false");
+        }
+      });
     });
   }
 
@@ -207,10 +245,11 @@ function setupThemeDropdown() {
   const currentWidgetTheme = localStorage.getItem("wrennon_widget_theme") || "widget-default";
   applyTheme(currentTheme);
   applyTheme(currentWidgetTheme);
+  updateTimeFormatUI(getTimeFormatSetting());
 
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
     if (localStorage.getItem("wrennon_theme") === "system") {
-      document.documentElement.setAttribute("data-theme", e.matches ? "dark-matte" : "light-offwhite");
+      document.documentElement.setAttribute("data-theme", e.matches ? "dark-professional" : "light-professional");
     }
   });
 }
@@ -497,15 +536,7 @@ function connectSocket() {
         if (data.summary) {
           appendMessage("system", `📋 ${data.summary}`);
         }
-        if (data.is_resolved) {
-          resolveBtn.textContent = "Resolved";
-          resolveBtn.disabled = true;
-          resolveBtn.classList.remove("btn-primary");
-        } else {
-          resolveBtn.textContent = "Mark resolved";
-          resolveBtn.disabled = false;
-          resolveBtn.classList.add("btn-primary");
-        }
+        updateResolveUI(!!data.is_resolved, data.updated_at || (data.is_resolved ? new Date().toISOString() : null));
       }
     } else if (data.type === "new_message") {
       if (data.session_id === activeSessionId) {
@@ -513,15 +544,7 @@ function connectSocket() {
         appendMessage(data.sender, data.content, new Date().toISOString(), data.sender === "agent_internal", data.message_id, data.author_username, data.author_role);
         // Refresh order context whenever a new message arrives (human or bot/ai may trigger order fetching)
         fetchOrderContext(data.session_id);
-        if (data.is_resolved) {
-          resolveBtn.textContent = "Resolved";
-          resolveBtn.disabled = true;
-          resolveBtn.classList.remove("btn-primary");
-        } else {
-          resolveBtn.textContent = "Mark resolved";
-          resolveBtn.disabled = false;
-          resolveBtn.classList.add("btn-primary");
-        }
+        updateResolveUI(!!data.is_resolved, data.updated_at);
       }
       loadConversations();
     } else if (data.type === "typing" || data.type === "stopped_typing") {
@@ -691,6 +714,8 @@ function renderConversationList(conversations) {
   for (const conv of conversations) {
     const item = document.createElement("div");
     item.className = "conv-item";
+    item.dataset.sessionId = conv.session_id;
+    item.dataset.updatedAt = conv.updated_at || '';
     item.setAttribute("role", "group");
     item.tabIndex = 0;
     item.setAttribute("aria-label", `Conversation with ${conv.customer_name || conv.customer_email || "unknown customer"}`);
@@ -792,11 +817,12 @@ function renderConversationList(conversations) {
       </div>
     `;
 
-    item.addEventListener("click", () => openConversation(conv.session_id, customerDisplayName, conv.short_id, conv.resolved, conv.updated_at));
+    const resolvedTimestamp = conv.resolved_at || conv.updated_at;
+    item.addEventListener("click", () => openConversation(conv.session_id, customerDisplayName, conv.short_id, conv.resolved, resolvedTimestamp));
     item.addEventListener("keydown", (e) => {
       if ((e.key === "Enter" || e.key === " ") && e.target === item) {
         e.preventDefault();
-        openConversation(conv.session_id, customerDisplayName, conv.short_id, conv.resolved, conv.updated_at);
+        openConversation(conv.session_id, customerDisplayName, conv.short_id, conv.resolved, resolvedTimestamp);
       }
     });
     conversationList.appendChild(item);
@@ -860,6 +886,17 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
   emptyState.classList.add("hidden");
   activeConversationEl.classList.remove("hidden");
 
+  // Immediately update visual selection in conversation list
+  document.querySelectorAll(".conv-item").forEach((ci) => {
+    ci.classList.remove("conv-item--selected");
+    ci.removeAttribute("aria-current");
+  });
+  const currentItem = document.querySelector(`.conv-checkbox[data-session-id="${sessionId}"]`)?.closest(".conv-item");
+  if (currentItem) {
+    currentItem.classList.add("conv-item--selected");
+    currentItem.setAttribute("aria-current", "true");
+  }
+
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({ type: "view_conversation", session_id: sessionId }));
   }
@@ -885,22 +922,9 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
   const hash = shortId ? shortId.split('').reduce((a, b) => {a = ((a << 5) - a) + b.charCodeAt(0); return a & a}, 0) : 0;
   const platform = platformsInfo[Math.abs(hash) % platformsInfo.length];
   conversationSession.innerHTML = `${platform.svg} ${platform.text}`;
+  updateViaMediaPosition();
   
-  const resolveTimeEl = document.getElementById("resolve-time");
-  if (isResolved) {
-    resolveBtn.textContent = "Resolved";
-    resolveBtn.disabled = true;
-    resolveBtn.classList.remove("btn-primary");
-    if (updatedAt) {
-      resolveTimeEl.textContent = `at ${formatSidebarTime(updatedAt)}`;
-      resolveTimeEl.classList.remove("hidden");
-    }
-  } else {
-    resolveBtn.textContent = "Mark resolved";
-    resolveBtn.disabled = false;
-    resolveBtn.classList.add("btn-primary");
-    resolveTimeEl.classList.add("hidden");
-  }
+  updateResolveUI(isResolved, updatedAt);
 
   // Clear sidebars immediately to prevent showing old data while loading
   clearCustomerSidebar();
@@ -1179,9 +1203,13 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
       const badgeHtml = `<span style="background: var(--accent-alert); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; vertical-align: middle;">${displayRole}</span>`;
       nameHtml = `<div class="msg-name" style="display: flex; align-items: center; margin-bottom: 6px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 600; color: var(--ink); opacity: 0.9; letter-spacing: 0.05em; text-transform: uppercase;"><span style="font-weight: 800; margin-right: 4px; color: var(--accent-alert);">Note:</span> ${displayName}${badgeHtml}</div>`;
     } else {
-      const badgeHtml = `<span style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: var(--bg-base); padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; vertical-align: middle;">${displayRole}</span>`;
-      nameHtml = `<div class="msg-name" style="display: flex; align-items: center; margin-bottom: 6px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 600; color: var(--bg-base); opacity: 0.95; letter-spacing: 0.05em; text-transform: uppercase;">${displayName}${badgeHtml}</div>`;
+      const badgeHtml = `<span style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: inherit; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; vertical-align: middle;">${displayRole}</span>`;
+      nameHtml = `<div class="msg-name" style="display: flex; align-items: center; margin-bottom: 6px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 600; opacity: 0.95; letter-spacing: 0.05em; text-transform: uppercase;">${displayName}${badgeHtml}</div>`;
     }
+  } else if ((actualSender === "human" || actualSender === "user") && !isGrouped) {
+    const custEmail = (document.getElementById("conversation-email")?.textContent || "").trim();
+    const custDisplay = (custEmail && custEmail !== "Unknown Customer") ? custEmail.split("@")[0].toUpperCase() : "CUSTOMER";
+    nameHtml = `<div class="msg-name msg-name--human" style="display: flex; align-items: center; margin-bottom: 6px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 600; color: var(--ink-soft); opacity: 0.85; letter-spacing: 0.05em; text-transform: uppercase;">${escapeHtml(custDisplay)}</div>`;
   }
   
   // Format message content
@@ -1217,11 +1245,25 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
     div.classList.add("msg--image-only");
   }
 
+  const isAudioOnly = /^\s*\[Audio\]\([^\)]+\)\s*$/i.test(displayContent.trim()) ||
+                      (/\[Audio\]\([^\)]+\)/i.test(displayContent) && displayContent.replace(/\[Audio\]\([^\)]+\)/gi, '').trim() === '');
+  if (isAudioOnly) {
+    div.classList.add("msg--voice-only");
+  }
+
   if (isInternal) {
     displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
     div.innerHTML = nameHtml + replyHtml + renderMarkdown(displayContent) + transcriptHtml;
   } else {
     div.innerHTML = nameHtml + replyHtml + renderMarkdown(displayContent) + transcriptHtml;
+  }
+
+  if (div.querySelector('.voice-player')) {
+    const clone = div.cloneNode(true);
+    clone.querySelectorAll('.voice-player, .msg-name, details, .msg-dropdown-container, .msg-pin-indicator').forEach(el => el.remove());
+    if (!clone.textContent.trim()) {
+      div.classList.add("msg--voice-only");
+    }
   }
 
   if (isPinned) {
@@ -1259,6 +1301,7 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
     actionsHtml += `</div></div>`;
     div.innerHTML += actionsHtml;
   }
+  contentWrapper.dataset.isoTimestamp = isoString || '';
   contentWrapper.appendChild(div);
 
   if (sender !== "system") {
@@ -1266,7 +1309,7 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
     const ticks = (sender === "ai" || sender === "agent" || isInternal) ? `<span class="msg-ticks"><svg viewBox="0 0 512 512" width="16" height="16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="44"><path d="M464 128L240 384l-96-96M144 384l-96-96M368 128L232 284"/></svg></span>` : "";
     const metaDiv = document.createElement("div");
     metaDiv.className = `msg-meta msg-meta--${actualSender}`;
-    metaDiv.innerHTML = `<span>${timeStr}</span>${ticks}`;
+    metaDiv.innerHTML = `<span class="msg-time">${timeStr}</span>${ticks}`;
     contentWrapper.appendChild(metaDiv);
   }
 
@@ -1758,16 +1801,14 @@ if (noteTypeSelect && chatInputWrapper) {
       chatInputWrapper.classList.add("internal-mode");
       chatFooterWrapper?.classList.add("internal-mode");
       internalNoteBanner?.classList.remove("hidden");
-      agentInput.placeholder = agentInput.clientWidth > 380 
-        ? "Add an internal note... (Use @ to tag, / for macros)" 
-        : "Add internal note...";
+      agentInput.placeholder = "Add an internal note...";
       if (modeBadge) modeBadge.textContent = "Note";
       if (sendBtn) sendBtn.title = "Add internal note (Enter)";
     } else {
       chatInputWrapper.classList.remove("internal-mode");
       chatFooterWrapper?.classList.remove("internal-mode");
       internalNoteBanner?.classList.add("hidden");
-      agentInput.placeholder = "Type a message... (Enter to send, Shift+Enter for newline)";
+      agentInput.placeholder = "Type a message...";
       if (modeBadge) modeBadge.textContent = "Reply";
       if (sendBtn) sendBtn.title = "Send public reply (Enter)";
     }
@@ -1956,12 +1997,19 @@ function showOrderPopup(order, customer) {
   
   const statusClass = `order-status-badge--${(order.status || '').toLowerCase()}`;
   
-  const formatTime = (isoStr) => {
+  const formatTimelineTime = (isoStr) => {
     if (!isoStr) return '';
     try {
       const d = new Date(isoStr);
       if (isNaN(d.getTime())) return isoStr;
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const is12h = getTimeFormatSetting() === "12h";
+      const timePart = d.toLocaleTimeString('en-US', {
+        hour: is12h ? 'numeric' : '2-digit',
+        minute: '2-digit',
+        hour12: is12h,
+        timeZone: "Asia/Dhaka"
+      });
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: "Asia/Dhaka" }) + ', ' + timePart;
     } catch (e) {
       return isoStr;
     }
@@ -1986,7 +2034,7 @@ function showOrderPopup(order, customer) {
       if (order.timeline && Array.isArray(order.timeline)) {
           const matched = order.timeline.find(t => t.status === baseEvt.status);
           if (matched && matched.time) {
-              time = formatTime(matched.time);
+              time = formatTimelineTime(matched.time);
           }
       }
       return { ...baseEvt, time };
@@ -2106,14 +2154,8 @@ resolveBtn.addEventListener("click", async () => {
   if (!activeSessionId) return;
   const result = await authedFetch(`/agent/conversations/${activeSessionId}/resolve`, "POST");
   if (result) {
-    resolveBtn.textContent = "Resolved";
-    resolveBtn.disabled = true;
-    resolveBtn.classList.remove("btn-primary");
-    const resolveTimeEl = document.getElementById("resolve-time");
-    if (resolveTimeEl) {
-      resolveTimeEl.textContent = `at ${formatSidebarTime(new Date().toISOString())}`;
-      resolveTimeEl.classList.remove("hidden");
-    }
+    const resolvedTime = result.resolved_at || new Date().toISOString();
+    updateResolveUI(true, resolvedTime);
     loadConversations();
   }
 });
@@ -2282,7 +2324,7 @@ function linkifyRawUrls(html) {
 
 function inlineMarkdown(text) {
   let escaped = escapeHtml(text);
-  escaped = escaped.replace(/\[Audio\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
+  escaped = escaped.replace(/\[Audio\]\(([^)]+)\)/g, (match, url) => {
     const safeUrl = escapeAttr(url);
     const playerId = 'vp_' + Math.random().toString(36).substr(2, 9);
     return `<div class="voice-player" id="${playerId}" data-src="${safeUrl}">` +
@@ -2294,6 +2336,7 @@ function inlineMarkdown(text) {
         Array.from({length: 20}, (_, i) => `<span class="voice-player__bar" style="animation-delay:${i * 0.05}s; height:${Math.floor(Math.random() * 60) + 20}%"></span>`).join('') +
       `</div>` +
       `<span class="voice-player__time">0:00</span>` +
+      `<button class="voice-player__speed-btn" type="button" aria-label="Playback speed" onclick="cyclePlaybackRate(event, '${playerId}')" title="Playback speed" data-speed="1">1x</button>` +
       `<audio preload="metadata" src="${safeUrl}" onloadedmetadata="const d = this.duration; if(d && d !== Infinity) { this.parentElement.querySelector('.voice-player__time').textContent = Math.floor(d/60) + ':' + Math.floor(d%60).toString().padStart(2, '0'); }"></audio>` +
     `</div>`;
   });
@@ -2384,6 +2427,13 @@ function toggleVoicePlayer(playerId) {
   });
 
   if (audio.paused) {
+    const speedBtn = container.querySelector('.voice-player__speed-btn');
+    if (speedBtn) {
+      const desiredRate = parseFloat(speedBtn.getAttribute('data-speed')) || 1;
+      if (audio.playbackRate !== desiredRate) {
+        audio.playbackRate = desiredRate;
+      }
+    }
     audio.play().catch(err => {
       console.error("Audio playback error:", err);
       alert("Cannot play audio: " + err.message + "\nCheck if your browser supports playing this file.");
@@ -2402,28 +2452,192 @@ function toggleVoicePlayer(playerId) {
   }
 }
 
+function cyclePlaybackRate(event, playerId) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  const container = document.getElementById(playerId);
+  if (!container) return;
+  const audio = container.querySelector('audio');
+  const btn = container.querySelector('.voice-player__speed-btn');
+  if (!audio || !btn) return;
+
+  const speeds = [1, 1.25, 1.5, 2];
+  const currentSpeed = parseFloat(btn.getAttribute('data-speed')) || audio.playbackRate || 1;
+  let nextIdx = speeds.findIndex(s => Math.abs(s - currentSpeed) < 0.05) + 1;
+  if (nextIdx >= speeds.length || nextIdx === -1) nextIdx = 0;
+
+  const newSpeed = speeds[nextIdx];
+  audio.playbackRate = newSpeed;
+  btn.textContent = `${newSpeed}x`;
+  btn.setAttribute('data-speed', newSpeed);
+}
+
+function getTimeFormatSetting() {
+  return localStorage.getItem("wrennon_time_format") || "12h";
+}
+
+function parseIsoDate(isoString) {
+  if (!isoString) return null;
+  const str = String(isoString).trim();
+  const normalized = str.includes(' ') && !str.includes('T') ? str.replace(' ', 'T') : str;
+  const date = new Date(normalized);
+  return isNaN(date.getTime()) ? null : date;
+}
+
 function formatTime(isoString) {
-  const date = new Date(isoString);
-  return date.toLocaleTimeString('en-US', { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dhaka" });
+  if (!isoString) return '';
+  const date = parseIsoDate(isoString);
+  if (!date) return isoString;
+  const is12h = getTimeFormatSetting() === "12h";
+  return date.toLocaleTimeString('en-US', {
+    hour: is12h ? 'numeric' : '2-digit',
+    minute: '2-digit',
+    hour12: is12h,
+    timeZone: "Asia/Dhaka"
+  });
 }
 
 function formatSidebarTime(isoString) {
   if (!isoString) return '';
-  const date = new Date(isoString);
+  const date = parseIsoDate(isoString);
+  if (!date) return '';
   const now = new Date();
   
-  const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+  const dateKey = date.toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' });
+  const todayKey = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' });
   
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const isYesterday = date.getDate() === yesterday.getDate() && date.getMonth() === yesterday.getMonth() && date.getFullYear() === yesterday.getFullYear();
+  const yDate = new Date(now);
+  yDate.setDate(yDate.getDate() - 1);
+  const yesterdayKey = yDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' });
+
+  const isToday = dateKey === todayKey;
+  const isYesterday = dateKey === yesterdayKey;
+  const isSameYear = date.getFullYear() === now.getFullYear();
+
+  const dateFormatted = date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(isSameYear ? {} : { year: 'numeric' }),
+    timeZone: "Asia/Dhaka"
+  });
 
   if (isToday) {
-    return date.toLocaleTimeString('en-GB', { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dhaka" });
+    return formatTime(isoString);
   } else if (isYesterday) {
     return 'Yesterday';
   } else {
-    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: "Asia/Dhaka" });
+    return dateFormatted;
+  }
+}
+
+function formatResolvedTime(isoString) {
+  if (!isoString) return '';
+  const date = parseIsoDate(isoString);
+  if (!date) return isoString;
+  const now = new Date();
+  const timeFormatted = formatTime(isoString);
+  
+  const dateKey = date.toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' });
+  const todayKey = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' });
+  
+  const yDate = new Date(now);
+  yDate.setDate(yDate.getDate() - 1);
+  const yesterdayKey = yDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' });
+
+  const isToday = dateKey === todayKey;
+  const isYesterday = dateKey === yesterdayKey;
+  const isSameYear = date.getFullYear() === now.getFullYear();
+
+  const dateFormatted = date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(isSameYear ? {} : { year: 'numeric' }),
+    timeZone: "Asia/Dhaka"
+  });
+
+  if (isToday) {
+    return `Today, ${timeFormatted}`;
+  } else if (isYesterday) {
+    return `Yesterday (${dateFormatted}), ${timeFormatted}`;
+  } else {
+    return `${dateFormatted}, ${timeFormatted}`;
+  }
+}
+
+function updateTimeFormatUI(fmt) {
+  const pill = document.getElementById("current-time-format-pill");
+  if (pill) pill.textContent = fmt === "24h" ? "24-hour" : "12-hour";
+
+  document.querySelectorAll(".time-format-option, .time-format-card").forEach(opt => {
+    opt.classList.toggle("active", opt.dataset.timeFormat === fmt);
+  });
+}
+
+function applyTimeFormat(fmt) {
+  localStorage.setItem("wrennon_time_format", fmt);
+  updateTimeFormatUI(fmt);
+
+  // 1. Update message timestamps in active conversation
+  document.querySelectorAll('.msg-content[data-iso-timestamp]').forEach(el => {
+    const iso = el.dataset.isoTimestamp;
+    const timeSpan = el.querySelector('.msg-time');
+    if (iso && timeSpan) {
+      timeSpan.textContent = formatTime(iso);
+    }
+  });
+
+  // 2. Update resolve timestamp badge if visible
+  const resolveTimeEl = document.getElementById("resolve-time");
+  if (resolveTimeEl && resolveTimeEl.dataset.timestamp) {
+    const span = resolveTimeEl.querySelector('span');
+    if (span) {
+      span.textContent = formatResolvedTime(resolveTimeEl.dataset.timestamp);
+    } else {
+      resolveTimeEl.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px; opacity:0.8;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg><span>${formatResolvedTime(resolveTimeEl.dataset.timestamp)}</span>`;
+    }
+  }
+
+  // 3. Update sidebar conversation items
+  document.querySelectorAll('.conv-item[data-updated-at]').forEach(item => {
+    const iso = item.dataset.updatedAt;
+    const timeEl = item.querySelector('.conv-item-time');
+    if (iso && timeEl) {
+      timeEl.textContent = formatSidebarTime(iso);
+    }
+  });
+}
+
+function updateResolveUI(isResolved, updatedAt) {
+  const resolveBtn = document.getElementById("resolve-btn");
+  const resolveTimeEl = document.getElementById("resolve-time");
+  if (!resolveBtn) return;
+
+  if (isResolved) {
+    resolveBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><polyline points="20 6 9 17 4 12"></polyline></svg><span>Resolved</span>`;
+    resolveBtn.disabled = true;
+    resolveBtn.classList.remove("btn-primary");
+    resolveBtn.classList.add("is-resolved");
+    if (resolveTimeEl) {
+      if (updatedAt) {
+        resolveTimeEl.dataset.timestamp = updatedAt;
+        resolveTimeEl.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px; opacity:0.8;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg><span>${formatResolvedTime(updatedAt)}</span>`;
+        resolveTimeEl.classList.remove("hidden");
+      } else {
+        resolveTimeEl.classList.add("hidden");
+        delete resolveTimeEl.dataset.timestamp;
+      }
+    }
+  } else {
+    resolveBtn.innerHTML = `<span>Mark resolved</span>`;
+    resolveBtn.disabled = false;
+    resolveBtn.classList.add("btn-primary");
+    resolveBtn.classList.remove("is-resolved");
+    if (resolveTimeEl) {
+      resolveTimeEl.classList.add("hidden");
+      delete resolveTimeEl.dataset.timestamp;
+    }
   }
 }
 
@@ -3250,6 +3464,7 @@ function renderTagChips(tags) {
       </button>
     </span>
   `).join("");
+  updateViaMediaPosition();
 }
 
 function resetTicketPropertiesBar() {
@@ -3276,6 +3491,10 @@ async function loadTicketProperties(sessionId) {
   renderAssigneeBadge(currentTicketProperties.assigned_agent);
   renderTagChips(currentTicketProperties.tags);
   renderCsatBadge(result.csat_rating, result.csat_comment);
+  updateViaMediaPosition();
+  if (result.resolved !== undefined) {
+    updateResolveUI(!!result.resolved, result.resolved_at || result.updated_at);
+  }
   
   const mergeContainer = document.getElementById('merge-banner-container');
   if (mergeContainer) {
@@ -3333,6 +3552,44 @@ async function saveTicketProperty(fields) {
   loadConversations(); // list rows show priority/tags too, keep them in sync
 }
 
+function updateViaMediaPosition() {
+  const session = document.getElementById("conversation-session");
+  const titleRow = document.querySelector(".conv-header-title-row");
+  const metaRow = document.querySelector(".conv-header-meta-row");
+  const propsBar = document.getElementById("ticket-properties-bar");
+  const header = document.getElementById("conversation-header");
+  if (!session || !titleRow || !metaRow || !propsBar || !header) return;
+
+  const infoEl = document.querySelector(".conv-header-info");
+  const availableWidth = infoEl ? infoEl.clientWidth : metaRow.clientWidth;
+  if (!availableWidth) return;
+
+  const isAtBottom = (session.parentElement === metaRow);
+  const sessionWidth = Math.max(session.scrollWidth, session.offsetWidth) || 115;
+  const propsWidth = Math.max(propsBar.scrollWidth, propsBar.offsetWidth) || 250;
+
+  if (isAtBottom) {
+    // Session is currently on the bottom line in its original position.
+    // ONLY move up if the items on the bottom line actually overflow the available container space:
+    const totalNeeded = sessionWidth + propsWidth + 8;
+    const isOverflowing = (availableWidth < totalNeeded) || (metaRow.scrollWidth > availableWidth + 2);
+
+    if (isOverflowing) {
+      titleRow.appendChild(session);
+    }
+  } else {
+    // Session is currently at the top beside the customer name.
+    // Check if bottom line has enough space to take session back down to its original position:
+    const neededAtBottom = propsWidth + sessionWidth + 20;
+
+    if (availableWidth >= neededAtBottom) {
+      metaRow.insertBefore(session, propsBar);
+    }
+  }
+}
+window.updateViaMediaPosition = updateViaMediaPosition;
+window.renderTagChips = renderTagChips;
+
 (function setupTicketPropertiesBar() {
   const priorityBadge = document.getElementById("priority-badge");
   const priorityDropdown = document.getElementById("priority-dropdown");
@@ -3342,6 +3599,19 @@ async function saveTicketProperty(fields) {
   const tagInput = document.getElementById("tag-input");
   const tagChips = document.getElementById("tag-chips");
   if (!priorityBadge || !assigneeBadge) return; // markup not present on this page
+
+  const convHeaderEl = document.getElementById("conversation-header");
+  const convInfoEl = document.querySelector(".conv-header-info");
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(updateViaMediaPosition);
+    });
+    if (convHeaderEl) ro.observe(convHeaderEl);
+    if (convInfoEl) ro.observe(convInfoEl);
+  }
+  window.addEventListener("resize", () => {
+    requestAnimationFrame(updateViaMediaPosition);
+  });
 
   function closeAllDropdowns(except) {
     if (priorityDropdown && priorityDropdown !== except) priorityDropdown.classList.add("hidden");
