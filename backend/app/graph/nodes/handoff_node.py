@@ -22,9 +22,11 @@ async def handoff_node(state: ConversationState) -> ConversationState:
     # Generate an LLM-based summary for the human agent, now informed by
     # *why* the manager escalated (not just the raw transcript) — this
     # makes the agent-facing note much more actionable.
+    include_sugg = state.get("include_suggestion", True)
     conversation_summary = await generate_conversation_summary(
         state["messages"],
         escalation_reason=state.get("handoff_reason"),
+        include_suggestion=include_sugg,
     )
 
     existing_ticket_id = state.get("existing_ticket_id")

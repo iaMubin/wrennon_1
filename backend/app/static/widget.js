@@ -745,6 +745,7 @@ function renderMarkdown(text) {
 
     const numbered = line.match(/^(\d+)[.)]\s+(.*)/);
     const bulleted = line.match(/^[-*•]\s+(.*)/);
+    const blockquoted = line.match(/^>\s*(.*)/);
 
     if (numbered || bulleted) {
       const tag = numbered ? "ol" : "ul";
@@ -756,6 +757,9 @@ function renderMarkdown(text) {
       }
       const content = numbered ? numbered[2] : bulleted[1];
       html += `<li>${inlineMarkdown(content)}</li>`;
+    } else if (blockquoted) {
+      closeList();
+      html += `<blockquote>${inlineMarkdown(blockquoted[1])}</blockquote>`;
     } else {
       closeList();
       html += `<p>${inlineMarkdown(line)}</p>`;
@@ -1115,14 +1119,38 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
     injectUnreadIndicator();
   }
 
-  const isGrouped = (uiRole === lastMsgRole && name === lastMsgName && (timestamp - lastMsgTime < 60000) && uiRole !== "system");
-  
-  if (!isGrouped) {
-      lastMsgRole = uiRole;
-      lastMsgName = name;
+  // Look for immediately preceding bubble in messagesEl
+  let prevBubble = messagesEl.lastElementChild;
+  while (prevBubble && !prevBubble.classList.contains("bubble")) {
+    prevBubble = prevBubble.previousElementSibling;
+  }
+
+  const isSameSender = Boolean(
+    prevBubble &&
+    (prevBubble.classList.contains(`bubble-${uiRole}`) || 
+     ((uiRole === "bot" || uiRole === "agent") && (prevBubble.classList.contains("bubble-bot") || prevBubble.classList.contains("bubble-agent"))))
+  );
+
+  const isGrouped = Boolean(
+    isSameSender &&
+    uiRole !== "system" &&
+    lastMsgTime &&
+    Math.abs(timestamp - lastMsgTime) < 600000 // 10 minutes cluster threshold (standard)
+  );
+
+  if (isGrouped && prevBubble) {
+    // Hide previous bubble's timestamp so only the latest in the burst shows the time
+    const prevMeta = prevBubble.querySelector(".msg-meta");
+    if (prevMeta) {
+      prevMeta.remove();
+    }
+    prevBubble.classList.add("bubble-grouped-prev");
+  } else {
+    lastMsgRole = uiRole;
+    lastMsgName = name;
   }
   lastMsgTime = timestamp;
-  
+
   let displayText = text || "";
   // Hide internal system annotations from the customer
   displayText = displayText.replace(/\[INTERNAL_IMAGE_DESC\][\s\S]*?\[\/INTERNAL_IMAGE_DESC\]/g, '');
@@ -1148,7 +1176,7 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   const isVoiceOnly = /^\s*\[Audio\]\([^\)]+\)\s*$/i.test(trimmedDisplay) ||
                       (/\[Audio\]\([^\)]+\)/i.test(trimmedDisplay) && trimmedDisplay.replace(/\[Audio\]\([^\)]+\)/gi, '').trim() === '');
 
-  // Sender Name header for agent / bot (matching Agent UI)
+  // Sender Name header for agent / bot (only on first message of a group)
   let nameHtml = '';
   if ((uiRole === "agent" || uiRole === "bot") && !isGrouped && !isImageOnly && !isVoiceOnly) {
     const authorName = name || (uiRole === "agent" ? "Support Agent" : "AI Assistant");
@@ -1167,7 +1195,7 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   }
 
   const wrapper = document.createElement("div");
-  wrapper.className = `bubble bubble-${uiRole} bubble-enter${isImageOnly ? ' bubble-image-only' : ''}${isVoiceOnly ? ' bubble-voice-only' : ''}`;
+  wrapper.className = `bubble bubble-${uiRole} bubble-enter${isImageOnly ? ' bubble-image-only' : ''}${isVoiceOnly ? ' bubble-voice-only' : ''}${isGrouped ? ' bubble-grouped-next' : ''}`;
   wrapper.setAttribute("role", "listitem");
   wrapper.innerHTML = nameHtml + replyHtml + renderMarkdown(displayText) + metaHtml;
 

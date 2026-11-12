@@ -348,34 +348,134 @@
   box-sizing: border-box !important;
 }
 
+#agent-messages,
 [data-theme$="-professional"] #agent-messages {
   background: var(--bg-base) !important;
-  padding: 28px !important;
-  gap: 16px !important;
+  padding: 24px 20px !important;
+  gap: 10px !important;
 }
 
+.msg,
+[data-theme$="-professional"] .msg {
+  padding: 9px 14px 8px !important;
+  font-size: 13.5px !important;
+  line-height: 1.5 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.msg--human,
+.msg--user,
 [data-theme$="-professional"] .msg--human,
 [data-theme$="-professional"] .msg--user {
   background: var(--bg-surface) !important;
   color: var(--ink) !important;
   border: 1px solid var(--line) !important;
-  border-left: 3px solid var(--accent) !important;
-  border-radius: 12px 12px 12px 3px !important;
-  box-shadow: var(--shadow-xs) !important;
-  padding: 12px 16px !important;
-  font-size: 14px !important;
-  line-height: 1.55 !important;
+  border-left: 1px solid var(--line) !important;
+  border-radius: 18px 18px 18px 4px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
 }
 
+.msg--agent,
 [data-theme$="-professional"] .msg--agent {
   background: var(--accent) !important;
   color: var(--accent-ink) !important;
-  border: none !important;
-  border-radius: 12px 12px 3px 12px !important;
-  box-shadow: 0 2px 8px -2px var(--accent-glow) !important;
-  padding: 12px 16px !important;
-  font-size: 14px !important;
-  line-height: 1.55 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 18px 18px 4px 18px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 2px 6px -1px var(--accent-glow) !important;
+}
+
+.msg--ai,
+.msg--bot,
+[data-theme$="-professional"] .msg--ai,
+[data-theme$="-professional"] .msg--bot {
+  background: var(--bg-surface) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--line) !important;
+  border-right: 1px solid var(--line) !important;
+  border-radius: 18px 18px 18px 4px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Consecutive messages grouped corners (WhatsApp / Messenger style) */
+.msg-content--grouped-prev.msg-content--human .msg,
+.msg-content--grouped-prev.msg-content--user .msg,
+.msg-content--grouped-prev.msg-content--bot .msg,
+.msg-content--grouped-prev.msg-content--ai .msg,
+.msg--grouped-prev.msg--human,
+.msg--grouped-prev.msg--user,
+.msg--grouped-prev.msg--bot,
+.msg--grouped-prev.msg--ai,
+[data-theme$="-professional"] .msg-content--grouped-prev.msg-content--human .msg,
+[data-theme$="-professional"] .msg-content--grouped-prev.msg-content--user .msg,
+[data-theme$="-professional"] .msg-content--grouped-prev.msg-content--bot .msg,
+[data-theme$="-professional"] .msg-content--grouped-prev.msg-content--ai .msg,
+[data-theme$="-professional"] .msg--grouped-prev.msg--human,
+[data-theme$="-professional"] .msg--grouped-prev.msg--user,
+[data-theme$="-professional"] .msg--grouped-prev.msg--bot,
+[data-theme$="-professional"] .msg--grouped-prev.msg--ai {
+  border-bottom-left-radius: 5px !important;
+}
+
+.msg-content--grouped.msg-content--human .msg,
+.msg-content--grouped.msg-content--user .msg,
+.msg-content--grouped.msg-content--bot .msg,
+.msg-content--grouped.msg-content--ai .msg,
+.msg--grouped-next.msg--human,
+.msg--grouped-next.msg--user,
+.msg--grouped-next.msg--bot,
+.msg--grouped-next.msg--ai,
+[data-theme$="-professional"] .msg-content--grouped.msg-content--human .msg,
+[data-theme$="-professional"] .msg-content--grouped.msg-content--user .msg,
+[data-theme$="-professional"] .msg-content--grouped.msg-content--bot .msg,
+[data-theme$="-professional"] .msg-content--grouped.msg-content--ai .msg,
+[data-theme$="-professional"] .msg--grouped-next.msg--human,
+[data-theme$="-professional"] .msg--grouped-next.msg--user,
+[data-theme$="-professional"] .msg--grouped-next.msg--bot,
+[data-theme$="-professional"] .msg--grouped-next.msg--ai {
+  border-top-left-radius: 5px !important;
+}
+
+.msg-content--grouped-prev.msg-content--agent .msg,
+.msg--grouped-prev.msg--agent,
+[data-theme$="-professional"] .msg-content--grouped-prev.msg-content--agent .msg,
+[data-theme$="-professional"] .msg--grouped-prev.msg--agent {
+  border-bottom-right-radius: 5px !important;
+}
+
+.msg-content--grouped.msg-content--agent .msg,
+.msg--grouped-next.msg--agent,
+[data-theme$="-professional"] .msg-content--grouped.msg-content--agent .msg,
+[data-theme$="-professional"] .msg--grouped-next.msg--agent {
+  border-top-right-radius: 5px !important;
+}
+
+/* 3px net gap between consecutive messages in a burst */
+.msg-content--grouped,
+.msg-content--grouped-next,
+[data-theme$="-professional"] .msg-content--grouped,
+[data-theme$="-professional"] .msg-content--grouped-next {
+  margin-top: -7px !important; /* 10px - 7px = 3px gap */
+}
+
+/* Dark mode surface refinements */
+[data-theme="dark-professional"] .msg--human,
+[data-theme="dark-professional"] .msg--user {
+  background: #18221D !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #E2E8E4 !important;
+}
+
+[data-theme="dark-professional"] .msg--ai,
+[data-theme="dark-professional"] .msg--bot {
+  background: #151D19 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #E2E8E4 !important;
+}
+
+[data-theme="dark-professional"] .msg-reply-bubble {
+  background: rgba(0, 0, 0, 0.35) !important;
+  border-left-color: var(--accent) !important;
 }
 
 [data-theme$="-professional"] .msg--image-only,
@@ -752,31 +852,29 @@
 /* ── Robust Conversation Header & Order Popup Responsive Layout (All Themes) ── */
 #conversation-header,
 [data-theme$="-professional"] #conversation-header {
-  height: 60px !important;
   min-height: 60px !important;
-  max-height: 60px !important;
+  height: auto !important;
   box-sizing: border-box !important;
   display: flex !important;
   align-items: flex-start !important;
   justify-content: space-between !important;
   flex-wrap: nowrap !important;
-  padding: 0 16px !important;
+  padding: 8px 16px !important;
   border-bottom: 1px solid var(--line) !important;
   border-top: 1px solid var(--line) !important;
   background: var(--bg-surface) !important;
-  overflow: hidden !important;
   gap: 10px !important;
+  flex-shrink: 0 !important;
 }
 
 .conv-header-info {
   display: flex !important;
   flex-direction: column !important;
   justify-content: flex-start !important;
-  padding: 6px 0 !important;
-  gap: 4px !important;
+  padding: 0 !important;
+  gap: 6px !important;
   flex: 1 1 auto !important;
   min-width: 0 !important;
-  overflow: hidden !important;
   box-sizing: border-box !important;
 }
 
@@ -854,25 +952,25 @@
 .conv-header-meta-row {
   display: flex !important;
   align-items: center !important;
-  height: 22px !important;
   min-height: 22px !important;
+  height: auto !important;
   gap: 8px !important;
   min-width: 0 !important;
-  flex-wrap: nowrap !important;
-  overflow: hidden !important;
+  flex-wrap: wrap !important;
   box-sizing: border-box !important;
 }
 
 #conversation-header #ticket-properties-bar {
   display: inline-flex !important;
   align-items: center !important;
-  flex-wrap: nowrap !important;
-  gap: 8px !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
   border: none !important;
   padding: 0 !important;
   background: transparent !important;
-  min-height: auto !important;
+  min-height: 22px !important;
   min-width: 0 !important;
+  max-width: 100% !important;
 }
 
 #conversation-header .tp-item {
@@ -884,9 +982,10 @@
 #conversation-header .tp-item--tags {
   display: inline-flex !important;
   align-items: center !important;
+  flex-wrap: nowrap !important;
   gap: 6px !important;
-  min-width: auto !important;
-  max-width: none !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
   flex-shrink: 0 !important;
   margin: 0 !important;
 }
@@ -895,11 +994,18 @@
   display: inline-flex !important;
   align-items: center !important;
   gap: 4px !important;
-  flex-shrink: 0 !important;
+  flex-wrap: nowrap !important;
+  min-width: 0 !important;
+  max-width: calc(100vw - 180px) !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+#conversation-header .tag-chips::-webkit-scrollbar {
+  display: none !important;
 }
 
 #conversation-header .tp-tag-chip {
-  max-width: 120px !important;
+  max-width: 130px !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
@@ -1025,27 +1131,25 @@
 @media (max-width: 820px) {
   #conversation-header,
   [data-theme$="-professional"] #conversation-header {
-    height: 60px !important;
     min-height: 60px !important;
-    max-height: 60px !important;
-    padding: 0 12px !important;
+    height: auto !important;
+    padding: 8px 12px !important;
     gap: 8px !important;
     flex-wrap: nowrap !important;
     display: flex !important;
     align-items: flex-start !important;
     box-sizing: border-box !important;
-    overflow: hidden !important;
+    flex-shrink: 0 !important;
   }
 
   .conv-header-info {
     min-width: 0 !important;
     flex: 1 1 auto !important;
-    overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: flex-start !important;
-    padding: 6px 0 !important;
-    gap: 4px !important;
+    padding: 0 !important;
+    gap: 6px !important;
     box-sizing: border-box !important;
   }
 
@@ -1082,37 +1186,40 @@
     white-space: nowrap !important;
   }
 
-  /* Bottom line: Priority + Assignee + Tags stay on single bottom line */
+  /* Bottom line: Priority + Assignee + Tags */
   .conv-header-meta-row {
     display: flex !important;
     align-items: center !important;
-    flex-wrap: nowrap !important;
+    flex-wrap: wrap !important;
     min-width: 0 !important;
-    overflow: hidden !important;
+    min-height: 22px !important;
+    height: auto !important;
     gap: 6px !important;
   }
 
   #conversation-header #ticket-properties-bar {
     display: inline-flex !important;
     align-items: center !important;
-    flex-wrap: nowrap !important;
+    flex-wrap: wrap !important;
     gap: 6px !important;
     min-width: 0 !important;
+    max-width: 100% !important;
   }
 
   #conversation-header .tp-item--tags {
-    min-width: auto !important;
+    min-width: 0 !important;
     order: unset !important;
     margin-top: 0 !important;
     display: inline-flex !important;
     align-items: center !important;
     flex-wrap: nowrap !important;
     gap: 6px !important;
-    max-width: none !important;
+    max-width: 100% !important;
+    flex-shrink: 0 !important;
   }
 
   #conversation-header .tp-divider:nth-of-type(2) {
-    display: block !important;
+    display: inline-block !important;
   }
 
   #conversation-header .tag-chips {
@@ -1120,13 +1227,19 @@
     align-items: center !important;
     flex-wrap: nowrap !important;
     gap: 4px !important;
-    overflow: hidden !important;
+    min-width: 0 !important;
+    max-width: calc(100vw - 180px) !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+  }
+  #conversation-header .tag-chips::-webkit-scrollbar {
+    display: none !important;
   }
 
   #conversation-header .tp-tag-chip {
-    max-width: 80px !important;
+    max-width: 110px !important;
     font-size: 10px !important;
-    padding: 1px 5px !important;
+    padding: 1px 6px !important;
   }
 
   .conv-header-actions {
@@ -1169,16 +1282,17 @@
     height: auto !important;
     min-height: 60px !important;
     max-height: none !important;
-    padding: 0 10px !important;
+    padding: 8px 10px !important;
     gap: 6px !important;
     align-items: flex-start !important;
     overflow: visible !important;
+    flex-shrink: 0 !important;
   }
 
   .conv-header-info {
     justify-content: flex-start !important;
-    padding: 6px 0 !important;
-    gap: 4px !important;
+    padding: 0 !important;
+    gap: 6px !important;
     overflow: visible !important;
     box-sizing: border-box !important;
   }
@@ -1211,11 +1325,13 @@
     padding: 1px 4px !important;
   }
 
-  /* Name bade max 2 lines: Priority/Assignee on bottom line 1, Tags wrapping onto bottom line 2 */
+  /* Name bade max 2 lines: Priority/Assignee on bottom line 1, Tags on bottom line 2 */
   .conv-header-meta-row {
     flex-wrap: wrap !important;
     overflow: visible !important;
-    gap: 3px 6px !important;
+    min-height: 22px !important;
+    height: auto !important;
+    gap: 4px 6px !important;
     box-sizing: border-box !important;
   }
 
@@ -1223,19 +1339,20 @@
     display: flex !important;
     flex-wrap: wrap !important;
     align-items: center !important;
-    gap: 3px 6px !important;
+    gap: 4px 6px !important;
+    max-width: 100% !important;
   }
 
   #conversation-header .tp-item--tags {
-    min-width: auto !important;
+    min-width: 0 !important;
     order: unset !important;
     margin-top: 0 !important;
     display: inline-flex !important;
     align-items: center !important;
-    flex-wrap: wrap !important;
+    flex-wrap: nowrap !important;
     gap: 4px !important;
     max-width: 100% !important;
-    overflow: visible !important;
+    flex-shrink: 0 !important;
   }
 
   #conversation-header .tp-divider {
@@ -1244,12 +1361,22 @@
 
   #conversation-header .tag-chips {
     display: inline-flex !important;
-    flex-wrap: wrap !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
     gap: 4px !important;
+    min-width: 0 !important;
+    max-width: calc(100vw - 140px) !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+  }
+  #conversation-header .tag-chips::-webkit-scrollbar {
+    display: none !important;
   }
 
   #conversation-header .tp-tag-chip {
-    max-width: none !important;
+    max-width: 100px !important;
+    font-size: 10px !important;
+    padding: 1px 5px !important;
   }
 
   .conv-header-actions {

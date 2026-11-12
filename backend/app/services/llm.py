@@ -418,14 +418,19 @@ LIGHT_MODEL = "openai/gpt-oss-20b"
 # https://console.groq.com/docs/deprecations before picking a new one.
 
 
-async def generate_conversation_summary(messages: list, escalation_reason: str | None = None) -> str:
+async def generate_conversation_summary(
+    messages: list,
+    escalation_reason: str | None = None,
+    include_suggestion: bool = True
+) -> str:
     """Generate a short summary of the conversation for the human agent.
 
     escalation_reason (new): the manager node's own reasoning for why
     this needed a human, if available. Folding it in gives the agent a
     sharper, more actionable note instead of just a transcript recap.
+    include_suggestion: whether to include a Suggestion heading based on agent preference.
     """
-    logger.info("Generating conversation summary for handoff")
+    logger.info("Generating conversation summary for handoff (include_suggestion=%s)", include_suggestion)
 
     transcript_lines = []
     for msg in messages:
@@ -435,6 +440,12 @@ async def generate_conversation_summary(messages: list, escalation_reason: str |
 
     transcript_text = "\n".join(transcript_lines)
 
+    suggestion_instruction = (
+        "You MUST include a '**Suggestion**' heading that provides a clear, very brief action plan for the human agent to take.\n\n"
+        if include_suggestion
+        else "Do NOT include any '**Suggestion**' or action plan heading.\n\n"
+    )
+
     system_prompt = (
         "You are an expert support supervisor summarizing a chat transcript for a human agent handoff.\n"
         "Read the transcript below and generate a structured summary. Do NOT reply to the customer. "
@@ -442,7 +453,7 @@ async def generate_conversation_summary(messages: list, escalation_reason: str |
         "Keep the summary extremely concise and short. Use a maximum of 3 short bullet points. Do not include fluff. Ensure the agent can understand the problem at a glance.\n"
         "Format your response as a list of key-value pairs (e.g., • **Issue**: ...). "
         "Do NOT include the word 'Summary' at the top. Only use headings that are contextually relevant (e.g., Issue, Status). "
-        "You MUST include a '**Macro Suggestion**' heading that provides a clear, very brief action plan for the human agent to take.\n\n"
+        f"{suggestion_instruction}"
     )
 
     if escalation_reason:

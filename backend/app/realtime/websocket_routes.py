@@ -109,6 +109,17 @@ def _sync_phase1(session_id: str, customer_text: str) -> dict | None:
                 if m.sender != "system"
             ]
 
+        target_agent = conversation.assigned_agent or conversation.handled_by or settings.agent_username
+        include_suggestion = True
+        if target_agent:
+            agent_obj = db.query(Agent).filter_by(username=target_agent).first()
+            if agent_obj and agent_obj.suggestions_enabled is not None:
+                include_suggestion = bool(agent_obj.suggestions_enabled)
+        else:
+            default_agent = db.query(Agent).first()
+            if default_agent and default_agent.suggestions_enabled is not None:
+                include_suggestion = bool(default_agent.suggestions_enabled)
+
         return {
             "handoff_active": conversation.handoff_active,
             "reopened": reopened,
@@ -121,7 +132,8 @@ def _sync_phase1(session_id: str, customer_text: str) -> dict | None:
             "last_order_id": conversation.last_order_id,
             "turn_count": conversation.turn_count,
             "messages": messages_data,
-            "message_id": msg.id
+            "message_id": msg.id,
+            "include_suggestion": include_suggestion,
         }
 
 
@@ -152,6 +164,17 @@ def _sync_fetch_conversation_snapshot(session_id: str) -> dict | None:
                 if m.sender != "system"
             ]
 
+        target_agent = conversation.assigned_agent or conversation.handled_by or settings.agent_username
+        include_suggestion = True
+        if target_agent:
+            agent_obj = db.query(Agent).filter_by(username=target_agent).first()
+            if agent_obj and agent_obj.suggestions_enabled is not None:
+                include_suggestion = bool(agent_obj.suggestions_enabled)
+        else:
+            default_agent = db.query(Agent).first()
+            if default_agent and default_agent.suggestions_enabled is not None:
+                include_suggestion = bool(default_agent.suggestions_enabled)
+
         return {
             "handoff_active": conversation.handoff_active,
             "customer_email": conversation.customer_email,
@@ -161,6 +184,7 @@ def _sync_fetch_conversation_snapshot(session_id: str) -> dict | None:
             "last_order_id": conversation.last_order_id,
             "turn_count": conversation.turn_count,
             "messages": messages_data,
+            "include_suggestion": include_suggestion,
         }
 
 
@@ -477,7 +501,10 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
 
         customer_text = phase1_data["messages"][-1]["content"] if phase1_data["messages"] else ""
 
-        state = initial_state(customer_email=phase1_data["customer_email"])
+        state = initial_state(
+            customer_email=phase1_data["customer_email"],
+            include_suggestion=phase1_data.get("include_suggestion", True)
+        )
 
         if phase1_data["handoff_ticket_id"]:
             state["existing_ticket_id"] = phase1_data["handoff_ticket_id"]

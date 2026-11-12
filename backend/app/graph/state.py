@@ -91,9 +91,10 @@ class ConversationState(TypedDict):
     sentiment: NotRequired[str]
     intent_category: NotRequired[str]
     language: NotRequired[str]
+    include_suggestion: NotRequired[bool]
 
 
-def initial_state(customer_email: Optional[str] = None) -> ConversationState:
+def initial_state(customer_email: Optional[str] = None, include_suggestion: bool = True) -> ConversationState:
     """Factory for a fresh conversation state. Keeps the TypedDict literal
     out of node code, so adding a field here is the only place that needs
     to change when new levels are switched on."""
@@ -131,4 +132,5 @@ def initial_state(customer_email: Optional[str] = None) -> ConversationState:
         intent_category=None,
         language="English",
         direct_reply=None,
+        include_suggestion=include_suggestion,
     )

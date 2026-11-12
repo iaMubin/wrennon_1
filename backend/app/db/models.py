@@ -136,6 +136,7 @@ class Agent(Base):
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     token_version: Mapped[int] = mapped_column(Integer, default=1)
     permissions: Mapped[str] = mapped_column(Text, default="[]", server_default="[]")
+    suggestions_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     # Bumped whenever the password changes (or the account needs its
     # sessions force-revoked). The JWT carries the token_version that was
     # current when it was issued ("tv" claim); get_current_agent rejects

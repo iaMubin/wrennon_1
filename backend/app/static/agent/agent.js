@@ -104,6 +104,44 @@ const conversationSession = document.getElementById("conversation-session");
 const agentMessages = document.getElementById("agent-messages");
 const agentInput = document.getElementById("agent-message-input");
 
+// --- Agent Preferences ---
+let agentSuggestionsEnabled = true;
+
+function updateSuggestionsUI() {
+  const pill = document.getElementById("current-suggestions-pill");
+  if (pill) {
+    pill.textContent = agentSuggestionsEnabled ? "On" : "Off";
+  }
+}
+
+async function setSuggestionsEnabled(enabled, saveToBackend = true) {
+  agentSuggestionsEnabled = !!enabled;
+  updateSuggestionsUI();
+  const currentUsername = localStorage.getItem("agent_username") || "default";
+  localStorage.setItem("agent_suggestions_enabled_" + currentUsername, agentSuggestionsEnabled ? "true" : "false");
+
+  if (saveToBackend) {
+    try {
+      await authedFetch("/agent/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ suggestions_enabled: agentSuggestionsEnabled })
+      });
+    } catch (err) {
+      console.error("Failed to save suggestions preference", err);
+    }
+  }
+}
+
+// Initialize preference from local storage for current agent
+const initialSavedUsername = localStorage.getItem("agent_username");
+if (initialSavedUsername) {
+  const localPref = localStorage.getItem("agent_suggestions_enabled_" + initialSavedUsername);
+  agentSuggestionsEnabled = localPref !== "false";
+} else {
+  agentSuggestionsEnabled = true;
+}
+
 // ── Theme Management ───────────────────────────────────────────────
 function setupThemeDropdown() {
   const menuBtn = document.getElementById("theme-menu-btn");
@@ -216,6 +254,16 @@ function setupThemeDropdown() {
       });
     });
   }
+
+  const btnToggleSuggestions = document.getElementById("btn-toggle-suggestions");
+  if (btnToggleSuggestions) {
+    btnToggleSuggestions.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setSuggestionsEnabled(!agentSuggestionsEnabled, true);
+    });
+  }
+  updateSuggestionsUI();
 
   document.addEventListener("click", (e) => {
     if (!e.target.closest("#theme-dropdown") && !e.target.closest("#theme-menu-btn")) {
@@ -435,6 +483,15 @@ loginForm.addEventListener("submit", async (e) => {
       localStorage.removeItem("agent_dp_url");
       document.getElementById("agent-profile-dp").src = "images/default-avatar.png?v=2";
     }
+
+    if (typeof data.suggestions_enabled === "boolean") {
+      agentSuggestionsEnabled = data.suggestions_enabled;
+    } else {
+      const localVal = localStorage.getItem("agent_suggestions_enabled_" + username);
+      agentSuggestionsEnabled = localVal !== "false";
+    }
+    localStorage.setItem("agent_suggestions_enabled_" + username, agentSuggestionsEnabled ? "true" : "false");
+    updateSuggestionsUI();
     
     if (data.role === "manager" || data.role === "admin") {
       document.getElementById("admin-dashboard-btn").classList.remove("hidden");
@@ -630,33 +687,50 @@ sectionTabs.forEach((tab) => {
 function formatPreview(conv) {
   let msg = conv.last_message;
   if (!msg) return "No messages yet";
-  
-  // Handle internal notes specially
-  if (conv.last_message_is_internal || msg.startsWith("*Internal Note:*")) {
-    let noteText = msg.replace(/^\*Internal Note:\*\s*/, '');
-    let cleanText = noteText.replace(/\n\n\(Transcript:.*?\)/g, '').replace(/\*\*(.+?)\*\*/g, "$1").replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '$1');
-    return `<span style="color: var(--warning); font-weight: 600; font-size: 11px; text-transform: uppercase; margin-right: 4px;">Note:</span>${escapeHtml(cleanText)}`;
+
+  let isInternalNote = conv.last_message_is_internal || msg.startsWith("*Internal Note:*");
+  if (isInternalNote) {
+    msg = msg.replace(/^\*Internal Note:\*\s*/, '');
   }
-  
+
+  // Feature: WhatsApp / Messenger / Telegram style reply preview in conversation list
+  let replyPrefix = "";
+  const replyMatch = msg.match(/^>\s*\*{0,2}Replying to:\*{0,2}\s*\n((?:>.*\n?)*)\n*([\s\S]*)$/i);
+  if (replyMatch) {
+    const quoted = replyMatch[1].split('\n').map(l => l.replace(/^>\s*/, '')).join(' ').trim();
+    const actual = replyMatch[2].trim();
+    msg = actual || quoted;
+
+    const tooltipAttr = quoted ? ` title="Replying to: ${escapeHtml(quoted.replace(/"/g, '&quot;'))}"` : '';
+    replyPrefix = `<span class="conv-item-reply-indicator"${tooltipAttr} style="color:var(--accent); font-weight:600; font-size:11.5px; margin-right:4px;">Replied:</span>`;
+  }
+
   // Remove transcript
   let text = msg.replace(/\n\n\(Transcript:.*?\)/g, '');
-  
+
+  let notePrefix = "";
+  if (isInternalNote) {
+    notePrefix = `<span style="color: var(--warning); font-weight: 600; font-size: 11px; text-transform: uppercase; margin-right: 4px;">Note:</span>`;
+  }
+
   // Check for Audio/Video
   if (/\[(?:Audio|Video)\]\((https?:\/\/[^\)]+)\)/.test(text)) {
-    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: text-bottom; margin-right: 4px;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>Voice message`;
+    return notePrefix + replyPrefix + `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: text-bottom; margin-right: 4px;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>Voice message`;
   }
-  
+
   // Check for Image
   if (/!\[.*?\]\((https?:\/\/[^\)]+)\)/.test(text)) {
-    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: text-bottom; margin-right: 4px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>Photo`;
+    return notePrefix + replyPrefix + `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: text-bottom; margin-right: 4px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>Photo`;
   }
-  
+
   // Strip bold
   text = text.replace(/\*\*(.+?)\*\*/g, "$1");
   // Strip links
   text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '$1');
-  
-  return escapeHtml(text);
+  // Strip extra newlines for smooth one-line preview
+  text = text.replace(/[\r\n]+/g, ' ').trim();
+
+  return notePrefix + replyPrefix + escapeHtml(text);
 }
 
 async function loadConversations() {
@@ -1168,27 +1242,75 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
   const actualSender = isInternal ? "agent" : sender;
   const currentAuthor = (actualSender === "agent") ? (author_username || localStorage.getItem("agent_username") || "Agent").toLowerCase() : null;
   
-  let isGrouped = (sender === lastMsgSender && currentAuthor === lastMsgAuthor && (timestamp - lastMsgTime < 60000) && sender !== "system");
-  
-  if (isInternal) {
-    isGrouped = false; // Never group internal notes
+  // Canonical sender role
+  const getSenderRole = (s, internal) => {
+    if (internal) return "internal";
+    if (s === "human" || s === "user") return "user";
+    if (s === "ai" || s === "bot") return "bot";
+    if (s === "agent") return "agent";
+    return s || "unknown";
+  };
+  const currentRole = getSenderRole(sender, isInternal);
+
+  // Look for immediately preceding msg-content in agentMessages
+  let prevWrapper = agentMessages.lastElementChild;
+  let hasDateSeparatorBetween = false;
+  while (prevWrapper && !prevWrapper.classList.contains("msg-content")) {
+    if (prevWrapper.classList && prevWrapper.classList.contains("date-separator") && !prevWrapper.classList.contains("unread-indicator")) {
+      hasDateSeparatorBetween = true;
+    }
+    prevWrapper = prevWrapper.previousElementSibling;
   }
-  
-  if (!isGrouped) {
+
+  const prevRole = prevWrapper ? (prevWrapper.dataset.senderRole || (prevWrapper.classList.contains("msg-content--user") || prevWrapper.classList.contains("msg-content--human") ? "user" : (prevWrapper.classList.contains("msg-content--agent") ? "agent" : (prevWrapper.classList.contains("msg-content--ai") || prevWrapper.classList.contains("msg-content--bot") ? "bot" : null)))) : null;
+  const prevAuthor = prevWrapper ? (prevWrapper.dataset.author || null) : null;
+  const prevTimestamp = prevWrapper ? Number(prevWrapper.dataset.timestamp || (prevWrapper.dataset.isoTimestamp ? new Date(prevWrapper.dataset.isoTimestamp).getTime() : 0)) : (lastMsgTime || 0);
+
+  const isSameSender = Boolean(
+    !hasDateSeparatorBetween &&
+    prevWrapper &&
+    prevRole === currentRole &&
+    currentRole !== "internal" &&
+    currentRole !== "system" &&
+    (currentRole !== "agent" || currentAuthor === prevAuthor || !prevAuthor || !currentAuthor)
+  );
+
+  const isGrouped = Boolean(
+    isSameSender &&
+    prevTimestamp &&
+    Math.abs(timestamp - prevTimestamp) < 600000 // 10 minutes cluster threshold (standard)
+  );
+
+  if (isGrouped && prevWrapper) {
+    // Hide previous bubble's timestamp so only the latest in the burst shows the time
+    const prevMeta = prevWrapper.querySelector(".msg-meta");
+    if (prevMeta) {
+      prevMeta.remove();
+    }
+    prevWrapper.classList.add("msg-content--grouped-prev");
+    const prevMsg = prevWrapper.querySelector(".msg");
+    if (prevMsg) {
+      prevMsg.classList.add("msg--grouped-prev");
+    }
+  } else {
     lastMsgSender = sender;
     lastMsgAuthor = currentAuthor;
   }
   lastMsgTime = timestamp;
 
   const contentWrapper = document.createElement("div");
-  contentWrapper.className = `msg-content msg-content--${actualSender}${isGrouped ? ' msg-content--grouped' : ''}${isInternal ? ' msg-content--internal' : ''}`;
+  contentWrapper.className = `msg-content msg-content--${actualSender}${isGrouped ? ' msg-content--grouped msg-content--grouped-next' : ''}${isInternal ? ' msg-content--internal' : ''}`;
   contentWrapper.style.display = "flex";
   contentWrapper.style.flexDirection = "column";
+  contentWrapper.dataset.senderRole = currentRole;
+  contentWrapper.dataset.author = currentAuthor || "";
+  contentWrapper.dataset.timestamp = String(timestamp);
+  contentWrapper.dataset.isoTimestamp = isoString || '';
   if (msgId) contentWrapper.dataset.msgId = msgId;
   contentWrapper.dataset.pinned = isPinned ? "1" : "0";
 
   const div = document.createElement("div");
-  div.className = `msg msg--${actualSender}${isInternal ? ' msg--internal' : ''}`;
+  div.className = `msg msg--${actualSender}${isInternal ? ' msg--internal' : ''}${isGrouped ? ' msg--grouped-next' : ''}`;
   div.setAttribute("role", "listitem");
   
   let nameHtml = "";
@@ -1217,6 +1339,12 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
     
   // Feature: Hide internal image descriptions from agent UI
   displayContent = displayContent.replace(/\[INTERNAL_IMAGE_DESC\][\s\S]*?\[\/INTERNAL_IMAGE_DESC\]/g, '');
+
+  // Feature: Handoff suggestions handling (normalize legacy Macro Suggestion -> Suggestion)
+  if (actualSender === "system" || /macro\s*suggestion/i.test(displayContent)) {
+    displayContent = displayContent.replace(/\*\*(?:Macro\s+Suggestion|Macro\s+suggestion)\*\*/gi, "**Suggestion**");
+    displayContent = displayContent.replace(/(^|\n|\s)(?:[•\*\-]\s*)?(?:Macro\s+Suggestion|Macro\s+suggestion)\s*:/gi, "$1• **Suggestion**:");
+  }
   
   // Feature: WhatsApp style replies
   let replyHtml = '';
@@ -2178,7 +2306,13 @@ async function authedFetch(path, method = "GET", body = null) {
       return null;
     }
     if (!response.ok) return null;
-    return await response.json();
+    const text = await response.text();
+    if (!text) return {};
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      return text;
+    }
   } catch (err) {
     console.error(err);
     return null;
@@ -2207,6 +2341,7 @@ function renderMarkdown(text) {
 
     const numbered = line.match(/^(\d+)[.)]\s+(.*)/);
     const bulleted = line.match(/^[-*]\s+(.*)/);
+    const blockquoted = line.match(/^>\s*(.*)/);
 
     if (numbered || bulleted) {
       const tag = numbered ? "ol" : "ul";
@@ -2218,6 +2353,9 @@ function renderMarkdown(text) {
       }
       const content = numbered ? numbered[2] : bulleted[1];
       html += `<li>${inlineMarkdown(content)}</li>`;
+    } else if (blockquoted) {
+      closeList();
+      html += `<blockquote>${inlineMarkdown(blockquoted[1])}</blockquote>`;
     } else {
       closeList();
       html += `<p>${inlineMarkdown(line)}</p>`;
@@ -2352,6 +2490,7 @@ function inlineMarkdown(text) {
   });
   escaped = linkifyRawUrls(escaped);
   escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  escaped = escaped.replace(/@\[([^\]]+)\]/g, '<span class="agent-mention" style="color: var(--accent); font-weight: 600; background: var(--accent-glow); padding: 0 4px; border-radius: 4px;">@$1</span>');
   escaped = escaped.replace(/@([a-zA-Z0-9_]+)/g, '<span class="agent-mention" style="color: var(--accent); font-weight: 600; background: var(--accent-glow); padding: 0 4px; border-radius: 4px;">@$1</span>');
   return escaped;
 }
@@ -2694,6 +2833,22 @@ document.addEventListener("DOMContentLoaded", async () => {
           });
         }
       }
+
+      // Sync agent preferences from backend
+      try {
+        const prefData = await authedFetch("/agent/preferences");
+        if (prefData && typeof prefData.suggestions_enabled === "boolean") {
+          agentSuggestionsEnabled = prefData.suggestions_enabled;
+        } else {
+          const localPref = localStorage.getItem("agent_suggestions_enabled_" + savedUsername);
+          agentSuggestionsEnabled = localPref !== "false";
+        }
+      } catch (e) {
+        const localPref = localStorage.getItem("agent_suggestions_enabled_" + savedUsername);
+        agentSuggestionsEnabled = localPref !== "false";
+      }
+      localStorage.setItem("agent_suggestions_enabled_" + savedUsername, agentSuggestionsEnabled ? "true" : "false");
+      updateSuggestionsUI();
       
       connectSocket();
       loadConversations();
@@ -3566,7 +3721,19 @@ function updateViaMediaPosition() {
 
   const isAtBottom = (session.parentElement === metaRow);
   const sessionWidth = Math.max(session.scrollWidth, session.offsetWidth) || 115;
-  const propsWidth = Math.max(propsBar.scrollWidth, propsBar.offsetWidth) || 250;
+
+  let truePropsWidth = 0;
+  Array.from(propsBar.children).forEach(child => {
+    if (child.offsetWidth) {
+      truePropsWidth += child.offsetWidth;
+      const cs = window.getComputedStyle(child);
+      truePropsWidth += (parseFloat(cs.marginLeft) || 0) + (parseFloat(cs.marginRight) || 0);
+    }
+  });
+  if (propsBar.children.length > 1) {
+    truePropsWidth += (propsBar.children.length - 1) * 6;
+  }
+  const propsWidth = Math.max(truePropsWidth, propsBar.scrollWidth, propsBar.offsetWidth) || 250;
 
   if (isAtBottom) {
     // Session is currently on the bottom line in its original position.
@@ -3580,11 +3747,20 @@ function updateViaMediaPosition() {
   } else {
     // Session is currently at the top beside the customer name.
     // Check if bottom line has enough space to take session back down to its original position:
-    const neededAtBottom = propsWidth + sessionWidth + 20;
+    const neededAtBottom = propsWidth + sessionWidth + 24;
 
     if (availableWidth >= neededAtBottom) {
       metaRow.insertBefore(session, propsBar);
     }
+  }
+
+  // Manage divider between assignee and tags if tags wrap onto line 3
+  const tagsItem = document.querySelector(".tp-item--tags");
+  const assigneeItem = document.querySelector(".tp-item--assignee");
+  const divider2 = document.querySelectorAll("#ticket-properties-bar .tp-divider")[1];
+  if (tagsItem && assigneeItem && divider2) {
+    const isWrapped = tagsItem.offsetTop > (assigneeItem.offsetTop + 4);
+    divider2.style.display = isWrapped ? "none" : "inline-block";
   }
 }
 window.updateViaMediaPosition = updateViaMediaPosition;

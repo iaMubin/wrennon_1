@@ -162,7 +162,8 @@ async def login(
     )
     
     return {"access_token": token, "token_type": "bearer",  # nosec B105 - OAuth token type label, not a secret
-            "role": agent.role, "dp_url": agent.dp_url, "full_name": agent.full_name}
+            "role": agent.role, "dp_url": agent.dp_url, "full_name": agent.full_name,
+            "suggestions_enabled": bool(getattr(agent, "suggestions_enabled", True))}
 
 @router.post("/agent/logout")
 def logout(
@@ -181,6 +182,33 @@ def logout(
     db.commit()
     response.delete_cookie(key="access_token", samesite="none", secure=True)
     return {"status": "logged_out"}
+
+
+class AgentPreferencesUpdate(BaseModel):
+    suggestions_enabled: bool
+
+
+@router.get("/agent/preferences")
+def get_preferences(
+    agent: Agent = Depends(get_current_agent),
+) -> dict:
+    return {
+        "suggestions_enabled": bool(getattr(agent, "suggestions_enabled", True))
+    }
+
+
+@router.patch("/agent/preferences")
+def update_preferences(
+    pref: AgentPreferencesUpdate,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent),
+) -> dict:
+    agent.suggestions_enabled = pref.suggestions_enabled
+    db.commit()
+    db.refresh(agent)
+    return {
+        "suggestions_enabled": bool(agent.suggestions_enabled)
+    }
 
 
 class VerifyTOTPRequest(BaseModel):
