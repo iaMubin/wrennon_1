@@ -1,20 +1,30 @@
 <nav id="global-nav">
       <div class="global-nav-top">
         <button id="mobile-sidebar-toggle" class="global-nav-btn" aria-label="Toggle Sidebar" title="Toggle Sidebar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
-            <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+            <rect x="3" y="3" width="18" height="18" rx="4"></rect>
             <path d="M9 3v18"></path>
+            <rect x="3" y="3" width="6" height="18" rx="4" fill="currentColor" fill-opacity="0.22" stroke="none"></rect>
+            <path d="m15.5 15-3-3 3-3"></path>
           </svg>
         </button>
-        <button id="nav-dashboard-btn" class="global-nav-btn" title="Dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></button>
-        <button id="nav-conversations-btn" class="global-nav-btn" title="Conversations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg></button>
-        <button id="nav-customers-btn" class="global-nav-btn" title="Customers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></button>
-        <button id="nav-analytics-btn" class="global-nav-btn" title="Analytics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M3 3v18h18"></path><rect width="4" height="7" x="7" y="14" rx="1"></rect><rect width="4" height="12" x="15" y="9" rx="1"></rect></svg></button>
+        <button id="nav-dashboard-btn" class="global-nav-btn" title="Dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect x="3" y="3" width="7.5" height="9" rx="2.5" fill="currentColor" fill-opacity="0.22"></rect><rect x="13.5" y="3" width="7.5" height="5" rx="2"></rect><rect x="13.5" y="11" width="7.5" height="10" rx="2.5" fill="currentColor" fill-opacity="0.14"></rect><rect x="3" y="15" width="7.5" height="6" rx="2"></rect></svg></button>
+        <button id="nav-conversations-btn" class="global-nav-btn" title="Conversations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2z" fill="currentColor" fill-opacity="0.22"></path><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"></path></svg></button>
+        <button id="nav-customers-btn" class="global-nav-btn" title="Customers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="9" cy="8" r="4" fill="currentColor" fill-opacity="0.22"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path><circle cx="16.5" cy="7.5" r="3"></circle><path d="M16 14.5c2.8.4 5.5 1.8 5.5 5.5"></path></svg></button>
+        <button id="nav-analytics-btn" class="global-nav-btn" title="Analytics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect x="3.5" y="13.5" width="4" height="7" rx="2" fill="currentColor" fill-opacity="0.25"></rect><rect x="10" y="8.5" width="4" height="12" rx="2" fill="currentColor" fill-opacity="0.5"></rect><rect x="16.5" y="3.5" width="4" height="17" rx="2" fill="currentColor" fill-opacity="0.85"></rect></svg></button>
 
         <div style="position: relative; width: 100%;">
           <button id="global-filter-btn" class="global-nav-btn" title="Filters" aria-haspopup="true" style="position: relative;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22" style="margin: 0 auto; display: block;">
-              <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"></path>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="margin: 0 auto; display: block;">
+              <line x1="3" y1="6" x2="13" y2="6"></line>
+              <line x1="17" y1="6" x2="21" y2="6"></line>
+              <circle cx="15" cy="6" r="2.2" fill="currentColor"></circle>
+              <line x1="3" y1="12" x2="7" y2="12"></line>
+              <line x1="11" y1="12" x2="21" y2="12"></line>
+              <circle cx="9" cy="12" r="2.2" fill="currentColor"></circle>
+              <line x1="3" y1="18" x2="15" y2="18"></line>
+              <line x1="19" y1="18" x2="21" y2="18"></line>
+              <circle cx="17" cy="18" r="2.2" fill="currentColor"></circle>
             </svg>
             <span id="filter-active-badge" style="display: none; position: absolute; top: 4px; right: 8px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--accent) 85%, black);"></span>
           </button>
@@ -23,7 +33,7 @@
             <!-- Header -->
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line);">
               <div style="display: flex; align-items: center; gap: 8px;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16" style="opacity: 0.6;"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"></path></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="opacity: 0.7;"><line x1="3" y1="6" x2="13" y2="6"></line><line x1="17" y1="6" x2="21" y2="6"></line><circle cx="15" cy="6" r="2.2" fill="currentColor"></circle><line x1="3" y1="12" x2="7" y2="12"></line><line x1="11" y1="12" x2="21" y2="12"></line><circle cx="9" cy="12" r="2.2" fill="currentColor"></circle><line x1="3" y1="18" x2="15" y2="18"></line><line x1="19" y1="18" x2="21" y2="18"></line><circle cx="17" cy="18" r="2.2" fill="currentColor"></circle></svg>
                 <span style="font-size: 14px; font-weight: 600; color: var(--ink);">Filters</span>
               </div>
               <button id="clear-filters-btn" style="display: none; background: none; border: none; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--accent); padding: 2px 6px; border-radius: 4px; transition: background 0.15s;">Clear all</button>
@@ -77,9 +87,9 @@
         </div>
         <div style="position: relative; width: 100%; display: flex; justify-content: center;">
           <button id="theme-menu-btn" class="global-nav-btn" aria-haspopup="true" aria-expanded="false" title="Settings">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22" style="margin: 0 auto; display: block;">
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-              <circle cx="12" cy="12" r="3"></circle>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="margin: 0 auto; display: block;">
+              <circle cx="12" cy="12" r="3" fill="currentColor" fill-opacity="0.25"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
           </button>
           
@@ -107,7 +117,7 @@
                 </button>
               </div>
 
-              <!-- Appearance Submenu View -->
+                                                        <!-- Appearance Submenu View -->
               <div id="menu-appearance-view" class="hidden">
                 <button id="btn-back-appearance" class="theme-option" style="display:flex; align-items:center; gap:8px;" role="menuitem">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
@@ -115,28 +125,49 @@
                 </button>
                 <div style="height: 1px; background: var(--line); margin: 4px 0;"></div>
                 
-                <button class="theme-option" data-theme-value="system" role="menuitem">System Preference</button>
+                <button class="theme-option" data-theme-value="system" role="menuitem">
+                  <span class="theme-swatch theme-swatch--system"></span>
+                  <span class="theme-name">System Default</span>
+                  <span class="theme-badge">Auto</span>
+                </button>
                 <div class="theme-tabs">
-                  <button class="theme-tab active" data-target="agent-light-themes">Light</button>
-                  <button class="theme-tab" data-target="agent-dark-themes">Dark</button>
+                  <button class="theme-tab active" data-target="agent-light-themes">Light (3)</button>
+                  <button class="theme-tab" data-target="agent-dark-themes">Dark (3)</button>
                   <button class="theme-tab" data-target="agent-widget-themes">Widget</button>
                 </div>
                 <div id="agent-light-themes" class="theme-tab-content active">
-                  <button class="theme-option" data-theme-value="light-brownish" role="menuitem">Brownish White</button>
-                  <button class="theme-option" data-theme-value="light-neutral-gray" role="menuitem">Neutral Gray</button>
-                  <button class="theme-option" data-theme-value="light-corporate-blue" role="menuitem">Corporate Blue</button>
-                  <button class="theme-option" data-theme-value="light-slate-teal" role="menuitem">Slate Teal</button>
-                  <button class="theme-option" data-theme-value="light-graphite" role="menuitem">Graphite Monochrome</button>
-                  <button class="theme-option" data-theme-value="light-pure-white" role="menuitem">Pure White</button>
+                  <button class="theme-option" data-theme-value="light-mono" role="menuitem">
+                    <span class="theme-swatch" style="background: linear-gradient(135deg, #FAFAFA 50%, #18181B 50%); border: 1px solid #E4E4E7;"></span>
+                    <span class="theme-name">Mono</span>
+                    <span class="theme-badge">Mono</span>
+                  </button>
+                  <button class="theme-option" data-theme-value="light-chrome-grey" role="menuitem">
+                    <span class="theme-swatch" style="background: linear-gradient(135deg, #F1F3F4 50%, #3C4043 50%); border: 1px solid #DADCE0;"></span>
+                    <span class="theme-name">Chrome Grey</span>
+                    <span class="theme-badge">Grey</span>
+                  </button>
+                  <button class="theme-option" data-theme-value="light-viridian" role="menuitem">
+                    <span class="theme-swatch" style="background: linear-gradient(135deg, #EDF5F1 50%, #2D6A53 50%); border: 1px solid #BFD8CD;"></span>
+                    <span class="theme-name">Chrome Viridian</span>
+                    <span class="theme-badge">Viridian</span>
+                  </button>
                 </div>
                 <div id="agent-dark-themes" class="theme-tab-content hidden">
-                  <button class="theme-option" data-theme-value="dark-matte" role="menuitem">Matte Black</button>
-                  <button class="theme-option" data-theme-value="dark-navy" role="menuitem">Black Navy</button>
-                  <button class="theme-option" data-theme-value="dark-charcoal" role="menuitem">Charcoal</button>
-                  <button class="theme-option" data-theme-value="dark-corporate-blue" role="menuitem">Corporate Blue</button>
-                  <button class="theme-option" data-theme-value="dark-slate-teal" role="menuitem">Slate Teal</button>
-                  <button class="theme-option" data-theme-value="dark-graphite" role="menuitem">Graphite Monochrome</button>
-                  <button class="theme-option" data-theme-value="dark-pure-black" role="menuitem">Pure Black</button>
+                  <button class="theme-option" data-theme-value="dark-matte" role="menuitem">
+                    <span class="theme-swatch" style="background: linear-gradient(135deg, #09090B 50%, #EDEDEF 50%); border: 1px solid #27272D;"></span>
+                    <span class="theme-name">Obsidian Carbon</span>
+                    <span class="theme-badge">Matte</span>
+                  </button>
+                  <button class="theme-option" data-theme-value="dark-chrome-grey" role="menuitem">
+                    <span class="theme-swatch" style="background: linear-gradient(135deg, #202124 50%, #8AB4F8 50%); border: 1px solid #3C4043;"></span>
+                    <span class="theme-name">Chrome Grey</span>
+                    <span class="theme-badge">Grey</span>
+                  </button>
+                  <button class="theme-option" data-theme-value="dark-viridian" role="menuitem">
+                    <span class="theme-swatch" style="background: linear-gradient(135deg, #0D1612 50%, #4FA882 50%); border: 1px solid #273F33;"></span>
+                    <span class="theme-name">Chrome Viridian</span>
+                    <span class="theme-badge">Viridian</span>
+                  </button>
                 </div>
                 <div id="agent-widget-themes" class="theme-tab-content hidden">
                   <button class="theme-option" data-theme-value="widget-default" role="menuitem">Default (System Auto)</button>
@@ -149,8 +180,10 @@
       </div>
       <div class="global-nav-bottom">
         <button id="admin-dashboard-btn" class="global-nav-btn active" title="Admin Panel">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
-            <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path>
+          <svg viewBox="1.15 1.3 21.4 21.4" fill="currentColor" width="22" height="22">
+            <path d="M 9.75,2.00 L 10.12,2.05 L 10.46,2.14 L 10.78,2.25 L 11.10,2.35 L 11.40,2.48 L 11.70,2.60 L 12.00,2.73 L 12.30,2.85 L 12.60,2.98 L 12.90,3.10 L 13.19,3.24 L 13.47,3.38 L 13.76,3.52 L 14.06,3.65 L 14.32,3.81 L 14.61,3.95 L 14.89,4.09 L 15.17,4.23 L 15.44,4.39 L 15.71,4.55 L 15.99,4.70 L 16.26,4.85 L 16.50,5.03 L 16.77,5.19 L 16.89,5.49 L 16.89,5.92 L 16.89,6.34 L 16.89,6.77 L 16.89,7.20 L 16.89,7.62 L 16.89,8.05 L 16.84,8.42 L 16.49,8.35 L 16.06,8.35 L 15.71,8.35 L 15.28,8.35 L 14.93,8.42 L 14.57,8.49 L 14.25,8.60 L 13.93,8.70 L 13.65,8.84 L 13.37,8.99 L 13.08,9.13 L 12.83,9.30 L 12.59,9.48 L 12.35,9.68 L 12.12,9.87 L 11.91,10.09 L 11.72,10.32 L 11.54,10.56 L 11.36,10.81 L 11.18,11.06 L 11.04,11.34 L 10.90,11.63 L 10.79,11.95 L 10.69,12.27 L 10.58,12.59 L 10.51,12.94 L 10.48,13.33 L 10.44,13.72 L 10.48,14.11 L 10.51,14.50 L 10.55,14.89 L 10.65,15.21 L 10.74,15.55 L 10.87,15.85 L 10.99,16.15 L 11.13,16.43 L 11.29,16.70 L 11.31,16.93 L 11.02,17.07 L 10.76,17.23 L 10.51,17.41 L 10.28,17.60 L 10.05,17.80 L 9.84,18.01 L 9.62,18.22 L 9.45,18.47 L 9.25,18.70 L 9.04,18.91 L 8.77,18.76 L 8.51,18.60 L 8.24,18.44 L 7.98,18.28 L 7.73,18.10 L 7.48,17.92 L 7.23,17.74 L 6.98,17.57 L 6.73,17.39 L 6.50,17.20 L 6.27,17.00 L 6.06,16.79 L 5.83,16.59 L 5.62,16.38 L 5.40,16.17 L 5.19,15.95 L 5.00,15.72 L 4.80,15.49 L 4.61,15.26 L 4.43,15.01 L 4.25,14.77 L 4.07,14.52 L 3.91,14.25 L 3.76,13.99 L 3.60,13.72 L 3.47,13.42 L 3.35,13.12 L 3.22,12.82 L 3.10,12.51 L 3.01,12.18 L 2.92,11.84 L 2.85,11.49 L 2.82,11.10 L 2.78,10.71 L 2.74,10.32 L 2.74,9.89 L 2.74,9.46 L 2.74,9.04 L 2.74,8.61 L 2.74,8.19 L 2.74,7.76 L 2.74,7.34 L 2.74,6.91 L 2.74,6.49 L 2.74,6.06 L 2.74,5.63 L 2.80,5.26 L 3.05,5.09 L 3.31,4.93 L 3.58,4.77 L 3.84,4.61 L 4.11,4.45 L 4.39,4.30 L 4.66,4.15 L 4.94,4.00 L 5.23,3.86 L 5.49,3.70 L 5.78,3.56 L 6.08,3.44 L 6.36,3.29 L 6.66,3.17 L 6.95,3.03 L 7.25,2.90 L 7.55,2.78 L 7.85,2.66 L 8.15,2.53 L 8.45,2.41 L 8.76,2.28 L 9.07,2.18 L 9.41,2.09 L 9.75,2.00 Z" stroke="none"></path>
+            <circle cx="15.8" cy="13.8" r="3.1" stroke="none"></circle>
+            <path d="M 10.6,22.0 C 10.6,19.4 12.9,18.6 15.8,18.6 C 18.7,18.6 21.0,19.4 21.0,22.0 Z" stroke="none"></path>
           </svg>
         </button>
         <div class="theme-dropdown-container" style="display: flex; justify-content: center; width: 100%; margin-bottom: 8px; position: relative;">

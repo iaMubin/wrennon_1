@@ -162,10 +162,16 @@ function setupThemeDropdown() {
     if (themeValue.startsWith("widget-")) {
       localStorage.setItem("wrennon_widget_theme", themeValue);
     } else {
+      // Map legacy names to modern verified theme suite
+      if (themeValue === "light-professional" || themeValue === "light-neutral-gray") themeValue = "light-mono";
+      else if (themeValue === "light-corporate-blue") themeValue = "light-chrome-grey";
+      else if (themeValue === "dark-professional") themeValue = "dark-matte";
+      else if (themeValue === "dark-navy") themeValue = "dark-chrome-grey";
+
       localStorage.setItem("wrennon_theme", themeValue);
       if (themeValue === "system") {
         const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        document.documentElement.setAttribute("data-theme", isDark ? "dark-professional" : "light-professional");
+        document.documentElement.setAttribute("data-theme", isDark ? "dark-matte" : "light-mono");
       } else {
         document.documentElement.setAttribute("data-theme", themeValue);
       }
@@ -297,7 +303,7 @@ function setupThemeDropdown() {
 
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
     if (localStorage.getItem("wrennon_theme") === "system") {
-      document.documentElement.setAttribute("data-theme", e.matches ? "dark-professional" : "light-professional");
+      document.documentElement.setAttribute("data-theme", e.matches ? "dark-matte" : "light-mono");
     }
   });
 }
@@ -3874,13 +3880,13 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       
       if (isOpen) {
-        mobileToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><path d="M9 3v18"></path><path d="m16 15-3-3 3-3"></path></svg>';
+        mobileToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="M9 3v18"></path><rect x="3" y="3" width="6" height="18" rx="4" fill="currentColor" fill-opacity="0.22" stroke="none"></rect><path d="m15.5 15-3-3 3-3"></path></svg>';
         mobileToggle.setAttribute("title", "Close Sidebar");
         mobileToggle.setAttribute("aria-label", "Close Sidebar");
         mobileToggle.setAttribute("aria-expanded", "true");
         mobileToggle.classList.add("sidebar-is-open");
       } else {
-        mobileToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><path d="M9 3v18"></path><path d="m14 9 3 3-3 3"></path></svg>';
+        mobileToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="M9 3v18"></path><path d="m13 9 3 3-3 3"></path></svg>';
         mobileToggle.setAttribute("title", "Open Sidebar");
         mobileToggle.setAttribute("aria-label", "Open Sidebar");
         mobileToggle.setAttribute("aria-expanded", "false");
@@ -4233,15 +4239,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if(btns[viewName]) {
       btns[viewName].classList.add('active');
     }
+
+    if (typeof window.initCharts === 'function') {
+      window.initCharts();
+    }
     
     if (viewName === 'dashboard') {
-        window.loadDashboard();
+        if (typeof window.loadDashboard === 'function') window.loadDashboard();
     } else if (viewName === 'customers') {
-        window.loadCustomers();
+        if (typeof window.loadCustomers === 'function') window.loadCustomers();
     } else if (viewName === 'analytics') {
-        window.loadAnalytics();
+        if (typeof window.loadAnalytics === 'function') window.loadAnalytics();
     }
   }
+  window.switchView = switchView;
 
   window.loadDashboard = async function() {
       try {
@@ -4299,10 +4310,11 @@ document.addEventListener('DOMContentLoaded', () => {
                       });
                   }
               }
-              if (window.miniVolumeChart && data.hourly_volume) {
-                  window.miniVolumeChart.data.datasets[0].data = data.hourly_volume;
-                  window.miniVolumeChart.data.labels = data.hourly_volume.map((_, i) => `${i}:00`);
-                  window.miniVolumeChart.update();
+              const miniChart = window.miniVolumeChartInstance || (typeof Chart !== 'undefined' ? Chart.getChart('miniVolumeChart') : null);
+              if (miniChart && miniChart.data && Array.isArray(miniChart.data.datasets) && miniChart.data.datasets[0] && data.hourly_volume) {
+                  miniChart.data.datasets[0].data = data.hourly_volume;
+                  miniChart.data.labels = data.hourly_volume.map((_, i) => `${i}:00`);
+                  miniChart.update();
               }
               
               const workloadList = document.getElementById('agent-chat-counts-list');
@@ -4350,10 +4362,11 @@ document.addEventListener('DOMContentLoaded', () => {
               const otEl = document.getElementById('analytics-one-touch');
               if(otEl) otEl.textContent = data.one_touch_resolutions_pct ? data.one_touch_resolutions_pct.toFixed(0) + '%' : '0%';
               
-              if (window.volumeChart) {
-                  window.volumeChart.data.datasets[0].data = data.hourly_volume;
-                  window.volumeChart.data.labels = data.volume_labels;
-                  window.volumeChart.update();
+              const volChart = window.volumeChartInstance || (typeof Chart !== 'undefined' ? Chart.getChart('volumeChart') : null);
+              if (volChart && volChart.data && Array.isArray(volChart.data.datasets) && volChart.data.datasets[0] && data.hourly_volume) {
+                  volChart.data.datasets[0].data = data.hourly_volume;
+                  volChart.data.labels = data.volume_labels || data.hourly_volume.map((_, i) => `${i}:00`);
+                  volChart.update();
               }
               
               // Rolling CSAT
@@ -4379,23 +4392,25 @@ document.addEventListener('DOMContentLoaded', () => {
               }
               
               // Tags Frequency
-              if (window.tagsChart && data.tag_frequency) {
+              const tagCh = window.tagsChartInstance || (typeof Chart !== 'undefined' ? Chart.getChart('tagsChart') : null);
+              if (tagCh && tagCh.data && Array.isArray(tagCh.data.datasets) && tagCh.data.datasets[0] && data.tag_frequency) {
                   const sortedTags = data.tag_frequency.slice(0, 5); // top 5
-                  window.tagsChart.data.labels = sortedTags.map(t => t.tag);
-                  window.tagsChart.data.datasets[0].data = sortedTags.map(t => t.count);
-                  window.tagsChart.update();
+                  tagCh.data.labels = sortedTags.map(t => t.tag);
+                  tagCh.data.datasets[0].data = sortedTags.map(t => t.count);
+                  tagCh.update();
               }
-              if (window.csatChart) {
+              const csatCh = window.csatChartInstance || (typeof Chart !== 'undefined' ? Chart.getChart('csatChart') : null);
+              if (csatCh && csatCh.data && Array.isArray(csatCh.data.datasets) && csatCh.data.datasets[0]) {
                   const counts = data.csat_distribution || [0,0,0,0,0];
                   // backend is [1, 2, 3, 4, 5], frontend is ['5 Stars', '4 Stars', '3 Stars', '1-2 Stars']
                   const mappedCounts = [
-                      counts[4],                 // 5 stars
-                      counts[3],                 // 4 stars
-                      counts[2],                 // 3 stars
-                      counts[0] + counts[1]      // 1-2 stars
+                      counts[4] || 0,                 // 5 stars
+                      counts[3] || 0,                 // 4 stars
+                      counts[2] || 0,                 // 3 stars
+                      (counts[0] || 0) + (counts[1] || 0)      // 1-2 stars
                   ];
-                  window.csatChart.data.datasets[0].data = mappedCounts;
-                  window.csatChart.update();
+                  csatCh.data.datasets[0].data = mappedCounts;
+                  csatCh.update();
               }
           }
       } catch (e) { console.error("Failed to load analytics", e); }
@@ -4487,9 +4502,12 @@ document.addEventListener('DOMContentLoaded', () => {
 // --- Production Features Logic ---
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Chart.js Initialization
-    let volumeChart, csatChart, resolutionChart, miniVolumeChart;
+    function isChartInstance(obj) {
+        return obj && typeof obj.destroy === 'function' && obj.data && Array.isArray(obj.data.datasets);
+    }
 
     function initCharts() {
+        if (typeof Chart === 'undefined') return;
         const textColor = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#1e293b';
         const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--line').trim() || '#e2e8f0';
         const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#3b82f6';
@@ -4511,7 +4529,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Mini Volume Chart (Dashboard)
         const ctxMini = document.getElementById('miniVolumeChart');
-        if(ctxMini && !window.miniVolumeChart) {
+        if(ctxMini && !isChartInstance(window.miniVolumeChartInstance)) {
+            const existing = Chart.getChart(ctxMini);
+            if (existing) existing.destroy();
             let gradientMini;
             if (ctxMini.getContext) {
                 const ctx = ctxMini.getContext('2d');
@@ -4519,7 +4539,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 gradientMini.addColorStop(0, accentColor + '40');
                 gradientMini.addColorStop(1, accentColor + '00');
             }
-            window.miniVolumeChart = new Chart(ctxMini, {
+            window.miniVolumeChartInstance = new Chart(ctxMini, {
                 type: 'line',
                 data: {
                     labels: ['8am', '10am', '12pm', '2pm', '4pm', '6pm'],
@@ -4539,11 +4559,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     scales: { x: { display: false }, y: { display: false } }
                 }
             });
+            window.miniVolumeChart = window.miniVolumeChartInstance;
         }
 
         // Volume Chart (Analytics)
         const ctxVol = document.getElementById('volumeChart');
-        if(ctxVol && !window.volumeChart) {
+        if(ctxVol && !isChartInstance(window.volumeChartInstance)) {
+            const existing = Chart.getChart(ctxVol);
+            if (existing) existing.destroy();
             let gradientVol;
             if (ctxVol.getContext) {
                 const ctx = ctxVol.getContext('2d');
@@ -4551,7 +4574,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 gradientVol.addColorStop(0, accentColor + '60');
                 gradientVol.addColorStop(1, accentColor + '00');
             }
-            window.volumeChart = new Chart(ctxVol, {
+            window.volumeChartInstance = new Chart(ctxVol, {
                 type: 'line',
                 data: {
                     labels: Array.from({length: 24}, (_, i) => `${i}:00`),
@@ -4572,12 +4595,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 options: commonOptions
             });
+            window.volumeChart = window.volumeChartInstance;
         }
 
         // CSAT Chart (Analytics)
         const ctxCsat = document.getElementById('csatChart');
-        if(ctxCsat && !window.csatChart) {
-            window.csatChart = new Chart(ctxCsat, {
+        if(ctxCsat && !isChartInstance(window.csatChartInstance)) {
+            const existing = Chart.getChart(ctxCsat);
+            if (existing) existing.destroy();
+            window.csatChartInstance = new Chart(ctxCsat, {
                 type: 'doughnut',
                 data: {
                     labels: ['5 Stars', '4 Stars', '3 Stars', '1-2 Stars'],
@@ -4595,12 +4621,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             });
+            window.csatChart = window.csatChartInstance;
         }
 
         // Tags Chart (Analytics)
         const ctxTags = document.getElementById('tagsChart');
-        if(ctxTags && !window.tagsChart) {
-            window.tagsChart = new Chart(ctxTags, {
+        if(ctxTags && !isChartInstance(window.tagsChartInstance)) {
+            const existing = Chart.getChart(ctxTags);
+            if (existing) existing.destroy();
+            window.tagsChartInstance = new Chart(ctxTags, {
                 type: 'bar',
                 data: {
                     labels: [],
@@ -4613,15 +4642,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 options: { ...commonOptions, indexAxis: 'y' }
             });
+            window.tagsChart = window.tagsChartInstance;
         }
     }
+    window.initCharts = initCharts;
 
     // Expose a method to rebuild charts when theme changes
     window.refreshCharts = function() {
-        if (window.miniVolumeChart) { window.miniVolumeChart.destroy(); window.miniVolumeChart = null; }
-        if (window.volumeChart) { window.volumeChart.destroy(); window.volumeChart = null; }
-        if (window.csatChart) { window.csatChart.destroy(); window.csatChart = null; }
-        if (window.tagsChart) { window.tagsChart.destroy(); window.tagsChart = null; }
+        if (isChartInstance(window.miniVolumeChartInstance)) { window.miniVolumeChartInstance.destroy(); window.miniVolumeChartInstance = null; }
+        if (isChartInstance(window.volumeChartInstance)) { window.volumeChartInstance.destroy(); window.volumeChartInstance = null; }
+        if (isChartInstance(window.csatChartInstance)) { window.csatChartInstance.destroy(); window.csatChartInstance = null; }
+        if (isChartInstance(window.tagsChartInstance)) { window.tagsChartInstance.destroy(); window.tagsChartInstance = null; }
         initCharts();
     };
 

@@ -8,12 +8,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400..800;1,6..72,400..800&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/agent/theme.css?v=65">
-<link rel="stylesheet" href="widget.css?v=91">
+<link rel="stylesheet" href="widget.css?v=95">
 <link rel="stylesheet" href="ui-polish.css?v=1">
-<link rel="stylesheet" href="storefront.css?v=5">
+<link rel="stylesheet" href="storefront.css?v=e2aa26">
 
 </head>
-<body>
+<body data-page="home">
   <!-- Northbound Goods — static storefront. Display only: the chat widget below is the one interactive element. -->
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -97,9 +97,9 @@
 
     <header class="sf-head">
       <div class="sf-wrap sf-head__grid">
-        <nav class="sf-nav sf-nav--l" aria-label="Departments"><span>Outerwear</span><span>Footwear</span></nav>
-        <span class="sf-logo "><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M18 6.5L22.6 18H18Z" fill="currentColor"/><path d="M18 29.5L13.4 18H18Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M18 6.5L13.4 18H18Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg><span class="sf-logo__txt"><span class="sf-logo__word">Northbound</span><span class="sf-logo__sub">Goods</span></span></span>
-        <nav class="sf-nav sf-nav--r" aria-label="Departments"><span>Essentials</span><span>Accessories</span></nav>
+        <nav class="sf-nav sf-nav--l" aria-label="Departments"><a href="shop.html?c=outerwear">Outerwear</a><a href="shop.html?c=footwear">Footwear</a></nav>
+        <a class="sf-logo-link" href="index.html" aria-label="Northbound Goods home"><span class="sf-logo "><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M18 6.5L22.6 18H18Z" fill="currentColor"/><path d="M18 29.5L13.4 18H18Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M18 6.5L13.4 18H18Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg><span class="sf-logo__txt"><span class="sf-logo__word">Northbound</span><span class="sf-logo__sub">Goods</span></span></span></a>
+        <nav class="sf-nav sf-nav--r" aria-label="Departments"><a href="shop.html?c=essentials">Essentials</a><a href="shop.html?c=accessories">Accessories</a><a class="sf-bag" href="cart.html">Bag (<span data-bag>0</span>)</a></nav>
       </div>
     </header>
 
@@ -238,6 +238,7 @@
           <p class="sf-eyebrow sf-eyebrow--light">Autumn / Winter 2026 Collection</p>
           <h1>Field jackets, built for weather that doesn&rsquo;t cooperate.</h1>
           <p class="sf-lede">Versatile layers for long days outside, built to keep moving when the forecast changes.</p>
+          <a class="sf-btn sf-btn--light" href="shop.html">Shop the collection</a>
         </div>
       </section>
 
@@ -252,23 +253,30 @@
         <div class="sf-wrap">
           <div class="sf-sec__head"><h2>Shop by category</h2><p>Four departments, one consistent standard of build.</p></div>
           <div class="sf-cats">
-        <article class="sf-cat" style="--c1:#2f5d4b;--c2:#214536;--c3:#d9a441;--tile:linear-gradient(160deg,#e1e8e2,#c9d6cd)">
+        <a class="sf-cat" href="shop.html?c=outerwear" style="--c1:#2f5d4b;--c2:#214536;--c3:#d9a441;--tile:linear-gradient(160deg,#e1e8e2,#c9d6cd)">
           <div class="sf-cat__art"><svg viewBox="0 0 200 200" role="img" aria-label="Outerwear"><use href="#g-parka"/></svg></div>
           <div class="sf-cat__txt"><h3>Outerwear</h3><p>Insulated, weather-ready layers for the cold months.</p></div>
-        </article>
-        <article class="sf-cat" style="--c1:#8a5a3b;--c2:#5e3a24;--c3:#eadfc8;--tile:linear-gradient(160deg,#ece3d6,#d9cbb6)">
+        </a>
+        <a class="sf-cat" href="shop.html?c=footwear" style="--c1:#8a5a3b;--c2:#5e3a24;--c3:#eadfc8;--tile:linear-gradient(160deg,#ece3d6,#d9cbb6)">
           <div class="sf-cat__art"><svg viewBox="0 0 200 200" role="img" aria-label="Footwear"><use href="#g-boot"/></svg></div>
           <div class="sf-cat__txt"><h3>Footwear</h3><p>Boots and everyday shoes built for the long walk.</p></div>
-        </article>
-        <article class="sf-cat" style="--c1:#41576b;--c2:#2e4152;--c3:#d7c9a8;--tile:linear-gradient(160deg,#e3e8ec,#ccd5dc)">
+        </a>
+        <a class="sf-cat" href="shop.html?c=essentials" style="--c1:#41576b;--c2:#2e4152;--c3:#d7c9a8;--tile:linear-gradient(160deg,#e3e8ec,#ccd5dc)">
           <div class="sf-cat__art"><svg viewBox="0 0 200 200" role="img" aria-label="Essentials"><use href="#g-knit"/></svg></div>
           <div class="sf-cat__txt"><h3>Essentials</h3><p>Knits, tees and layers you reach for every day.</p></div>
-        </article>
-        <article class="sf-cat" style="--c1:#7f8c62;--c2:#5f6c46;--c3:#7a4b2a;--tile:linear-gradient(160deg,#ebe7da,#d8d3bf)">
+        </a>
+        <a class="sf-cat" href="shop.html?c=accessories" style="--c1:#7f8c62;--c2:#5f6c46;--c3:#7a4b2a;--tile:linear-gradient(160deg,#ebe7da,#d8d3bf)">
           <div class="sf-cat__art"><svg viewBox="0 0 200 200" role="img" aria-label="Accessories"><use href="#g-bag"/></svg></div>
           <div class="sf-cat__txt"><h3>Accessories</h3><p>Bags, hats and the small things that finish a kit.</p></div>
-        </article>
+        </a>
           </div>
+        </div>
+      </section>
+
+      <section class="sf-sec">
+        <div class="sf-wrap">
+          <div class="sf-sec__head"><h2>Featured pieces</h2><p>A few favourites from the collection.</p></div>
+          <div class="sf-grid" id="sf-featured"></div>
         </div>
       </section>
 
@@ -354,7 +362,7 @@
     <footer class="sf-foot">
       <div class="sf-wrap sf-foot__grid">
         <div><span class="sf-logo sf-logo--light"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M18 6.5L22.6 18H18Z" fill="currentColor"/><path d="M18 29.5L13.4 18H18Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M18 6.5L13.4 18H18Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg><span class="sf-logo__txt"><span class="sf-logo__word">Northbound</span><span class="sf-logo__sub">Goods</span></span></span><p class="sf-foot__blurb">Outdoor-ready clothing, footwear and accessories for people who&rsquo;d rather be outside.</p></div>
-        <div><h4>Shop</h4><ul><li>Outerwear</li><li>Footwear</li><li>Essentials</li><li>Accessories</li></ul></div>
+        <div><h4>Shop</h4><ul><li><a href="shop.html?c=outerwear">Outerwear</a></li><li><a href="shop.html?c=footwear">Footwear</a></li><li><a href="shop.html?c=essentials">Essentials</a></li><li><a href="shop.html?c=accessories">Accessories</a></li></ul></div>
         <div><h4>Support</h4><ul><li>Shipping &amp; delivery</li><li>Returns (30 days)</li><li>Order status</li><li>Size guide</li></ul></div>
         <div><h4>Company</h4><ul><li>Our story</li><li>Materials</li><li>Careers</li><li>Contact</li></ul></div>
         <div class="sf-foot__legal"><span>&copy; 2026 Northbound Goods. Customer support powered by Wrennon.</span><span>Privacy &middot; Terms &middot; Accessibility</span></div>
@@ -530,6 +538,8 @@
   </div>
 
   <script src="/widget.js?v=89"></script>
+<script src="products.js?v=83eeed"></script>
+<script src="storefront.js?v=83eeed"></script>
 </body>
 </html>
 
