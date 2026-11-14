@@ -284,3 +284,6 @@ class ApiKey(Base):
     last_used_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by_username: Mapped[str] = mapped_column(String, ForeignKey("agents.username"))
+
+# Storefront tables (products, orders, ...). Imported last so Base.metadata (Alembic) sees them.
+from app.db import store_models  # noqa: E402,F401

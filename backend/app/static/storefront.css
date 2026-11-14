@@ -187,23 +187,14 @@ html, body { margin: 0; background: #f5f2eb; }
   --espresso: #1f3b33; --cream: #f5f2eb; --ok: #4f7a5e; --line: #d9d3c5;
   --glass-bg: rgba(245, 242, 235, .94); --glass-bg-strong: rgba(245, 242, 235, .98); --glass-border: rgba(217, 211, 197, .95);
   --shadow-soft: 0 10px 28px -16px rgba(16, 26, 23, .22); --shadow-lift: 0 26px 52px -20px rgba(16, 26, 23, .38);
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 #wrennon-widget .chat-card-head .chat-status { color: #a9bdb3; }
 #wrennon-widget #panel-header a { color: #cfe0d6 !important; }
 
-/* Header logo lockup (mark + NORTHBOUND / GOODS). Pure CSS on the widget's existing .chat-avatar / .chat-name elements,
-   so it works with any header markup. Box heights are fixed and the status/help lines are tightened by the same amount,
-   so the header keeps its original height and the close icon stays exactly where it was. */
-#wrennon-widget #panel-header { display: flex !important; flex-direction: row !important; align-items: center !important; text-align: left !important; }
-#wrennon-widget #panel-header .chat-avatar { position: static !important; margin: 0 !important; transform: none !important; }
-#wrennon-widget #panel-header .chat-status { line-height: 1.15; }
-#wrennon-widget #panel-header a { margin-top: 0 !important; line-height: 1.2; }
-#wrennon-widget .chat-card-head .chat-avatar { flex: none; width: 38px; height: 38px; border-radius: 50%; border: 0; padding: 0; background: #f5f2eb url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 36 36%22%3E%3Ccircle cx=%2218%22 cy=%2218%22 r=%2216%22 fill=%22none%22 stroke=%22%231f3b33%22 stroke-width=%222%22/%3E%3Cpath d=%22M18 6.5L22.6 18H18Z%22 fill=%22%231f3b33%22/%3E%3Cpath d=%22M18 29.5L13.4 18H18Z%22 fill=%22none%22 stroke=%22%231f3b33%22 stroke-width=%221.6%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M18 6.5L13.4 18H18Z%22 fill=%22none%22 stroke=%22%231f3b33%22 stroke-width=%221.6%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E") center / 26px 26px no-repeat; }
-#wrennon-widget .chat-card-head .chat-avatar > * { opacity: 0; width: 0; height: 0; }
-#wrennon-widget .chat-card-head .chat-name { font-size: 0 !important; height: 21.5px; margin-top: -4.5px; width: max-content; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-#wrennon-widget .chat-card-head .chat-name::before { content: 'NORTHBOUND'; font: 600 12px/12px 'Jost', 'Inter', system-ui, sans-serif; letter-spacing: .3em; margin-right: -.3em; color: #fff; }
-#wrennon-widget .chat-card-head .chat-name::after { content: 'GOODS'; font: 500 7px/7px 'Jost', 'Inter', system-ui, sans-serif; letter-spacing: .62em; margin: 2.5px -.62em 0 0; color: #a9bdb3; }
+/* Header lockup: plain elements inserted into the widget's own name/avatar slots (no layout overrides). */
+#wrennon-widget .chat-card-head .chat-avatar svg { display: block; width: 20px; height: 20px; color: #1f3b33; }
+#wrennon-widget .nb-w { display: block; font: 600 13px/1.25 'Jost', 'Inter', system-ui, sans-serif; letter-spacing: .28em; text-transform: uppercase; color: #fff; }
+#wrennon-widget .nb-s { display: block; font: 500 8px/1.3 'Jost', 'Inter', system-ui, sans-serif; letter-spacing: .6em; text-transform: uppercase; color: #a9bdb3; margin-top: 1px; }
 /* Crisp-style header variant */
 #wrennon-widget .crisp-avatar-wrap img { opacity: 0; }
 #wrennon-widget .crisp-avatar-wrap { background: #f5f2eb url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 36 36%22%3E%3Ccircle cx=%2218%22 cy=%2218%22 r=%2216%22 fill=%22none%22 stroke=%22%231f3b33%22 stroke-width=%222%22/%3E%3Cpath d=%22M18 6.5L22.6 18H18Z%22 fill=%22%231f3b33%22/%3E%3Cpath d=%22M18 29.5L13.4 18H18Z%22 fill=%22none%22 stroke=%22%231f3b33%22 stroke-width=%221.6%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M18 6.5L13.4 18H18Z%22 fill=%22none%22 stroke=%22%231f3b33%22 stroke-width=%221.6%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E") center / 26px 26px no-repeat; border-radius: 50%; }
@@ -328,3 +319,17 @@ html, body { margin: 0; background: #f5f2eb; }
   .sf-fgrid { grid-template-columns: 1fr; }
   .sf-sum { padding: 24px; }
 }
+
+/* ===== Live store: stock, status, timeline ===== */
+.sf-tag { position: absolute; top: 12px; left: 12px; z-index: 1; background: #14201c; color: #fff; font: 600 10.5px/1 var(--label); letter-spacing: .16em; text-transform: uppercase; padding: 7px 10px; }
+.sf-size.is-out span { opacity: .4; text-decoration: line-through; cursor: not-allowed; }
+.sf-stock { min-height: 20px; margin-top: 10px; font-size: 13px; color: #a23b1a; }
+.sf-btn:disabled { background: #9aa39e; cursor: not-allowed; }
+.sf-sum__row--top { border-top: 0; margin-top: 0; padding-top: 0; padding-bottom: 14px; }
+.sf-status { font: 600 11px/1 var(--label); letter-spacing: .16em; text-transform: uppercase; padding: 7px 12px; background: #fff; color: var(--forest); }
+.sf-status--shipped { background: #dcebe3; } .sf-status--delivered { background: var(--forest); color: #fff; } .sf-status--cancelled { background: #f1d9d1; color: #a23b1a; }
+.sf-timeline { margin-top: 26px; border-left: 1px solid var(--line); padding-left: 22px; }
+.sf-timeline li { position: relative; padding: 0 0 18px; display: flex; flex-direction: column; font-size: 14px; }
+.sf-timeline li::before { content: ''; position: absolute; left: -27px; top: 6px; width: 9px; height: 9px; border-radius: 50%; background: var(--forest); }
+.sf-timeline span { color: var(--muted); font-size: 13px; }
+.sf-track-out { margin-top: 32px; }

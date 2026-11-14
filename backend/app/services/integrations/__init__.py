@@ -12,7 +12,10 @@ if _raw_mock is None and os.environ.get("APP_ENV") == "production":
     )
 USE_MOCK = (_raw_mock or "true").lower() == "true"
 
-def get_ecommerce_provider() -> EcommerceProvider:
+def get_ecommerce_provider() -> EcommerceProvider:
+    if os.environ.get("ECOMMERCE_PROVIDER", "").strip().lower() == "store_db":
+        from .store_db import StoreDBProvider  # storefront database (see app/db/store_models.py)
+        return StoreDBProvider()
     if USE_MOCK:
         return MockEcommerceProvider()
     

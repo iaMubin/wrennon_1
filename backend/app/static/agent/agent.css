@@ -353,26 +353,12 @@ body {
   align-items: center;
 }
 
-/* Admin button */
-/* Admin button */
+/* Admin button in global navigation */
 #admin-dashboard-btn {
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 7px 14px;
-  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-  color: var(--accent);
-  cursor: pointer;
-  transition: var(--transition);
-  letter-spacing: 0.01em;
-}
-#admin-dashboard-btn:hover {
-  color: var(--accent-ink);
-  border-color: var(--accent);
-  background: var(--accent);
-  box-shadow: var(--shadow-sm);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ── Tabs ── */
@@ -2663,17 +2649,6 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   background: var(--bg-hover);
 }
 
-#admin-dashboard-btn {
-  color: var(--ink-soft);
-  background: transparent;
-  border-color: var(--line);
-}
-
-#admin-dashboard-btn:hover {
-  color: var(--ink);
-  background: var(--bg-hover);
-  border-color: var(--line);
-}
 
 #section-tabs {
   padding: 8px 10px;
@@ -3689,24 +3664,31 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   flex-direction: column !important;
   width: 100% !important;
   margin: 0 auto !important;
-  padding: 1px !important;
-  border-radius: 20px !important; /* var(--nux-composer-frame-radius) */
-  background-color: var(--color-card-border, #E2E8F0) !important;
-  box-shadow: 0 1px 2px rgb(10 10 12 / 0.015), 0 0 0 4px var(--onyx-frame, #F9F9F9), 0 0 0 5px rgb(10 10 12 / 0.065), 0 12px 28px -10px rgb(10 10 12 / 0.08) !important;
+  padding: 0 !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
   box-sizing: border-box !important;
 }
 
-/* ALL Dark Themes Outer Frame: Exact Matte Black elevation */
+/* ALL Dark Themes Outer Frame */
 [data-theme^="dark"] .surface-composer {
-  background-color: rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.275), 0 0 0 4px var(--onyx-frame, #0D0D11), 0 0 0 5px rgb(255 255 255 / 0.065), 0 18px 40px -12px rgb(0 0 0 / 0.45) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
 }
 
-/* Internal Note Active State on Outer Frame */
+/* Internal Note Active State on Outer Frame (No extra gradient border) */
 .chat-footer-wrapper.internal-mode .surface-composer {
-  background-color: rgba(245, 158, 11, 0.5) !important;
-  box-shadow: 0 1px 2px rgb(10 10 12 / 0.015), 0 0 0 4px color-mix(in srgb, #f59e0b 6%, #F9F9F9), 0 0 0 5px rgba(245, 158, 11, 0.25), 0 12px 28px -10px rgba(245, 158, 11, 0.15) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
 }
 
 /* 2. Antigravity Inner Raised Card (.surface-composer-card) */
@@ -3719,43 +3701,49 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   flex-direction: column !important;
   gap: 0 !important;
   width: 100% !important;
-  border-radius: 19px !important; /* calc(20px - 1px) */
+  border-radius: 12px !important;
   background-color: var(--onyx-raised, var(--bg-surface, #FFFFFF)) !important;
-  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgb(10 10 12 / 0.06) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
   padding: 8px 10px 8px 12px !important;
   box-sizing: border-box !important;
-  border: none !important;
+  border: 1px solid var(--border) !important;
   margin: 0 !important;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .surface-composer:focus-within > .surface-composer-card,
 .surface-composer-card:focus-within {
-  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px color-mix(in srgb, var(--accent) 75%, transparent), 0 4px 14px -2px rgba(var(--accent-rgb, 79, 70, 229), 0.15), 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  border-color: var(--border-focus) !important;
+  box-shadow: 0 0 0 1px var(--border-focus), 0 2px 8px rgba(0, 0, 0, 0.10) !important;
 }
 
-/* ALL Dark Themes Inner Card: Exact Matte Black raised card surface */
+/* ALL Dark Themes Inner Card */
 [data-theme^="dark"] .surface-composer-card,
 [data-theme^="dark"] .chat-composer-card,
 [data-theme^="dark"] #agent-input-row {
   background-color: var(--onyx-raised, #15151A) !important;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 0 0 1px rgb(255 255 255 / 0.065) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
 }
 
 [data-theme^="dark"] .surface-composer:focus-within > .surface-composer-card,
 [data-theme^="dark"] .chat-composer-card:focus-within,
 [data-theme^="dark"] #agent-input-row:focus-within {
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.11), 0 0 0 1px color-mix(in srgb, var(--accent) 70%, #ffffff), 0 6px 18px -3px rgba(0, 0, 0, 0.5) !important;
+  border-color: var(--border-focus) !important;
+  box-shadow: 0 0 0 1px var(--border-focus), 0 2px 8px rgba(0, 0, 0, 0.10) !important;
 }
 
-/* Internal Note Active State on Inner Card */
+/* Internal Note Active State on Inner Card (Clean border, no extra gradient halo) */
 .chat-footer-wrapper.internal-mode .surface-composer-card {
-  background-color: color-mix(in srgb, #f59e0b 2.5%, var(--bg-surface, #ffffff)) !important;
-  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(245, 158, 11, 0.3) !important;
+  background-color: var(--bg-elevated) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
 }
 
-.chat-footer-wrapper.internal-mode .surface-composer:focus-within > .surface-composer-card {
-  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1.5px #f59e0b, 0 4px 16px -2px rgba(245, 158, 11, 0.22) !important;
+.chat-footer-wrapper.internal-mode .surface-composer:focus-within > .surface-composer-card,
+.chat-footer-wrapper.internal-mode .surface-composer-card:focus-within {
+  border-color: var(--border-focus) !important;
+  box-shadow: 0 0 0 1px var(--border-focus), 0 2px 8px rgba(0, 0, 0, 0.10) !important;
 }
 
 /* 3. Text Area Row (Top portion of card) */
