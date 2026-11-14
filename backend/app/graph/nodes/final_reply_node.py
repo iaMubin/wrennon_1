@@ -94,6 +94,11 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
 
     context_parts = []
 
+    if state.get("customer_email"):
+        context_parts.append(
+            "The customer is signed in to the store (verified account). Never ask them for their email or an order number "
+            "just to identify them; if tool results contain their orders, answer from those."
+        )
     if state.get("gathered_context"):
         context_parts.append("Tool/policy results:\n" + "\n".join(state["gathered_context"]))
 

@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Wrennon Agent Workspace</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css?v=110">
-<link rel="stylesheet" href="agent.css?v=204">
-<link rel="stylesheet" href="ui-polish.css?v=1">
-<link rel="stylesheet" href="professional-override.css?v=212">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Big+Shoulders+Display:wght@700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css?v=247">
+<link rel="stylesheet" href="agent.css?v=247">
+<link rel="stylesheet" href="ui-polish.css?v=247">
+<link rel="stylesheet" href="professional-override.css?v=247">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   (function() {
@@ -102,10 +102,22 @@
             <path d="m15.5 15-3-3 3-3"></path>
           </svg>
         </button>
-        <button id="nav-dashboard-btn" class="global-nav-btn" title="Dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect x="3" y="3" width="7.5" height="9" rx="2.5" fill="currentColor" fill-opacity="0.22"></rect><rect x="13.5" y="3" width="7.5" height="5" rx="2"></rect><rect x="13.5" y="11" width="7.5" height="10" rx="2.5" fill="currentColor" fill-opacity="0.14"></rect><rect x="3" y="15" width="7.5" height="6" rx="2"></rect></svg></button>
-        <button id="nav-conversations-btn" class="global-nav-btn active" title="Conversations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2z" fill="currentColor" fill-opacity="0.22"></path><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"></path></svg></button>
-        <button id="nav-customers-btn" class="global-nav-btn" title="Customers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="9" cy="8" r="4" fill="currentColor" fill-opacity="0.22"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path><circle cx="16.5" cy="7.5" r="3"></circle><path d="M16 14.5c2.8.4 5.5 1.8 5.5 5.5"></path></svg></button>
-        <button id="nav-analytics-btn" class="global-nav-btn" title="Analytics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect x="3.5" y="13.5" width="4" height="7" rx="2" fill="currentColor" fill-opacity="0.25"></rect><rect x="10" y="8.5" width="4" height="12" rx="2" fill="currentColor" fill-opacity="0.5"></rect><rect x="16.5" y="3.5" width="4" height="17" rx="2" fill="currentColor" fill-opacity="0.85"></rect></svg></button>
+        <button id="nav-conversations-btn" class="global-nav-btn active" title="Conversations">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2z" fill="currentColor" fill-opacity="0.22"></path><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"></path></svg>
+          <span class="nav-label">Chats</span>
+        </button>
+        <button id="nav-customers-btn" class="global-nav-btn" title="Customers">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="9" cy="8" r="4" fill="currentColor" fill-opacity="0.22"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path><circle cx="16.5" cy="7.5" r="3"></circle><path d="M16 14.5c2.8.4 5.5 1.8 5.5 5.5"></path></svg>
+          <span class="nav-label">Customers</span>
+        </button>
+        <button id="nav-dashboard-btn" class="global-nav-btn" title="Dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect x="3" y="3" width="7.5" height="9" rx="2.5" fill="currentColor" fill-opacity="0.22"></rect><rect x="13.5" y="3" width="7.5" height="5" rx="2"></rect><rect x="13.5" y="11" width="7.5" height="10" rx="2.5" fill="currentColor" fill-opacity="0.14"></rect><rect x="3" y="15" width="7.5" height="6" rx="2"></rect></svg>
+          <span class="nav-label">Dashboard</span>
+        </button>
+        <button id="nav-analytics-btn" class="global-nav-btn" title="Analytics">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect x="3.5" y="13.5" width="4" height="7" rx="2" fill="currentColor" fill-opacity="0.25"></rect><rect x="10" y="8.5" width="4" height="12" rx="2" fill="currentColor" fill-opacity="0.5"></rect><rect x="16.5" y="3.5" width="4" height="17" rx="2" fill="currentColor" fill-opacity="0.85"></rect></svg>
+          <span class="nav-label">Analytics</span>
+        </button>
 
         <div style="position: relative; width: 100%;">
           <button id="global-filter-btn" class="global-nav-btn" title="Filters" aria-haspopup="true" style="position: relative;">
@@ -187,6 +199,7 @@
               <circle cx="12" cy="12" r="3" fill="currentColor" fill-opacity="0.25"></circle>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
+            <span class="nav-label">Settings</span>
           </button>
           
           <div id="theme-dropdown" class="theme-dropdown-menu hidden" role="menu" style="left: 100%; top: auto; bottom: 0; margin-left: 8px; right: auto; transform: none; width: 236px;">
@@ -408,7 +421,21 @@
             <span class="brand-name">Wrennon</span>
           </span>
         </div>
-
+        <div class="mobile-top-actions">
+          <button id="mobile-top-search-btn" class="mobile-icon-btn" aria-label="Search" title="Search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </button>
+          <button id="mobile-top-menu-btn" class="mobile-icon-btn" aria-label="Menu" title="More options" onclick="const b=document.getElementById('theme-menu-btn'); if(b) b.click();">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+              <circle cx="12" cy="5" r="2"></circle>
+              <circle cx="12" cy="12" r="2"></circle>
+              <circle cx="12" cy="19" r="2"></circle>
+            </svg>
+          </button>
+        </div>
       </div>
 
       <nav id="section-tabs">
@@ -452,6 +479,11 @@
         </div>
       </div>
       <div id="conversation-list" role="list" aria-label="Conversations"></div>
+      <button id="whatsapp-fab-btn" class="whatsapp-fab" aria-label="Refresh chats" title="Refresh chats" onclick="if(typeof loadConversations==='function') loadConversations();">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+          <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
+        </svg>
+      </button>
     </aside>
 
     <div id="resizer"></div>
@@ -464,6 +496,15 @@
 
       <div id="active-conversation" class="hidden">
         <header id="conversation-header">
+          <button id="mobile-back-to-list-btn" class="mobile-back-btn" aria-label="Back to conversations" title="Back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+          </button>
+          <div class="conv-header-avatar" id="conv-header-avatar">
+            <span id="conv-header-initials">?</span>
+          </div>
           <div class="conv-header-info">
             <div class="conv-header-title-row">
               <h2 id="conversation-email">Unknown Customer</h2>
@@ -681,54 +722,310 @@
     </main>
     </div> <!-- /view-conversations -->
 
-    <!-- Dashboard View -->
+        <!-- Dashboard View -->
     <div id="view-dashboard" class="view-panel hidden">
       <div class="view-content">
-        <div class="view-header">
-          <h2>Home Overview</h2>
-          <div class="header-actions">
-          </div>
-        </div>
-        <div class="dashboard-grid">
-          <div class="metric-card">
-            <h3>Open Tickets</h3>
-            <div class="metric-value" id="metric-open-tickets" style="color: #22c55e;">—</div>
-          </div>
-          <div class="metric-card">
-            <h3>Unassigned</h3>
-            <div class="metric-value" id="metric-unassigned" style="color: #16a34a;">—</div>
-          </div>
-          <div class="metric-card">
-            <h3>Solved Today</h3>
-            <div class="metric-value" id="metric-solved-today" style="color: #15803d;">—</div>
-          </div>
-          <div class="metric-card">
-            <h3>CSAT Score</h3>
-            <div class="metric-value" id="metric-csat" style="color: #10b981;">—</div>
-          </div>
-        </div>
-        <div class="dashboard-main-area">
-          <div class="activity-feed-panel">
-            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h3 style="margin: 0;">Priority Inbox / SLA Risks</h3>
-                <button class="btn btn-sm btn-secondary" onclick="switchView('conversations')">View All</button>
-            </div>
-            <div class="activity-list" id="sla-risk-list">
-              <!-- Populated by JS -->
-            </div>
-          </div>
-          
-          <div style="display: flex; flex-direction: column; gap: 24px;">
-              <div class="activity-feed-panel">
-                <h3 style="margin: 0 0 16px 0;">Live Team Status</h3>
-                <div class="team-status-list" id="team-status-list"></div>
+        <div class="view-header-enterprise">
+          <div class="view-header-meta">
+            <div class="view-title-row">
+              <h1 class="view-title">Operations Command Center</h1>
+              <div class="live-telemetry-badge">
+                <span class="ping-ring"></span>
+                <span class="ping-dot"></span>
+                <span class="ping-text">Live 99.9%</span>
               </div>
-              <div class="activity-feed-panel">
-                <h3 style="margin: 0 0 16px 0;">Today's Volume</h3>
-                <div class="chart-container" style="position: relative; height: 150px; width: 100%;">
-                    <canvas id="miniVolumeChart"></canvas>
+            </div>
+          </div>
+          <div class="header-actions">
+            <button class="btn-enterprise-outline" onclick="if(window.loadDashboard) window.loadDashboard();" title="Refresh Live Data">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              <span>Sync</span>
+            </button>
+            <button class="btn-enterprise-primary" onclick="switchView('conversations')">
+              <span>Open Inbox</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Operations Telemetry Bar -->
+        <div class="telemetry-strip-enterprise">
+          <div class="telemetry-item">
+            <span class="telemetry-dot"></span>
+            <strong class="telemetry-val">99.98% Operational</strong>
+          </div>
+          <div class="telemetry-divider"></div>
+          <div class="telemetry-item">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            <span class="telemetry-label">Velocity</span>
+            <strong class="telemetry-val" id="telemetry-velocity">42.8/min</strong>
+          </div>
+          <div class="telemetry-divider"></div>
+          <div class="telemetry-item">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <span class="telemetry-label">P95 Response</span>
+            <strong class="telemetry-val">3m 04s</strong>
+          </div>
+          <div class="telemetry-divider"></div>
+          <div class="telemetry-item">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            <span class="telemetry-label">Copilot Savings</span>
+            <strong class="telemetry-val" style="color: #10b981;">$12.5k/mo</strong>
+          </div>
+          <div class="telemetry-divider"></div>
+          <div class="telemetry-item">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            <strong class="telemetry-val">4 Specialists Online</strong>
+          </div>
+        </div>
+
+        <!-- 6 Executive KPI Metric Cards (Visual-First, Minimal Text) -->
+        <div class="dashboard-grid dashboard-grid-6">
+          <div class="metric-card-enterprise">
+            <div class="metric-header-enterprise">
+              <span class="metric-label-enterprise">Active Queue</span>
+              <span class="status-chip chip-warning" id="metric-unassigned-badge">3 Unassigned</span>
+            </div>
+            <div class="metric-main-enterprise">
+              <div class="metric-num-enterprise" id="metric-open-tickets">—</div>
+              <div class="metric-badge-enterprise badge-neutral">Live</div>
+            </div>
+            <div class="metric-sparkline-track"><div class="metric-sparkline-fill" style="width: 58%; background: var(--accent);"></div></div>
+          </div>
+
+          <div class="metric-card-enterprise">
+            <div class="metric-header-enterprise">
+              <span class="metric-label-enterprise">SLA Attainment</span>
+              <span class="status-chip chip-success">≥ 95%</span>
+            </div>
+            <div class="metric-main-enterprise">
+              <div class="metric-num-enterprise" id="metric-sla-compliance">97.4%</div>
+              <div class="metric-badge-enterprise badge-up">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                +1.8%
+              </div>
+            </div>
+            <div class="metric-sparkline-track"><div class="metric-sparkline-fill fill-success" style="width: 97%;"></div></div>
+          </div>
+
+          <div class="metric-card-enterprise">
+            <div class="metric-header-enterprise">
+              <span class="metric-label-enterprise">First Response</span>
+              <span class="status-chip chip-info">&lt; 3m</span>
+            </div>
+            <div class="metric-main-enterprise">
+              <div class="metric-num-enterprise" id="metric-first-response">1m 32s</div>
+              <div class="metric-badge-enterprise badge-up">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                -24s
+              </div>
+            </div>
+            <div class="metric-sparkline-track"><div class="metric-sparkline-fill fill-info" style="width: 76%;"></div></div>
+          </div>
+
+          <div class="metric-card-enterprise">
+            <div class="metric-header-enterprise">
+              <span class="metric-label-enterprise">Solved Today</span>
+              <span class="status-chip chip-success" id="metric-solved-chip">+18%</span>
+            </div>
+            <div class="metric-main-enterprise">
+              <div class="metric-num-enterprise" id="metric-solved-today">—</div>
+              <div class="metric-badge-enterprise badge-up">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                Active
+              </div>
+            </div>
+            <div class="metric-sparkline-track"><div class="metric-sparkline-fill fill-accent" style="width: 82%;"></div></div>
+          </div>
+
+          <div class="metric-card-enterprise">
+            <div class="metric-header-enterprise">
+              <span class="metric-label-enterprise">Customer CSAT</span>
+              <span class="status-chip chip-gold">5.0 Scale</span>
+            </div>
+            <div class="metric-main-enterprise">
+              <div class="metric-num-enterprise" id="metric-csat">—</div>
+              <div class="metric-badge-enterprise badge-up">94% ★</div>
+            </div>
+            <div class="metric-sparkline-track"><div class="metric-sparkline-fill fill-gold" style="width: 95%;"></div></div>
+          </div>
+
+          <div class="metric-card-enterprise">
+            <div class="metric-header-enterprise">
+              <span class="metric-label-enterprise">AI Deflection</span>
+              <span class="status-chip chip-accent">Copilot</span>
+            </div>
+            <div class="metric-main-enterprise">
+              <div class="metric-num-enterprise" id="metric-ai-deflection">71.8%</div>
+              <div class="metric-badge-enterprise badge-up">Tier-1</div>
+            </div>
+            <div class="metric-sparkline-track"><div class="metric-sparkline-fill fill-accent" style="width: 72%;"></div></div>
+          </div>
+        </div>
+
+        <!-- Row 1: High-Impact Visual Analytics (Hero Area Chart + SLA Donut & Queue) -->
+        <div class="dashboard-visual-hero-grid">
+          <!-- Main Chart: 24H Live Inbound vs Copilot Deflection -->
+          <div class="command-panel visual-chart-panel">
+            <div class="panel-header-enterprise">
+              <div>
+                <h3 class="panel-title-enterprise">Traffic Velocity &amp; Copilot Deflection (24H)</h3>
+                <span class="panel-subtitle-enterprise">Inbound hourly demand vs autonomous AI resolutions</span>
+              </div>
+              <div class="chart-legend-pills">
+                <span class="legend-pill"><span class="legend-dot" style="background: var(--accent);"></span> Inbound</span>
+                <span class="legend-pill"><span class="legend-dot" style="background: #10b981;"></span> AI Deflected</span>
+                <span class="legend-pill"><span class="legend-dot" style="background: var(--ink-muted); opacity: 0.6;"></span> Yesterday</span>
+              </div>
+            </div>
+
+            <div class="chart-container" style="position: relative; height: 240px; width: 100%;">
+              <canvas id="dashboardMainChart"></canvas>
+            </div>
+
+            <!-- Visual Deflection Summary Strip -->
+            <div class="deflection-visual-summary">
+              <div class="deflection-stat-item">
+                <span class="deflection-stat-label">TOTAL VOLUME</span>
+                <strong class="deflection-stat-val" id="dash-stat-total">448</strong>
+              </div>
+              <div class="deflection-stat-divider"></div>
+              <div class="deflection-stat-item">
+                <span class="deflection-stat-label">AI DEFLECTED</span>
+                <strong class="deflection-stat-val" style="color: #10b981;" id="dash-stat-deflected">322 (71.8%)</strong>
+              </div>
+              <div class="deflection-stat-divider"></div>
+              <div class="deflection-stat-item">
+                <span class="deflection-stat-label">HUMAN ESCALATED</span>
+                <strong class="deflection-stat-val" style="color: var(--accent);" id="dash-stat-escalated">126 (28.2%)</strong>
+              </div>
+              <div class="deflection-stat-divider"></div>
+              <div class="deflection-stat-item" style="flex: 1.4;">
+                <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                  <span style="color: var(--text-muted);">Deflection Ratio</span>
+                  <strong style="color: #10b981;">71.8% Autonomous</strong>
+                </div>
+                <div class="deflection-ratio-bar">
+                  <div class="deflection-ratio-ai" style="width: 71.8%; background: #10b981;" title="Autonomous: 71.8%"></div>
+                  <div class="deflection-ratio-human" style="width: 28.2%; background: var(--accent);" title="Human: 28.2%"></div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- Col 2: SLA Health & Real-time Urgency Queue -->
+          <div class="command-panel visual-chart-panel">
+            <div class="panel-header-enterprise">
+              <div>
+                <h3 class="panel-title-enterprise">SLA Health &amp; Queue Urgency</h3>
+                <span class="panel-subtitle-enterprise">Active policy compliance &amp; risk distribution</span>
+              </div>
+              <button class="btn-panel-action" onclick="switchView('conversations')">Open Inbox</button>
+            </div>
+
+            <!-- Visual Donut Chart -->
+            <div style="position: relative; height: 160px; width: 100%; display: flex; justify-content: center; align-items: center;">
+              <canvas id="dashboardSlaChart"></canvas>
+            </div>
+
+            <!-- Priority Urgency Queue Items with Visual Countdown Bars -->
+            <div class="activity-list" id="sla-risk-list">
+              <!-- Rendered dynamically by JS with visual urgency bars -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: Visual Distribution & Real-time Operations (3 Panels) -->
+        <div class="dashboard-command-grid" style="margin-top: 16px;">
+          <!-- Panel 1: Omnichannel Mix & Inbound Breakdown -->
+          <div class="command-panel visual-chart-panel">
+            <div class="panel-header-enterprise">
+              <div class="panel-title-wrap">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                <h3 class="panel-title-enterprise">Omnichannel Mix</h3>
+              </div>
+              <span class="count-pill" id="omni-total-badge">448 Inbound</span>
+            </div>
+
+            <div class="channel-donut-container">
+              <div class="channel-chart-wrap">
+                <canvas id="dashboardChannelChart"></canvas>
+                <div class="channel-donut-center">
+                  <span class="donut-center-val" id="dash-channel-total">448</span>
+                  <span class="donut-center-lbl">SESSIONS</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3 Visual KPI Channel Micro-Cards (No plain text bars) -->
+            <div class="channel-card-grid" id="dashboard-channel-distribution">
+              <div class="channel-kpi-card" data-channel="chat">
+                <div class="channel-kpi-header">
+                  <div class="channel-icon-pill channel-icon-chat">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                  </div>
+                  <span class="channel-kpi-trend up">48%</span>
+                </div>
+                <div class="channel-kpi-val" id="omni-chat-count">215</div>
+                <div class="channel-kpi-label">Web Chat</div>
+              </div>
+
+              <div class="channel-kpi-card" data-channel="widget">
+                <div class="channel-kpi-header">
+                  <div class="channel-icon-pill channel-icon-widget">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+                  </div>
+                  <span class="channel-kpi-trend neutral">34%</span>
+                </div>
+                <div class="channel-kpi-val" id="omni-widget-count">152</div>
+                <div class="channel-kpi-label">Storefront</div>
+              </div>
+
+              <div class="channel-kpi-card" data-channel="email">
+                <div class="channel-kpi-header">
+                  <div class="channel-icon-pill channel-icon-email">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                  </div>
+                  <span class="channel-kpi-trend sub">18%</span>
+                </div>
+                <div class="channel-kpi-val" id="omni-email-count">81</div>
+                <div class="channel-kpi-label">Email</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panel 2: Copilot AI Telemetry Stream -->
+          <div class="command-panel visual-chart-panel">
+            <div class="panel-header-enterprise">
+              <div class="panel-title-wrap">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path></svg>
+                <h3 class="panel-title-enterprise">Copilot AI Stream</h3>
+              </div>
+              <div class="live-telemetry-badge" style="font-size: 10px; padding: 2px 7px;">
+                <span class="ping-dot" style="background: #10b981;"></span>
+                <span class="ping-text">71.8% Deflected</span>
+              </div>
+            </div>
+
+            <!-- Real-time High-Precision Copilot Event Stream -->
+            <div class="copilot-stream-container" id="copilot-stream-list">
+              <!-- Populated dynamically by JS with high-tech action rows -->
+            </div>
+          </div>
+
+          <!-- Panel 3: Specialist Capacity & Live Roster -->
+          <div class="command-panel visual-chart-panel">
+            <div class="panel-header-enterprise">
+              <div class="panel-title-wrap">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                <h3 class="panel-title-enterprise">Specialist Roster</h3>
+              </div>
+              <span class="count-pill" id="team-online-badge">4 Specialists Online</span>
+            </div>
+
+            <div class="team-status-list" id="team-status-list">
+              <!-- Populated dynamically by JS with visual workload capacity bars -->
+            </div>
           </div>
         </div>
       </div>
@@ -737,40 +1034,180 @@
     <!-- Customers View -->
     <div id="view-customers" class="view-panel hidden">
       <div class="view-content">
-        <div class="view-header">
-          <h2>Customers Directory</h2>
+        <div class="view-header-enterprise">
+          <div class="view-header-meta">
+            <div class="breadcrumbs-bar">
+              <span class="breadcrumb-item">WORKSPACE</span>
+              <span class="breadcrumb-sep">/</span>
+              <span class="breadcrumb-item active">CUSTOMER INTELLIGENCE 360°</span>
+            </div>
+            <div class="view-title-row">
+              <h1 class="view-title">Customer Accounts Directory</h1>
+              <span class="count-pill" id="customer-total-badge">10 Verified Accounts</span>
+            </div>
+            <p class="view-subtitle">Global accounts, lifetime value, relationship health, churn risk, and omnichannel conversation history.</p>
+          </div>
           <div class="header-actions">
-            <input type="text" id="customer-search-input" class="search-input" placeholder="Search customers...">
-            <select class="filter-select" style="display:none;">
-                <option value="all">All Plans</option>
-                <option value="pro">Pro Plan</option>
-                <option value="enterprise">Enterprise</option>
-            </select>
-            <button class="btn btn-primary" id="customer-export-btn">Export CSV</button>
+            <button class="btn-enterprise-primary" id="customer-export-btn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span>Export Directory (CSV)</span>
+            </button>
           </div>
         </div>
-        <div class="table-container">
-          <table class="data-table" id="customers-table">
+
+        <!-- Filter & Search Toolbar -->
+        <div class="filter-toolbar-enterprise">
+          <div class="filter-search-enterprise">
+            <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="customer-search-input" class="search-input-enterprise" placeholder="Search accounts by name, email, country, or tier...">
+            <span class="search-kbd-shortcut">⌘K</span>
+          </div>
+          <div class="filter-selects-group">
+            <div class="select-wrapper-enterprise">
+              <select id="customer-tier-filter" class="filter-select-enterprise">
+                <option value="all">All Tiers &amp; Plans</option>
+                <option value="Enterprise">Enterprise</option>
+                <option value="Gold VIP">Gold VIP</option>
+                <option value="Silver">Silver</option>
+                <option value="Bronze">Bronze</option>
+                <option value="Starter">Starter</option>
+              </select>
+            </div>
+            <div class="select-wrapper-enterprise">
+              <select id="customer-health-filter" class="filter-select-enterprise">
+                <option value="all">All Retention Health</option>
+                <option value="Healthy">Healthy (≥ 80%)</option>
+                <option value="Neutral">Neutral (60-79%)</option>
+                <option value="At Risk">At Risk (&lt; 60%)</option>
+              </select>
+            </div>
+            <div class="select-wrapper-enterprise">
+              <select id="customer-sort-filter" class="filter-select-enterprise">
+                <option value="tickets_desc">Sort: Highest Tickets</option>
+                <option value="ltv_desc">Sort: Highest LTV</option>
+                <option value="csat_desc">Sort: Highest CSAT</option>
+                <option value="active_desc">Sort: Recent Activity</option>
+                <option value="name_asc">Sort: Name (A-Z)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Customer Table -->
+        <div class="table-container table-container-enterprise">
+          <table class="data-table data-table-enterprise" id="customers-table">
             <thead>
               <tr>
-                <th data-sort="email" class="sortable">Customer <span class="sort-icon"></span></th>
-                <th data-sort="total_tickets" class="sortable">Total Tickets <span class="sort-icon"></span></th>
-                <th data-sort="resolved_ratio" class="sortable">Resolved Ratio <span class="sort-icon"></span></th>
+                <th data-sort="name" class="sortable">Customer Account <span class="sort-icon"></span></th>
+                <th data-sort="tier" class="sortable">Plan / Tier <span class="sort-icon"></span></th>
+                <th data-sort="health_score" class="sortable">Health &amp; Retention <span class="sort-icon"></span></th>
+                <th data-sort="lifetime_value" class="sortable">LTV &amp; Orders <span class="sort-icon"></span></th>
+                <th data-sort="total_tickets" class="sortable">Tickets &amp; FCR <span class="sort-icon"></span></th>
                 <th data-sort="avg_csat" class="sortable">Avg CSAT <span class="sort-icon"></span></th>
+                <th>Region</th>
                 <th data-sort="last_active" class="sortable">Last Active <span class="sort-icon"></span></th>
-                <th></th>
+                <th style="text-align: right;">Action</th>
               </tr>
             </thead>
             <tbody id="customers-table-body">
-              <!-- Populated by JS -->
+              <!-- Populated dynamically by JS -->
             </tbody>
           </table>
           <div class="pagination-footer">
-              <span class="pagination-info">Showing 1-10 of 243 customers</span>
-              <div class="pagination-controls">
-                  <button class="btn btn-sm btn-secondary" disabled>Previous</button>
-                  <button class="btn btn-sm btn-secondary">Next</button>
-              </div>
+            <span class="pagination-info" id="customer-pagination-info">Showing 1-10 of 10 customers</span>
+            <div class="pagination-controls" id="customer-pagination-controls">
+              <button class="btn btn-sm btn-secondary" id="cust-prev-btn" disabled>Previous</button>
+              <div id="cust-page-numbers" style="display: flex; gap: 4px;"></div>
+              <button class="btn btn-sm btn-secondary" id="cust-next-btn" disabled>Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide-Over Customer Details Drawer -->
+    <div id="customer-drawer-backdrop" class="drawer-backdrop hidden" onclick="closeCustomerDrawer()"></div>
+    <div id="customer-drawer" class="customer-drawer hidden">
+      <div class="drawer-header">
+        <div class="drawer-header-info">
+          <div class="drawer-avatar-wrap">
+            <img id="drawer-customer-avatar" src="images/default-avatar.png?v=2" class="drawer-avatar" alt="Avatar">
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <h3 id="drawer-customer-name" style="margin: 0; font-size: 18px; font-weight: 700;">Customer Name</h3>
+              <span id="drawer-customer-tier" class="badge badge-tier">Enterprise</span>
+            </div>
+            <div id="drawer-customer-email" style="font-size: 13px; color: var(--ink-soft); margin-top: 2px;">customer@example.com</div>
+          </div>
+        </div>
+        <button class="drawer-close-btn" onclick="closeCustomerDrawer()" title="Close Drawer">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div class="drawer-body">
+        <!-- Quick KPI strip -->
+        <div class="drawer-kpi-grid">
+          <div class="drawer-kpi-card">
+            <span class="drawer-kpi-label">Lifetime Value</span>
+            <span class="drawer-kpi-val" id="drawer-kpi-ltv">$0.00</span>
+          </div>
+          <div class="drawer-kpi-card">
+            <span class="drawer-kpi-label">Total Orders</span>
+            <span class="drawer-kpi-val" id="drawer-kpi-orders">0</span>
+          </div>
+          <div class="drawer-kpi-card">
+            <span class="drawer-kpi-label">Health Score</span>
+            <span class="drawer-kpi-val" id="drawer-kpi-health">0%</span>
+          </div>
+          <div class="drawer-kpi-card">
+            <span class="drawer-kpi-label">Satisfaction</span>
+            <span class="drawer-kpi-val" id="drawer-kpi-csat">0.0 ★</span>
+          </div>
+        </div>
+
+        <!-- Drawer Tab buttons -->
+        <div class="drawer-tabs">
+          <button class="drawer-tab active" data-tab="profile" onclick="switchDrawerTab('profile')">Account Overview</button>
+          <button class="drawer-tab" data-tab="tickets" onclick="switchDrawerTab('tickets')">Tickets History</button>
+          <button class="drawer-tab" data-tab="orders" onclick="switchDrawerTab('orders')">Order History</button>
+        </div>
+
+        <!-- Tab 1: Profile Overview -->
+        <div id="drawer-tab-profile" class="drawer-tab-content">
+          <div class="drawer-info-group">
+            <label>Contact &amp; Regional Details</label>
+            <div class="drawer-info-grid">
+              <div><span class="info-label">Phone:</span> <strong id="drawer-info-phone">—</strong></div>
+              <div><span class="info-label">Region:</span> <strong id="drawer-info-location">—</strong></div>
+              <div><span class="info-label">Sentiment:</span> <strong id="drawer-info-sentiment">—</strong></div>
+              <div><span class="info-label">Last Active:</span> <strong id="drawer-info-last-active">—</strong></div>
+            </div>
+          </div>
+          <div class="drawer-info-group">
+            <label>Customer Account Tags</label>
+            <div id="drawer-info-tags" class="tag-chip-list"></div>
+          </div>
+          <div class="drawer-info-group">
+            <label>AI Relationship Assessment</label>
+            <div class="drawer-ai-summary" id="drawer-ai-summary">
+              High-value account with consistent positive interaction history. Prioritize rapid response for billing inquiries.
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Tickets History -->
+        <div id="drawer-tab-tickets" class="drawer-tab-content hidden">
+          <div id="drawer-tickets-list" class="drawer-records-list">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Tab 3: Order History -->
+        <div id="drawer-tab-orders" class="drawer-tab-content hidden">
+          <div id="drawer-orders-list" class="drawer-records-list">
+            <!-- Populated by JS -->
           </div>
         </div>
       </div>
@@ -779,117 +1216,305 @@
     <!-- Analytics View -->
     <div id="view-analytics" class="view-panel hidden">
       <div class="view-content">
-        <div class="view-header">
-          <h2>Analytics & Reporting</h2>
+        <div class="view-header-enterprise">
+          <div class="view-header-meta">
+            <div class="breadcrumbs-bar">
+              <span class="breadcrumb-item">WORKSPACE</span>
+              <span class="breadcrumb-sep">/</span>
+              <span class="breadcrumb-item active">PERFORMANCE INTELLIGENCE</span>
+            </div>
+            <div class="view-title-row">
+              <h1 class="view-title">Enterprise Support Intelligence</h1>
+              <div class="live-telemetry-badge" style="background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.25); color: #818cf8;">
+                <span class="ping-dot" style="background: #818cf8;"></span>
+                <span class="ping-text">Executive Audit</span>
+              </div>
+            </div>
+            <p class="view-subtitle">Cross-channel ticket velocity, First Contact Resolution, AI Copilot deflection, and QA compliance audit.</p>
+          </div>
           <div class="header-actions">
-            <div class="filter-select-wrapper" data-value="All time">
-              <select id="analytics-date-range" class="filter-select" onchange="this.parentElement.setAttribute('data-value', this.options[this.selectedIndex].text); if(window.loadAnalytics) window.loadAnalytics()">
-                <option value="today">Today</option>
-                <option value="7d">Last 7 days</option>
-                <option value="30d">Last 30 days</option>
-                <option value="all" selected>All time</option>
-              </select>
+            <!-- Sleek Segmented Range Control -->
+            <div class="segmented-control" id="analytics-range-selector">
+              <button type="button" class="segment-btn active" data-range="7d">Last 7D</button>
+              <button type="button" class="segment-btn" data-range="today">24H</button>
+              <button type="button" class="segment-btn" data-range="30d">30D</button>
+              <button type="button" class="segment-btn" data-range="quarter">90D</button>
+              <button type="button" class="segment-btn" data-range="all">All-Time</button>
             </div>
-            <!-- Download PDF intentionally left dead for this phase or hidden -->
-            <button class="btn btn-secondary" style="display:none;">Download PDF</button>
+            <select id="analytics-date-range" style="display: none;">
+              <option value="today">Today (24h)</option>
+              <option value="7d" selected>Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="quarter">Last 90 days</option>
+              <option value="all">All time</option>
+            </select>
+            <button class="btn-enterprise-outline" id="export-analytics-btn" onclick="exportAnalyticsReport()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span>Export Report (CSV)</span>
+            </button>
           </div>
         </div>
-        <div class="analytics-grid">
-          <div class="chart-card" style="grid-column: span 2;">
-            <h3>Ticket Volume Over Time</h3>
-            <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
-                <canvas id="volumeChart"></canvas>
+
+        <!-- 6 Executive KPI Metric Summary Cards with Period-over-Period Deltas -->
+        <div class="dashboard-grid dashboard-grid-6">
+          <div class="metric-card-enterprise">
+            <div class="metric-header-enterprise">
+              <span class="metric-label-enterprise">TOTAL VOLUME</span>
+              <span class="status-chip chip-info" id="kpi-volume-chip">Inbound</span>
             </div>
-          </div>
-          <div class="chart-card">
-            <h3>Customer Satisfaction (CSAT)</h3>
-            <div class="chart-container" style="position: relative; height: 300px; width: 100%; display: flex; justify-content: center; align-items: center;">
-                <canvas id="csatChart"></canvas>
-            </div>
-          </div>
-        </div>
-        <div class="analytics-grid" style="margin-top: 24px; grid-template-columns: 1fr;">
-            <div class="stats-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                <div class="stat-item">
-                <span class="stat-label">First Response Time (Avg)</span>
-                <span class="stat-value" id="analytics-first-response" style="color: #22c55e;">—</span>
-                <!-- trend removed -->
-                </div>
-                <div class="stat-item">
-                <span class="stat-label">Avg Resolution Time</span>
-                <span class="stat-value" id="analytics-avg-resolution-time" style="color: #16a34a;">—</span>
-                <!-- trend removed -->
-                </div>
-                <div class="stat-item">
-                <span class="stat-label">One-Touch Resolutions</span>
-                <span class="stat-value" id="analytics-one-touch" style="color: #15803d;">—</span>
-                <!-- trend removed -->
-                </div>
-                <div class="stat-item" style="display:none;">
-                <span class="stat-label">Agent Utilization</span>
-                <span class="stat-value">74%</span>
-                <span class="trend trend-up">↑ 4% vs last period</span>
-                </div>
-            </div>
-          
-          <!-- Analytics & Copilot Section -->
-          <div class="section-block" style="margin-top: 24px;">
-              <h3 class="section-title">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-                  System Analytics & Copilot Insights
-              </h3>
-              <p class="section-subtitle">Real-time performance metrics and recent AI assistant actions.</p>
-  
-              <div class="stat-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 16px;">
-                  <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 8px; border: 1px solid var(--border-light);">
-                      <div class="stat-label" style="font-size: 13px; color: var(--ink-soft); margin-bottom: 8px;">Total Support Tickets</div>
-                      <div id="analytics-total-tickets" class="stat-value" style="font-size: 24px; font-weight: 700; color: var(--ink);">0</div>
-                  </div>
-                  <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 8px; border: 1px solid var(--border-light);">
-                      <div class="stat-label" style="font-size: 13px; color: var(--ink-soft); margin-bottom: 8px;">AI Resolution Rate</div>
-                      <div class="stat-row" style="display: flex; align-items: baseline; gap: 8px;">
-                          <div id="analytics-deflection-rate" class="stat-value stat-value--accent" style="font-size: 24px; font-weight: 700; color: #10b981;">0%</div>
-                          <div id="analytics-ai-resolved" class="stat-sub" style="font-size: 12px; color: var(--ink-muted);">(0 resolved)</div>
-                      </div>
-                  </div>
-                  <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 8px; border: 1px solid var(--border-light);">
-                      <div class="stat-label" style="font-size: 13px; color: var(--ink-soft); margin-bottom: 8px;">Revenue Generated</div>
-                      <div id="analytics-revenue" class="stat-value stat-value--success" style="font-size: 24px; font-weight: 700; color: var(--success);">$0.00</div>
-                  </div>
-                  <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 8px; border: 1px solid var(--border-light);">
-                      <div class="stat-label" style="font-size: 13px; color: var(--ink-soft); margin-bottom: 8px;">Total Upsells</div>
-                      <div id="analytics-upsells" class="stat-value" style="font-size: 24px; font-weight: 700; color: #059669;">0</div>
-                  </div>
+            <div class="metric-main-enterprise">
+              <div class="metric-num-enterprise" id="kpi-total-volume">1,040</div>
+              <div class="metric-badge-enterprise badge-up" id="kpi-volume-delta">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                +8.4%
               </div>
-          </div>
-  
-          <div class="section-block" style="margin-top: 24px;">
-              <h3 class="section-title">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M9 15l2 2 4-4"></path></svg>
-                  Automated QA & CSAT Scorecards
-              </h3>
-              <p class="section-subtitle">AI-generated evaluations of recent human-handled and AI-handled conversations.</p>
-              <div style="overflow-x: auto; background: var(--bg-surface); border: 1px solid var(--border-light); border-radius: 8px; margin-top: 16px;">
-                  <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                      <thead>
-                          <tr>
-                              <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--line); color: var(--ink-soft);">Time</th>
-                              <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--line); color: var(--ink-soft);">Conv ID</th>
-                              <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line); color: var(--ink-soft);">Empathy</th>
-                              <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line); color: var(--ink-soft);">Accuracy</th>
-                              <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line); color: var(--ink-soft);">Resolution</th>
-                              <th style="text-align: center; padding: 12px; border-bottom: 1px solid var(--line); color: var(--ink-soft);">Pred. CSAT</th>
-                              <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--line); min-width: 250px; color: var(--ink-soft);">AI Feedback</th>
-                          </tr>
-                      </thead>
-                      <tbody id="qa-scorecards-list">
-                          <tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--ink-soft);">No scorecards yet. Resolve a conversation to generate one.</td></tr>
-                      </tbody>
-                  </table>
-              </div>
+            </div>
+            <div class="metric-sub-enterprise">Total customer conversations</div>
+            <div class="metric-sparkline-track"><div class="metric-sparkline-fill" style="width: 84%;"></div></div>
           </div>
 
+          <div class="metric-card-enterprise">
+            <div class="metric-header-enterprise">
+              <span class="metric-label-enterprise">SLA COMPLIANCE</span>
+              <span class="status-chip chip-success">Target ≥ 95%</span>
+            </div>
+            <div class="metric-main-enterprise">
+              <div class="metric-num-enterprise" id="kpi-sla-compliance">97.4%</div>
+              <div class="metric-badge-enterprise badge-up" id="kpi-sla-delta">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                +1.8%
+              </div>
+            </div>
+            <div class="metric-sub-enterprise">Responses within target SLA</div>
+            <div class="metric-sparkline-track"><div class="metric-sparkline-fill fill-success" style="width: 97%;"></div></div>
+          </div>
+
+          <div class="metric-card-enterprise">
+            <div class="metric-header-enterprise">
+              <span class="metric-label-enterprise">FIRST RESPONSE (FRT)</span>
+              <span class="status-chip chip-info">SLA &lt; 3m</span>
+            </div>
+            <div class="metric-main-enterprise">
+              <div class="metric-num-enterprise" id="analytics-first-response">1m 32s</div>
+              <div class="metric-badge-enterprise badge-up" id="kpi-frt-delta">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                -24s faster
+              </div>
+            </div>
+            <div class="metric-sub-enterprise">Initial reply time to customer</div>
+            <div class="metric-sparkline-track"><div class="metric-sparkline-fill fill-info" style="width: 76%;"></div></div>
+          </div>
+
+          <div class="metric-card-enterprise">
+            <div class="metric-header-enterprise">
+              <span class="metric-label-enterprise">MEAN RESOLUTION TIME</span>
+              <span class="status-chip chip-info">MTTR</span>
+            </div>
+            <div class="metric-main-enterprise">
+              <div class="metric-num-enterprise" id="analytics-avg-resolution-time">14m 10s</div>
+              <div class="metric-badge-enterprise badge-up" id="kpi-mttr-delta">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                -3.2m faster
+              </div>
+            </div>
+            <div class="metric-sub-enterprise">Full end-to-end resolution</div>
+            <div class="metric-sparkline-track"><div class="metric-sparkline-fill fill-info" style="width: 68%;"></div></div>
+          </div>
+
+          <div class="metric-card-enterprise">
+            <div class="metric-header-enterprise">
+              <span class="metric-label-enterprise">FIRST CONTACT RESOLUTION</span>
+              <span class="status-chip chip-success">FCR Rate</span>
+            </div>
+            <div class="metric-main-enterprise">
+              <div class="metric-num-enterprise" id="analytics-one-touch">84.6%</div>
+              <div class="metric-badge-enterprise badge-up" id="kpi-fcr-delta">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                +4.6%
+              </div>
+            </div>
+            <div class="metric-sub-enterprise">Resolved on first response</div>
+            <div class="metric-sparkline-track"><div class="metric-sparkline-fill fill-success" style="width: 85%;"></div></div>
+          </div>
+
+          <div class="metric-card-enterprise">
+            <div class="metric-header-enterprise">
+              <span class="metric-label-enterprise">CSAT SATISFACTION</span>
+              <span class="status-chip chip-gold">5.0 Scale</span>
+            </div>
+            <div class="metric-main-enterprise">
+              <div class="metric-num-enterprise" id="analytics-rolling-csat">4.85 ★</div>
+              <div class="metric-badge-enterprise badge-up" id="kpi-csat-delta">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                +0.3 vs prev
+              </div>
+            </div>
+            <div class="metric-sub-enterprise">Post-resolution CSAT feedback</div>
+            <div class="metric-sparkline-track"><div class="metric-sparkline-fill fill-gold" style="width: 96%;"></div></div>
+          </div>
         </div>
+
+        <!-- Primary Analytical Visualizations Grid -->
+        <div class="analytics-grid">
+          <!-- Inbound vs Resolved Volume Chart -->
+          <div class="chart-card" style="grid-column: span 2;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div>
+                <h3 style="margin: 0; font-size: 15px; font-weight: 600;">Ticket Velocity &amp; Resolution Trends</h3>
+                <span style="font-size: 12px; color: var(--ink-muted);">Inbound ticket demand vs resolved tickets across selected timeframe</span>
+              </div>
+              <div class="chart-legend-pills">
+                <span class="legend-pill"><span class="legend-dot" id="legend-dot-inbound"></span> Inbound Tickets</span>
+                <span class="legend-pill"><span class="legend-dot" id="legend-dot-resolved" style="background: #10b981;"></span> Resolved Tickets</span>
+              </div>
+            </div>
+            <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
+              <canvas id="volumeChart"></canvas>
+            </div>
+          </div>
+
+          <!-- CSAT & Sentiment Breakdown -->
+          <div class="chart-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div>
+                <h3 style="margin: 0; font-size: 15px; font-weight: 600;">Customer Satisfaction (CSAT)</h3>
+                <span style="font-size: 12px; color: var(--ink-muted);">5-Star ratings breakdown</span>
+              </div>
+            </div>
+            <div class="chart-container" style="position: relative; height: 210px; width: 100%; display: flex; justify-content: center; align-items: center;">
+              <canvas id="csatChart"></canvas>
+            </div>
+            <!-- Sentiment Meter -->
+            <div class="sentiment-meter-wrap" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line);">
+              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+                <span style="color: var(--ink-soft); font-weight: 500;">Customer Sentiment</span>
+                <strong style="color: #10b981;" id="sentiment-positive-pct">78% Positive</strong>
+              </div>
+              <div class="sentiment-bar-track">
+                <div class="sentiment-bar-segment" id="sentiment-seg-pos" style="width: 78%; background: #10b981;" title="Positive: 78%"></div>
+                <div class="sentiment-bar-segment" id="sentiment-seg-neu" style="width: 15%; background: #eab308;" title="Neutral: 15%"></div>
+                <div class="sentiment-bar-segment" id="sentiment-seg-neg" style="width: 7%; background: #ef4444;" title="Negative: 7%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Secondary Analytical Charts: Categories & Channels -->
+        <div class="analytics-grid" style="margin-top: 20px;">
+          <div class="chart-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div>
+                <h3 style="margin: 0; font-size: 15px; font-weight: 600;">Top Contact Drivers &amp; Categories</h3>
+                <span style="font-size: 12px; color: var(--ink-muted);">Volume and distribution by category</span>
+              </div>
+            </div>
+            <div class="chart-container" style="position: relative; height: 240px; width: 100%;">
+              <canvas id="tagsChart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div>
+                <h3 style="margin: 0; font-size: 15px; font-weight: 600;">Support Channels Distribution</h3>
+                <span style="font-size: 12px; color: var(--ink-muted);">Volume share across customer touchpoints</span>
+              </div>
+            </div>
+            <div class="chart-container" style="position: relative; height: 240px; width: 100%; display: flex; justify-content: center; align-items: center;">
+              <canvas id="channelChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Autonomous Copilot & Business Impact -->
+        <div class="section-block" style="margin-top: 24px;">
+          <h3 class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            Autonomous Copilot &amp; Financial Impact
+          </h3>
+          <p class="section-subtitle">Real-time AI resolution efficiency, operational cost savings, and assisted commerce revenue.</p>
+
+          <div class="stat-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 16px;">
+            <div class="stat-card">
+              <div class="stat-label">Total Inbound Conversations</div>
+              <div id="analytics-total-tickets" class="stat-value">1,040</div>
+              <div class="stat-sub-text">Across widget, chat &amp; email</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">AI Autonomy &amp; Deflection</div>
+              <div class="stat-row" style="display: flex; align-items: baseline; gap: 8px;">
+                <div id="analytics-deflection-rate" class="stat-value" style="color: var(--accent);">72.8%</div>
+                <div id="analytics-ai-resolved" class="stat-sub">(757 resolved by AI)</div>
+              </div>
+              <div class="stat-sub-text">Zero human escalation required</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Assisted Revenue Generated</div>
+              <div id="analytics-revenue" class="stat-value" style="color: #10b981;">$4,850.00</div>
+              <div class="stat-sub-text">From in-chat recommendations</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Successful Product Upsells</div>
+              <div id="analytics-upsells" class="stat-value" style="color: #10b981;">38</div>
+              <div class="stat-sub-text">Accepted checkout offers</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agent & Workforce Performance Leaderboard -->
+        <div class="section-block" style="margin-top: 24px;">
+          <h3 class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            Specialist &amp; Copilot Performance Leaderboard
+          </h3>
+          <p class="section-subtitle">Comparative throughput, First Contact Resolution (FCR), handling times, and satisfaction scores.</p>
+          <div class="table-container" style="margin-top: 14px;">
+            <table class="data-table" id="analytics-leaderboard-table">
+              <thead>
+                <tr>
+                  <th>Team Member / Agent</th>
+                  <th>Role</th>
+                  <th style="text-align: center;">Resolved</th>
+                  <th style="text-align: center;">Avg MTTR</th>
+                  <th style="text-align: center;">FCR Rate</th>
+                  <th style="text-align: center;">CSAT</th>
+                  <th style="text-align: center;">Copilot Assist</th>
+                </tr>
+              </thead>
+              <tbody id="analytics-leaderboard-body">
+                <!-- Populated dynamically by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Automated QA & CSAT Scorecards -->
+        <div class="section-block" style="margin-top: 24px;">
+          <h3 class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M9 15l2 2 4-4"></path></svg>
+            Automated QA &amp; CSAT Scorecard Audits
+          </h3>
+          <p class="section-subtitle">Real-time AI audit of conversation empathy, policy accuracy, resolution effectiveness &amp; customer sentiment.</p>
+          <div class="table-container" style="margin-top: 14px;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Ticket Short ID</th>
+                  <th style="text-align: center;">Empathy</th>
+                  <th style="text-align: center;">Accuracy</th>
+                  <th style="text-align: center;">Resolution</th>
+                  <th style="text-align: center;">Pred. CSAT</th>
+                  <th style="min-width: 280px;">AI Executive Audit Notes</th>
+                </tr>
+              </thead>
+              <tbody id="qa-scorecards-list">
+                <tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--ink-soft);">No scorecards yet. Resolve a conversation to generate an automated audit.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </div>
   </div> <!-- /dashboard -->
@@ -927,7 +1552,7 @@
     </div>
   </div>
 
-  <script src="agent.js?v=202"></script>
+  <script src="agent.js?v=247"></script>
 </body>
 </html>
 

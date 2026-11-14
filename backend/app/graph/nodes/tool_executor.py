@@ -37,6 +37,10 @@ async def tool_executor_node(state: ConversationState) -> ConversationState:
                 if e.lower() not in (c.lower() for c in claimed_emails):
                     claimed_emails.append(e)
 
+    # A customer signed in on the storefront already proved who they are (email comes from our signed session token).
+    _logged_in = state.get("customer_email")
+    if _logged_in and _logged_in.lower() not in [c.lower() for c in claimed_emails]:
+        claimed_emails.append(_logged_in)
     for tool_call in planned_tools:
         tool_name = tool_call.get("name")
         # Strip any LLM-supplied private "_" args, then add the trusted ones.
@@ -51,7 +55,7 @@ async def tool_executor_node(state: ConversationState) -> ConversationState:
                 state["last_order_id"] = str(tool_args["order_id"])
                 
             try:
-                result = str(await TOOL_EXECUTORS[tool_name]({**tool_args, "_claimed_emails": claimed_emails}))
+                result = str(await TOOL_EXECUTORS[tool_name]({**tool_args, "_claimed_emails": claimed_emails, "_customer_email": state.get("customer_email")}))
                 if len(result) > 1500:
                     from app.services.llm import _safe_llm_call
                     summary_prompt = f"Summarize this tool output concisely, focusing on key facts and policy details. Do not omit important data. \n\nOutput:\n{result}"

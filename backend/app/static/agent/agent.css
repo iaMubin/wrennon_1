@@ -4143,11 +4143,11 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
 }
 
 .view-header h2 {
-  font-family: 'Big Shoulders Display', sans-serif;
-  font-size: 32px;
-  font-weight: 800;
+  font-family: 'Inter', var(--font-display), sans-serif;
+  font-size: 26px;
+  font-weight: 700;
   color: var(--ink);
-  letter-spacing: -0.5px;
+  letter-spacing: -0.025em;
   margin: 0;
 }
 

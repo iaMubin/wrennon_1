@@ -244,3 +244,52 @@ def refund(db: Session, order_id: Any, amount: float, reason: Optional[str] = No
     add_event(order, "refunded" if full else "partially_refunded")
     db.commit()
     return ref
+
+
+# -------------------------------------------------------------- customers
+TIERS = ((Decimal("1200"), "Platinum"), (Decimal("600"), "Gold"), (Decimal("200"), "Silver"), (Decimal("0"), "Bronze"))
+
+
+def customer_by_email(db: Session, email: str) -> Optional[StoreCustomer]:
+    return db.execute(select(StoreCustomer).where(StoreCustomer.email == (email or "").strip().lower())).scalars().first()
+
+
+def orders_for_email(db: Session, email: str) -> List[StoreOrder]:
+    return list(db.execute(
+        select(StoreOrder).where(StoreOrder.email == (email or "").strip().lower())
+        .order_by(StoreOrder.created_at.desc(), StoreOrder.order_id.desc())
+    ).scalars().all())
+
+
+def customer_profile(db: Session, c: StoreCustomer) -> Dict[str, Any]:
+    """What an agent (or the account page) wants to know about a customer at a glance."""
+    orders = orders_for_email(db, c.email)
+    spent = Decimal("0")
+    for o in orders:
+        if o.status == "cancelled":
+            continue
+        spent += o.total - sum((r.amount for r in o.refunds if r.status == "approved"), Decimal("0"))
+    tier = next(name for floor, name in TIERS if spent >= floor)
+    return {
+        "id": f"CUST-{1000 + c.id}", "name": c.name, "email": c.email, "phone": c.phone,
+        "member_since": c.created_at.date().isoformat() if c.created_at else None,
+        "total_orders": len(orders), "lifetime_value": money(spent), "loyalty_tier": tier,
+        "tags": ["VIP"] if tier == "Platinum" else [], "recent_order": orders[0].order_id if orders else None,
+        "has_account": bool(c.password_hash),
+    }
+
+
+def register_customer(db: Session, *, name: str, email: str, password_hash: str) -> StoreCustomer:
+    email = email.strip().lower()
+    if customer_by_email(db, email):
+        # Never claim an existing record (it may hold someone's order history); this also hides which emails shop here.
+        raise StoreError("account_exists", "We couldn't create that account. If you already have one, please sign in.")
+    c = StoreCustomer(email=email, name=name.strip(), password_hash=password_hash, last_login_at=_now())
+    db.add(c)
+    db.commit()
+    return c
+
+
+def mark_login(db: Session, c: StoreCustomer) -> None:
+    c.last_login_at = _now()
+    db.commit()

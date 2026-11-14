@@ -1,6 +1,7 @@
 import asyncio
 from typing import Dict, Any
-from app.services.integrations import get_ecommerce_provider
+from app.services.integrations import get_ecommerce_provider
+from app.services import store_tools as _store_tools
 from app.services.vectorstore import retrieve_and_rerank
 import json
 
@@ -83,7 +84,8 @@ TOOL_EXECUTORS = {
     # money-moving actions must not be reachable from LLM output (prompt
     # injection). Re-add only behind a deterministic policy gate + identity check.
     "recommend_product": execute_recommend_product,
-    "track_purchase": execute_track_purchase,
+    "track_purchase": execute_track_purchase,
+    "get_my_orders": _store_tools.execute_get_my_orders,
     # check_refund_policy / send_otp / verify_otp were unregistered: they are stubs
     # (eligibility always True, any 4-6 digit OTP accepted) and no prompt exposes them.
 }

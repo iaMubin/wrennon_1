@@ -11,12 +11,13 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.limiter import limiter
+from app.services import customer_auth as auth
 from app.services import store_service as svc
 
 router = APIRouter(tags=["store"])
@@ -56,10 +57,11 @@ def get_product(product_id: str, db: Session = Depends(get_db)):
 
 @router.post("/orders", status_code=201)
 @limiter.limit("10/minute")
-def create_order(request: Request, payload: OrderIn, db: Session = Depends(get_db)):
+def create_order(request: Request, payload: OrderIn, db: Session = Depends(get_db), authorization: Optional[str] = Header(default=None)):
+    signed_in = auth.customer_email_from_header(authorization)  # a signed-in customer always orders as themselves
     try:
         order = svc.create_order(
-            db, email=payload.email, name=payload.name, address=payload.address, city=payload.city,
+            db, email=signed_in or payload.email, name=payload.name, address=payload.address, city=payload.city,
             zip_code=payload.zip, phone=payload.phone, country=payload.country,
             items=[i.model_dump() for i in payload.items],
         )
@@ -77,3 +79,49 @@ def track_order(request: Request, order_id: str, email: str = Query(min_length=3
     if not order:  # same answer for "no such order" and "wrong email"
         raise HTTPException(status_code=404, detail="Order not found")
     return svc.order_to_dict(order, include_email=True)
+
+
+# ----------------------------------------------------------- customer accounts
+class RegisterIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    email: str = Field(pattern=_EMAIL, max_length=254)
+    password: str = Field(min_length=8, max_length=128)
+
+
+class LoginIn(BaseModel):
+    email: str = Field(pattern=_EMAIL, max_length=254)
+    password: str = Field(min_length=1, max_length=128)
+
+
+def _session_payload(c) -> dict:
+    return {"token": auth.issue_customer_token(c.email, c.name), "customer": {"name": c.name, "email": c.email}}
+
+
+@router.post("/auth/register", status_code=201)
+@limiter.limit("5/minute")
+def register(request: Request, payload: RegisterIn, db: Session = Depends(get_db)):
+    try:
+        c = svc.register_customer(db, name=payload.name, email=payload.email, password_hash=auth.hash_pw(payload.password))
+    except svc.StoreError as e:
+        raise HTTPException(status_code=409, detail={"code": e.code, "message": str(e)})
+    return _session_payload(c)
+
+
+@router.post("/auth/login")
+@limiter.limit("10/minute")
+def login(request: Request, payload: LoginIn, db: Session = Depends(get_db)):
+    c = svc.customer_by_email(db, payload.email)
+    if not auth.check_pw(payload.password, c.password_hash if c else None):  # same answer for "no account" and "wrong password"
+        raise HTTPException(status_code=401, detail={"code": "bad_credentials", "message": "Incorrect email or password."})
+    svc.mark_login(db, c)
+    return _session_payload(c)
+
+
+@router.get("/auth/me")
+@limiter.limit("60/minute")
+def me(request: Request, db: Session = Depends(get_db), authorization: Optional[str] = Header(default=None)):
+    email = auth.customer_email_from_header(authorization)
+    c = svc.customer_by_email(db, email) if email else None
+    if not c:
+        raise HTTPException(status_code=401, detail="Please sign in.")
+    return {"customer": svc.customer_profile(db, c), "orders": [svc.order_to_dict(o) for o in svc.orders_for_email(db, c.email)]}

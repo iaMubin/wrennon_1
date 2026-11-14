@@ -10,7 +10,8 @@ from app.db.session import SessionLocal
 from app.limiter import limiter
 from app.services import store_service as svc
 from app.services.integrations.store_db import StoreDBProvider
-from app.services.store_seed import seed_store
+from app.services import customer_auth as auth
+from app.services.store_seed import DEMO_PASSWORD, seed_store
 
 
 @pytest.fixture()
@@ -19,7 +20,7 @@ def db():
         for model in (m.StoreRefund, m.StoreOrderEvent, m.StoreOrderItem, m.StoreOrder, m.StoreCustomer, m.StoreInventory, m.StoreProduct):
             s.execute(delete(model))
         s.commit()
-        seed_store(s)
+        seed_store(s, with_history=False)
         yield s
 
 
@@ -37,7 +38,7 @@ def _order(db, **kw):
 
 def test_seed_is_idempotent(db):
     assert db.query(m.StoreProduct).count() == 9 and db.query(m.StoreOrder).count() == 10
-    assert seed_store(db) == {"products_created": 0, "orders_created": 0}
+    assert seed_store(db, with_history=False) == {"products_created": 0, "customers_created": 0, "orders_created": 0, "history_orders_created": 0}
 
 
 def test_order_lookup_requires_matching_email(provider):
@@ -137,3 +138,84 @@ def test_factory_selects_store_db(monkeypatch):
     monkeypatch.setenv("ECOMMERCE_PROVIDER", "store_db")
     from app.services.integrations import get_ecommerce_provider
     assert isinstance(get_ecommerce_provider(), StoreDBProvider)
+
+
+# ------------------------------------------------------------ customers & login
+@pytest.fixture()
+def full(db):
+    from app.services.store_seed import seed_history
+    seed_history(db)
+    return db
+
+
+def test_fifteen_customers_with_history_and_passwords(full):
+    customers = full.query(m.StoreCustomer).all()
+    assert len(customers) == 15 and all(c.password_hash for c in customers)
+    assert all(svc.customer_profile(full, c)["total_orders"] >= 1 for c in customers)
+    assert full.query(m.StoreOrder).count() > 40
+
+
+def _client():
+    app = FastAPI()
+    app.state.limiter = limiter
+    app.include_router(store_router, prefix="/api/store")
+    return TestClient(app)
+
+
+def test_login_register_and_me(full):
+    c = _client()
+    bad = c.post("/api/store/auth/login", json={"email": "eleanor.v@example.com", "password": "nope"})
+    unknown = c.post("/api/store/auth/login", json={"email": "ghost@example.com", "password": "nope"})
+    assert bad.status_code == unknown.status_code == 401 and bad.json() == unknown.json()
+    ok = c.post("/api/store/auth/login", json={"email": "Eleanor.V@example.com", "password": DEMO_PASSWORD})
+    assert ok.status_code == 200
+    me = c.get("/api/store/auth/me", headers={"Authorization": "Bearer " + ok.json()["token"]}).json()
+    assert me["customer"]["name"] == "Eleanor Vance" and me["orders"][0]["order_id"] and me["customer"]["total_orders"] == len(me["orders"])
+    assert c.get("/api/store/auth/me").status_code == 401
+    reg = c.post("/api/store/auth/register", json={"name": "Fresh User", "email": "fresh@example.com", "password": "longenough1"})
+    assert reg.status_code == 201
+    assert c.post("/api/store/auth/register", json={"name": "Dup", "email": "eleanor.v@example.com", "password": "longenough1"}).status_code == 409
+    assert c.post("/api/store/auth/register", json={"name": "Weak", "email": "w@example.com", "password": "short"}).status_code == 422
+
+
+def test_signed_in_checkout_always_orders_as_the_customer(full):
+    c = _client()
+    tok = c.post("/api/store/auth/login", json={"email": "mchang.tech@example.com", "password": DEMO_PASSWORD}).json()["token"]
+    body = {"email": "attacker@example.com", "name": "x", "address": "1", "city": "x", "zip": "1",
+            "items": [{"product_id": "WRN-ACC-501", "size": "One size", "quantity": 1}]}
+    r = c.post("/api/store/orders", json=body, headers={"Authorization": "Bearer " + tok})
+    assert r.status_code == 201 and r.json()["email"] == "mchang.tech@example.com"
+
+
+def test_chat_session_token_carries_only_a_verified_customer(full):
+    tok = auth.issue_customer_token("eleanor.v@example.com", "Eleanor")
+    sess = auth.session_token_for_customer("sess-1", "Bearer " + tok)
+    assert auth.session_customer_email(sess) == "eleanor.v@example.com"
+    from app.auth.security import decode_session_token
+    assert decode_session_token(sess) == "sess-1"                     # still a valid ordinary session token
+    assert auth.session_token_for_customer("s", "Bearer garbage") is None
+    assert auth.session_token_for_customer("s", None) is None
+    assert auth.customer_email_from_header("Bearer " + sess) is None   # a chat session token is not a customer login token
+
+
+def test_agent_profile_and_get_my_orders(full, provider):
+    info = provider.get_customer_info(email="sarah.fake@example.com")
+    assert info is None
+    info = provider.get_customer_info(email="sjenkins88@example.com")
+    assert info["id"].startswith("CUST-") and info["loyalty_tier"] in ("Bronze", "Silver", "Gold", "Platinum") and info["recent_order"]
+    assert provider.get_customer_info(customer_id=info["id"])["email"] == "sjenkins88@example.com"
+    import asyncio
+    from app.services.store_tools import execute_get_my_orders
+    guest = asyncio.run(execute_get_my_orders({}))
+    assert "not signed in" in guest
+    mine = asyncio.run(execute_get_my_orders({"_customer_email": "sjenkins88@example.com"}))
+    assert "Recent orders" in mine and "sjenkins88" not in mine
+
+
+def test_planner_and_reply_node_are_told_the_customer_is_signed_in():
+    from app.graph.nodes.manager_node import _build_context_block
+    assert "SIGNED IN" in _build_context_block({"customer_email": "a@b.co"}) and "get_my_orders" in _build_context_block({"customer_email": "a@b.co"})
+    assert "SIGNED IN" not in _build_context_block({})
+    import inspect
+    from app.graph.nodes import final_reply_node
+    assert "signed in to the store" in inspect.getsource(final_reply_node)

@@ -41,7 +41,8 @@ SYSTEM_PROMPT = """You are the decision-making core of Wrennon's customer suppor
 - search_knowledge_base(query): store policy info — returns, shipping, exchanges, warranty, etc.
 - NOTE: you cannot process refunds or change subscriptions. If the customer wants one executed, collect the order ID and escalate to a human (handoff_required). Never promise or imply it has been done.
 - recommend_product(context_keywords): Shopping assistant - recommend clothing/footwear/accessories from Wrennon's catalog to help the customer find something or to upsell, based on context (e.g. "running shoes", "winter jacket", "gift for him").
-- track_purchase(product_id): Track a simulated purchase when customer agrees to buy a recommended product.
+- track_purchase(product_id): Track a simulated purchase when customer agrees to buy a recommended product.
+- get_my_orders(): the signed-in customer's recent orders with status, items and tracking (no arguments; only works when the customer is signed in on the store). Use it for "my orders", "my last order", or "where is my order" when they give no order number.
 
 ## Scope & professional conduct — read this before anything else
 You are a customer service representative, not a general-purpose assistant. Your only job is helping customers with Wrennon: their orders, shipping, returns/refunds, subscriptions, and shopping for Wrennon's clothing/footwear/accessories.
@@ -136,6 +137,13 @@ def _build_context_block(state: ConversationState) -> str:
         lines.append(f"Active topic: {state['active_topic']}")
     if state.get("last_order_id"):
         lines.append(f"Last order ID discussed: {state['last_order_id']}")
+    if state.get("customer_email"):
+        lines.append(
+            "The customer is SIGNED IN to the store (identity verified by the system; their email is hidden from you). "
+            "For 'my order(s)', 'my last order', 'where is my order' or any order question without an order number, call get_my_orders "
+            "(no arguments) instead of asking for an order number. If they give an order number, call get_order_status directly; "
+            "never ask a signed-in customer for their email."
+        )
     if state.get("gathered_context"):
         lines.append("Tool results so far this turn:\n" + "\n".join(state["gathered_context"]))
     return "\n\n".join(lines)

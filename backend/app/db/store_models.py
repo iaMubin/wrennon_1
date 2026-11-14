@@ -74,6 +74,8 @@ class StoreCustomer(Base):
     email: Mapped[str] = mapped_column(String(254), unique=True, index=True)  # stored lower-case
     name: Mapped[str] = mapped_column(String(200), default="")
     phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(String(100), nullable=True)  # None = guest (never registered)
+    last_login_at: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=_now)
 
 

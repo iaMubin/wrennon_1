@@ -72,7 +72,9 @@ def verify_upload_token(session_id: str, request: Request, authorization: str | 
 def init_session(request: Request):
     """Start a new session and get a signed token."""
     new_session_id = str(uuid.uuid4())
-    token = create_session_token(new_session_id)
+    token = create_session_token(new_session_id)
+    from app.services.customer_auth import session_token_for_customer
+    token = session_token_for_customer(new_session_id, request.headers.get("authorization")) or token
     return {"session_id": new_session_id, "token": token}
 
 

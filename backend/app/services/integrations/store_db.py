@@ -27,7 +27,8 @@ _DEFAULT_RECOMMENDATIONS = ["WRN-TSH-301", "WRN-SHO-101"]
 
 
 def _store_url() -> str:
-    return (os.environ.get("STORE_PUBLIC_URL") or "http://127.0.0.1:8000").rstrip("/")
+    from app.services.integrations import env_value  # honours .env as well as real environment variables
+    return (env_value("STORE_PUBLIC_URL") or "http://127.0.0.1:8000").rstrip("/")
 
 
 class StoreDBProvider(EcommerceProvider):
@@ -51,6 +52,10 @@ class StoreDBProvider(EcommerceProvider):
             order = svc.latest_order_for_email(db, email)
             return svc.order_to_dict(order, include_email) if order else None
 
+    def list_orders(self, email: str, limit: int = 5) -> List[Dict[str, Any]]:
+        with self._session() as db:
+            return [svc.order_to_dict(o) for o in svc.orders_for_email(db, email)[:limit]]
+
     def get_customer_info(self, email: Optional[str] = None, phone: Optional[str] = None,
                           customer_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         with self._session() as db:
@@ -59,20 +64,15 @@ class StoreDBProvider(EcommerceProvider):
                 q = q.where(StoreCustomer.email == email.strip().lower())
             elif phone:
                 q = q.where(StoreCustomer.phone == phone.strip())
-            elif customer_id and str(customer_id).isdigit():
-                q = q.where(StoreCustomer.id == int(customer_id))
+            elif customer_id:
+                digits = "".join(ch for ch in str(customer_id) if ch.isdigit())
+                if not digits:
+                    return None
+                q = q.where(StoreCustomer.id == int(digits) - (1000 if str(customer_id).upper().startswith("CUST-") else 0))
             else:
                 return None
             c = db.execute(q).scalars().first()
-            if not c:
-                return None
-            orders = db.execute(select(StoreOrder).where(StoreOrder.customer_id == c.id)
-                                .order_by(StoreOrder.created_at.desc())).scalars().all()
-            spent = sum((o.total for o in orders if o.status != "cancelled"), start=0)
-            return {
-                "name": c.name, "email": c.email, "phone": c.phone, "total_orders": len(orders),
-                "lifetime_value": svc.money(spent), "recent_order": orders[0].order_id if orders else None,
-            }
+            return svc.customer_profile(db, c) if c else None
 
     def process_refund(self, order_id: str, amount: float) -> Dict[str, Any]:
         with self._session() as db:

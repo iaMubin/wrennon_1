@@ -13,7 +13,7 @@ if _raw_mock is None and os.environ.get("APP_ENV") == "production":
 USE_MOCK = (_raw_mock or "true").lower() == "true"
 
 def get_ecommerce_provider() -> EcommerceProvider:
-    if os.environ.get("ECOMMERCE_PROVIDER", "").strip().lower() == "store_db":
+    if store_db_enabled():
         from .store_db import StoreDBProvider  # storefront database (see app/db/store_models.py)
         return StoreDBProvider()
     if USE_MOCK:
@@ -36,3 +36,20 @@ def get_crm_provider() -> CRMProvider:
     subdomain = os.environ.get("ZENDESK_SUBDOMAIN", "")
     email = os.environ.get("ZENDESK_EMAIL", "")
     return ZendeskProvider(api_token, subdomain, email)
+
+def env_value(key, default=""):
+    """os.environ first, then the .env file. The app loads .env through pydantic-settings, which does NOT fill os.environ."""
+    value = os.environ.get(key)
+    if value is None:
+        try:
+            with open(".env", encoding="utf-8") as fh:
+                for line in fh:
+                    k, _, v = line.strip().partition("=")
+                    if k.strip() == key:
+                        return v.strip().strip("\"'")
+        except OSError:
+            pass
+    return default if value is None else value
+
+def store_db_enabled():
+    return env_value("ECOMMERCE_PROVIDER").strip().lower() == "store_db"

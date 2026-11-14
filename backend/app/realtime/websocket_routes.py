@@ -68,9 +68,12 @@ def _save_message(db: Session, conversation_id: str, sender: str, content: str, 
 
 # --- SYNC WRAPPERS FOR ASYNC EVENT LOOP ---
 
-def _sync_setup_conversation(session_id: str) -> dict:
+def _sync_setup_conversation(session_id: str, customer_email: str | None = None) -> dict:
     with SessionLocal() as db:
-        conversation = _get_or_create_conversation(db, session_id, customer_email=None)
+        conversation = _get_or_create_conversation(db, session_id, customer_email=customer_email)
+        if customer_email and not conversation.customer_email:
+            conversation.customer_email = customer_email  # signed in after starting as a guest
+            db.commit()
         return {
             "reopen_count": conversation.reopen_count,
             "handoff_active": conversation.handoff_active,
@@ -362,7 +365,9 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
         await websocket.close(code=4401)
         return
 
-    await manager.connect_customer(session_id, websocket)
+    await manager.connect_customer(session_id, websocket)
+    from app.services.customer_auth import session_customer_email
+    _ws_customer_email = session_customer_email(token)  # verified email of a signed-in customer, else None
 
     # --- Debounce state for this connection ---
     # These are local to this function call, i.e. scoped per-connection —
@@ -700,7 +705,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             # Re-check handoff status right before firing — a human agent
             # may have claimed the conversation during the wait window,
             # even though it wasn't claimed when the last message arrived.
-            recheck = await asyncio.to_thread(_sync_setup_conversation, session_id)
+            recheck = await asyncio.to_thread(_sync_setup_conversation, session_id, _ws_customer_email)
             if recheck["handoff_active"]:
                 continue
 
@@ -720,7 +725,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
 
     try:
         # One-off connection for initial setup (non-blocking)
-        init_data = await asyncio.to_thread(_sync_setup_conversation, session_id)
+        init_data = await asyncio.to_thread(_sync_setup_conversation, session_id, _ws_customer_email)
         if init_data["reopen_count"] > 0 and not init_data["handoff_active"]:
             await manager.broadcast_to_agents({
                 "type": "reopen",
