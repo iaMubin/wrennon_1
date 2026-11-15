@@ -28,6 +28,9 @@ on:
       - "frontend/agent/admin.css"
       - "frontend/widget.css"
 
+permissions:
+  contents: read
+
 jobs:
   notify-site:
     runs-on: ubuntu-latest

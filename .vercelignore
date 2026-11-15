@@ -1,0 +1,8 @@
+# Only the static frontend (+ vercel.json) may be uploaded/served. Without this,
+# a repo-root deployment can expose backend source, render.yaml, scripts and archives.
+/*
+!/frontend
+!/vercel.json
+**/*.py
+**/*.zip
+**/*.md

@@ -57,3 +57,8 @@ backend/data/*.log
 .ruff_cache/
 .pytest_cache/
 *.db
+
+# Archives and one-off codemods must not be committed (they get served/shipped)
+*.zip
+frontend/**/*.py
+backend/app/static/**/*.py

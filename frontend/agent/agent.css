@@ -757,7 +757,7 @@ body {
   padding: 24px 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   background: var(--bg-base);
   border: none !important;
   border-bottom: none !important;
@@ -860,7 +860,7 @@ body {
 
 .msg-content--grouped,
 .msg-content--grouped-next {
-  margin-top: -7px; /* 10px - 7px = 3px gap */
+  margin-top: -5px; /* 8px - 5px = 3px gap */
 }
 .msg-content--grouped .msg::before {
   display: none !important;
@@ -2774,7 +2774,7 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
 
 #agent-messages {
   padding: 20px 16px;
-  gap: 10px;
+  gap: 8px;
   background: transparent;
 }
 

@@ -53,7 +53,10 @@ Ensure you provide valid keys for:
 - `GROQ_API_KEY`
 - `PINECONE_API_KEY`
 - `COHERE_API_KEY`
-- `JWT_SECRET` (You can generate one using `openssl rand -hex 32`)
+- `JWT_SECRET_KEY` (generate with `openssl rand -hex 32`)
+- `AGENT_PASSWORD_HASH` (run `python scripts/generate_agent_password.py`)
+- `CORS_ALLOWED_ORIGINS` — your exact frontend origin(s). The agent WebSocket also checks the browser `Origin` against this list.
+- `REDIS_URL` — a real Redis in production (`memory://` is dev-only and the app refuses to start with it when `APP_ENV=production`)
 
 ### 3. Database & Vector Store
 If using the RAG features, ensure your Pinecone index matches the dimensions of your embedding model. 
@@ -101,6 +104,10 @@ The `frontend/` directory can be deployed directly to Vercel as a static site. E
 
 ## Security Notes
 
-- **Internal Notes:** Agents can leave internal notes visible only to other agents. Strict backend enforcement prevents agents from deleting notes they do not own (unless they are an Admin).
-- **Passwords:** Agent passwords are cryptographically hashed using `passlib` (bcrypt).
-- **RBAC:** Only `admin` roles can manage accounts. Regular `manager` or `agent` accounts are restricted appropriately.
+- **Auth:** agent sessions are an `httpOnly` cookie only — the JWT is never stored in or readable from page JS. Cookie-authenticated writes require the `X-Wrennon-Client` header (CSRF), and the agent WebSocket rejects foreign `Origin`s.
+- **Roles:** `admin` > `manager` > `agent`. Only an `admin` can create, modify, delete or reset another `admin`; a `manager` can manage `agent` accounts only. Promote an account with `python scripts/set_agent_role.py <username> <role>`.
+- **Passwords:** bcrypt-hashed (max 72 bytes). Password reset and logout revoke existing tokens (`token_version`).
+- **2FA (TOTP):** failed codes count toward the login lockout, codes can't be replayed, and (re)enrolling requires the current password (plus a current code if 2FA is already on).
+- **Internal notes:** visible only to agents; only the author (or an admin) can delete a note.
+- **Privacy:** `GET/DELETE /api/admin/customer-data` export/erase a customer's conversations (matched by stored email or an email typed in chat; `dry_run=true` previews a delete). `scripts/purge_old_conversations.py` enforces retention — schedule it (e.g. a Render Cron Job). Sentry is configured to drop request bodies, cookies and chat log lines.
+- **Customer-facing identity:** AI replies are labelled as the AI assistant; human replies show the agent's first name only.

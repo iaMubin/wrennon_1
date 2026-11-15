@@ -13,6 +13,8 @@
   var IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   var API = window.SF_API || (IS_LOCAL ? 'http://127.0.0.1:8000/api/store' : 'https://wrennon-1.onrender.com/api/store');
   var LIVE = false;   // true once the catalog has been loaded from the store database
+  var PAGE = document.body.getAttribute('data-page');
+  var selSize = null;   // size currently chosen on the product page (shared with the chatbot context)
   var ART = { outerwear: 'g-parka', footwear: 'g-boot', essentials: 'g-knit', accessories: 'g-bag' };
 
   /* ---------- customer sign-in ---------- */
@@ -153,7 +155,8 @@
     var thumbBox = $('.sf-thumbs', m), main = $('.sf-pd__main', m);
     thumbBox.addEventListener('click', function (e) { var t = e.target.closest('.sf-thumb'), im = $('img.sf-photo', main); if (t && im) { im.removeAttribute('data-e'); im.src = t.src; } });
     function stockNote() { var c = $('input[name=size]:checked', m), n = c && p.stock ? p.stock[c.value] : null; $('#sf-stock').textContent = n > 0 && n <= 3 ? 'Only ' + n + ' left in this size.' : ''; }
-    m.addEventListener('change', function (e) { if (e.target.name === 'size') stockNote(); }); stockNote();
+    m.addEventListener('change', function (e) { if (e.target.name === 'size') { selSize = e.target.value; stockNote(); } }); stockNote();
+    var pre = $('input[name=size]:checked', m); if (pre) selSize = pre.value;
     $('#sf-add').addEventListener('click', function () {
       var s = $('input[name=size]:checked', m), msg = $('#sf-msg');
       if (!s) { msg.className = 'sf-msg is-err'; msg.textContent = 'Please choose a size.'; return; }
@@ -293,6 +296,67 @@
     }).catch(function (x) { if (x.message === 'out') location.reload(); else m.innerHTML = head('Your account') + '<div class="sf-wrap sf-narrow"><p class="sf-empty">We couldn\u2019t load your account. Please try again.</p></div>'; });
   }
 
+  /* ---------- tell the chatbot what the visitor is looking at ---------- */
+  // Sends only identifiers (page, product, size, bag lines). The backend looks up names, prices and stock itself.
+  var lastPushed = '';
+  function contextPayload() {
+    var pl = { page: PAGE, cart: cart().map(function (l) { return { product_id: l.id, size: l.size, quantity: l.qty }; }) };
+    if (PAGE === 'shop' && CATS[qs('c')]) pl.category = qs('c');
+    if (PAGE === 'product') { pl.product_id = qs('id'); if (selSize) pl.size = selSize; }
+    return pl;
+  }
+  function pushContext() {
+    if (!LIVE) return;
+    var sid, tok;
+    try { sid = localStorage.getItem('wrennon_session_id'); tok = localStorage.getItem('wrennon_session_token'); } catch (e) { return; }
+    if (!sid || !tok) return;   // chat not opened yet
+    var pl = contextPayload(), key = sid + JSON.stringify(pl);
+    if (key === lastPushed) return;
+    lastPushed = key; pl.session_id = sid;
+    fetch(API + '/context', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Chat-Token': tok }, body: JSON.stringify(pl), keepalive: true })
+      .catch(function () { lastPushed = ''; });   // network blip: try again on the next tick
+  }
+
+  /* ---------- the chatbot acting on the page ---------- */
+  function toast(html) {
+    var t = document.createElement('div'); t.className = 'sf-toast'; t.setAttribute('role', 'status'); t.innerHTML = html;
+    document.body.appendChild(t); setTimeout(function () { t.classList.add('is-out'); setTimeout(function () { t.remove(); }, 400); }, 4200);
+  }
+  function bump() { document.querySelectorAll('.sf-bag').forEach(function (e) { e.classList.remove('is-bump'); void e.offsetWidth; e.classList.add('is-bump'); }); }
+  function runAction(a) {
+    var p = a.payload || {};
+    if (a.type === 'add_to_bag' && typeof p.product_id === 'string' && /^[\w-]{1,32}$/.test(p.product_id)) {
+      addToCart(p.product_id, String(p.size || ''), Math.max(1, Math.min(5, +p.quantity || 1)));
+      bump(); toast('<b>Added to your bag</b>' + esc(p.name || 'Item') + ' \u00b7 ' + esc(p.size || '') + (p.quantity > 1 ? ' \u00d7 ' + (+p.quantity) : '') + '<span>by your Northbound assistant</span>');
+      if (PAGE === 'cart') cartPage();
+    } else if (a.type === 'navigate' && typeof p.url === 'string' && /^[a-z]+\.html(\?[\w=&%.-]*)?$/.test(p.url)) {
+      toast('<b>Opening</b>' + esc(p.label || 'that page') + '<span>by your Northbound assistant</span>');
+      setTimeout(function () { location.href = p.url; }, 700);
+    }
+  }
+  var polling = false;
+  function pollActions() {
+    if (!LIVE || polling || document.hidden) return;
+    var sid, tok;
+    try { sid = localStorage.getItem('wrennon_session_id'); tok = localStorage.getItem('wrennon_session_token'); } catch (e) { return; }
+    if (!sid || !tok) return;
+    polling = true;
+    fetch(API + '/actions?session_id=' + encodeURIComponent(sid), { headers: { 'X-Chat-Token': tok } })
+      .then(function (r) { return r.ok ? r.json() : { actions: [] }; })
+      .then(function (d) { (d.actions || []).forEach(runAction); })
+      .catch(function () {}).finally(function () { polling = false; });
+  }
+
+  // Keep the chat open while the customer (or the assistant) moves between pages.
+  function keepChatOpen() {
+    var launcher = document.getElementById('launcher'); if (!launcher) return;
+    try {
+      new MutationObserver(function () { sessionStorage.setItem('nb_chat_open', launcher.getAttribute('aria-expanded') === 'true' ? '1' : '0'); })
+        .observe(launcher, { attributes: true, attributeFilter: ['aria-expanded'] });
+      if (sessionStorage.getItem('nb_chat_open') === '1') setTimeout(function () { if (launcher.getAttribute('aria-expanded') !== 'true') launcher.click(); }, 600);
+    } catch (e) {}
+  }
+
   /* ---------- boot ---------- */
   function boot() {
     var page = document.body.getAttribute('data-page');
@@ -304,7 +368,8 @@
     updateBag(); updateAcct();
     var run = { home: home, shop: shop, product: product, cart: cartPage, checkout: checkout, order: orderPage, track: trackPage, account: accountPage }[page] || function () {};
     var main = $('#sf-main'); if (main) main.innerHTML = '<div class="sf-wrap"><p class="sf-empty">Loading\u2026</p></div>';
-    loadCatalog().then(run);
+    loadCatalog().then(function () { run(); setInterval(function () { pushContext(); pollActions(); }, 1000); });
+    keepChatOpen();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
