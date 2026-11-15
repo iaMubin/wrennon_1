@@ -44,7 +44,7 @@ broadcaster==0.3.1
 tenacity==9.1.2
 langsmith==0.14.17
 sentry-sdk==2.8.0
-slowapi==0.1.9
+slowapi==0.1.10
 
 # HTTP client (Shopify integration)
 httpx==0.28.1
