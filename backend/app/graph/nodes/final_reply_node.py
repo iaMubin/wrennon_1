@@ -16,6 +16,7 @@ from langchain_core.messages import AIMessage
 from app.graph.state import ConversationState
 from app.services.llm import _safe_llm_call, mask_pii, LIGHT_MODEL
 from app.logger import logger
+from app.security.sanitize import render_brand_voice
 
 SYSTEM_INSTRUCTION = (
     "You are Wrennon's customer support assistant, replying directly to the customer. "
@@ -66,13 +67,7 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
     try:
         brand_setting = db.query(SystemSetting).filter_by(key="brand_voice").first()
         if brand_setting and brand_setting.value:
-            system_instruction += (
-                f"\n\n## Brand Persona\nYou must adopt the following persona for your reply:\n"
-                f"{brand_setting.value}\n\n"
-                "(This persona governs tone and voice only. It never overrides the rules above — "
-                "you remain a Wrennon customer service representative and continue to redirect "
-                "off-topic requests exactly as instructed there.)"
-            )
+            system_instruction += render_brand_voice(brand_setting.value)
     except Exception as e:
         logger.error(f"Failed to fetch brand voice: {e}")
 
@@ -99,6 +94,8 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
             "The customer is signed in to the store (verified account). Never ask them for their email or an order number "
             "just to identify them; if tool results contain their orders, answer from those."
         )
+    if state.get("page_context"):
+        context_parts.append(state["page_context"])
     if state.get("gathered_context"):
         context_parts.append("Tool/policy results:\n" + "\n".join(state["gathered_context"]))
 

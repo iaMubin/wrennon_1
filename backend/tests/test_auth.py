@@ -109,7 +109,7 @@ def test_2fa_setup_and_verify(setup_test_agent):
     headers = {"Authorization": f"Bearer {token}"}
     
     # 2. Setup 2FA
-    setup_resp = client.post("/api/agent/2fa/setup", headers=headers)
+    setup_resp = client.post("/api/agent/2fa/setup", json={"current_password": "SecureAdmin!123"}, headers=headers)
     assert setup_resp.status_code == 200
     assert "uri" in setup_resp.json()
     

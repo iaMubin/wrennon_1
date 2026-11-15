@@ -3,7 +3,9 @@ from typing import Optional, List, Dict, Any
 
 class EcommerceProvider(ABC):
     # True => the bot must verify the requester (email match) before revealing an order.
-    requires_verification = False
+    # FAIL-CLOSED: a new provider is verified by default; only providers that
+    # serve fake demo data opt out explicitly (see MockEcommerceProvider).
+    requires_verification = True
 
     @abstractmethod
     def get_order_status(self, order_id: str) -> Optional[Dict[str, Any]]:

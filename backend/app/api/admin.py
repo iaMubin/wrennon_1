@@ -5,22 +5,34 @@ Only accessible by agents with role='manager'.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, File, Request, UploadFile
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+import datetime
+import json
 import os
+from zoneinfo import ZoneInfo
 import uuid
 
 from sqlalchemy import func
 from app.auth.dependencies import get_current_manager
+from app.auth.dependencies import API_KEY_SCOPES
+from app.db.models import Tenant
+from app.security.secrets_box import SecretsUnavailable, encrypt as encrypt_secret
+from app.services.integrations import invalidate_provider_cache
 from app.auth.security import hash_password
-from app.db.models import Agent, Conversation, AuditLog, ApiKey
+from app.security.sanitize import clean_brand_voice
+from app.services.audit import add_audit
+from app.db.models import Agent, AuditLog, ApiKey
+from app.services.erasure import find_conversations_for_email, erase_conversations
 import secrets
 from app.db.session import get_db
 
 import re
 
 def validate_password(password: str) -> None:
+    if len(password.encode("utf-8")) > 72:
+        raise HTTPException(status_code=400, detail="Password must be at most 72 bytes long")
     if len(password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
     if not re.search(r"[A-Z]", password):
@@ -34,13 +46,57 @@ def validate_password(password: str) -> None:
 
 router = APIRouter()
 
+# Role hierarchy. Account management is gated on rank, NOT just on the
+# "manage_managers" permission: that permission used to be granted to every
+# manager by default, which let any manager mint an admin account (admin has
+# every permission) or reset an admin's password and take the account over.
+_ROLE_RANK = {"agent": 0, "manager": 1, "admin": 2}
+
+
+def _assert_may_assign_role(actor: Agent, new_role: str) -> None:
+    """Only an admin may create/promote to admin; creating a manager needs an
+    explicit manage_managers grant; anyone with account access may create agents."""
+    if new_role == "agent":
+        return
+    if actor.role == "admin":
+        return
+    if new_role == "admin":
+        raise HTTPException(status_code=403, detail="Only an admin can create admin accounts.")
+    if not actor.has_permission("manage_managers"):
+        raise HTTPException(status_code=403, detail="Managers can only create standard Agent accounts.")
+
+
+def _assert_may_manage(actor: Agent, target: Agent) -> None:
+    """Block acting on an account that outranks (or, without an explicit
+    grant, equals) the actor. Admins can manage anyone."""
+    if actor.role == "admin":
+        return
+    if _ROLE_RANK.get(target.role, 2) >= _ROLE_RANK.get(actor.role, 0) and target.username != actor.username:
+        if target.role == "admin" or not actor.has_permission("manage_managers"):
+            raise HTTPException(status_code=403, detail="You cannot manage an account with equal or higher privileges.")
+
+
+def _safe_dp_url(v: str | None) -> str | None:
+    """dp_url is rendered into <img src>. Allow only our own uploads/static
+    images or an https URL — never javascript:/data: or attribute-breaking text."""
+    if v is None or v == "":
+        return None
+    if len(v) > 500 or any(c in v for c in '"\'<>\\ \n\r\t'):
+        raise ValueError("Invalid image URL")
+    if v.startswith("/agent/images/") or v.startswith("https://"):
+        return v
+    raise ValueError("Image URL must be an uploaded image or an https URL")
+
+
 class AgentCreate(BaseModel):
-    username: str
-    full_name: str
-    employee_id: str
-    password: str
+    username: str = Field(pattern=r"^[A-Za-z0-9_.-]{3,32}$")
+    full_name: str = Field(min_length=1, max_length=80, pattern=r"^[^<>\"'&`]+$")
+    employee_id: str = Field(pattern=r"^[A-Za-z0-9-]{1,20}$")
+    password: str = Field(max_length=128)
     role: str = "agent"
     dp_url: str | None = None
+
+    _check_dp = field_validator("dp_url")(lambda cls, v: _safe_dp_url(v))
 
 class PasswordReset(BaseModel):
     new_password: str
@@ -132,9 +188,8 @@ def create_agent(
     if agent_in.role not in ["agent", "manager", "admin"]:
         raise HTTPException(status_code=400, detail="Invalid role.")
         
-    if not manager.has_permission("manage_managers") and agent_in.role != "agent":
-        raise HTTPException(status_code=403, detail="Managers can only create standard Agent accounts.")
-        
+    _assert_may_assign_role(manager, agent_in.role)
+
     if db.query(Agent).filter_by(employee_id=agent_in.employee_id).first():
         raise HTTPException(status_code=400, detail="Employee ID already exists")
 
@@ -171,9 +226,10 @@ def delete_agent(
         raise HTTPException(status_code=404, detail="Agent not found")
     if agent.username == manager.username:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    if agent.role == "admin" and manager.role != "admin":
+        raise HTTPException(status_code=403, detail="Only an admin can modify admin accounts.")
         
-    if not manager.has_permission("manage_managers") and agent.role != "agent":
-        raise HTTPException(status_code=403, detail="Managers can only delete standard Agent accounts.")
+    _assert_may_manage(manager, agent)
         
     db.delete(agent)
     
@@ -191,6 +247,8 @@ def delete_agent(
 class AgentUpdate(BaseModel):
     dp_url: str | None = None
 
+    _check_dp = field_validator("dp_url")(lambda cls, v: _safe_dp_url(v))
+
 @router.put("/admin/agents/{username}")
 def update_agent(
     username: str,
@@ -202,10 +260,8 @@ def update_agent(
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
         
-    if not manager.has_permission("manage_managers") and agent.role != "agent":
-        if agent.username != manager.username:
-            raise HTTPException(status_code=403, detail="Managers can only update standard Agent accounts.")
-            
+    _assert_may_manage(manager, agent)
+
     agent.dp_url = payload.dp_url
     
     audit = AuditLog(
@@ -230,9 +286,8 @@ def reset_password(
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
         
-    if not manager.has_permission("manage_managers") and agent.role != "agent":
-        raise HTTPException(status_code=403, detail="Managers can only reset passwords for standard Agent accounts.")
-        
+    _assert_may_manage(manager, agent)
+
     validate_password(payload.new_password)
         
     agent.password_hash = hash_password(payload.new_password)
@@ -267,27 +322,107 @@ def get_audit_logs(
         for log in logs
     ]
 
-from app.db.models import SystemSetting, KnowledgeGap, AnalyticsScorecard, Message
-from app.services.vectorstore import insert_into_pinecone
+from app.db.models import SystemSetting, KnowledgeGap, AnalyticsScorecard
+from app.security.kb_guard import MAX_ARTICLE_CHARS, review_findings
+from app.services.vectorstore import delete_from_pinecone, insert_into_pinecone
 
 class SettingUpdate(BaseModel):
-    value: str
+    value: str = Field(..., max_length=4000)
+
+
+_VALID_DAYS = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
+_HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+def _validate_business_hours(raw: str) -> str:
+    if not raw.strip():
+        return ""  # empty = always open
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="business_hours must be valid JSON")
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="business_hours must be a JSON object")
+    tz = data.get("timezone", "UTC")
+    try:
+        ZoneInfo(tz)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Unknown timezone")
+    for k, v in data.items():
+        if k == "timezone":
+            continue
+        if k not in _VALID_DAYS:
+            raise HTTPException(status_code=400, detail=f"Unknown key '{k}'")
+        if v in (None, []):
+            continue
+        if not (isinstance(v, list) and len(v) == 2 and all(isinstance(x, str) and _HHMM.match(x) for x in v)):
+            raise HTTPException(status_code=400, detail=f"{k} must be [\"HH:MM\", \"HH:MM\"] or null")
+    return json.dumps(data)
+
+
+def _validate_sla_policy(raw: str) -> str:
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="sla_policy must be valid JSON")
+    if not isinstance(data, dict) or set(data) - {"urgent", "high", "normal", "low"}:
+        raise HTTPException(status_code=400, detail="sla_policy keys must be urgent/high/normal/low")
+    for k, v in data.items():
+        if not isinstance(v, int) or isinstance(v, bool) or not (1 <= v <= 10080):
+            raise HTTPException(status_code=400, detail=f"{k} must be minutes between 1 and 10080")
+    return json.dumps(data)
+
+
+def _validate_brand_voice(raw: str) -> str:
+    return clean_brand_voice(raw)
+
+
+# Only these keys exist. The endpoint used to accept ANY key/value pair, so a
+# manager session could plant arbitrary settings (and brand_voice is injected
+# straight into the system prompt).
+SETTING_VALIDATORS = {
+    "brand_voice": _validate_brand_voice,
+    "business_hours": _validate_business_hours,
+    "sla_policy": _validate_sla_policy,
+}
+
+
+def _check_setting_key(key: str) -> None:
+    if key not in SETTING_VALIDATORS:
+        raise HTTPException(status_code=404, detail="Unknown setting")
+
 
 @router.get("/admin/settings/{key}")
 def get_setting(key: str, db: Session = Depends(get_db), manager: Agent = Depends(get_current_manager)):
+    _check_setting_key(key)
     setting = db.query(SystemSetting).filter_by(key=key).first()
     return {"key": key, "value": setting.value if setting else ""}
 
+
 @router.put("/admin/settings/{key}")
-def update_setting(key: str, payload: SettingUpdate, db: Session = Depends(get_db), manager: Agent = Depends(get_current_manager)):
+def update_setting(
+    key: str,
+    payload: SettingUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    manager: Agent = Depends(get_current_manager),
+):
+    _check_setting_key(key)
+    value = SETTING_VALIDATORS[key](payload.value)
     setting = db.query(SystemSetting).filter_by(key=key).first()
+    old = setting.value if setting else ""
     if not setting:
-        setting = SystemSetting(key=key, value=payload.value)
+        setting = SystemSetting(key=key, value=value)
         db.add(setting)
     else:
-        setting.value = payload.value
+        setting.value = value
+    add_audit(
+        db, manager.username, "update_setting", key,
+        details=f"old={old[:120]!r} new={value[:120]!r} (len {len(old)}->{len(value)})",
+        ip=request.client.host if request.client else None,
+    )
     db.commit()
-    return {"status": "success", "key": key, "value": payload.value}
+    return {"status": "success", "key": key, "value": value}
 
 @router.get("/admin/knowledge-gaps")
 def list_knowledge_gaps(db: Session = Depends(get_db), manager: Agent = Depends(get_current_manager)):
@@ -301,21 +436,47 @@ def list_knowledge_gaps(db: Session = Depends(get_db), manager: Agent = Depends(
         "created_at": g.created_at.isoformat()
     } for g in gaps]
 
+class GapApproval(BaseModel):
+    # The reviewer may correct the draft; the text that is indexed is exactly this
+    # (or the draft if omitted) and it must pass review_findings().
+    edited_article: str | None = Field(None, max_length=MAX_ARTICLE_CHARS * 2)
+    confirm_reviewed: bool = False
+
+
 @router.post("/admin/knowledge-gaps/{gap_id}/approve")
-def approve_knowledge_gap(gap_id: str, db: Session = Depends(get_db), manager: Agent = Depends(get_current_manager)):
+def approve_knowledge_gap(
+    gap_id: str,
+    request: Request,
+    payload: GapApproval | None = None,
+    db: Session = Depends(get_db),
+    manager: Agent = Depends(get_current_manager),
+):
+    payload = payload or GapApproval()
     gap = db.query(KnowledgeGap).filter_by(id=gap_id).first()
     if not gap:
         raise HTTPException(status_code=404, detail="Gap not found")
     if gap.status != "pending":
         raise HTTPException(status_code=400, detail="Gap is already processed")
-    
-    # Sync to pinecone
+    if not payload.confirm_reviewed:
+        raise HTTPException(status_code=422, detail="Review the article text and send confirm_reviewed=true")
+
+    text = (payload.edited_article if payload.edited_article is not None else gap.draft_article).strip()
+    findings = review_findings(text)
+    if findings:
+        raise HTTPException(status_code=422, detail={"message": "Article cannot be published as written", "findings": findings})
+
     title = gap.question[:50] + "..." if len(gap.question) > 50 else gap.question
-    insert_into_pinecone(title, gap.draft_article, f"KB_GAP_{gap.id}")
-    
+    insert_into_pinecone(title, text, f"KB_GAP_{gap.id}", approved_by=manager.username)
+
     gap.status = "approved"
+    gap.reviewed_by = manager.username
+    gap.reviewed_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    gap.published_text = text
+    add_audit(db, manager.username, "kb_gap_publish", gap.id, details=f"edited={payload.edited_article is not None} len={len(text)}",
+              ip=request.client.host if request.client else None)
     db.commit()
     return {"status": "success", "id": gap.id}
+
 
 @router.post("/admin/knowledge-gaps/{gap_id}/reject")
 def reject_knowledge_gap(gap_id: str, db: Session = Depends(get_db), manager: Agent = Depends(get_current_manager)):
@@ -323,8 +484,23 @@ def reject_knowledge_gap(gap_id: str, db: Session = Depends(get_db), manager: Ag
     if not gap:
         raise HTTPException(status_code=404, detail="Gap not found")
     gap.status = "rejected"
+    gap.reviewed_by = manager.username
+    add_audit(db, manager.username, "kb_gap_reject", gap.id)
     db.commit()
     return {"status": "success", "id": gap.id}
+
+
+@router.post("/admin/knowledge-gaps/{gap_id}/unpublish")
+def unpublish_knowledge_gap(gap_id: str, db: Session = Depends(get_db), manager: Agent = Depends(get_current_manager)):
+    """Pull a published article back out of the index (bad content, poisoning, PII)."""
+    gap = db.query(KnowledgeGap).filter_by(id=gap_id).first()
+    if not gap or gap.status != "approved":
+        raise HTTPException(status_code=404, detail="No published article for this id")
+    delete_from_pinecone(f"KB_GAP_{gap.id}")
+    gap.status = "unpublished"
+    add_audit(db, manager.username, "kb_gap_unpublish", gap.id)
+    db.commit()
+    return {"status": "unpublished", "id": gap.id}
 
 @router.get("/admin/analytics/scorecards")
 def get_analytics_scorecards(db: Session = Depends(get_db), manager: Agent = Depends(get_current_manager)):
@@ -353,11 +529,7 @@ def export_customer_data(
     a customer asks what data is held on them. Case-insensitive match,
     since the email is stored exactly as the customer typed it and
     wasn't normalized at capture time."""
-    conversations = (
-        db.query(Conversation)
-        .filter(func.lower(Conversation.customer_email) == email.lower().strip())
-        .all()
-    )
+    conversations = find_conversations_for_email(db, email)
     if not conversations:
         raise HTTPException(status_code=404, detail="No data found for this email")
 
@@ -396,6 +568,7 @@ def export_customer_data(
 @router.delete("/admin/customer-data")
 def delete_customer_data(
     email: str,
+    dry_run: bool = False,
     db: Session = Depends(get_db),
     manager: Agent = Depends(get_current_manager),
 ) -> dict:
@@ -404,23 +577,17 @@ def delete_customer_data(
     and knowledge-gap record tied to a customer's email. There is no
     undo — the audit log entry this leaves behind (which intentionally
     does not include message content) is the only record this happened."""
-    conversations = (
-        db.query(Conversation)
-        .filter(func.lower(Conversation.customer_email) == email.lower().strip())
-        .all()
-    )
+    conversations = find_conversations_for_email(db, email)
     if not conversations:
         raise HTTPException(status_code=404, detail="No data found for this email")
 
     conversation_ids = [c.id for c in conversations]
+    if dry_run:
+        # Lets the operator see the blast radius before an irreversible delete.
+        return {"status": "dry_run", "email": email, "conversations_matched": len(conversation_ids)}
 
-    # Child rows first — Conversation.messages has no delete cascade
-    # configured, so deleting the parent directly would either leave
-    # these orphaned or fail on the FK, depending on the database.
-    db.query(Message).filter(Message.conversation_id.in_(conversation_ids)).delete(synchronize_session=False)
-    db.query(AnalyticsScorecard).filter(AnalyticsScorecard.conversation_id.in_(conversation_ids)).delete(synchronize_session=False)
-    db.query(KnowledgeGap).filter(KnowledgeGap.conversation_id.in_(conversation_ids)).delete(synchronize_session=False)
-    db.query(Conversation).filter(Conversation.id.in_(conversation_ids)).delete(synchronize_session=False)
+    from app.services.uploads import UPLOAD_DIR
+    erase_conversations(db, conversation_ids, upload_dir=UPLOAD_DIR, actor=manager.username)
 
     audit = AuditLog(
         actor_username=manager.username,
@@ -434,7 +601,10 @@ def delete_customer_data(
     return {"status": "deleted", "email": email, "conversations_removed": len(conversation_ids)}
 
 class ApiKeyCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=80, pattern=r"^[^<>\"'&`]+$")
+    # Least privilege by default: read-only, expires in 90 days.
+    scopes: list[str] = Field(default_factory=lambda: ["conversations:read"])
+    expires_in_days: int | None = Field(90, ge=1, le=365)
 
 @router.get("/api-keys")
 def list_api_keys(
@@ -452,7 +622,10 @@ def list_api_keys(
         "created_at": k.created_at,
         "last_used_at": k.last_used_at,
         "is_active": k.is_active,
-        "created_by_username": k.created_by_username
+        "created_by_username": k.created_by_username,
+        "scopes": k.scope_list,
+        "expires_at": k.expires_at,
+        "revoked_by": k.revoked_by,
     } for k in keys]
 
 @router.post("/api-keys")
@@ -464,17 +637,31 @@ def create_api_key(
     if not manager.has_permission("manage_api_keys"):
         raise HTTPException(status_code=403, detail="Not authorized to manage API keys")
         
+    unknown = set(payload.scopes) - set(API_KEY_SCOPES)
+    if unknown or not payload.scopes:
+        raise HTTPException(status_code=400, detail=f"Invalid scopes. Allowed: {sorted(API_KEY_SCOPES)}")
+    if db.query(ApiKey).filter_by(is_active=True).count() >= 50:
+        raise HTTPException(status_code=400, detail="Too many active API keys; revoke unused ones first")
+
     raw_key = "wk_live_" + secrets.token_urlsafe(32)
     key_hash = hash_password(raw_key)
     prefix = raw_key[:16]
-    
+    expires_at = (
+        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=payload.expires_in_days)
+        if payload.expires_in_days else None
+    )
+
     new_key = ApiKey(
         name=payload.name,
         key_hash=key_hash,
         prefix=prefix,
-        created_by_username=manager.username
+        created_by_username=manager.username,
+        scopes=json.dumps(sorted(set(payload.scopes))),
+        expires_at=expires_at,
     )
     db.add(new_key)
+    add_audit(db, manager.username, "create_api_key", payload.name[:80],
+              details=f"prefix={prefix} scopes={','.join(sorted(set(payload.scopes)))} expires={expires_at.date() if expires_at else 'never'}")
     db.commit()
     db.refresh(new_key)
     
@@ -483,7 +670,9 @@ def create_api_key(
         "id": new_key.id,
         "name": new_key.name,
         "raw_key": raw_key,
-        "created_at": new_key.created_at
+        "created_at": new_key.created_at,
+        "scopes": new_key.scope_list,
+        "expires_at": new_key.expires_at,
     }
 
 @router.delete("/api-keys/{key_id}")
@@ -500,5 +689,74 @@ def revoke_api_key(
         raise HTTPException(status_code=404, detail="API Key not found")
         
     key.is_active = False
+    key.revoked_at = datetime.datetime.now(datetime.timezone.utc)
+    key.revoked_by = manager.username
+    add_audit(db, manager.username, "revoke_api_key", key.name[:80], details=f"prefix={key.prefix}")
     db.commit()
     return {"status": "success", "message": "API key revoked"}
+
+
+# --------------------------------------------------------------------------
+# Tenant (store) settings: each tenant manages ONLY its own record.
+# --------------------------------------------------------------------------
+_SHOPIFY_HOST = re.compile(r"^[a-z0-9][a-z0-9-]{0,60}\.myshopify\.com$")
+
+
+class ShopifyCredentials(BaseModel):
+    store_url: str = Field(..., max_length=120)
+    access_token: str = Field(..., min_length=10, max_length=200)
+
+
+def _own_tenant(db: Session, manager: Agent) -> Tenant:
+    tenant = db.get(Tenant, manager.tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return tenant
+
+
+@router.get("/admin/tenant")
+def get_tenant(db: Session = Depends(get_db), manager: Agent = Depends(get_current_manager)):
+    t = _own_tenant(db, manager)
+    return {
+        "id": t.id, "slug": t.slug, "name": t.name, "public_key": t.public_key,
+        "shopify_store_url": t.shopify_store_url,
+        "shopify_configured": bool(t.shopify_store_url and t.shopify_token_enc),   # never the token itself
+    }
+
+
+@router.put("/admin/tenant/shopify")
+def set_tenant_shopify(
+    payload: ShopifyCredentials,
+    request: Request,
+    db: Session = Depends(get_db),
+    manager: Agent = Depends(get_current_manager),
+):
+    if manager.role != "admin":
+        raise HTTPException(status_code=403, detail="Only an admin can change store credentials")
+    store = payload.store_url.strip().lower().removeprefix("https://").rstrip("/")
+    if not _SHOPIFY_HOST.match(store):
+        raise HTTPException(status_code=400, detail="store_url must look like your-store.myshopify.com")
+    try:
+        encrypted = encrypt_secret(payload.access_token.strip())
+    except SecretsUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    t = _own_tenant(db, manager)
+    t.shopify_store_url = store
+    t.shopify_token_enc = encrypted
+    add_audit(db, manager.username, "set_tenant_shopify", t.id, details=f"store={store}", ip=request.client.host if request.client else None)
+    db.commit()
+    invalidate_provider_cache(t.id)
+    return {"status": "success", "shopify_store_url": store}
+
+
+@router.delete("/admin/tenant/shopify")
+def clear_tenant_shopify(db: Session = Depends(get_db), manager: Agent = Depends(get_current_manager)):
+    if manager.role != "admin":
+        raise HTTPException(status_code=403, detail="Only an admin can change store credentials")
+    t = _own_tenant(db, manager)
+    t.shopify_store_url = None
+    t.shopify_token_enc = None
+    add_audit(db, manager.username, "clear_tenant_shopify", t.id)
+    db.commit()
+    invalidate_provider_cache(t.id)
+    return {"status": "success"}

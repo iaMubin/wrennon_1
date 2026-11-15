@@ -18,6 +18,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.db.models import ApiKey
 import datetime
 from app.db.session import get_db
+from app.db.tenancy import bind_session
+from app.services import ratelimit
 from app.db.models import Agent
 
 # tokenUrl points at the login endpoint — used only for generating
@@ -28,7 +30,7 @@ _oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/agent/login")
 _SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
-def get_current_agent(request: Request, db: Session = Depends(get_db)) -> Agent:
+async def get_current_agent(request: Request, db: Session = Depends(get_db)) -> Agent:
     # First try Authorization header, then fallback to cookie
     token = request.headers.get("Authorization")
     used_cookie_fallback = False
@@ -76,6 +78,10 @@ def get_current_agent(request: Request, db: Session = Depends(get_db)) -> Agent:
     if token_data.get("tv") != agent.token_version:
         raise HTTPException(status_code=401, detail="Token revoked (password was changed)")
         
+    # Bind the tenant for this request: the ORM filters every query by it and helper
+    # sessions / background tasks spawned from here inherit it. This dependency is
+    # async so the ContextVar set here is visible to the (sync) endpoint that follows.
+    bind_session(db, agent.tenant_id)
     return agent
 
 
@@ -86,26 +92,69 @@ def get_current_manager(agent: Agent = Depends(get_current_agent)) -> Agent:
 
 api_key_scheme = HTTPBearer(auto_error=False)
 
-def get_api_key(
+API_KEY_SCOPES = {
+    "conversations:read": "List and read conversations (customer-visible messages only)",
+    "notes:read": "Also read internal notes / system messages",
+    "notes:write": "Add internal notes",
+    "messages:send": "Send customer-visible messages (only while a human handoff is active)",
+    "conversations:resolve": "Resolve conversations",
+}
+
+
+async def get_api_key(
+    request: Request,
     db: Session = Depends(get_db),
     auth: HTTPAuthorizationCredentials = Depends(api_key_scheme)
 ) -> ApiKey:
+    ip = request.client.host if request.client else "unknown"
+    # Failed-auth throttle: bcrypt verification is deliberately slow, so unlimited
+    # bad keys is also a CPU-exhaustion vector.
+    if await ratelimit.peek(f"apikey_fail:{ip}") >= 20:
+        raise HTTPException(status_code=429, detail="Too many failed attempts")
+
+    async def _fail(detail: str):
+        await ratelimit.hit(f"apikey_fail:{ip}", 600)
+        raise HTTPException(status_code=401, detail=detail)
+
     if not auth or auth.scheme.lower() != "bearer":
-        raise HTTPException(status_code=401, detail="Invalid or missing API Key")
-        
+        await _fail("Invalid or missing API Key")
+
     raw_key = auth.credentials
-    if not raw_key.startswith("wk_live_"):
-        raise HTTPException(status_code=401, detail="Invalid API Key format")
-        
+    if not raw_key.startswith("wk_live_") or len(raw_key) > 128:
+        await _fail("Invalid API Key format")
+
     prefix = raw_key[:16]
-    
+    now = datetime.datetime.now(datetime.timezone.utc)
+
     # Find all keys that match this prefix (usually just 1, but we'll check hashes)
     keys = db.query(ApiKey).filter_by(prefix=prefix, is_active=True).all()
-    
+
     for key in keys:
         if verify_password(raw_key, key.key_hash):
-            key.last_used_at = datetime.datetime.now(datetime.timezone.utc)
-            db.commit()
+            expires = key.expires_at
+            if expires is not None:
+                if expires.tzinfo is None:
+                    expires = expires.replace(tzinfo=datetime.timezone.utc)
+                if expires <= now:
+                    await _fail("API Key expired")
+            last = key.last_used_at
+            if last is not None and last.tzinfo is None:
+                last = last.replace(tzinfo=datetime.timezone.utc)
+            if last is None or (now - last).total_seconds() > 60:   # not one write per request
+                key.last_used_at = now
+                db.commit()
+            bind_session(db, key.tenant_id)   # a key only ever sees its own tenant's data
             return key
-            
-    raise HTTPException(status_code=401, detail="Invalid or revoked API Key")
+
+    await _fail("Invalid or revoked API Key")
+
+
+def require_scope(scope: str):
+    """Dependency factory: the authenticated key must carry *scope*."""
+
+    async def _dep(api_key: ApiKey = Depends(get_api_key)) -> ApiKey:
+        if scope not in api_key.scope_list:
+            raise HTTPException(status_code=403, detail=f"API key lacks required scope: {scope}")
+        return api_key
+
+    return _dep

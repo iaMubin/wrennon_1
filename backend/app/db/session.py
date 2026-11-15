@@ -16,6 +16,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import settings
+from app.db.tenancy import TenantSession
 
 # check_same_thread=False is SQLite-specific: by default SQLite only
 # allows the thread that created a connection to use it, which breaks
@@ -25,7 +26,7 @@ _connect_args = {"check_same_thread": False} if settings.database_url.startswith
 
 engine = create_engine(settings.database_url, connect_args=_connect_args)
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=TenantSession)
 
 
 def get_db() -> Generator[Session, None, None]:

@@ -10,7 +10,9 @@ async def execute_check_refund_policy(args: Dict[str, Any]) -> str:
         return "Missing order_id."
     
     # In a real system, you'd fetch order details and check the 30-day policy
-    order = ecommerce.get_order_status(order_id)
+    tid = args.get("_tenant_id")
+    provider = ecommerce if not tid or tid == "default" else get_ecommerce_provider(tid)
+    order = provider.get_order_status(order_id)
     if not order:
         return json.dumps({
             "order_id": order_id,

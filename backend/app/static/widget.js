@@ -4,6 +4,9 @@ const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hos
 const BACKEND_URL = IS_LOCAL ? `http://127.0.0.1:8000` : `https://${_RENDER_HOST}`;
 
 const API_BASE = `${BACKEND_URL}/api`;
+// Multi-tenant installs: <script src=".../widget.js" data-tenant-key="wt_..."> picks the store.
+// (document.currentScript is only valid while the script first runs, so capture it here.)
+const TENANT_KEY = (document.currentScript && document.currentScript.dataset.tenantKey) || window.WRENNON_TENANT_KEY || "";
 const WS_URL = IS_LOCAL 
   ? `ws://127.0.0.1:8000/ws/customer`
   : `wss://${_RENDER_HOST}/ws/customer`;
@@ -249,6 +252,28 @@ scrollToBottomBtn.className = "hidden";
 scrollToBottomBtn.innerHTML = `New Message <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; vertical-align: middle;"><path d="M6 9l6 6 6-6"/></svg>`;
 document.getElementById("panel").appendChild(scrollToBottomBtn);
 
+// --- Transparency notice: AI disclosure + data-use statement -----------------
+// Customers must be told they are talking to an AI (EU AI Act Art. 50, several US
+// state bot-disclosure laws) and that the chat is stored. Set PRIVACY_URL to your
+// privacy policy (https only); the link is rendered only when it is set.
+const PRIVACY_URL = "";
+(function addTransparencyNotice() {
+  const panel = document.getElementById("panel");
+  if (!panel || document.getElementById("ai-disclosure")) return;
+  const note = document.createElement("div");
+  note.id = "ai-disclosure";
+  note.style.cssText = "font-size:11px;line-height:1.4;padding:6px 14px 8px;text-align:center;color:var(--text-muted,#6b7280);";
+  note.append("You\u2019re chatting with an AI assistant; a human teammate can join if needed. Chats are stored to help resolve your request.");
+  if (PRIVACY_URL.startsWith("https://")) {
+    const a = document.createElement("a");
+    a.href = PRIVACY_URL; a.target = "_blank"; a.rel = "noopener noreferrer";
+    a.textContent = " Privacy policy";
+    a.style.color = "inherit"; a.style.textDecoration = "underline";
+    note.append(a);
+  }
+  panel.appendChild(note);
+})();
+
 // Fixed typing-indicator bar, sitting between #messages and #input-row.
 // Deliberately NOT part of the scrolling message list (unlike the old
 // implementation) — it stays anchored right above the input box no
@@ -316,7 +341,7 @@ async function resolveSessionId() {
 
   // No valid stored session — create a new one via backend
   try {
-    const response = await fetch(`${API_BASE}/chat/init`, { method: "POST" });
+    const response = await fetch(`${API_BASE}/chat/init`, { method: "POST", headers: TENANT_KEY ? { "X-Wrennon-Tenant-Key": TENANT_KEY } : {} });
     if (response.ok) {
       const data = await response.json();
       SESSION_ID = data.session_id;
@@ -611,7 +636,7 @@ async function resyncMissedMessages() {
     const missing = serverHistory.slice(localVisibleCount);
     for (const msg of missing) {
       const ts = msg.created_at ? new Date(msg.created_at).getTime() : Date.now();
-      appendMessage(msg.sender, msg.content, true, ts);
+      appendMessage(msg.sender, msg.content, true, ts, msg.name || undefined);
     }
   } catch (err) {
     console.error("Failed to resync missed messages:", err);
@@ -623,7 +648,9 @@ let widgetReconnectTimeout = null;
 
 function connectSocket() {
   if (widgetReconnectTimeout) clearTimeout(widgetReconnectTimeout);
-  socket = new WebSocket(`${WS_URL}/${SESSION_ID}?token=${SESSION_TOKEN}`);
+  // Session token goes in the Sec-WebSocket-Protocol header, not the URL, so it
+  // never lands in access logs / history / Referer.
+  socket = new WebSocket(`${WS_URL}/${SESSION_ID}`, ["wrennon.v1", SESSION_TOKEN]);
 
   socket.onopen = () => {
     const wasReconnecting = widgetReconnectAttempts > 0;
@@ -769,6 +796,56 @@ function renderMarkdown(text) {
   return html;
 }
 
+// ---- Link / media safety ---------------------------------------------------
+// Chat text is attacker-influenced (customers, the AI, copilot output). Anything
+// rendered from it must not (a) auto-load third-party resources, which leaks the
+// viewer's IP/User-Agent and can carry data out in the URL, or (b) show a label
+// that hides where a link really goes.
+const CARRIER_DOMAINS = ['fedex.com', 'ups.com', 'dhl.com', 'usps.com'];
+
+function parseHttpUrl(raw) {
+  try {
+    const u = new URL(String(raw).replace(/&amp;/g, '&'));
+    return (u.protocol === 'https:' || u.protocol === 'http:') ? u : null;
+  } catch (e) { return null; }
+}
+
+function hostMatches(host, domain) {
+  return host === domain || host.endsWith('.' + domain);
+}
+
+function isOwnHost(host) {
+  const own = [location.hostname, (parseHttpUrl(BACKEND_URL) || {}).hostname]
+    .filter(Boolean).map(h => h.toLowerCase().replace(/^www\./, ''));
+  return own.some(o => hostMatches(host, o));
+}
+
+function isTrustedHost(host) {
+  return isOwnHost(host) || CARRIER_DOMAINS.some(d => hostMatches(host, d));
+}
+
+// Only files served by OUR backend's /uploads/ path may be auto-loaded as media.
+function isOwnUploadUrl(raw) {
+  const u = parseHttpUrl(raw);
+  const b = parseHttpUrl(BACKEND_URL);
+  return !!(u && b && u.origin === b.origin && u.pathname.startsWith('/uploads/'));
+}
+
+// " (example.com)" for links that leave our/known domains, so a friendly label
+// ("Track on FedEx", "Help Center") can never hide the real destination.
+function linkHostSuffix(url) {
+  const u = parseHttpUrl(url);
+  if (!u) return '';
+  const host = u.hostname.toLowerCase().replace(/^www\./, '');
+  return isTrustedHost(host) ? '' : ` (${host})`;
+}
+
+function blockedMediaHtml(kind, url) {
+  const u = parseHttpUrl(url);
+  const host = u ? u.hostname : 'unknown';
+  return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer nofollow" title="${escapeAttr(url)}" style="color: var(--accent); text-decoration: underline;">External ${kind} not loaded (${escapeHtml(host)}) \u2014 open link</a>`;
+}
+
 function formatLinkTitle(url, existingText = '') {
   const cleanExisting = (existingText || '').trim();
   const isRawUrl = /^https?:\/\//i.test(cleanExisting) || 
@@ -786,11 +863,12 @@ function formatLinkTitle(url, existingText = '') {
     const path = parsed.pathname.toLowerCase();
 
     // 1. Tracking links
-    if (path.includes('track') || host.includes('fedex') || host.includes('ups') || host.includes('dhl') || host.includes('usps') || host.includes('courier')) {
-      if (host.includes('fedex')) return 'Track on FedEx';
-      if (host.includes('ups')) return 'Track on UPS';
-      if (host.includes('dhl')) return 'Track on DHL';
-      if (host.includes('usps')) return 'Track on USPS';
+    if (path.includes('track') || CARRIER_DOMAINS.some(d => hostMatches(host, d)) || host.includes('courier')) {
+      // Carrier names only for the carrier's REAL domain (not fedex-login.evil.com).
+      if (hostMatches(host, 'fedex.com')) return 'Track on FedEx';
+      if (hostMatches(host, 'ups.com')) return 'Track on UPS';
+      if (hostMatches(host, 'dhl.com')) return 'Track on DHL';
+      if (hostMatches(host, 'usps.com')) return 'Track on USPS';
       return 'Track Shipment';
     }
 
@@ -830,7 +908,7 @@ function formatLinkTitle(url, existingText = '') {
     }
 
     // 7. Store / Brand domain
-    if (host.includes('wrennon')) {
+    if (isOwnHost(host)) {
       const cleanPath = path.replace(/^\/|\/$/g, '').replace(/[-_]+/g, ' ');
       if (cleanPath) {
         return cleanPath.replace(/\b\w/g, c => c.toUpperCase());
@@ -860,14 +938,15 @@ function linkifyRawUrls(html) {
       fullUrl = fullUrl.slice(0, -trailing.length);
       url = url.slice(0, -trailing.length);
     }
-    const maskedTitle = formatLinkTitle(fullUrl, '');
-    return `<a href="${escapeAttr(fullUrl)}" target="_blank" rel="noopener noreferrer" title="${escapeAttr(fullUrl)}" style="color: var(--accent); text-decoration: underline;">${escapeHtml(maskedTitle)}</a>${trailing}`;
+    const maskedTitle = formatLinkTitle(fullUrl, '') + linkHostSuffix(fullUrl);
+    return `<a href="${escapeAttr(fullUrl)}" target="_blank" rel="noopener noreferrer nofollow" title="${escapeAttr(fullUrl)}" style="color: var(--accent); text-decoration: underline;">${escapeHtml(maskedTitle)}</a>${trailing}`;
   });
 }
 
 function inlineMarkdown(text) {
   let escaped = escapeHtml(text);
   escaped = escaped.replace(/\[Audio\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
+    if (!isOwnUploadUrl(url)) return blockedMediaHtml('audio', url);
     const safeUrl = escapeAttr(url);
     const playerId = 'vp_' + Math.random().toString(36).substr(2, 9);
     return `<div class="voice-player" id="${playerId}" data-src="${safeUrl}">` +
@@ -884,14 +963,18 @@ function inlineMarkdown(text) {
     `</div>`;
   });
   escaped = escaped.replace(/\[Video\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
+    if (!isOwnUploadUrl(url)) return blockedMediaHtml('video', url);
     return `<video controls src="${escapeAttr(url)}" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;"></video>`;
   });
   escaped = escaped.replace(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
+    // A remote <img> is a tracking pixel / data-exfiltration channel (the URL can
+    // carry data and loads automatically). Only our own uploads are inlined.
+    if (!isOwnUploadUrl(url)) return blockedMediaHtml('image', url);
     return `<img src="${escapeAttr(url)}" class="chat-lightbox-image" alt="Image" loading="lazy" onclick="openLightbox(this.src)" />`;
   });
   escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, (match, linkText, url) => {
-    const maskedTitle = formatLinkTitle(url, linkText);
-    return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer" title="${escapeAttr(url)}" style="color: var(--accent); text-decoration: underline;">${escapeHtml(maskedTitle)}</a>`;
+    const maskedTitle = formatLinkTitle(url, linkText) + linkHostSuffix(url);
+    return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer nofollow" title="${escapeAttr(url)}" style="color: var(--accent); text-decoration: underline;">${escapeHtml(maskedTitle)}</a>`;
   });
   escaped = linkifyRawUrls(escaped);
   escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
@@ -912,7 +995,11 @@ function escapeAttr(text) {
 function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text;
-  return div.innerHTML;
+  // Escape quotes too: many call sites interpolate the result into
+  // "double-quoted" attributes (data-content, href, title). Without this, a
+  // message containing a literal " could inject attributes / event handlers
+  // (stored XSS in the agent dashboard).
+  return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 // --- Voice Player Logic ---

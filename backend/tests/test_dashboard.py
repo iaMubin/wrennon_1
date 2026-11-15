@@ -185,12 +185,15 @@ def test_agent_saved_views(setup_test_data):
 
 def test_order_context_tells_the_ui_whether_data_is_demo(setup_test_data, monkeypatch):
     # The sidebar only fabricates history / uses third-party avatars when this is True.
+    from types import SimpleNamespace
     from app.api import agent as agent_api
     db = SessionLocal()
+    req = SimpleNamespace(client=None)
+    me = SimpleNamespace(username="ctx-test-agent", has_permission=lambda _p: True)
     try:
-        resp = agent_api.get_order_context("session1", db=db, agent=None)
+        resp = agent_api.get_order_context("session1", request=req, db=db, agent=me)
         assert resp["demo"] is True  # default test env uses mock integrations
         monkeypatch.setattr(agent_api, "USE_MOCK", False)
-        assert agent_api.get_order_context("session1", db=db, agent=None)["demo"] is False
+        assert agent_api.get_order_context("session1", request=req, db=db, agent=me)["demo"] is False
     finally:
         db.close()

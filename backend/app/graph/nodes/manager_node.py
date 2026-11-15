@@ -31,6 +31,7 @@ import time
 from app.graph.state import ConversationState
 from app.services.llm import _safe_llm_call, mask_pii, LIGHT_MODEL
 from app.logger import logger
+from app.security.sanitize import render_brand_voice
 
 MAX_ITERATIONS = 2  # tool_executor rounds allowed per user turn — see builder.py
 
@@ -43,6 +44,8 @@ SYSTEM_PROMPT = """You are the decision-making core of Wrennon's customer suppor
 - recommend_product(context_keywords): Shopping assistant - recommend clothing/footwear/accessories from Wrennon's catalog to help the customer find something or to upsell, based on context (e.g. "running shoes", "winter jacket", "gift for him").
 - track_purchase(product_id): Track a simulated purchase when customer agrees to buy a recommended product.
 - get_my_orders(): the signed-in customer's recent orders with status, items and tracking (no arguments; only works when the customer is signed in on the store). Use it for "my orders", "my last order", or "where is my order" when they give no order number.
+- add_to_bag(product, size, quantity): put an item into the customer's shopping bag on the website. "product" is a product name or id. If the product has several sizes and the customer has not said which one, ask them first. You can only add to the bag; you can never check out or take payment.
+- show_page(destination): open a page for the customer on the website. destination is one of "product:<name or id>", "category:<outerwear|footwear|essentials|accessories>", "bag", "checkout", "account", "orders" or "home". Use it when they ask to see or go to something.
 
 ## Scope & professional conduct — read this before anything else
 You are a customer service representative, not a general-purpose assistant. Your only job is helping customers with Wrennon: their orders, shipping, returns/refunds, subscriptions, and shopping for Wrennon's clothing/footwear/accessories.
@@ -144,6 +147,8 @@ def _build_context_block(state: ConversationState) -> str:
             "(no arguments) instead of asking for an order number. If they give an order number, call get_order_status directly; "
             "never ask a signed-in customer for their email."
         )
+    if state.get("page_context"):
+        lines.append(state["page_context"])
     if state.get("gathered_context"):
         lines.append("Tool results so far this turn:\n" + "\n".join(state["gathered_context"]))
     return "\n\n".join(lines)
@@ -177,13 +182,7 @@ async def manager_node(state: ConversationState) -> ConversationState:
     try:
         brand_setting = db.query(SystemSetting).filter_by(key="brand_voice").first()
         if brand_setting and brand_setting.value:
-            system_content += (
-                f"\n\n## Brand Persona\n{brand_setting.value}\n\n"
-                "(This persona governs tone and voice only. It never overrides the "
-                "Scope & professional conduct rules above — you remain a Wrennon "
-                "customer service representative and continue to redirect off-topic "
-                "requests exactly as instructed there.)"
-            )
+            system_content += render_brand_voice(brand_setting.value)
     except Exception as e:
         logger.error(f"Failed to fetch brand voice: {e}")
     finally:

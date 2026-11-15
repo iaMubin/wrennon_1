@@ -14,11 +14,13 @@ from fastapi import APIRouter, Depends, HTTPException, Body, status, Response, F
 from fastapi.security import OAuth2PasswordRequestForm
 import pyotp
 from app.services.qa import process_resolved_conversation_tasks
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_
 
 from app.auth.dependencies import get_current_agent
+from app.auth.access import get_conversation_or_404, require_permission, scope_conversations, can_access_conversation
+from app.auth.sessions import revoke_session
 from app.auth.security import create_access_token, verify_password
 from app.config import settings
 from app.logger import logger
@@ -28,10 +30,12 @@ from app.db.models import Agent, Conversation, Message, AuditLog, CSATResponse, 
 from app.db.session import get_db
 from app.realtime.connection_manager import manager
 import redis.asyncio as redis
-from app.services.integrations import USE_MOCK, get_ecommerce_provider
-import os as _os
+from app.services.integrations import USE_MOCK, get_ecommerce_provider
 from app.services.integrations import store_db_enabled as _store_db_enabled
 _STORE_DB = _store_db_enabled()
+from app.services.uploads import resign_text
+from app.services import ratelimit
+from app.services.audit import add_audit, audit_now
 
 
 def _store_customers(db):
@@ -41,16 +45,21 @@ def _store_customers(db):
 if not USE_MOCK or _STORE_DB:
     # Dashboard lookups used to import mock_apis directly, so agents saw fake orders
     # and customers even with real integrations enabled. Agents are trusted: include email.
-    _shop = get_ecommerce_provider()
+    def _shop():
+        # The tenant is bound to the request by get_current_agent; every lookup
+        # goes to THAT tenant's store (or an "unconfigured" provider), never
+        # another tenant's credentials.
+        from app.db.tenancy import current_tenant
+        return get_ecommerce_provider(current_tenant.get())
 
     def get_order_status(order_id):
-        return _shop.get_order_status(order_id, include_email=True)
+        return _shop().get_order_status(order_id, include_email=True)
 
     def get_order_by_email(email):
-        return _shop.get_order_by_email(email, include_email=True)
+        return _shop().get_order_by_email(email, include_email=True)
 
     def get_customer_info(email=None, phone=None, customer_id=None):
-        return _shop.get_customer_info(email=email, phone=phone, customer_id=customer_id)
+        return _shop().get_customer_info(email=email, phone=phone, customer_id=customer_id)
 
 # Create a Redis client for rate limiting
 _redis_client = None
@@ -74,6 +83,26 @@ def get_redis():
 
 router = APIRouter()
 
+async def _totp_valid_once(agent: Agent, code: str) -> bool:
+    """Verify a TOTP code and reject replays of an already-used code.
+    valid_window=1 tolerates one 30s step of clock drift. Replay tracking uses the
+    shared counter helper, which falls back to an in-process store if Redis is down
+    (so replay protection does not silently disappear)."""
+    if not code or not agent.totp_secret or not pyotp.TOTP(agent.totp_secret).verify(code, valid_window=1):
+        return False
+    return await ratelimit.hit(f"totp_used:{agent.username}:{code}", 120) == 1
+
+
+_DUMMY_HASH: str | None = None
+
+
+def _dummy_hash() -> str:
+    global _DUMMY_HASH
+    if _DUMMY_HASH is None:
+        from app.auth.security import hash_password
+        _DUMMY_HASH = hash_password("timing-equaliser")
+    return _DUMMY_HASH
+
 
 @router.post("/agent/login")
 async def login(
@@ -85,55 +114,71 @@ async def login(
 ) -> dict:
     # Rate Limiting
     # Keyed by IP + username so an attacker can only lock out their own IP,
-    # not the real admin (username alone = trivial lockout DoS).
+    # not the real admin (username alone = trivial lockout DoS). A second,
+    # IP-wide counter stops one source from walking through many usernames.
     client_ip = request.client.host if request.client else "unknown"
-    rate_key = f"login_attempts:{client_ip}:{form_data.username.lower()}"
+    username_key = form_data.username.lower()[:80]
+    rate_key = f"login_attempts:{client_ip}:{username_key}"
+    ip_key = f"login_ip:{client_ip}"
     locked = False
     try:
         r = get_redis()
         attempts = await r.get(rate_key)
         locked = bool(attempts) and int(attempts) >= 5
+        ip_attempts = await r.get(ip_key)
+        locked = locked or (bool(ip_attempts) and int(ip_attempts) >= 40)
     except Exception as e:
         # If Redis is down, brute-force lockout silently fails OPEN — an
         # attacker can hammer this endpoint unthrottled until Redis comes
         # back. That's an operationally important signal, not routine
-        # noise, so it's logged at WARNING (visible in production/Sentry)
-        # rather than DEBUG (which would make this failure mode invisible
-        # exactly when it matters most).
+        # noise, so it's logged at WARNING (visible in production/Sentry).
         logger.warning(f"Redis unavailable during login rate-limit check for {form_data.username}: {e}")
     # Raised OUTSIDE the try block: previously this 429 was raised inside
     # `except Exception`'s scope and got swallowed, so lockout never fired.
     if locked:
+        audit_now(db, username_key, "login_locked_out", ip=client_ip)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many failed login attempts. Please try again later.",
         )
 
-    agent = db.query(Agent).filter(
-        or_(Agent.username == form_data.username, Agent.employee_id == form_data.username)
-    ).first()
-    
-    if not agent or not verify_password(form_data.password, agent.password_hash):
+    async def _record_failure(reason: str) -> None:
         try:
             r = get_redis()
             if await r.incr(rate_key) == 1:
                 await r.expire(rate_key, 300)  # fixed 5-min window, not refreshed per attempt
+            if await r.incr(ip_key) == 1:
+                await r.expire(ip_key, 600)
         except Exception as e:
             logger.warning(f"Redis unavailable while recording a failed login attempt for {form_data.username}: {e}")
-            
+        audit_now(db, username_key, "login_failed", details=reason, ip=client_ip)
+
+    agent = db.query(Agent).filter(
+        or_(Agent.username == form_data.username, Agent.employee_id == form_data.username)
+    ).first()
+
+    # Always run one bcrypt comparison so "no such user" and "wrong password"
+    # cost the same time (no username enumeration by timing).
+    if agent:
+        db.info["tenant_id"] = agent.tenant_id   # failed/successful logins are audited in the account's own tenant
+    password_ok = verify_password(form_data.password, agent.password_hash if agent else _dummy_hash())
+    if not agent or not password_ok:
+        await _record_failure("bad_credentials")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
         )
-        
+
     if agent.totp_enabled:
         if not totp_code:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="2FA_REQUIRED"
             )
-        totp = pyotp.TOTP(agent.totp_secret)
-        if not totp.verify(totp_code):
+        # A wrong 2FA code counts as a failed login (it used to be free to
+        # guess), and an accepted code cannot be replayed inside its window.
+        if not await _totp_valid_once(agent, totp_code):
+            await _record_failure("bad_totp")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid 2FA code"
@@ -144,31 +189,23 @@ async def login(
         r = get_redis()
         await r.delete(rate_key)
     except Exception as e:
-        # Non-critical (a stale lockout counter just lingers an extra
-        # ~60s), but still worth a WARNING for consistency with the two
-        # login-path Redis fallbacks above.
         logger.warning(f"Redis unavailable while clearing rate-limit counter for {agent.username}: {e}")
-        
+
     token = create_access_token(subject=agent.username, token_version=agent.token_version)
-    
-    # Audit log
-    audit = AuditLog(
-        actor_username=agent.username,
-        action="login"
-    )
-    db.add(audit)
-    db.commit()
-    
-    # Set httpOnly cookie
+
+    audit_now(db, agent.username, "login", ip=client_ip)
+
+    # Set httpOnly cookie. Its lifetime now matches the JWT's (it was 7 days
+    # against an 8-hour token).
     response.set_cookie(
         key="access_token",
         value=f"Bearer {token}",
         httponly=True,
         secure=True,     # Must be True for samesite="none" (HTTPS)
         samesite="none", # Allow cross-origin requests
-        max_age=60 * 60 * 24 * 7 # 7 days
+        max_age=settings.jwt_expire_minutes * 60,
     )
-    
+
     return {"access_token": token, "token_type": "bearer",  # nosec B105 - OAuth token type label, not a secret
             "role": agent.role, "dp_url": agent.dp_url, "full_name": agent.full_name,
             "suggestions_enabled": bool(getattr(agent, "suggestions_enabled", True))}
@@ -187,6 +224,7 @@ def logout(
     the cookie (and the token inside it) valid until it expires on its own.
     """
     agent.token_version = (agent.token_version or 1) + 1
+    add_audit(db, agent.username, "logout")
     db.commit()
     response.delete_cookie(key="access_token", samesite="none", secure=True)
     return {"status": "logged_out"}
@@ -222,35 +260,64 @@ def update_preferences(
 class VerifyTOTPRequest(BaseModel):
     code: str
 
+
+class Setup2FARequest(BaseModel):
+    current_password: str
+    code: str | None = None  # required when 2FA is already enabled
+
+
 @router.post("/agent/2fa/setup")
-def setup_2fa(
+async def setup_2fa(
+    request: Request,
+    payload: Setup2FARequest,
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
 ) -> dict:
+    client_ip = request.client.host if request.client else "unknown"
+    # Step-up auth: a stolen session/token must NOT be enough to (re)enroll or
+    # silently disable 2FA. Require the password, and the current TOTP code if
+    # 2FA is already on. Bounded guessing: 5 failures / 10 min / agent.
+    if await ratelimit.peek(f"setup2fa_fail:{agent.username}") >= 5:
+        raise HTTPException(status_code=429, detail="Too many attempts. Try again later.")
+    if not verify_password(payload.current_password, agent.password_hash):
+        await ratelimit.hit(f"setup2fa_fail:{agent.username}", 600)
+        audit_now(db, agent.username, "2fa_setup_denied", details="bad_password", ip=client_ip)
+        raise HTTPException(status_code=401, detail="Incorrect password")
+    if agent.totp_enabled and not await _totp_valid_once(agent, payload.code or ""):
+        await ratelimit.hit(f"setup2fa_fail:{agent.username}", 600)
+        audit_now(db, agent.username, "2fa_setup_denied", details="bad_code", ip=client_ip)
+        raise HTTPException(status_code=401, detail="Invalid 2FA code")
     secret = pyotp.random_base32()
     agent.totp_secret = secret
     agent.totp_enabled = False
+    add_audit(db, agent.username, "2fa_setup_started", ip=client_ip)
     db.commit()
     uri = pyotp.totp.TOTP(secret).provisioning_uri(name=agent.username, issuer_name="Wrennon")
     return {"uri": uri}
 
+
 @router.post("/agent/2fa/verify")
-def verify_2fa(
+async def verify_2fa(
+    request: Request,
     payload: VerifyTOTPRequest,
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
 ) -> dict:
+    client_ip = request.client.host if request.client else "unknown"
     if not agent.totp_secret:
         raise HTTPException(status_code=400, detail="2FA setup not initiated")
-    totp = pyotp.TOTP(agent.totp_secret)
-    if not totp.verify(payload.code):
+    # Bounded guessing: 5 wrong codes per 10 minutes per agent.
+    if await ratelimit.peek(f"totp_verify_fail:{agent.username}") >= 5:
+        raise HTTPException(status_code=429, detail="Too many invalid codes. Try again later.")
+    if not await _totp_valid_once(agent, payload.code):
+        await ratelimit.hit(f"totp_verify_fail:{agent.username}", 600)
+        audit_now(db, agent.username, "2fa_verify_failed", ip=client_ip)
         raise HTTPException(status_code=400, detail="Invalid 2FA code")
     agent.totp_enabled = True
-    
-    audit = AuditLog(actor_username=agent.username, action="enable_2fa")
-    db.add(audit)
+    agent.token_version = (agent.token_version or 1) + 1   # other sessions must re-authenticate with 2FA
+    add_audit(db, agent.username, "enable_2fa", ip=client_ip)
     db.commit()
-    return {"status": "success"}
+    return {"status": "success", "relogin_required": True}
 
 
 @router.get("/agent/dashboard-summary")
@@ -307,10 +374,10 @@ def dashboard_summary(
             hourly_volume[local_dt.hour] += 1
 
     # SLA Risks: tickets closest to or past breach, ordered by urgency
-    open_convs = db.query(Conversation).filter(
+    open_convs = scope_conversations(db.query(Conversation).filter(
         Conversation.resolved == False,
         Conversation.handoff_active == True
-    ).all()
+    ), agent).all()
     
     sla_policy = get_sla_policy(db)
     
@@ -529,7 +596,7 @@ def dashboard_summary(
 @router.get("/agent/customers")
 def get_customers(
     db: Session = Depends(get_db),
-    agent: Agent = Depends(get_current_agent),
+    agent: Agent = Depends(require_permission("view_customers")),
 ):
     from sqlalchemy import func, case
     from app.services.mock_apis import MOCK_CUSTOMERS, MOCK_ORDERS
@@ -745,15 +812,15 @@ def get_customers(
     return results
 
 class CreateSavedViewRequest(BaseModel):
-    name: str
-    filter_json: str
+    name: str = Field(..., max_length=80)
+    filter_json: str = Field(..., max_length=2000)
 
 @router.get("/agent/saved-views")
 def get_saved_views(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent)
 ):
-    views = db.query(SavedView).all()
+    views = db.query(SavedView).filter(SavedView.agent_username == agent.username).all()
     return [{"id": v.id, "name": v.name, "filter_json": v.filter_json, "agent_username": v.agent_username} for v in views]
 
 @router.post("/agent/saved-views")
@@ -778,7 +845,7 @@ def delete_saved_view(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent)
 ):
-    view = db.query(SavedView).filter(SavedView.id == view_id).first()
+    view = db.query(SavedView).filter(SavedView.id == view_id, SavedView.agent_username == agent.username).first()
     if not view:
         raise HTTPException(status_code=404, detail="View not found")
     db.delete(view)
@@ -807,7 +874,7 @@ def needs_attention(
     tag: str | None = None,
 ) -> list[dict]:
     q = db.query(Conversation)
-    q = _apply_conversation_filters(q, priority, assigned_agent, tag)
+    q = scope_conversations(_apply_conversation_filters(q, priority, assigned_agent, tag), agent)
     conversations = (
         q
         .filter(Conversation.handoff_active == True, Conversation.resolved == False, Conversation.handled_by == None)
@@ -829,7 +896,7 @@ def get_my_cases(
     tag: str | None = None,
 ):
     q = db.query(Conversation)
-    q = _apply_conversation_filters(q, priority, assigned_agent, tag)
+    q = scope_conversations(_apply_conversation_filters(q, priority, assigned_agent, tag), agent)
     convs = q.options(selectinload(Conversation.messages)).outerjoin(
         Message, Conversation.id == Message.conversation_id
     ).filter(
@@ -880,7 +947,7 @@ def active_chats(
     tag: str | None = None,
 ) -> list[dict]:
     q = db.query(Conversation)
-    q = _apply_conversation_filters(q, priority, assigned_agent, tag)
+    q = scope_conversations(_apply_conversation_filters(q, priority, assigned_agent, tag), agent)
     conversations = (
         q
         .filter(Conversation.resolved == False)
@@ -902,7 +969,7 @@ def all_conversations(
     tag: str | None = None,
 ) -> list[dict]:
     q = db.query(Conversation)
-    q = _apply_conversation_filters(q, priority, assigned_agent, tag)
+    q = scope_conversations(_apply_conversation_filters(q, priority, assigned_agent, tag), agent)
     conversations = (
         q
         .filter(Conversation.messages.any())
@@ -926,11 +993,7 @@ def get_conversation(
     conversation is opened, independent of whichever list view it was
     clicked from — the list's cached copy can be stale by the time the
     agent clicks it."""
-    conversation = db.query(Conversation).filter_by(session_id=session_id).options(
-        selectinload(Conversation.messages)
-    ).first()
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+    conversation = get_conversation_or_404(db, agent, session_id, options=(selectinload(Conversation.messages),))
     sla_policy = get_sla_policy(db)
     summary = _conversation_summary(conversation, sla_policy)
     
@@ -948,9 +1011,7 @@ def conversation_messages(
 ) -> dict:
     """Full message history for one conversation — used when an agent
     clicks into a conversation to see what's been said so far."""
-    conversation = db.query(Conversation).filter_by(session_id=session_id).first()
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+    conversation = get_conversation_or_404(db, agent, session_id)
     agent_roles = {a.username: a.role for a in db.query(Agent).all()}
     
     return {
@@ -958,7 +1019,7 @@ def conversation_messages(
             {
                 "id": m.id, 
                 "sender": m.sender, 
-                "content": m.content, 
+                "content": resign_text(m.content), 
                 "created_at": m.created_at.isoformat(), 
                 "author_username": m.author_username,
                 "author_role": agent_roles.get(m.author_username, "agent") if m.author_username else "agent",
@@ -969,6 +1030,22 @@ def conversation_messages(
     }
 
 
+@router.post("/agent/conversations/{session_id}/revoke-session")
+def revoke_customer_session(
+    session_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent),
+) -> dict:
+    """Invalidate the customer's session token (abuse, compromised device,
+    support request). The live WebSocket is dropped on its next message."""
+    conversation = get_conversation_or_404(db, agent, session_id)
+    revoke_session(db, session_id, agent.username, "revoked by agent")
+    add_audit(db, agent.username, "revoke_customer_session", session_id, ip=request.client.host if request.client else None)
+    db.commit()
+    return {"status": "revoked", "session_id": session_id}
+
+
 @router.post("/agent/conversations/{session_id}/resolve")
 def resolve_conversation(
     session_id: str,
@@ -976,9 +1053,7 @@ def resolve_conversation(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
 ) -> dict:
-    conversation = db.query(Conversation).filter_by(session_id=session_id).first()
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+    conversation = get_conversation_or_404(db, agent, session_id)
     _do_resolve_conversation(conversation, agent.username, db, background_tasks)
     db.commit()
     resolved_at_iso = conversation.resolved_at.isoformat() if conversation.resolved_at else datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat()
@@ -1000,9 +1075,7 @@ def update_ticket_properties(
     """Partial update of agent-facing ticket metadata (priority, tags,
     assignee). Separate from /resolve — this is triage info an agent can
     change at any point in a ticket's life, not a workflow transition."""
-    conversation = db.query(Conversation).filter_by(session_id=session_id).first()
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+    conversation = get_conversation_or_404(db, agent, session_id)
 
     _do_update_ticket_properties(conversation, agent.username, db, priority, tags, assigned_agent)
 
@@ -1030,6 +1103,10 @@ def delete_internal_note(
     if msg.sender != "agent_internal":
         raise HTTPException(status_code=403, detail="Only internal notes can be deleted")
         
+    conv = db.query(Conversation).filter_by(id=msg.conversation_id).first()
+    if conv is None or not can_access_conversation(db, agent, conv):
+        raise HTTPException(status_code=404, detail="Message not found")
+
     if msg.author_username and msg.author_username != agent.username and agent.role != "admin":
         raise HTTPException(status_code=403, detail="You can only delete your own notes")
         
@@ -1065,7 +1142,7 @@ def _pinned_messages_payload(conversation: Conversation, db: Session) -> list[di
         {
             "id": m.id,
             "sender": m.sender,
-            "content": m.content,
+            "content": resign_text(m.content),
             "author_username": m.author_username,
             "created_at": m.created_at.isoformat(),
         }
@@ -1081,9 +1158,7 @@ def pin_message(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent)
 ) -> dict:
-    conversation = db.query(Conversation).filter_by(session_id=session_id).first()
-    if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+    conversation = get_conversation_or_404(db, agent, session_id)
 
     msg = db.query(Message).filter_by(id=message_id, conversation_id=conversation.id).first()
     if not msg:
@@ -1133,15 +1208,17 @@ def pin_message(
 @router.get("/agent/conversations/{session_id}/order-context")
 def get_order_context(
     session_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
 ) -> dict | None:
     """Retrieve order and customer context for a conversation.
     Prioritizes order ID in messages, then stored customer email."""
-    conversation = db.query(Conversation).filter_by(session_id=session_id).first()
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    
+    conversation = get_conversation_or_404(db, agent, session_id)
+
+    # Reading order + customer PII from the commerce backend is an audited event.
+    audit_now(db, agent.username, "read_order_context", session_id, ip=request.client.host if request.client else None)
+
     # helper
     def build_response(order, source):
         resp = {"source": source, "demo": USE_MOCK and not _STORE_DB}
@@ -1285,7 +1362,11 @@ def bulk_update_conversations(
     if not payload.session_ids:
         return {"status": "success", "updated": 0}
         
-    conversations = db.query(Conversation).filter(Conversation.session_id.in_(payload.session_ids)).all()
+    if len(payload.session_ids) > 200:
+        raise HTTPException(status_code=400, detail="At most 200 conversations per bulk action")
+    conversations = scope_conversations(
+        db.query(Conversation).filter(Conversation.session_id.in_(payload.session_ids)), agent
+    ).all()
     
     updated_count = 0
     for conv in conversations:
@@ -1571,11 +1652,12 @@ def merge_conversation(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent)
 ):
-    source = db.query(Conversation).filter_by(session_id=session_id).first()
-    if not source:
-        raise HTTPException(404, "Source conversation not found")
-        
-    target = db.query(Conversation).filter((Conversation.session_id == payload.target_session_id) | (Conversation.short_id == payload.target_session_id)).first()
+    source = get_conversation_or_404(db, agent, session_id)
+
+    target = scope_conversations(
+        db.query(Conversation).filter((Conversation.session_id == payload.target_session_id) | (Conversation.short_id == payload.target_session_id)),
+        agent,
+    ).first()
     if not target:
         raise HTTPException(404, "Target conversation not found")
         

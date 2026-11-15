@@ -3,6 +3,25 @@ from app.db.session import SessionLocal
 from app.db.models import Conversation, AnalyticsScorecard, KnowledgeGap
 from app.services.llm import _safe_llm_call
 from app.logger import logger
+from app.security.kb_guard import MAX_QUESTION_CHARS, clean_draft
+from app.security.pii import mask_pii
+from app.security.sanitize import neutralize_markers
+
+# Senders whose content must never be sent to an LLM provider or distilled into
+# customer-visible knowledge: internal agent notes and system notes.
+_EXCLUDED_SENDERS = {"agent_internal", "system"}
+
+
+def build_safe_transcript(messages) -> str:
+    """Transcript for QA / KB-gap prompts: internal notes dropped, PII masked,
+    trusted-context markers neutralised (the text is untrusted data)."""
+    lines = []
+    for m in messages:
+        if m.sender in _EXCLUDED_SENDERS:
+            continue
+        label = {"human": "Customer", "ai": "Bot", "agent": "Agent"}.get(m.sender, "Other")
+        lines.append(f"{label}: {neutralize_markers(mask_pii(m.content or ''))}")
+    return "\n".join(lines)
 
 async def process_resolved_conversation_tasks(conversation_id: str):
     """Entry point for FastAPI BackgroundTasks when a conversation is resolved."""
@@ -16,7 +35,7 @@ async def process_resolved_conversation_tasks(conversation_id: str):
         if not messages:
             return
 
-        transcript = "\n".join([f"{m.sender}: {m.content}" for m in messages])
+        transcript = build_safe_transcript(messages)
 
         # 1. Generate Scorecard
         await _generate_scorecard(conversation_id, transcript, db)
@@ -90,8 +109,8 @@ async def _detect_knowledge_gap(conversation_id: str, transcript: str, db):
         if data.get("has_gap") and data.get("draft_article"):
             gap = KnowledgeGap(
                 conversation_id=conversation_id,
-                question=data.get("question", "Unknown Question"),
-                draft_article=data.get("draft_article")
+                question=clean_draft(str(data.get("question", "Unknown Question")), MAX_QUESTION_CHARS),
+                draft_article=clean_draft(str(data.get("draft_article")))
             )
             db.add(gap)
             db.commit()

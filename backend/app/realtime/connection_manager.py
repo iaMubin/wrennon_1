@@ -22,9 +22,30 @@ import asyncio
 import json
 from fastapi import WebSocket
 
+import time
+
 from broadcaster import Broadcast
 from app.config import settings
 from app.logger import logger
+
+# Events that carry no conversation content and are fine for every agent.
+_PUBLIC_EVENTS = {"presence", "viewers_update"}
+_OWNER_TTL = 3.0
+
+
+def _lookup_owner(session_id: str) -> tuple[str | None, str | None, str] | None:
+    """(handled_by, assigned_agent, tenant_id) of a conversation, or None."""
+    from sqlalchemy import select
+
+    from app.db.models import Conversation
+    from app.db.session import SessionLocal
+
+    with SessionLocal() as db:
+        row = db.execute(
+            select(Conversation.handled_by, Conversation.assigned_agent, Conversation.tenant_id).where(Conversation.session_id == session_id),
+            execution_options={"skip_tenant_filter": True},
+        ).first()
+        return (row[0], row[1], row[2]) if row else None
 
 broadcast = Broadcast(settings.redis_url)
 
@@ -41,6 +62,9 @@ class ConnectionManager:
         # disconnecting cleanly removes exactly one entry.
         self._viewing: dict[WebSocket, str] = {}  # websocket -> session_id
         self._viewers_by_session: dict[str, dict[WebSocket, str]] = {}  # session_id -> {websocket: username}
+        self._agent_view_all: dict[WebSocket, bool] = {}
+        self._agent_tenant: dict[WebSocket, str] = {}
+        self._owner_cache: dict[str, tuple[float, tuple[str | None, str | None, str] | None]] = {}
 
     # --- Customer side ---
 
@@ -115,23 +139,65 @@ class ConnectionManager:
 
     # --- Agent side ---
 
-    async def connect_agent(self, websocket: WebSocket, username: str) -> None:
+    async def _owner(self, session_id: str):
+        hit = self._owner_cache.get(session_id)
+        if hit and time.monotonic() - hit[0] < _OWNER_TTL:
+            return hit[1]
+        owner = await asyncio.to_thread(_lookup_owner, session_id)
+        if len(self._owner_cache) > 5000:
+            self._owner_cache.clear()
+        self._owner_cache[session_id] = (time.monotonic(), owner)
+        return owner
+
+    async def _deliver_to_agents(self, payload: dict) -> None:
+        """Fan a dashboard event out to connected agents.
+
+        1. TENANT: an event only ever reaches agents of the tenant that owns it
+           (resolved from the payload's tenant_id, else from its conversation).
+           An event whose tenant cannot be determined is dropped, not broadcast.
+        2. VISIBILITY: inside a tenant, agents without ``view_all_conversations``
+           do not receive events (which carry message text) for conversations
+           claimed by somebody else.
+        """
+        sid = payload.get("session_id")
+        tenant_id = payload.get("tenant_id")
+        claimed: list[str] = []
+        owner = None
+        if sid:
+            owner = await self._owner(sid)
+            if owner is None:
+                return                      # unknown conversation: nothing to deliver safely
+            tenant_id = owner[2]
+            claimed = [o for o in owner[:2] if o]
+        if not tenant_id:
+            logger.error(f"Dropping dashboard event without a tenant: type={payload.get('type')}")
+            return
+        restricted = bool(sid) and payload.get("type") not in _PUBLIC_EVENTS and settings.restrict_agent_visibility
+        dead = []
+        for ws, uname in list(self._agent_connections.items()):
+            if self._agent_tenant.get(ws, "default") != tenant_id:
+                continue
+            if restricted and not self._agent_view_all.get(ws, False):
+                if claimed and uname not in claimed:
+                    continue
+            try:
+                await ws.send_json(payload)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self.disconnect_agent(ws)
+
+    async def connect_agent(self, websocket: WebSocket, username: str, view_all: bool = False, tenant_id: str = "default") -> None:
         self._agent_connections[websocket] = username
+        self._agent_view_all[websocket] = view_all
+        self._agent_tenant[websocket] = tenant_id
         
         if self._agent_task is None:
             async def listen_to_agent_channel():
                 try:
                     async with broadcast.subscribe("agent_dashboard") as subscriber:
                         async for event in subscriber:
-                            payload = json.loads(event.message)
-                            dead_connections = []
-                            for ws in list(self._agent_connections.keys()):
-                                try:
-                                    await ws.send_json(payload)
-                                except Exception:
-                                    dead_connections.append(ws)
-                            for ws in dead_connections:
-                                self.disconnect_agent(ws)
+                            await self._deliver_to_agents(json.loads(event.message))
                 except Exception as e:
                     logger.warning(f"Redis subscribe failed for agent_dashboard: {e}")
                             
@@ -140,6 +206,8 @@ class ConnectionManager:
         await self.broadcast_presence()
 
     def disconnect_agent(self, websocket: WebSocket) -> None:
+        self._agent_view_all.pop(websocket, None)
+        self._agent_tenant.pop(websocket, None)
         if websocket in self._agent_connections:
             del self._agent_connections[websocket]
             # Fire-and-forget the async presence broadcast safely
@@ -188,24 +256,22 @@ class ConnectionManager:
 
     async def broadcast_presence(self) -> None:
         # Get unique list of currently connected usernames across this worker
-        online_agents = list(set(self._agent_connections.values()))
-        await self.broadcast_to_agents({
-            "type": "presence",
-            "online_agents": online_agents
-        })
+        # One presence list PER tenant: tenant A must not learn tenant B's staff.
+        by_tenant: dict[str, set[str]] = {}
+        for ws, uname in self._agent_connections.items():
+            by_tenant.setdefault(self._agent_tenant.get(ws, "default"), set()).add(uname)
+        for tid, names in by_tenant.items():
+            await self.broadcast_to_agents({
+                "type": "presence",
+                "tenant_id": tid,
+                "online_agents": sorted(names),
+            })
 
     async def broadcast_to_agents(self, payload: dict) -> None:
         try:
             await broadcast.publish("agent_dashboard", json.dumps(payload))
         except Exception as e:
             logger.warning(f"Skipping Redis broadcast_to_agents (Redis unavailable): {e}")
-            dead_connections = []
-            for ws in list(self._agent_connections.keys()):
-                try:
-                    await ws.send_json(payload)
-                except Exception:
-                    dead_connections.append(ws)
-            for ws in dead_connections:
-                self.disconnect_agent(ws)
+            await self._deliver_to_agents(payload)
 
 manager = ConnectionManager()

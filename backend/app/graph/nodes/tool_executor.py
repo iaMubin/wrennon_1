@@ -18,6 +18,7 @@ import json
 import re
 import time
 
+
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 
 
@@ -48,14 +49,21 @@ async def tool_executor_node(state: ConversationState) -> ConversationState:
         signature = f"{tool_name}:{json.dumps(tool_args, sort_keys=True)}"
 
         if tool_name in TOOL_EXECUTORS:
-            logger.info(f"Executing tool: {tool_name} with args {tool_args}")
+            logger.info(f"Executing tool: {tool_name} (arg keys: {sorted(tool_args)})")
             
             # Extract order_id to keep conversation state updated
             if "order_id" in tool_args:
                 state["last_order_id"] = str(tool_args["order_id"])
                 
             try:
-                result = str(await TOOL_EXECUTORS[tool_name]({**tool_args, "_claimed_emails": claimed_emails, "_customer_email": state.get("customer_email")}))
+                result = str(await TOOL_EXECUTORS[tool_name]({
+                    **tool_args,
+                    "_claimed_emails": claimed_emails,
+                    "_customer_email": state.get("customer_email"),
+                    "_session_id": state.get("session_id", ""),
+                    "_client_ip": state.get("client_ip", ""),
+                    "_tenant_id": state.get("tenant_id", "default"),
+                }))
                 if len(result) > 1500:
                     from app.services.llm import _safe_llm_call
                     summary_prompt = f"Summarize this tool output concisely, focusing on key facts and policy details. Do not omit important data. \n\nOutput:\n{result}"

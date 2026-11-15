@@ -15,10 +15,14 @@ these model definitions don't need to change.
 from __future__ import annotations
 
 import datetime
+import json
 import uuid
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, func, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+from app.db.tenancy import DEFAULT_TENANT_ID, TENANT_MODELS  # noqa: E402
 
 
 class Base(DeclarativeBase):
@@ -33,8 +37,30 @@ def _generate_short_id() -> str:
     return f"CUST-{uuid.uuid4().hex[:6].upper()}"
 
 
+class Tenant(Base):
+    """One merchant. Credentials are stored encrypted (see app.security.secrets_box)."""
+
+    __tablename__ = "tenants"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
+    slug: Mapped[str] = mapped_column(String, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String)
+    # Public, non-secret identifier the storefront widget sends to pick its tenant.
+    public_key: Mapped[str] = mapped_column(String, unique=True, index=True)
+    shopify_store_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    shopify_token_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    @property
+    def pinecone_namespace(self) -> str:
+        return "" if self.id == DEFAULT_TENANT_ID else f"t_{self.id}"
+
+
 class Conversation(Base):
     __tablename__ = "conversations"
+
+    tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id"), default=DEFAULT_TENANT_ID, server_default=DEFAULT_TENANT_ID, index=True)
     __table_args__ = (
         # "needs attention" / open-ticket queues filter on these and sort by updated_at
         Index("ix_conversations_queue", "resolved", "handoff_active", "updated_at"),
@@ -125,6 +151,8 @@ class Message(Base):
 class Agent(Base):
     __tablename__ = "agents"
 
+    tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id"), default=DEFAULT_TENANT_ID, server_default=DEFAULT_TENANT_ID, index=True)
+
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     employee_id: Mapped[str | None] = mapped_column(String, unique=True, index=True, nullable=True)
     full_name: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -163,7 +191,7 @@ class Agent(Base):
         if not perms:
             # Fallback for backwards compatibility with existing rows that haven't been updated
             if self.role == "manager":
-                perms = ["manage_agents", "manage_managers", "view_analytics", "manage_canned_responses", "manage_api_keys"]
+                perms = ["manage_agents", "view_analytics", "manage_canned_responses", "manage_api_keys", "view_all_conversations", "view_customers"]  # manage_managers is explicit-grant only
             else:
                 perms = []
                 
@@ -172,6 +200,8 @@ class Agent(Base):
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
+
+    tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id"), default=DEFAULT_TENANT_ID, server_default=DEFAULT_TENANT_ID, index=True)
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     actor_username: Mapped[str] = mapped_column(String, index=True)
@@ -187,11 +217,18 @@ class AuditLog(Base):
 class KnowledgeGap(Base):
     __tablename__ = "knowledge_gaps"
 
+    tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id"), default=DEFAULT_TENANT_ID, server_default=DEFAULT_TENANT_ID, index=True)
+
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id"), index=True)
     question: Mapped[str] = mapped_column(Text)
     draft_article: Mapped[str] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(String, default="pending")  # pending, approved, rejected
+    status: Mapped[str] = mapped_column(String, default="pending")  # pending, approved, rejected, unpublished
+    # Four-eyes record: who published which exact text. published_text is what
+    # was indexed (the reviewer may edit the draft), draft_article stays as drafted.
+    reviewed_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    reviewed_at: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
+    published_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
@@ -235,9 +272,12 @@ class CSATResponse(Base):
 
 class SystemSetting(Base):
     __tablename__ = "system_settings"
+    __table_args__ = (UniqueConstraint("tenant_id", "key", name="uq_system_settings_tenant_key"),)
+
+    tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id"), default=DEFAULT_TENANT_ID, server_default=DEFAULT_TENANT_ID, index=True)
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
-    key: Mapped[str] = mapped_column(String, unique=True, index=True)
+    key: Mapped[str] = mapped_column(String, index=True)
     value: Mapped[str] = mapped_column(Text)
 
     updated_at: Mapped[datetime.datetime] = mapped_column(
@@ -246,6 +286,8 @@ class SystemSetting(Base):
 
 class CannedResponse(Base):
     __tablename__ = "canned_responses"
+
+    tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id"), default=DEFAULT_TENANT_ID, server_default=DEFAULT_TENANT_ID, index=True)
     
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     shortcut: Mapped[str] = mapped_column(String, unique=True)  # e.g., "/refund"
@@ -263,6 +305,8 @@ class CannedResponse(Base):
 class SavedView(Base):
     __tablename__ = "saved_views"
 
+    tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id"), default=DEFAULT_TENANT_ID, server_default=DEFAULT_TENANT_ID, index=True)
+
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     agent_username: Mapped[str] = mapped_column(String, index=True)
     name: Mapped[str] = mapped_column(String)
@@ -275,6 +319,8 @@ class SavedView(Base):
 
 class ApiKey(Base):
     __tablename__ = "api_keys"
+
+    tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id"), default=DEFAULT_TENANT_ID, server_default=DEFAULT_TENANT_ID, index=True)
     
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_uuid)
     name: Mapped[str] = mapped_column(String, nullable=False)
@@ -284,6 +330,38 @@ class ApiKey(Base):
     last_used_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by_username: Mapped[str] = mapped_column(String, ForeignKey("agents.username"))
+    # Least privilege: a key can only do what its scopes say (see API_KEY_SCOPES).
+    scopes: Mapped[str] = mapped_column(Text, default='["conversations:read"]')
+    expires_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_by: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    @property
+    def scope_list(self) -> list[str]:
+        try:
+            v = json.loads(self.scopes or "[]")
+            return v if isinstance(v, list) else []
+        except ValueError:
+            return []
+
+
+class RevokedSession(Base):
+    """Deny-list for customer session tokens. A row means "tokens minted for this
+    session_id are no longer accepted" (agent-initiated revoke, GDPR erase, abuse).
+    Customer tokens are stateless JWTs valid for up to 72h, so without this there
+    was no way to cut one off."""
+
+    __tablename__ = "revoked_sessions"
+
+    session_id: Mapped[str] = mapped_column(String, primary_key=True)
+    revoked_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    revoked_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None), index=True
+    )
+
+
+TENANT_MODELS.extend([Conversation, Agent, AuditLog, KnowledgeGap, SystemSetting, CannedResponse, SavedView, ApiKey])
 
 # Storefront tables (products, orders, ...). Imported last so Base.metadata (Alembic) sees them.
 from app.db import store_models  # noqa: E402,F401

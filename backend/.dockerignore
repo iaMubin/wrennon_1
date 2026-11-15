@@ -14,3 +14,11 @@ ruff.toml
 .pytest_cache/
 .coverage
 evals/
+
+# Dev/demo tooling: not needed at runtime, no reason to ship it in the prod image
+load_test/
+scripts/dev_check_*.py
+scripts/seed_*.py
+scripts/shift_dates.py
+scripts/backfill_audit_logs.py
+app/static/**/*.py

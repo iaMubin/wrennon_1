@@ -30,14 +30,15 @@ async def handoff_node(state: ConversationState) -> ConversationState:
     )
 
     existing_ticket_id = state.get("existing_ticket_id")
+    tenant_crm = crm if state.get("tenant_id", "default") == "default" else get_crm_provider(state.get("tenant_id"))
 
     if existing_ticket_id:
-        ticket = crm.reopen_support_ticket(
+        ticket = tenant_crm.reopen_support_ticket(
             ticket_id=existing_ticket_id,
             conversation_summary=conversation_summary,
         )
     else:
-        ticket = crm.create_support_ticket(
+        ticket = tenant_crm.create_support_ticket(
             customer_email=state.get("customer_email") or "unknown@customer",
             conversation_summary=conversation_summary,
             order_id=state.get("order_id"),

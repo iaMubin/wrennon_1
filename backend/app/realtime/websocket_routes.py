@@ -8,13 +8,17 @@ from __future__ import annotations
 
 import datetime
 import asyncio
+import json
 import time
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Cookie
 from langchain_core.messages import AIMessage, HumanMessage
 from sqlalchemy.orm import Session
 
-from app.auth.security import decode_access_token, decode_session_token
+from app.auth.security import decode_access_token, decode_session_claims
+from app.db.tenancy import current_tenant
+from app.auth.access import can_access_conversation, can_view_all
+from app.auth.sessions import is_session_revoked
 from app.db.models import Conversation, Message, Agent, AuditLog
 from app.db.session import SessionLocal
 from app.graph.builder import build_graph
@@ -22,12 +26,84 @@ from app.graph.state import initial_state
 from app.logger import logger
 from app.realtime.connection_manager import manager
 from app.config import settings
+from app.security.sanitize import (
+    MAX_AGENT_MESSAGE_CHARS,
+    MAX_CUSTOMER_FRAME_CHARS,
+    build_page_event_text,
+    sanitize_customer_text,
+)
 from app.services.llm import mask_pii, update_conversation_summary, transcribe_audio_if_present, describe_image_if_present
 from app.services.cache import get_cache, set_cache
+from app.services.public_identity import public_agent_name
 from app.api.agent import get_redis
 
 router = APIRouter()
 _graph = build_graph()
+
+WS_SUBPROTOCOL = "wrennon.v1"
+
+
+def _ws_credentials(websocket: WebSocket, query_token: str | None) -> tuple[str | None, str | None]:
+    """Return (token, subprotocol_to_echo).
+
+    Preferred transport is ``Sec-WebSocket-Protocol: wrennon.v1, <jwt>`` — unlike
+    a ``?token=`` query string it is not recorded in access logs, browser history
+    or Referer headers. The query-string form is a deprecated fallback that is
+    refused in production unless WS_ALLOW_QUERY_TOKEN=true.
+    """
+    offered = [p.strip() for p in websocket.headers.get("sec-websocket-protocol", "").split(",") if p.strip()]
+    if WS_SUBPROTOCOL in offered:
+        rest = [p for p in offered if p != WS_SUBPROTOCOL]
+        return (rest[0] if rest else None), WS_SUBPROTOCOL
+    if query_token and settings.allow_ws_query_token:
+        logger.warning("WebSocket authenticated via deprecated ?token= query string")
+        return query_token, None
+    return None, None
+
+
+def _sync_conversation_tenant(session_id: str) -> str | None:
+    from sqlalchemy import select
+
+    with SessionLocal() as db:
+        return db.execute(
+            select(Conversation.tenant_id).where(Conversation.session_id == session_id),
+            execution_options={"skip_tenant_filter": True},
+        ).scalar_one_or_none()
+
+
+def _sync_session_revoked(session_id: str) -> bool:
+    with SessionLocal() as db:
+        return is_session_revoked(db, session_id)
+
+
+async def _receive_json_limited(websocket: WebSocket, max_chars: int = MAX_CUSTOMER_FRAME_CHARS) -> dict:
+    """Receive one frame with a size ceiling applied *before* JSON parsing.
+
+    Returns ``{}`` for anything that is not a JSON object (callers treat that
+    as "ignore"), and closes the socket with 1009 (message too big) for
+    oversized frames, so a client cannot make the server buffer/parse
+    arbitrarily large payloads.
+    """
+    message = await websocket.receive()
+    if message["type"] == "websocket.disconnect":
+        raise WebSocketDisconnect(message.get("code", 1000))
+    raw = message.get("text")
+    if raw is None:
+        raw_bytes = message.get("bytes")
+        if raw_bytes is None:
+            return {}
+        if len(raw_bytes) > max_chars:
+            await websocket.close(code=1009)
+            raise WebSocketDisconnect(1009)
+        raw = raw_bytes.decode("utf-8", errors="ignore")
+    if len(raw) > max_chars:
+        await websocket.close(code=1009)
+        raise WebSocketDisconnect(1009)
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def _get_or_create_conversation(db: Session, session_id: str, customer_email: str | None) -> Conversation:
@@ -87,6 +163,14 @@ def _sync_phase1(session_id: str, customer_text: str) -> dict | None:
         if not conversation:
             return None
         msg = _save_message(db, conversation.id, sender="human", content=customer_text)
+
+        # Persist the first email the customer gives us. It was previously never
+        # written, so GDPR export/erasure (matched by email) found nothing.
+        if not conversation.customer_email:
+            from app.services.erasure import extract_email
+            found = extract_email(customer_text)
+            if found:
+                conversation.customer_email = found
 
         reopened = False
         if conversation.resolved:
@@ -292,7 +376,14 @@ def _sync_validate_agent(username: str, token_version: int | None) -> dict | Non
         if token_version != agent.token_version:
             return None
             
-        return {"full_name": agent.full_name, "role": agent.role}
+        return {"full_name": agent.full_name, "role": agent.role, "view_all": can_view_all(agent), "tenant_id": agent.tenant_id}
+
+
+def _sync_agent_can_access(username: str, session_id: str) -> bool:
+    with SessionLocal() as db:
+        agent = db.query(Agent).filter_by(username=username).first()
+        conv = db.query(Conversation).filter_by(session_id=session_id).first()
+        return bool(agent and conv and can_access_conversation(db, agent, conv))
 
 
 def _sync_agent_reply(session_id: str, username: str, reply_text: str, is_internal: bool = False) -> dict | None:
@@ -352,20 +443,37 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
     # just sees an abnormal closure (code 1006). That silently broke the
     # frontend's ability to tell "auth failed, don't retry" apart from any
     # other disconnect, no matter what the frontend checked for.
-    await websocket.accept()
+    token, subprotocol = _ws_credentials(websocket, token)
+    await websocket.accept(subprotocol=subprotocol)
 
     if not token:
         logger.warning(f"Customer {session_id} rejected: missing token")
         await websocket.close(code=4401)
         return
 
-    decoded = decode_session_token(token)
-    if not decoded or decoded != session_id:
+    claims = decode_session_claims(token)
+    if not claims or claims["session_id"] != session_id:
         logger.warning(f"Customer {session_id} rejected: invalid token")
         await websocket.close(code=4401)
         return
+    tenant_id = claims["tenant_id"]
+    # Everything this connection does (DB sessions, tools, KB, cache, analytics,
+    # background tasks) inherits this tenant through the context variable.
+    current_tenant.set(tenant_id)
 
-    await manager.connect_customer(session_id, websocket)
+    # A session id already owned by ANOTHER tenant can never be adopted.
+    owner_tenant = await asyncio.to_thread(_sync_conversation_tenant, session_id)
+    if owner_tenant is not None and owner_tenant != tenant_id:
+        logger.error(f"Cross-tenant WS attempt: session {session_id} belongs to {owner_tenant}, token is for {tenant_id}")
+        await websocket.close(code=4403)
+        return
+
+    if await asyncio.to_thread(_sync_session_revoked, session_id):
+        logger.warning(f"Customer {session_id} rejected: session revoked")
+        await websocket.close(code=4401)
+        return
+
+    await manager.connect_customer(session_id, websocket)
     from app.services.customer_auth import session_customer_email
     _ws_customer_email = session_customer_email(token)  # verified email of a signed-in customer, else None
 
@@ -436,8 +544,8 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
         below); only the DB-write/broadcast content is enriched here,
         asynchronously, off that critical path.
         """
-        customer_text = await transcribe_audio_if_present(customer_text)
-        customer_text = await describe_image_if_present(customer_text)
+        customer_text = await transcribe_audio_if_present(customer_text, session_id)
+        customer_text = await describe_image_if_present(customer_text, session_id)
         # Auto-translate is temporarily disabled to save LLM calls.
         # customer_text = await auto_translate_if_needed(customer_text)
 
@@ -508,7 +616,10 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
 
         state = initial_state(
             customer_email=phase1_data["customer_email"],
-            include_suggestion=phase1_data.get("include_suggestion", True)
+            include_suggestion=phase1_data.get("include_suggestion", True),
+            session_id=session_id,
+            client_ip=websocket.client.host if websocket.client else "unknown",
+            tenant_id=current_tenant.get() or "default",
         )
 
         if phase1_data["handoff_ticket_id"]:
@@ -538,7 +649,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             cached_reply = await get_cache(customer_text)
             if cached_reply:
                 reply_text = cached_reply
-                logger.info(f"Semantic Cache HIT for '{customer_text}'")
+                logger.info(f"Semantic Cache HIT for '{mask_pii(customer_text)}'")
 
         # Phase 2: AI Processing (LangGraph)
         phase2_start = time.time()
@@ -734,8 +845,12 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
                 "is_resolved": init_data["resolved"],
             })
 
+        seen_page_events: set[str] = set()
+
         while True:
-            data = await websocket.receive_json()
+            data = await _receive_json_limited(websocket)
+            if not data:
+                continue
 
             # Real-time typing signal from the customer.
             if data.get("type") in ("typing", "stopped_typing"):
@@ -747,35 +862,26 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
                 pending_event.set()
                 mid_turn_typing_event.set()
                 continue
-                
-            if data.get("type") == "page_event":
-                event_name = data.get("event")
-                context = data.get("context", "")
-                customer_text = f"[SYSTEM_EVENT: {event_name}] {context}"
-                logger.info(f"Received page_event for customer {session_id}: {customer_text}")
-            else:
-                customer_text = data.get("message")
-                if not customer_text:
+
+            is_page_event = data.get("type") == "page_event"
+            if is_page_event:
+                # Only allow-listed events, with server-owned context text. The
+                # client-supplied "context" is never forwarded to the model.
+                customer_text = build_page_event_text(data.get("event"))
+                if customer_text is None:
+                    logger.warning(f"Ignoring unknown page_event from {session_id}")
                     continue
-
-                if len(customer_text) > 2000:
-                    logger.warning(f"Message from {session_id} exceeded max length. Truncating.")
-                    customer_text = customer_text[:2000]
-
+                # A synthetic event must never pre-empt a real conversation: it
+                # is dropped if a turn is running, and fires at most once per
+                # event name per connection.
+                if (current_turn_task is not None and not current_turn_task.done()) or data["event"] in seen_page_events:
+                    continue
+                logger.info(f"Received page_event for customer {session_id}: {data['event']}")
+            else:
+                customer_text = sanitize_customer_text(data.get("message"))
+                if not customer_text.strip():
+                    continue
                 logger.info(f"Received message from customer {session_id}: {mask_pii(customer_text)}")
-
-            # Cancel any in-flight turn immediately — before this message's
-            # own Phase 1 DB write even starts — so the loop never has to
-            # "hear" this decision late.
-            interrupting_inflight_turn = current_turn_task is not None and not current_turn_task.done()
-            if interrupting_inflight_turn:
-                current_turn_task.cancel()
-
-            # A message arriving always means typing has effectively ended
-            # for debounce purposes, even if stopped_typing hasn't fired yet
-            # (e.g. Enter pressed before the 1.5s client-side timeout) — the
-            # grace period in _wait_until_quiet() still applies from here.
-            is_typing = False
 
             # Rate Limiting — three layers, each catching what the one
             # before it can't:
@@ -787,13 +893,13 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             #    via /chat/init).
             # 3. Global circuit breaker (default 300/min, see config.py):
             #    stops a DISTRIBUTED flood (many IPs, many sessions) that
-            #    bypasses both #1 and #2. This layer can't identify or
-            #    block the attacker — it's a blunt system-wide ceiling,
-            #    not attribution — but it caps worst-case paid-LLM-call
-            #    volume/cost regardless of how the load is spread. When
-            #    it trips, that's a signal worth alerting on (logged at
-            #    ERROR, not WARNING), since it means the first two layers
-            #    were already bypassed.
+            #    bypasses both #1 and #2. When it trips that is a signal worth
+            #    alerting on (logged at ERROR), since it means the first two
+            #    layers were already bypassed.
+            #
+            # IMPORTANT: this runs BEFORE any in-flight turn is cancelled. It
+            # used to run after, so a rate-limited (i.e. dropped) message still
+            # killed the AI reply the customer was legitimately waiting for.
             try:
                 r = get_redis()
                 client_ip = websocket.client.host if websocket.client else "unknown"
@@ -834,6 +940,28 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             except Exception as e:
                 logger.error(f"Rate limiting error: {e}")
 
+            # A revoked session stops being served mid-connection too.
+            if await asyncio.to_thread(_sync_session_revoked, session_id):
+                logger.warning(f"Session {session_id} revoked mid-connection; closing")
+                await websocket.close(code=4401)
+                return
+
+            if is_page_event:
+                seen_page_events.add(data["event"])
+
+            # Only now that the message is accepted do we cancel any in-flight
+            # turn — before this message's own Phase 1 DB write even starts — so
+            # the loop never has to "hear" this decision late.
+            interrupting_inflight_turn = current_turn_task is not None and not current_turn_task.done()
+            if interrupting_inflight_turn:
+                current_turn_task.cancel()
+
+            # A message arriving always means typing has effectively ended
+            # for debounce purposes, even if stopped_typing hasn't fired yet
+            # (e.g. Enter pressed before the 1.5s client-side timeout) — the
+            # grace period in _wait_until_quiet() still applies from here.
+            is_typing = False
+
             # Dispatch this message's DB write CONCURRENTLY — not queued
             # behind any other message's write — so the receive loop stays
             # free to react to the NEXT signal immediately, regardless of
@@ -862,6 +990,37 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             current_turn_task.cancel()
 
 
+# Kept as an alias: the sanitizer lives in app.security.sanitize (a strict superset of the
+# original inline version: marker neutralisation incl. look-alikes, control-char stripping).
+_sanitize_customer_text = sanitize_customer_text
+
+
+def _origin_allowed(websocket: WebSocket) -> bool:
+    """Cross-Site WebSocket Hijacking (CSWSH) guard for cookie-authenticated sockets.
+
+    CORS does not apply to WebSocket handshakes, and the auth cookie is
+    SameSite=None, so without this check any third-party page open in a
+    logged-in agent's browser could connect to /ws/agent with the agent's
+    cookie and read/send as that agent. Browsers ALWAYS send Origin on a
+    WebSocket handshake, so we require it to be either a configured origin
+    or the same host that served the request. Non-browser clients (no
+    Origin header) can't be driven by a victim's cookie jar, so they pass
+    and are still subject to normal token auth.
+    """
+    origin = websocket.headers.get("origin")
+    if not origin:
+        return True
+    allowed = settings.cors_origins_list
+    if allowed == ["*"]:
+        # Wildcard is rejected in production by config.py; dev/staging only.
+        return settings.app_env != "production"
+    if origin in allowed:
+        return True
+    from urllib.parse import urlparse
+    host = websocket.headers.get("host", "")
+    return bool(host) and urlparse(origin).netloc == host
+
+
 @router.websocket("/ws/agent")
 async def agent_websocket(websocket: WebSocket, access_token: str | None = Cookie(None), token: str | None = None):
     # Accept BEFORE validating — see the matching comment in
@@ -871,9 +1030,15 @@ async def agent_websocket(websocket: WebSocket, access_token: str | None = Cooki
     # "Agent connection rejected: unauthorized" / "403 Forbidden" log
     # pairing was) and the frontend has no way to distinguish it from any
     # other disconnect reason, so it kept retrying forever.
-    await websocket.accept()
+    header_token, subprotocol = _ws_credentials(websocket, token)
+    await websocket.accept(subprotocol=subprotocol)
 
-    raw_token = token or access_token
+    if not _origin_allowed(websocket):
+        logger.warning(f"Agent WS rejected: disallowed Origin {websocket.headers.get('origin')!r}")
+        await websocket.close(code=4403)
+        return
+
+    raw_token = header_token or access_token
     if not raw_token:
         logger.warning("Agent connection rejected: missing token")
         await websocket.close(code=4401)
@@ -896,12 +1061,21 @@ async def agent_websocket(websocket: WebSocket, access_token: str | None = Cooki
             await websocket.close(code=4401)
             return
 
-        logger.info(f"Agent connected: {username}")
-        await manager.connect_agent(websocket, username)
+        tenant_id = agent_data["tenant_id"]
+        current_tenant.set(tenant_id)
+        logger.info(f"Agent connected: {username} (tenant {tenant_id})")
+        await manager.connect_agent(websocket, username, view_all=agent_data["view_all"], tenant_id=tenant_id)
         
         while True:
-            data = await websocket.receive_json()
+            data = await _receive_json_limited(websocket, max_chars=MAX_AGENT_MESSAGE_CHARS * 2)
+            if not data:
+                continue
             session_id = data.get("session_id")
+            # Every conversation-scoped action below requires access to it.
+            if isinstance(session_id, str) and data.get("type") != "leave_conversation":
+                if not await asyncio.to_thread(_sync_agent_can_access, username, session_id):
+                    logger.warning(f"Agent {username} denied WS access to conversation {session_id}")
+                    continue
             if data.get("type") in ["typing", "stopped_typing"]:
                 if session_id:
                     await manager.send_to_customer(session_id, {"type": data["type"]})
@@ -916,10 +1090,11 @@ async def agent_websocket(websocket: WebSocket, access_token: str | None = Cooki
                 continue
                 
             reply_text = data.get("message")
-            is_internal = data.get("is_internal", False)
+            is_internal = data.get("is_internal", False) is True
             
-            if not session_id or not reply_text:
+            if not isinstance(session_id, str) or not isinstance(reply_text, str) or not reply_text.strip():
                 continue
+            reply_text = reply_text[:MAX_AGENT_MESSAGE_CHARS]
                 
             logger.info(f"Agent {username} replied to conversation {session_id} (Internal: {is_internal})")
 
@@ -944,7 +1119,7 @@ async def agent_websocket(websocket: WebSocket, access_token: str | None = Cooki
                 await manager.send_to_customer(session_id, {
                     "reply": reply_text, 
                     "sender": "agent", 
-                    "name": agent_data["full_name"]
+                    "name": public_agent_name(agent_data["full_name"])
                 })
             
             # Broadcast to all agents so they stay in sync

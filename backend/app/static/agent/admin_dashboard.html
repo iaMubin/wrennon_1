@@ -825,16 +825,20 @@
         // credentials:'include' to actually send it cross-origin, and
         // mutating (non-GET) requests need this header too, since the
         // backend requires it as CSRF protection for cookie-only auth.
+        // Escape anything server-supplied before it goes into innerHTML. Names, usernames,
+        // audit details and (LLM-drafted, customer-influenced) knowledge-gap text are untrusted.
+        function esc(v) {
+            return String(v ?? "").replace(/[&<>"'`]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;","`":"&#96;"}[c]));
+        }
+        function safeImg(u) {
+            return (typeof u === "string" && (u.startsWith("/agent/images/") || u.startsWith("https://"))) ? u : "images/default-avatar.png?v=2";
+        }
         function getAuthHeaders(extra = {}) {
-            const token = localStorage.getItem("agent_token");
-            const headers = {
+            // Cookie-only auth: the JWT is never exposed to page JS.
+            return {
                 "X-Wrennon-Client": "agent-dashboard",
                 ...extra
             };
-            if (token) {
-                headers["Authorization"] = `Bearer ${token}`;
-            }
-            return headers;
         }
         const authHeaders = getAuthHeaders();
         // Toggle password logic
@@ -1061,7 +1065,8 @@
                 formData.append("file", dpFile);
                 const uploadRes = await fetch(`${API_BASE}/admin/upload-dp`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('agent_token')}` },
+                    headers: { 'X-Wrennon-Client': 'agent-dashboard' },
+                    credentials: 'include',
                     body: formData
                 });
                 if (!uploadRes.ok) throw new Error("Upload failed");
@@ -1204,17 +1209,17 @@
                 tr.innerHTML = `
                     <td class="cell-strong">
                         <div style="display: flex; align-items: center; gap: 12px;">
-                            <img src="${agent.dp_url || 'images/default-avatar.png?v=2'}" alt="DP" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;">
+                            <img src="${esc(safeImg(agent.dp_url))}" alt="DP" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;">
                             <div style="display: flex; flex-direction: column;">
                                 <div style="display: flex; align-items: center; gap: 6px;">
-                                    ${agent.full_name || agent.username}
-                                    <span class="role-badge ${roleClass}">${agent.role}</span>
+                                    ${esc(agent.full_name || agent.username)}
+                                    <span class="role-badge ${roleClass}">${esc(agent.role)}</span>
                                 </div>
-                                ${agent.full_name && agent.full_name.toLowerCase() !== agent.username.toLowerCase() ? `<div style="font-size: 11px; color: var(--ink-muted); font-weight: normal; margin-top: 2px;">@${agent.username}</div>` : ''}
+                                ${agent.full_name && agent.full_name.toLowerCase() !== agent.username.toLowerCase() ? `<div style="font-size: 11px; color: var(--ink-muted); font-weight: normal; margin-top: 2px;">@${esc(agent.username)}</div>` : ''}
                             </div>
                         </div>
                     </td>
-                    <td class="cell-mono">${agent.employee_id}</td>
+                    <td class="cell-mono">${esc(agent.employee_id)}</td>
                     <td><span class="role-badge" style="${statusStyle}">${statusText}</span></td>
                     <td class="cell-accent">${agent.resolved_count}</td>
                     <td class="cell-muted">${date}</td>
@@ -1273,7 +1278,8 @@
                 formData.append("file", dpFile);
                 const uploadRes = await fetch(`${API_BASE}/admin/upload-dp`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('agent_token')}` },
+                    headers: { 'X-Wrennon-Client': 'agent-dashboard' },
+                    credentials: 'include',
                     body: formData
                 });
                 if (uploadRes.ok) {
@@ -1370,9 +1376,9 @@
                     const tr = document.createElement("tr");
                     tr.innerHTML = `
                         <td class="cell-muted" style="font-size: 13px;">${date}</td>
-                        <td class="cell-strong">${log.actor}</td>
-                        <td class="cell-mono" style="color: var(--accent);">${log.action}</td>
-                        <td class="cell-muted" style="font-size: 13px;">${log.details || "-"}</td>
+                        <td class="cell-strong">${esc(log.actor)}</td>
+                        <td class="cell-mono" style="color: var(--accent);">${esc(log.action)}</td>
+                        <td class="cell-muted" style="font-size: 13px;">${esc(log.details || "-")}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -1674,11 +1680,11 @@
                                     <span class="result-eyebrow">NEW KB DRAFT DETECTED</span>
                                     <span class="confidence-pill" style="background: var(--accent); color: var(--accent-ink);">Action Required</span>
                                 </div>
-                                <div class="result-title result-title--lg">${gap.question}</div>
-                                <textarea class="result-body" style="width: 100%; height: 120px; padding: 12px; border-radius: 8px; border: 1px solid var(--border-light); background: var(--bg-body); color: var(--text-main); font-family: 'Inter', sans-serif; resize: vertical;">${gap.draft_article}</textarea>
+                                <div class="result-title result-title--lg">${kbEsc(gap.question)}</div>
+                                <textarea id="gap-text-${kbEsc(gap.id)}" class="result-body" style="width: 100%; height: 120px; padding: 12px; border-radius: 8px; border: 1px solid var(--border-light); background: var(--bg-body); color: var(--text-main); font-family: 'Inter', sans-serif; resize: vertical;">${kbEsc(gap.draft_article)}</textarea>
                                 <div class="result-actions">
-                                    <button class="btn btn-primary" onclick="approveGap('${gap.id}')">Approve & Sync to Pinecone</button>
-                                    <button class="btn btn-danger" onclick="rejectGap('${gap.id}')">Reject</button>
+                                    <button class="btn btn-primary" onclick="approveGap('${kbEsc(gap.id)}')">Approve & Sync to Pinecone</button>
+                                    <button class="btn btn-danger" onclick="rejectGap('${kbEsc(gap.id)}')">Reject</button>
                                 </div>
                             </div>
                         `;
@@ -1689,12 +1695,30 @@
             }
         }
         
+        // Escape model/customer-derived text before it goes into innerHTML.
+        function kbEsc(v) {
+            return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
         async function approveGap(id) {
+            // The reviewer approves the EXACT text shown (they may have edited it).
+            const box = document.getElementById(`gap-text-${id}`);
+            const text = box ? box.value : null;
+            if (!confirm('This article will be used by the AI to answer customers. Confirm it contains no personal data and no instructions aimed at the AI.')) return;
             try {
-                const res = await fetch(`${API_BASE}/admin/knowledge-gaps/${id}/approve`, { method: 'POST', headers: authHeaders, credentials: 'include' });
+                const res = await fetch(`${API_BASE}/admin/knowledge-gaps/${id}/approve`, {
+                    method: 'POST',
+                    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ edited_article: text, confirm_reviewed: true })
+                });
                 if (res.ok) {
                     alert('Draft approved and synced to Pinecone vector database!');
                     fetchKnowledgeGaps();
+                } else if (res.status === 422) {
+                    const err = await res.json().catch(() => ({}));
+                    const f = err.detail && err.detail.findings ? err.detail.findings.join('\n- ') : 'Review failed';
+                    alert('Cannot publish as written:\n- ' + f + '\n\nEdit the text and try again.');
                 }
             } catch (err) { console.error(err); }
         }

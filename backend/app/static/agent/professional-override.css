@@ -27,9 +27,10 @@
 #sidebar-header .logo-text,
 .logo-text,
 #brand .brand-name {
-  font-family: var(--font-display, 'Big Shoulders Display', sans-serif) !important;
+  font-family: 'Big Shoulders Display', var(--font-display), sans-serif !important;
   font-weight: 800 !important;
   letter-spacing: -0.01em !important;
+  text-transform: uppercase !important;
 }
 
 /* ── 2. GLOBAL NAV RAIL (HIGH CONTRAST DOCK) ── */
@@ -354,11 +355,29 @@
 [data-theme^="dark"] #agent-messages {
   background-color: var(--bg-base) !important;
   padding: 24px 32px !important;
-  gap: 16px !important;
+  gap: 8px !important;
   display: flex !important;
   flex-direction: column !important;
   overflow-y: auto !important;
   flex: 1 !important;
+}
+
+.msg-content,
+[data-theme] .msg-content {
+  margin: 0 !important;
+}
+
+.msg-content--grouped,
+.msg-content--grouped-next,
+[data-theme] .msg-content--grouped,
+[data-theme] .msg-content--grouped-next {
+  margin-top: -5px !important; /* 8px container gap - 5px = 3px visual gap */
+  margin-bottom: 0 !important;
+}
+
+.msg-content .msg,
+[data-theme] .msg-content .msg {
+  margin: 0 !important;
 }
 
 .msg,
@@ -426,10 +445,66 @@
 
 .msg-meta,
 [data-theme] .msg-meta {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
   font-size: 11px !important;
   color: var(--text-dim) !important;
   font-weight: 500 !important;
-  margin-bottom: 4px !important;
+  margin-top: 4px !important;
+  margin-bottom: 0 !important;
+}
+
+.msg-content--user .msg-meta,
+.msg-content--human .msg-meta,
+[data-theme] .msg-content--user .msg-meta,
+[data-theme] .msg-content--human .msg-meta {
+  justify-content: flex-start !important;
+  padding-left: 2px !important;
+}
+
+.msg-content--agent .msg-meta,
+.msg-content--ai .msg-meta,
+.msg-content--bot .msg-meta,
+.msg-content--internal .msg-meta,
+[data-theme] .msg-content--agent .msg-meta,
+[data-theme] .msg-content--ai .msg-meta,
+[data-theme] .msg-content--bot .msg-meta,
+[data-theme] .msg-content--internal .msg-meta {
+  justify-content: flex-end !important;
+  padding-right: 2px !important;
+}
+
+/* WhatsApp Style Reply Quote */
+.msg-reply-bubble,
+[data-theme] .msg-reply-bubble {
+  background: color-mix(in srgb, currentColor 8%, transparent) !important;
+  border-left: 3px solid currentColor !important;
+  border-radius: 6px !important;
+  padding: 5px 9px !important;
+  margin-bottom: 5px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+.msg-reply-author,
+[data-theme] .msg-reply-author {
+  font-weight: 700 !important;
+  color: currentColor !important;
+  opacity: 0.9 !important;
+  font-size: 11px !important;
+  margin-bottom: 2px !important;
+  letter-spacing: 0.03em !important;
+}
+.msg-reply-text,
+[data-theme] .msg-reply-text {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: 12px !important;
+  opacity: 0.8 !important;
+  line-height: 1.35 !important;
 }
 
 /* ── Chat Composer / Input Area ── */
@@ -2720,19 +2795,25 @@ textarea:focus,
   }
 
   #sidebar-header .logo-img {
-    display: none !important;
+    display: inline-block !important;
+    width: 28px !important;
+    height: 28px !important;
+    flex-shrink: 0 !important;
   }
 
   #sidebar-header .brand-name,
   #sidebar-header .logo-text {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-    font-size: 20px !important;
-    font-weight: 600 !important;
+    font-family: 'Big Shoulders Display', var(--font-display), sans-serif !important;
+    font-size: 22px !important;
+    font-weight: 800 !important;
     color: #FFFFFF !important;
     letter-spacing: -0.01em !important;
+    text-transform: uppercase !important;
     margin: 0 !important;
     padding: 0 !important;
-    display: inline-block !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
   }
 
   /* WhatsApp search and three-dot action icons */
@@ -3581,7 +3662,7 @@ textarea:focus,
     white-space: pre-wrap !important;
   }
 
-  /* Left Bubble (Customer) - Pure White */
+  /* Left Bubble (Customer) - Pure White with 2px Accent Border */
   .msg--customer,
   .msg--human,
   .msg--user,
@@ -3599,6 +3680,7 @@ textarea:focus,
     color: #111B21 !important;
     border-radius: 8px 8px 8px 2px !important;
     border: none !important;
+    border-left: 2px solid var(--accent) !important;
     align-self: flex-start !important;
   }
   html[data-theme^="dark"] .msg--customer,
@@ -3606,9 +3688,10 @@ textarea:focus,
     background: #202C33 !important;
     background-color: #202C33 !important;
     color: #E9EDEF !important;
+    border-left: 2px solid var(--accent) !important;
   }
 
-  /* Right Bubble (Agent / AI) - WhatsApp Emerald Green */
+  /* Right Bubble (Agent / AI) - Emerald Green with 2px Accent Border */
   .msg--agent,
   .msg--ai,
   .msg--bot,
@@ -3624,6 +3707,7 @@ textarea:focus,
     color: #111B21 !important;
     border-radius: 8px 8px 2px 8px !important;
     border: none !important;
+    border-right: 2px solid var(--accent) !important;
     align-self: flex-end !important;
   }
   html[data-theme^="dark"] .msg--agent,
@@ -3631,6 +3715,7 @@ textarea:focus,
     background: #005C4B !important;
     background-color: #005C4B !important;
     color: #E9EDEF !important;
+    border-right: 2px solid var(--accent) !important;
   }
 
   /* Timestamp & Blue Double Checkmarks */
@@ -4509,14 +4594,34 @@ textarea:focus,
 .msg--voice-only,
 [data-theme] .msg:has(.voice-player),
 [data-theme] .msg--voice-only {
-  min-width: 200px !important;
-  max-width: min(80%, 330px) !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
   width: fit-content !important;
-  padding: 8px 12px !important; /* Exactly matches standard message bubble padding */
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
   box-sizing: border-box !important;
   overflow: visible !important;
   position: relative !important;
   margin: 0 !important;
+}
+
+.msg:has(.voice-player)::before,
+.msg:has(.voice-player)::after,
+.msg--voice-only::before,
+.msg--voice-only::after,
+[data-theme] .msg:has(.voice-player)::before,
+[data-theme] .msg:has(.voice-player)::after,
+[data-theme] .msg--voice-only::before,
+[data-theme] .msg--voice-only::after {
+  display: none !important;
+  content: none !important;
+  border: none !important;
 }
 
 /* Ensure right-aligned agent voice messages align flush with other agent messages */
@@ -4548,25 +4653,55 @@ textarea:focus,
 }
 
 .msg:has(.voice-player) p,
-.msg--voice-only p {
+.msg--voice-only p,
+[data-theme] .msg:has(.voice-player) p,
+[data-theme] .msg--voice-only p {
   margin: 0 !important;
   padding: 0 !important;
   width: 100% !important;
   line-height: 1 !important;
+  background: transparent !important;
+  border: none !important;
 }
 
 .voice-player,
 [data-theme] .voice-player {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 6px !important;
-  padding: 4px 10px 4px 6px !important;
+  gap: 8px !important;
+  padding: 4px 12px 4px 5px !important;
   width: fit-content !important;
-  max-width: 100% !important;
+  max-width: 310px !important;
   box-sizing: border-box !important;
   overflow: visible !important;
   border-radius: 9999px !important;
-  margin: 2px 0 !important;
+  background: var(--well, #f0f2f5) !important;
+  border: none !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  margin: 0 !important;
+}
+
+.msg-content--human .voice-player,
+.msg-content--user .voice-player,
+[data-theme] .msg-content--human .voice-player,
+[data-theme] .msg-content--user .voice-player {
+  border-left: 2px solid var(--accent) !important;
+  border-right: none !important;
+}
+
+.msg-content--agent .voice-player,
+.msg-content--ai .voice-player,
+.msg-content--bot .voice-player,
+[data-theme] .msg-content--agent .voice-player,
+[data-theme] .msg-content--ai .voice-player,
+[data-theme] .msg-content--bot .voice-player {
+  border-right: 2px solid var(--accent) !important;
+  border-left: none !important;
+}
+
+[data-theme^="dark"] .voice-player {
+  background: color-mix(in srgb, #ffffff 9%, var(--bg-base, #111113)) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25) !important;
 }
 
 .voice-player__btn {

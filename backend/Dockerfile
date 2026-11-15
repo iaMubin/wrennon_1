@@ -34,7 +34,7 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Ingest runs at startup (not build time) because it needs env vars
-# like GROQ_API_KEY and COHERE_API_KEY which are only available at runtime
-# on Render. start.sh runs ingest.py first, then starts uvicorn.
+# start.sh runs `alembic upgrade head` and then starts uvicorn. Policy-doc ingestion
+# (needs GROQ/COHERE/PINECONE env vars, so it can't run at build time) lives in
+# pre_deploy.sh, which Render runs as its preDeployCommand.
 CMD ["./start.sh"]

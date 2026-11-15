@@ -48,7 +48,17 @@ def _get_cohere():
 
 import asyncio
 
-async def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
+def namespace_for(tenant_id: str | None = None) -> str:
+    """Pinecone namespace of a tenant. The default tenant keeps the legacy (empty)
+    namespace so existing vectors stay valid; every other tenant is isolated in
+    its own namespace and can never retrieve another tenant's documents."""
+    from app.db.tenancy import DEFAULT_TENANT_ID, current_tenant
+
+    tid = tenant_id or current_tenant.get() or DEFAULT_TENANT_ID
+    return "" if tid == DEFAULT_TENANT_ID else f"t_{tid}"
+
+
+async def retrieve_and_rerank(query: str, top_k: int = 3, include_internal: bool = True, tenant_id: str | None = None) -> list[dict]:
     """Retrieve candidate chunks from Pinecone, then rerank with Cohere.
 
     Returns:
@@ -73,12 +83,14 @@ async def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
 
     # Pinecone fetch
     index = _get_index()
+    namespace = namespace_for(tenant_id)
     
     def _pinecone_query():
         return index.query(
             vector=query_embedding,
             top_k=max(top_k * 3, 5),
-            include_metadata=True
+            include_metadata=True,
+            namespace=namespace,
         )
         
     pinecone_start = time.time()
@@ -88,7 +100,13 @@ async def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
     if not results.matches:
         return []
 
-    candidates = [match.metadata["text"] for match in results.matches if "text" in match.metadata]
+    # Filter in Python (not via a Pinecone $ne filter): documents ingested before
+    # the visibility field existed have no such key and must count as public.
+    candidates = [
+        match.metadata["text"]
+        for match in results.matches
+        if "text" in match.metadata and (include_internal or match.metadata.get("visibility", "public") != "internal")
+    ]
     if not candidates:
         return []
 
@@ -107,7 +125,17 @@ async def retrieve_and_rerank(query: str, top_k: int = 3) -> list[dict]:
         for result in reranked.results
     ]
 
-def insert_into_pinecone(title: str, text: str, gap_id: str):
+def delete_from_pinecone(gap_id: str, tenant_id: str | None = None) -> None:
+    """Remove a previously inserted auto-generated article (unpublish / rollback)."""
+    if settings.pinecone_api_key == "YOUR_NEW_PINECONE_API_KEY":
+        logger.info(f"Mocked removal of vector for: {gap_id}")
+        return
+    vector_id = "kb_" + gap_id   # a vector id, not SQL
+    _get_index().delete(ids=[vector_id], namespace=namespace_for(tenant_id))
+    logger.info(f"Removed KB article kb_{gap_id} from Pinecone")
+
+
+def insert_into_pinecone(title: str, text: str, gap_id: str, approved_by: str | None = None, tenant_id: str | None = None):
     """Embeds and inserts a new KB article into Pinecone."""
     if settings.pinecone_api_key == "YOUR_NEW_PINECONE_API_KEY":
         logger.info(f"Mocked insert into pinecone for: {title}")
@@ -118,6 +146,7 @@ def insert_into_pinecone(title: str, text: str, gap_id: str):
     
     index = _get_index()
     index.upsert(
+        namespace=namespace_for(tenant_id),
         vectors=[
             {
                 "id": f"kb_{gap_id}",
@@ -125,7 +154,11 @@ def insert_into_pinecone(title: str, text: str, gap_id: str):
                 "metadata": {
                     "title": title,
                     "text": text,
-                    "source": "auto_generated_gap"
+                    "source": "auto_generated_gap",
+                    # Drafted from conversations: usable by the AI agent, never
+                    # returned by the unauthenticated public search.
+                    "visibility": "internal",
+                    "approved_by": approved_by or "",
                 }
             }
         ]

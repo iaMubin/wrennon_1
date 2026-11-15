@@ -22,6 +22,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_not_e
 
 from app.config import settings
 from app.logger import logger
+from app.security.sanitize import sanitize_llm_derived
 
 # Explicit timeouts: a hung provider must fail fast so the fallback chain can run,
 # instead of leaving the customer waiting for the SDK default.
@@ -50,37 +51,9 @@ def _read_bytes(path: str) -> bytes:
         return f.read()
 
 
-def mask_pii(text: str) -> str:
-    """Masks PII from user input using robust regex rules."""
-
-    # 1. Emails
-    text = re.sub(r'[\w\.-]+@[\w\.-]+\.\w+', '[EMAIL HIDDEN]', text)
-
-    # 2. Credit Cards (13-16 digits, with optional dashes/spaces)
-    text = re.sub(r'\b(?:\d[ -]*?){13,16}\b', '[CARD HIDDEN]', text)
-
-    # 3. Phone Numbers (US/International standard formats)
-    text = re.sub(r'\b(?:\+\d{1,3}[- ]?)?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}\b', '[PHONE HIDDEN]', text)
-
-    # 4. Social Security Numbers (SSN)
-    text = re.sub(r'\b\d{3}-\d{2}-\d{4}\b', '[SSN HIDDEN]', text)
-
-    # 5. IP Addresses (IPv4)
-    text = re.sub(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', '[IP HIDDEN]', text)
-
-    # 6. Passwords (contextual)
-    text = re.sub(r'(?i)(password\s+is|pwd\s+is|password:|pwd:)\s+([^\s]+)', r'\1 [PASSWORD HIDDEN]', text)
-
-    # 7. Street Addresses (e.g., 123 Main St, 456 Elm Avenue)
-    address_pattern = r'\b\d{1,5}\s+(?:[A-Z][a-z0-9]*\s+){1,3}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct|Way|Circle|Cir)\b(?:.*?,\s*[A-Z]{2}\s+\d{5})?'
-    text = re.sub(address_pattern, '[ADDRESS HIDDEN]', text, flags=re.IGNORECASE)
-
-    # 8. Contextual Names
-    # Matches: "My name is John Doe", "I am John", "Shipping to John", "Deliver to John Smith"
-    name_trigger_pattern = r"\b((?i:my\s+name\s+is|i\s+am|i'm|this\s+is|shipping\s+to|deliver\s+to|account\s+under|name:))\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b"
-    text = re.sub(name_trigger_pattern, r'\1 [NAME HIDDEN]', text)
-
-    return text
+# mask_pii lives in app.security.pii; re-exported here because the graph
+# nodes and existing tests import it from this module.
+from app.security.pii import mask_pii  # noqa: E402,F401
 
 
 @retry(
@@ -282,10 +255,10 @@ async def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: i
     return ""
 
 
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads")
+from app.services.uploads import resolve_own_upload  # noqa: E402
 
 
-async def transcribe_audio_if_present(text: str) -> str:
+async def transcribe_audio_if_present(text: str, session_id: str | None = None) -> str:
     """Checks for [Audio](url) or [Video](url), transcribes it, and appends to text."""
     matches = re.findall(r'\[(?:Audio|Video)\]\((https?://[^\)]+)\)', text)
     if not matches:
@@ -293,12 +266,12 @@ async def transcribe_audio_if_present(text: str) -> str:
 
     url = matches[0]
     try:
-        # Prevent SSRF: only allow processing files from our own /uploads/ path
-        if "/uploads/" not in url:
+        # Prevent SSRF / cross-session reads: only files in THIS conversation's
+        # own upload directory are ever opened.
+        file_path = resolve_own_upload(url, session_id) if session_id else None
+        if file_path is None:
             return text + "\n\n(Transcript: [Cannot process external audio])"
-
-        filename = os.path.basename(url.split("/uploads/")[-1])
-        file_path = os.path.join(UPLOAD_DIR, filename)
+        filename = os.path.basename(file_path)
 
         if not os.path.exists(file_path):
             return text + "\n\n(Transcript: [Audio file not found])"
@@ -311,7 +284,7 @@ async def transcribe_audio_if_present(text: str) -> str:
             file=(filename, content),
             model="whisper-large-v3-turbo"
         )
-        return text + f"\n\n(Transcript: {transcription.text})"
+        return text + f"\n\n(Transcript: {sanitize_llm_derived(transcription.text)})"
     except Exception as e:
         logger.error(f"Failed to transcribe audio: {e}")
         return text + "\n\n(Transcript: [Failed to process audio])"
@@ -342,17 +315,13 @@ def parse_image_urls(text: str) -> list[str]:
     return re.findall(r'!\[.*?\]\((https?://[^\)]+)\)', text)
 
 
-async def _url_to_base64(url: str) -> str:
+async def _url_to_base64(url: str, session_id: str | None = None) -> str:
     """Reads an image from local uploads directory and converts to base64."""
     try:
-        if "/uploads/" not in url:
+        file_path = resolve_own_upload(url, session_id) if session_id else None
+        if file_path is None or not os.path.exists(file_path):
             return None
-
-        filename = os.path.basename(url.split("/uploads/")[-1])
-        file_path = os.path.join(UPLOAD_DIR, filename)
-
-        if not os.path.exists(file_path):
-            return None
+        filename = os.path.basename(file_path)
 
         content = await asyncio.to_thread(_read_bytes, file_path)
 
@@ -374,7 +343,7 @@ async def _url_to_base64(url: str) -> str:
     return None
 
 
-async def describe_image_if_present(text: str) -> str:
+async def describe_image_if_present(text: str, session_id: str | None = None) -> str:
     """Checks for ![Image](url), describes it using the vision model, and appends to text."""
     image_urls = parse_image_urls(text)
     if not image_urls:
@@ -382,7 +351,7 @@ async def describe_image_if_present(text: str) -> str:
 
     descriptions = []
     for url in image_urls:
-        b64 = await _url_to_base64(url)
+        b64 = await _url_to_base64(url, session_id)
         if b64:
             content_list = [
                 {"type": "text", "text": "Describe this image in detail. Be very specific about any products, brands, or text visible. Keep it concise."},
@@ -398,11 +367,14 @@ async def describe_image_if_present(text: str) -> str:
                 if desc:
                     # Strip <think> blocks even if unclosed
                     desc = re.sub(r'<think>.*?(?:</think>|$)', '', desc, flags=re.DOTALL).strip()
+                    # The description is model output about attacker-controlled
+                    # pixels: it can contain a forged closing marker.
+                    desc = sanitize_llm_derived(desc)
                     if desc:
                         descriptions.append(desc)
             except Exception as e:
                 logger.error(f"Failed to describe image: {e}")
-                descriptions.append(f"System Note: The customer uploaded an image, but the visual analysis system timed out or failed ({e}). You cannot see this image. You MUST escalate to a human to look at it.")
+                descriptions.append(f"System Note: The customer uploaded an image, but the visual analysis system timed out or failed. You cannot see this image. You MUST escalate to a human to look at it.")
                 
     if descriptions:
         desc_text = "\n\n".join([f"\n\n[INTERNAL_IMAGE_DESC]\n{d}\n[/INTERNAL_IMAGE_DESC]\n\n" for d in descriptions])
@@ -435,7 +407,7 @@ async def generate_conversation_summary(
     transcript_lines = []
     for msg in messages:
         sender = "Customer" if msg.type == "human" else "Bot"
-        content = mask_pii(msg.content) if msg.type == "human" else msg.content
+        content = mask_pii(msg.content)
         transcript_lines.append(f"{sender}: {content}")
 
     transcript_text = "\n".join(transcript_lines)
@@ -490,7 +462,7 @@ async def update_conversation_summary(messages: list, current_summary: str | Non
 
     for msg in messages:
         role = "user" if msg.type == "human" else "assistant"
-        llm_messages.append({"role": role, "content": msg.content})
+        llm_messages.append({"role": role, "content": mask_pii(msg.content)})
 
     result = await _safe_llm_call(messages=llm_messages, temperature=0.2, max_tokens=250, model_override=LIGHT_MODEL)
     return result or current_summary or ""

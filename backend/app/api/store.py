@@ -18,6 +18,8 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.limiter import limiter
 from app.services import customer_auth as auth
+from app.services import store_actions as actions_svc
+from app.services import store_context as ctx_svc
 from app.services import store_service as svc
 
 router = APIRouter(tags=["store"])
@@ -125,3 +127,43 @@ def me(request: Request, db: Session = Depends(get_db), authorization: Optional[
     if not c:
         raise HTTPException(status_code=401, detail="Please sign in.")
     return {"customer": svc.customer_profile(db, c), "orders": [svc.order_to_dict(o) for o in svc.orders_for_email(db, c.email)]}
+
+
+# --------------------------------------------------------- chatbot page context
+class ContextLine(BaseModel):
+    product_id: str = Field(max_length=32)
+    size: str = Field(max_length=16)
+    quantity: int = Field(ge=1, le=svc.MAX_QTY)
+
+
+class ContextIn(BaseModel):
+    session_id: str = Field(min_length=8, max_length=64)
+    page: str = Field(max_length=16)
+    category: Optional[str] = Field(default=None, max_length=32)
+    product_id: Optional[str] = Field(default=None, max_length=32)
+    size: Optional[str] = Field(default=None, max_length=16)
+    cart: List[ContextLine] = Field(default_factory=list, max_length=svc.MAX_LINES)
+
+
+@router.post("/context")
+@limiter.limit("120/minute")
+def set_context(request: Request, payload: ContextIn, db: Session = Depends(get_db),
+                x_chat_token: Optional[str] = Header(default=None)):
+    """The storefront tells the chatbot what the visitor is looking at. Only the owner of the chat session (proved by its
+    signed session token) can set it, and only identifiers are accepted (see services/store_context.py)."""
+    from app.auth.security import decode_session_token
+    if not x_chat_token or decode_session_token(x_chat_token) != payload.session_id:
+        raise HTTPException(status_code=401, detail="Invalid chat session")
+    ctx_svc.save_context(db, payload.session_id, payload.model_dump())
+    return {"ok": True}
+
+
+@router.get("/actions")
+@limiter.limit("180/minute")
+def pending_actions(request: Request, session_id: str = Query(min_length=8, max_length=64), db: Session = Depends(get_db),
+                    x_chat_token: Optional[str] = Header(default=None)):
+    """Things the chatbot asked this page to do (add to bag, open a page). Delivered once, to the session's owner only."""
+    from app.auth.security import decode_session_token
+    if not x_chat_token or decode_session_token(x_chat_token) != session_id:
+        raise HTTPException(status_code=401, detail="Invalid chat session")
+    return {"actions": actions_svc.pop_actions(db, session_id)}

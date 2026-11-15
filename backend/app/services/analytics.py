@@ -2,10 +2,23 @@ import json
 import os
 from typing import Dict, Any
 
-ANALYTICS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data', 'analytics.json')
+_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data')
+ANALYTICS_FILE = os.path.join(_DATA_DIR, 'analytics.json')   # default tenant (legacy path)
+
+
+def _analytics_file() -> str:
+    """One counters file per tenant, so merchants never see each other's numbers."""
+    import re
+    from app.db.tenancy import DEFAULT_TENANT_ID, current_tenant
+
+    tid = current_tenant.get() or DEFAULT_TENANT_ID
+    if tid == DEFAULT_TENANT_ID:
+        return ANALYTICS_FILE
+    return os.path.join(_DATA_DIR, f"analytics_{re.sub(r'[^A-Za-z0-9_-]', '', tid)[:64]}.json")
+
 
 def load_analytics() -> Dict[str, Any]:
-    if not os.path.exists(ANALYTICS_FILE):
+    if not os.path.exists(_analytics_file()):
         return {
             "total_tickets": 0,
             "resolved_by_ai": 0,
@@ -15,15 +28,15 @@ def load_analytics() -> Dict[str, Any]:
             "intents": {},
             "sentiments": {}
         }
-    with open(ANALYTICS_FILE, 'r') as f:
+    with open(_analytics_file(), 'r') as f:
         data = json.load(f)
         if "intents" not in data: data["intents"] = {}
         if "sentiments" not in data: data["sentiments"] = {}
         return data
 
 def save_analytics(data: Dict[str, Any]):
-    os.makedirs(os.path.dirname(ANALYTICS_FILE), exist_ok=True)
-    with open(ANALYTICS_FILE, 'w') as f:
+    os.makedirs(os.path.dirname(_analytics_file()), exist_ok=True)
+    with open(_analytics_file(), 'w') as f:
         json.dump(data, f, indent=4)
 
 def log_resolution(was_autonomous: bool, intent: str = None, sentiment: str = None):

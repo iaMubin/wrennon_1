@@ -159,3 +159,24 @@ class StoreRefund(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=_now)
 
     order: Mapped[StoreOrder] = relationship(back_populates="refunds")
+
+
+class StoreSessionContext(Base):
+    """What a chat visitor is looking at on the storefront right now (page, product, bag). One row per chat session."""
+    __tablename__ = "store_session_context"
+
+    session_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    context: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
+class StoreUiAction(Base):
+    """A command the chatbot wants the storefront page to perform for one chat session (add to bag, open a page)."""
+    __tablename__ = "store_ui_actions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String(64), index=True)
+    type: Mapped[str] = mapped_column(String(24))
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    delivered: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=_now)

@@ -44,6 +44,39 @@ class Settings(BaseSettings):
     # Tune this to your actual Groq/Cohere/Pinecone paid-tier throughput.
     global_ws_message_limit_per_minute: int = 300
 
+    # --- Uploads -------------------------------------------------------
+    # Absolute public origin used in upload links (set it behind a proxy so
+    # links are https and point at the right host). Falls back to the request.
+    public_base_url: str | None = None
+    upload_url_ttl_seconds: int = 86400
+    upload_retention_days: int = 30            # 0 disables the purge job
+    upload_max_total_bytes: int = 2 * 1024**3   # global disk ceiling
+    upload_max_files_per_session: int = 15      # per conversation, per 24h
+    upload_max_bytes_per_session: int = 15 * 1024 * 1024
+    upload_max_per_ip_per_hour: int = 30
+
+    # --- Token handling ------------------------------------------------
+    # WebSocket credentials are accepted via the Sec-WebSocket-Protocol header
+    # ("wrennon.v1, <jwt>"), which is not written to access logs, history or
+    # Referer. The legacy ?token= query string is only honoured when this is
+    # true. None (default) = allowed outside production, refused in production.
+    ws_allow_query_token: bool | None = None
+    # One-shot recovery switch: when true, the boot-time admin sync overwrites
+    # the stored admin password hash with AGENT_PASSWORD_HASH. Leave false:
+    # otherwise every restart silently reverts passwords changed in the app.
+    force_admin_password_reset: bool = False
+    customer_session_ttl_hours: int = 72
+
+    # --- Multi-tenancy ------------------------------------------------
+    # Fernet key used to encrypt per-tenant credentials at rest.
+    tenant_secrets_key: str | None = None
+    # Widgets that send no tenant key land in the built-in "default" tenant
+    # (single-merchant deployments). Set false once every storefront sends its key.
+    allow_default_tenant: bool = True
+    # Plain agents only see the unclaimed queue + their own / @-mentioned
+    # conversations. Set false for tiny teams that want everyone to see everything.
+    restrict_agent_visibility: bool = True
+
     # JWT settings for agent login. jwt_secret_key MUST be overridden in
     # .env for any real deployment — this default is fine for local dev
     # only, since anyone reading this source file could forge a token
@@ -57,6 +90,12 @@ class Settings(BaseSettings):
     # before adding a second agent.
     agent_username: str = "mubin"
     agent_password_hash: str = ""  # set in .env — see generate_agent_password.py
+
+    @property
+    def allow_ws_query_token(self) -> bool:
+        if self.ws_allow_query_token is not None:
+            return self.ws_allow_query_token
+        return self.app_env != "production"
 
     @property
     def cors_origins_list(self) -> list[str]:
@@ -75,6 +114,8 @@ class Settings(BaseSettings):
                     "the app in production — a warning here isn't enough, since "
                     "this key signs every agent session token."
                 )
+            if len(self.jwt_secret_key) < 32:
+                raise ValueError("JWT_SECRET_KEY must be at least 32 characters in production.")
             if self.cors_allowed_origins.strip() == "*":
                 raise ValueError(
                     "CORS_ALLOWED_ORIGINS is still the wildcard default in "
@@ -82,6 +123,12 @@ class Settings(BaseSettings):
                     "wildcard CORS in production also silently disables "
                     "credentialed requests (see main.py), which would break "
                     "cookie-based agent auth rather than just being insecure."
+                )
+            if self.redis_url.startswith("memory://"):
+                raise ValueError(
+                    "REDIS_URL=memory://... is a dev-only stub that silently DISABLES "
+                    "login lockout and all WebSocket/API rate limiting. Point REDIS_URL "
+                    "at a real Redis instance in production."
                 )
             if self.database_url.startswith("sqlite"):
                 raise ValueError(

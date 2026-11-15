@@ -18,6 +18,11 @@ from alembic import command
 # Set the database URL for all tests
 os.environ["DATABASE_URL"] = "sqlite:///./test.db"
 os.environ["TEST_DATABASE_URL"] = "sqlite:///./test.db"
+# Hermetic provider selection. The app reads ECOMMERCE_PROVIDER from the environment first and then
+# from backend/.env (see integrations.env_value), so a developer whose local .env says store_db would
+# otherwise run the whole suite against a different provider than CI does. An EMPTY value wins over
+# .env; tests that need the store database set it explicitly with monkeypatch.setenv.
+os.environ["ECOMMERCE_PROVIDER"] = ""
 
 # Clean up old test db if it exists
 if os.path.exists("./test.db"):

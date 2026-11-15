@@ -101,6 +101,8 @@ def _public_fields(item: dict) -> Dict[str, Any]:
 from app.services.mock_apis import MOCK_ORDERS
 
 class MockEcommerceProvider(EcommerceProvider):
+    requires_verification = False  # demo data only: nothing real to protect
+
     def __init__(self):
         self.mock_orders = MOCK_ORDERS
 

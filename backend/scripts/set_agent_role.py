@@ -17,9 +17,14 @@ if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
 from app.db.session import SessionLocal
-from app.db.models import Agent
+from app.db.models import Agent, AuditLog
+
+VALID_ROLES = ("agent", "manager", "admin")
 
 def set_agent_role(username: str, role: str):
+    if role not in VALID_ROLES:
+        print(f"Error: invalid role '{role}'. Choose one of: {', '.join(VALID_ROLES)}")
+        sys.exit(2)
     db = SessionLocal()
     try:
         agent = db.query(Agent).filter(Agent.username == username).first()
@@ -29,6 +34,10 @@ def set_agent_role(username: str, role: str):
         
         old_role = agent.role
         agent.role = role
+        # Revoke existing JWTs so a demoted account can't keep acting with its old privileges.
+        agent.token_version = (agent.token_version or 1) + 1
+        db.add(AuditLog(actor_username="system:cli", action="set_agent_role",
+                        target_username=username, details=f"{old_role} -> {role}"))
         db.commit()
         print(f"Success! Agent '{username}' role updated: {old_role} -> {role}")
     except Exception as e:

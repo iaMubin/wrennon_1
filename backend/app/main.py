@@ -1,26 +1,28 @@
 from __future__ import annotations
 
+import asyncio
 import os
+import re
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import warnings
 
 # Suppress known noisy third-party warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic")
 warnings.filterwarnings("ignore", category=PendingDeprecationWarning, module="sentry_sdk")
-from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from contextlib import asynccontextmanager
 
 from app.api.agent import router as agent_router
 from app.api.admin import router as admin_router
-from app.api.chat import router as chat_router, ALLOWED_EXTENSIONS
+from app.api.chat import router as chat_router
+from app.api.uploads import router as uploads_router
 from app.api.analytics import router as analytics_router
 from app.api.copilot import router as copilot_router
 from app.api.kb import router as kb_router
-from app.api.public_kb import router as public_kb_router
+from app.api.public_kb import router as public_kb_router
 from app.api.store import router as store_router
 from app.config import settings
 from app.db.models import Agent
@@ -39,14 +41,61 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from app.limiter import limiter
 
 # Initialize Sentry
+_SENSITIVE_HEADERS = {"authorization", "cookie", "set-cookie", "x-api-key", "x-wrennon-client"}
+
+
+def _scrub_sentry_event(event, hint):
+    """Chat transcripts, tokens and customer PII must never be shipped to a third party.
+    Drop request bodies/cookies/query strings (the WS auth token used to ride in ?token=)
+    and mask credential headers."""
+    req = event.get("request") or {}
+    for key in ("data", "cookies", "query_string"):
+        req.pop(key, None)
+    headers = req.get("headers")
+    if isinstance(headers, dict):
+        for h in list(headers):
+            if h.lower() in _SENSITIVE_HEADERS:
+                headers[h] = "[Filtered]"
+    return event
+
+
+def _drop_app_log_breadcrumbs(crumb, hint):
+    # The app logger's INFO lines include customer-derived text; keep them out of Sentry.
+    return None if crumb.get("category") == "wrennon" else crumb
+
+
 if os.environ.get("SENTRY_DSN"):
     sentry_sdk.init(
         dsn=os.environ.get("SENTRY_DSN"),
-        enable_tracing=True,
-        traces_sample_rate=1.0,
-        profiles_sample_rate=1.0,
+        environment=settings.app_env,
+        send_default_pii=False,
+        max_request_body_size="never",
+        # 100% tracing + profiling is both costly and a data-volume/privacy risk; sample instead.
+        traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+        profiles_sample_rate=float(os.environ.get("SENTRY_PROFILES_SAMPLE_RATE", "0")),
+        before_send=_scrub_sentry_event,
+        before_breadcrumb=_drop_app_log_breadcrumbs,
         integrations=[FastApiIntegration()],
     )
+
+async def _upload_retention_loop() -> None:
+    """Hourly sweep deleting uploads past UPLOAD_RETENTION_DAYS (0 = keep forever)."""
+    from app.auth.sessions import purge_expired_revocations
+    from app.db.session import SessionLocal as _SL
+    from app.services.uploads import purge_expired_uploads
+
+    def _purge_revocations() -> None:
+        with _SL() as _db:
+            purge_expired_revocations(_db)
+
+    while True:
+        try:
+            await asyncio.to_thread(purge_expired_uploads)
+            await asyncio.to_thread(_purge_revocations)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Upload retention sweep failed: {e}")
+        await asyncio.sleep(3600)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -55,7 +104,9 @@ async def lifespan(app: FastAPI):
         await broadcast.connect()
     except Exception as e:
         logger.warning(f"Failed to connect to Redis Pub/Sub: {e}. Running in single-instance mode without Redis.")
+    purge_task = asyncio.create_task(_upload_retention_loop())
     yield
+    purge_task.cancel()
     logger.info("Disconnecting from Redis Pub/Sub...")
     try:
         await broadcast.disconnect()
@@ -71,11 +122,15 @@ app.add_middleware(SlowAPIMiddleware)
 _origins = settings.cors_origins_list
 _allow_all = _origins == ["*"]
 
+# Wildcard mode (dev/staging only; config.py refuses it in production) must NOT be
+# combined with credentials: the old allow_origin_regex=".*" + allow_credentials=True
+# reflected ANY origin with credentials, i.e. any website could make authenticated,
+# cookie-bearing requests as a logged-in agent. Explicit origins get credentials;
+# the wildcard gets none.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_origins if not _allow_all else [],
-    allow_origin_regex=".*" if _allow_all else None,
-    allow_credentials=True,
+    allow_origins=["*"] if _allow_all else _origins,
+    allow_credentials=not _allow_all,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -95,9 +150,8 @@ async def add_security_headers(request, call_next):
     blocks plugins/objects, restricts embedding, and stops the page from
     loading resources off arbitrary origins — not the end state.
     Tightening script-src/style-src further means migrating inline
-    handlers to addEventListener() plus a nonce or hash; connect-src
-    should be pinned to the actual deployed domains once those are fixed
-    in your hosting setup, rather than left this broad.
+    handlers to addEventListener() plus a nonce or hash. connect-src is
+    already pinned to this server's own origin (see below).
 
     style-src/font-src explicitly allow fonts.googleapis.com/fonts.gstatic.com
     because the app's branded fonts (Big Shoulders Display, Inter, JetBrains
@@ -124,6 +178,14 @@ async def add_security_headers(request, call_next):
         response.headers["Expires"] = "0"
     if settings.app_env == "production":
         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+    # connect-src is pinned to this server (plus its own ws/wss origin). The previous
+    # `https: wss:` let any injected script exfiltrate data to an arbitrary host.
+    # (Pages served from a different origin, e.g. Vercel, get their CSP from vercel.json.)
+    host = request.headers.get("host", "")
+    if re.fullmatch(r"[A-Za-z0-9.\-:\[\]]{1,255}", host):
+        connect_src = f"'self' wss://{host}" + (f" ws://{host}" if settings.app_env != "production" else "")
+    else:
+        connect_src = "'self'"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
@@ -131,7 +193,7 @@ async def add_security_headers(request, call_next):
         "font-src 'self' https://fonts.gstatic.com; "
         "img-src 'self' data: https:; "
         "media-src 'self' https:; "
-        "connect-src 'self' https: wss:; "
+        f"connect-src {connect_src}; "
         "object-src 'none'; "
         "base-uri 'self'; "
         "frame-ancestors 'self';"
@@ -159,7 +221,7 @@ with SessionLocal() as db:
                 username=settings.agent_username, 
                 full_name=settings.agent_username.capitalize(), 
                 password_hash=settings.agent_password_hash, 
-                role="manager", 
+                role="admin",
                 employee_id="EMP-1001"
             ))
             try:
@@ -170,10 +232,14 @@ with SessionLocal() as db:
                     "another worker process (race on startup) — continuing."
                 )
                 db.rollback()
-    else:
+    elif settings.force_admin_password_reset:
+        # Explicit, one-shot recovery path only (FORCE_ADMIN_PASSWORD_RESET=true).
+        # Previously EVERY boot overwrote the DB hash with the env value, so a
+        # password changed inside the app silently reverted on the next deploy
+        # and the env secret stayed a permanent standing credential.
         admin_agent = db.query(Agent).filter_by(username=settings.agent_username).first()
         if admin_agent and settings.agent_password_hash and admin_agent.password_hash != settings.agent_password_hash:
-            logger.info(f"Updating password hash for admin agent: {settings.agent_username}")
+            logger.warning(f"FORCE_ADMIN_PASSWORD_RESET: resetting password hash for admin agent: {settings.agent_username}")
             admin_agent.password_hash = settings.agent_password_hash
             admin_agent.token_version = (admin_agent.token_version or 1) + 1
             db.commit()
@@ -212,7 +278,7 @@ app.include_router(admin_router, prefix="/api")
 app.include_router(analytics_router, prefix="/api/analytics")
 app.include_router(copilot_router, prefix="/api/copilot")
 app.include_router(kb_router, prefix="/api/kb")
-app.include_router(public_kb_router, prefix="/api/public/kb")
+app.include_router(public_kb_router, prefix="/api/public/kb")
 app.include_router(store_router, prefix="/api/store")
 from app.api.v1_public import router as v1_public_router
 app.include_router(v1_public_router, prefix="/api/v1")
@@ -265,22 +331,7 @@ async def ready():
 
 
 
-upload_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
-os.makedirs(upload_path, exist_ok=True)
-
-@app.get("/uploads/{filename}")
-async def get_upload_file(filename: str):
-    ext = os.path.splitext(filename)[1].lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=403, detail="Forbidden file type")
-        
-    safe_filename = os.path.basename(filename)
-    file_path = os.path.join(upload_path, safe_filename)
-    
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
-        
-    return FileResponse(file_path)
+app.include_router(uploads_router)  # signed-link file serving (see app/api/uploads.py)
 
 # Mount the frontend directory to serve the dashboard and the widget
 # The frontend agent files have been copied to backend/app/static/agent 

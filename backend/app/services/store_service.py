@@ -32,6 +32,29 @@ LABELS = {
 STATUSES = ("processing", "shipped", "delivered", "cancelled")
 
 
+_TRACK_URL = {
+    "FedEx": "https://www.fedex.com/fedextrack/?trknbr={n}",
+    "UPS": "https://www.ups.com/track?tracknum={n}",
+    "USPS": "https://tools.usps.com/go/TrackConfirmAction?tLabels={n}",
+    "DHL": "https://www.dhl.com/us-en/home/tracking/tracking-express.html?submit=1&tracking-id={n}",
+}
+
+
+def make_tracking(carrier: str, rng=None):
+    """(tracking_number, tracking_url) in the carrier's real format."""
+    import random
+    r = rng or random
+    if carrier == "UPS":
+        n = "1Z" + "".join(r.choices("ABCDEFGHJKLMNPQRSTUVWXYZ0123456789", k=6)) + f"{r.randint(0, 99):02d}{r.randint(0, 10**8 - 1):08d}"
+    elif carrier == "USPS":
+        n = "9400" + f"{r.randint(0, 10**18 - 1):018d}"
+    elif carrier == "DHL":
+        n = str(r.randint(10**9, 10**10 - 1))
+    else:
+        n = str(r.randint(10**11, 10**12 - 1))
+    return n, _TRACK_URL.get(carrier, _TRACK_URL["FedEx"]).format(n=n)
+
+
 class StoreError(Exception):
     """Business-rule failure. `code` is machine-readable; str(e) is safe to show a customer."""
 
@@ -217,8 +240,9 @@ def set_status(db: Session, order_id: Any, status: str, *, carrier: Optional[str
     order.status = status
     if status == "shipped":
         order.carrier = carrier or order.carrier or "FedEx"
-        order.tracking_number = tracking_number or order.tracking_number or f"NB{uuid.uuid4().hex[:10].upper()}"
-        order.tracking_url = tracking_url or order.tracking_url or f"https://example.com/track/{order.tracking_number}"
+        auto_no, auto_url = make_tracking(order.carrier)
+        order.tracking_number = tracking_number or order.tracking_number or auto_no
+        order.tracking_url = tracking_url or order.tracking_url or (_TRACK_URL.get(order.carrier, _TRACK_URL["FedEx"]).format(n=order.tracking_number) if tracking_number or order.tracking_number else auto_url)
         order.eta = eta or order.eta or (_now() + datetime.timedelta(days=4)).date()
     if status == "delivered":
         order.eta = None

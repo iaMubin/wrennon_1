@@ -34,7 +34,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.db.session import SessionLocal
-from app.db.models import Conversation, Message, AnalyticsScorecard, KnowledgeGap, AuditLog
+from app.db.models import Conversation, AuditLog
+from app.services.erasure import erase_conversations
 
 
 def purge(days: int, confirm: bool) -> None:
@@ -64,10 +65,8 @@ def purge(days: int, confirm: bool) -> None:
 
         conversation_ids = [c.id for c in candidates]
 
-        db.query(Message).filter(Message.conversation_id.in_(conversation_ids)).delete(synchronize_session=False)
-        db.query(AnalyticsScorecard).filter(AnalyticsScorecard.conversation_id.in_(conversation_ids)).delete(synchronize_session=False)
-        db.query(KnowledgeGap).filter(KnowledgeGap.conversation_id.in_(conversation_ids)).delete(synchronize_session=False)
-        db.query(Conversation).filter(Conversation.id.in_(conversation_ids)).delete(synchronize_session=False)
+        from app.api.chat import UPLOAD_DIR
+        erase_conversations(db, conversation_ids, upload_dir=UPLOAD_DIR)
 
         db.add(AuditLog(
             actor_username="system:retention-job",

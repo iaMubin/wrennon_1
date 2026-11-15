@@ -79,3 +79,49 @@ def test_money_moving_tools_not_reachable_by_llm():
     from app.services.tools import TOOL_EXECUTORS
     assert "process_refund" not in TOOL_EXECUTORS
     assert "update_subscription" not in TOOL_EXECUTORS
+
+
+# --- Bangladeshi formats / secrets (regression for the PII-leak audit) -------
+
+import pytest
+from app.security.pii import mask_pii as _mask, redact_for_log, redact_secrets
+
+
+@pytest.mark.parametrize("raw", [
+    "01712345678", "01912-345678", "+8801712345678", "+880 1712-345678", "880-1712-345678",
+])
+def test_bd_phone_numbers_masked_with_correct_label(raw):
+    out = _mask(f"call me on {raw} please")
+    assert "[PHONE HIDDEN]" in out
+    assert "[CARD HIDDEN]" not in out
+    assert "345678" not in out
+
+
+def test_bd_addresses_masked_english_and_bengali():
+    assert "Dhanmondi" not in _mask("House 12, Road 5, Block C, Dhanmondi, Dhaka")
+    assert "ধানমন্ডি" not in _mask("আমার ঠিকানা: বাসা ১২, রোড ৫, ধানমন্ডি, ঢাকা")
+    assert "Mirpur" not in _mask("my address is flat 4B, Mirpur 10, Dhaka")
+
+
+def test_lowercase_and_bengali_names_masked_with_explicit_trigger():
+    assert "rahim" not in _mask("my name is rahim uddin and I need help")
+    assert "রহিম" not in _mask("আমার নাম রহিম উদ্দিন")
+    assert "karim" not in _mask("ship to Karim Hossain")
+
+
+def test_passport_and_nid_masked():
+    assert "A01234567" not in _mask("my passport is A01234567")
+    assert "1990123456789" not in _mask("NID: 1990123456789")
+
+
+def test_order_numbers_and_tracking_not_overmasked():
+    assert _mask("order #1002 shipped") == "order #1002 shipped"
+    assert _mask("track 1Z999AA10123456784") == "track 1Z999AA10123456784"
+
+
+def test_secrets_redacted_from_logs():
+    jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.abcdefghijklmnop"
+    line = f"GET /ws/customer/abc?token={jwt} Authorization: Bearer {jwt} wk_live_abcdefgh12345678"
+    out = redact_secrets(line)
+    assert jwt not in out and "wk_live_abcdefgh" not in out
+    assert "10.0.0.1" in redact_for_log("client 10.0.0.1 failed")   # IPs kept for ops

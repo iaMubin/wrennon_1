@@ -64,11 +64,14 @@ function customerAvatarUrl(key) {
     : 'images/default-avatar.png?v=2';
 }
 let activeSessionId = null;
-let _agentToken = localStorage.getItem("agent_token") || null;
+// SECURITY: the JWT lives ONLY in the httpOnly access_token cookie. It must never be
+// readable by page JS (any XSS would otherwise steal the session). Purge copies that
+// older builds persisted to localStorage.
+localStorage.removeItem("agent_token");
+let _agentToken = null;
 
 function getAuthToken() {
-  const token = _agentToken || localStorage.getItem("agent_token");
-  return token ? `Bearer ${token}` : "";
+  return ""; // cookie-only auth; X-Wrennon-Client (below) satisfies the CSRF check
 }
 
 function getAuthHeaders(extra = {}) {
@@ -473,8 +476,6 @@ loginForm.addEventListener("submit", async (e) => {
     }
 
     const data = await response.json();
-    _agentToken = data.access_token;
-    localStorage.setItem("agent_token", data.access_token);
     localStorage.setItem("agent_username", username); // Save username to identify self
     localStorage.setItem("agent_role", data.role); // Save role to show admin btn
     if (data.full_name) {
@@ -538,9 +539,11 @@ function connectSocket() {
   // cookie path works. If the cookie is missing/expired/invalid, the
   // server closes with 4401 and onclose() below sends the agent back to
   // login — no client-side pre-check needed.
+  // The JWT travels in the Sec-WebSocket-Protocol header ("wrennon.v1, <jwt>"),
+  // NOT in the URL: query strings end up in access logs and browser history.
+  // Without a stored token we fall back to the httpOnly cookie.
   const token = _agentToken || localStorage.getItem("agent_token");
-  const wsUrl = token ? `${WS_URL}?token=${encodeURIComponent(token)}` : WS_URL;
-  socket = new WebSocket(wsUrl);
+  socket = token ? new WebSocket(WS_URL, ["wrennon.v1", token]) : new WebSocket(WS_URL);
 
   socket.onopen = () => {
     const wasReconnecting = reconnectAttempts > 0;
@@ -1413,7 +1416,7 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
 
   if (div.querySelector('.voice-player')) {
     const clone = div.cloneNode(true);
-    clone.querySelectorAll('.voice-player, .msg-name, details, .msg-dropdown-container, .msg-pin-indicator').forEach(el => el.remove());
+    clone.querySelectorAll('.voice-player, .msg-name, .msg-sender-bar, details, .msg-dropdown-container, .msg-pin-indicator').forEach(el => el.remove());
     if (!clone.textContent.trim()) {
       div.classList.add("msg--voice-only");
     }
@@ -1585,7 +1588,7 @@ document.addEventListener("click", async (e) => {
        authedFetch(`/copilot/suggest`, "POST", { ticket_id: activeSessionId, context_message: content })
          .then(res => {
            if (res && res.suggested_reply) {
-              input.value = res.suggested_reply;
+              input.value = sanitizeSuggestion(res.suggested_reply);
               input.focus();
            }
          })
@@ -2026,7 +2029,7 @@ if (agentCopilotBtn) {
       if (res.ok) {
         const data = await res.json();
         // Insert suggested draft into the input field
-        agentInput.value = data.suggested_reply;
+        agentInput.value = sanitizeSuggestion(data.suggested_reply);
         agentInput.dispatchEvent(new Event("input"));
         
         // Render action buttons if any
@@ -2236,7 +2239,7 @@ function showOrderPopup(order, customer) {
           let valueHtml = '';
           if (order.tracking_url) {
               const trackingTitle = order.carrier ? `Track on ${order.carrier}` : 'Track Shipment';
-              valueHtml = `<div style="display: flex; align-items: center; gap: 4px; line-height: 1.2; min-width: 0;"><a href="${escapeHtml(order.tracking_url)}" target="_blank" rel="noopener noreferrer" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; display: inline-block;" title="${escapeHtml(order.tracking_url)}">${escapeHtml(trackingTitle)}</a><button class="icon-action-btn" style="padding: 2px; height: 18px; width: 18px; margin: 0; min-height: 0; min-width: 0; flex-shrink: 0;" onclick="navigator.clipboard.writeText('${escapeHtml(order.tracking_url)}')" title="Copy tracking URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>`;
+              valueHtml = `<div style="display: flex; align-items: center; gap: 4px; line-height: 1.2; min-width: 0;"><a href="${escapeAttr(safeHttpUrl(order.tracking_url))}" target="_blank" rel="noopener noreferrer" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; display: inline-block;" title="${escapeAttr(safeHttpUrl(order.tracking_url))}">${escapeHtml(trackingTitle)}</a><button class="icon-action-btn" style="padding: 2px; height: 18px; width: 18px; margin: 0; min-height: 0; min-width: 0; flex-shrink: 0;" data-copy="${escapeAttr(safeHttpUrl(order.tracking_url))}" onclick="navigator.clipboard.writeText(this.dataset.copy)" title="Copy tracking URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>`;
           } else {
               valueHtml = `<span style="color: var(--text-muted);">No tracking link</span>`;
           }
@@ -2256,7 +2259,7 @@ function showOrderPopup(order, customer) {
       let labelHtml = `<span style="display:flex; align-items:center; gap: 4px;">Payment ${paymentBadge}</span>`;
       let valueHtml = '';
       if (order.invoice_url) {
-          valueHtml = `<div style="display: flex; align-items: center; gap: 4px; line-height: 1.2; min-width: 0;"><a href="${escapeHtml(order.invoice_url)}" target="_blank" rel="noopener noreferrer" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; display: inline-block;">View Invoice</a><button class="icon-action-btn" style="padding: 2px; height: 18px; width: 18px; margin: 0; min-height: 0; min-width: 0; flex-shrink: 0;" onclick="navigator.clipboard.writeText('${escapeHtml(order.invoice_url)}')" title="Copy invoice URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>`;
+          valueHtml = `<div style="display: flex; align-items: center; gap: 4px; line-height: 1.2; min-width: 0;"><a href="${escapeAttr(safeHttpUrl(order.invoice_url))}" target="_blank" rel="noopener noreferrer" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; display: inline-block;">View Invoice</a><button class="icon-action-btn" style="padding: 2px; height: 18px; width: 18px; margin: 0; min-height: 0; min-width: 0; flex-shrink: 0;" data-copy="${escapeAttr(safeHttpUrl(order.invoice_url))}" onclick="navigator.clipboard.writeText(this.dataset.copy)" title="Copy invoice URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>`;
       } else {
           valueHtml = `<span style="color: var(--text-muted);">No invoice link</span>`;
       }
@@ -2344,6 +2347,24 @@ async function authedFetch(path, method = "GET", body = null) {
   }
 }
 
+// Only http(s) URLs may reach href/src/clipboard (blocks javascript: / data: URLs
+// coming from commerce-platform data).
+function safeHttpUrl(url) {
+  try {
+    const u = new URL(String(url || ""), location.href);
+    return (u.protocol === "https:" || u.protocol === "http:") ? u.href : "";
+  } catch (e) { return ""; }
+}
+
+// Copilot output is untrusted model text that an agent may send on as-is: strip
+// images / raw HTML / non-http links before it lands in the reply box.
+function sanitizeSuggestion(text) {
+  return String(text || "")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/<[^>]{1,200}>/g, "")
+    .replace(/\[([^\]]+)\]\((?!https?:\/\/)[^)]*\)/gi, "$1");
+}
+
 function renderMarkdown(text) {
   const lines = text.split("\n");
   let html = "";
@@ -2390,6 +2411,56 @@ function renderMarkdown(text) {
   return html;
 }
 
+// ---- Link / media safety ---------------------------------------------------
+// Chat text is attacker-influenced (customers, the AI, copilot output). Anything
+// rendered from it must not (a) auto-load third-party resources, which leaks the
+// viewer's IP/User-Agent and can carry data out in the URL, or (b) show a label
+// that hides where a link really goes.
+const CARRIER_DOMAINS = ['fedex.com', 'ups.com', 'dhl.com', 'usps.com'];
+
+function parseHttpUrl(raw) {
+  try {
+    const u = new URL(String(raw).replace(/&amp;/g, '&'));
+    return (u.protocol === 'https:' || u.protocol === 'http:') ? u : null;
+  } catch (e) { return null; }
+}
+
+function hostMatches(host, domain) {
+  return host === domain || host.endsWith('.' + domain);
+}
+
+function isOwnHost(host) {
+  const own = [location.hostname, (parseHttpUrl(BACKEND_URL) || {}).hostname]
+    .filter(Boolean).map(h => h.toLowerCase().replace(/^www\./, ''));
+  return own.some(o => hostMatches(host, o));
+}
+
+function isTrustedHost(host) {
+  return isOwnHost(host) || CARRIER_DOMAINS.some(d => hostMatches(host, d));
+}
+
+// Only files served by OUR backend's /uploads/ path may be auto-loaded as media.
+function isOwnUploadUrl(raw) {
+  const u = parseHttpUrl(raw);
+  const b = parseHttpUrl(BACKEND_URL);
+  return !!(u && b && u.origin === b.origin && u.pathname.startsWith('/uploads/'));
+}
+
+// " (example.com)" for links that leave our/known domains, so a friendly label
+// ("Track on FedEx", "Help Center") can never hide the real destination.
+function linkHostSuffix(url) {
+  const u = parseHttpUrl(url);
+  if (!u) return '';
+  const host = u.hostname.toLowerCase().replace(/^www\./, '');
+  return isTrustedHost(host) ? '' : ` (${host})`;
+}
+
+function blockedMediaHtml(kind, url) {
+  const u = parseHttpUrl(url);
+  const host = u ? u.hostname : 'unknown';
+  return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer nofollow" title="${escapeAttr(url)}" style="color: var(--accent); text-decoration: underline;">External ${kind} not loaded (${escapeHtml(host)}) \u2014 open link</a>`;
+}
+
 function formatLinkTitle(url, existingText = '') {
   const cleanExisting = (existingText || '').trim();
   const isRawUrl = /^https?:\/\//i.test(cleanExisting) || 
@@ -2407,11 +2478,12 @@ function formatLinkTitle(url, existingText = '') {
     const path = parsed.pathname.toLowerCase();
 
     // 1. Tracking links
-    if (path.includes('track') || host.includes('fedex') || host.includes('ups') || host.includes('dhl') || host.includes('usps') || host.includes('courier')) {
-      if (host.includes('fedex')) return 'Track on FedEx';
-      if (host.includes('ups')) return 'Track on UPS';
-      if (host.includes('dhl')) return 'Track on DHL';
-      if (host.includes('usps')) return 'Track on USPS';
+    if (path.includes('track') || CARRIER_DOMAINS.some(d => hostMatches(host, d)) || host.includes('courier')) {
+      // Carrier names only for the carrier's REAL domain (not fedex-login.evil.com).
+      if (hostMatches(host, 'fedex.com')) return 'Track on FedEx';
+      if (hostMatches(host, 'ups.com')) return 'Track on UPS';
+      if (hostMatches(host, 'dhl.com')) return 'Track on DHL';
+      if (hostMatches(host, 'usps.com')) return 'Track on USPS';
       return 'Track Shipment';
     }
 
@@ -2451,7 +2523,7 @@ function formatLinkTitle(url, existingText = '') {
     }
 
     // 7. Store / Brand domain
-    if (host.includes('wrennon')) {
+    if (isOwnHost(host)) {
       const cleanPath = path.replace(/^\/|\/$/g, '').replace(/[-_]+/g, ' ');
       if (cleanPath) {
         return cleanPath.replace(/\b\w/g, c => c.toUpperCase());
@@ -2480,14 +2552,15 @@ function linkifyRawUrls(html) {
       trailing = punctMatch[0];
       fullUrl = fullUrl.slice(0, -trailing.length);
     }
-    const maskedTitle = formatLinkTitle(fullUrl, '');
-    return `<a href="${escapeAttr(fullUrl)}" target="_blank" rel="noopener noreferrer" title="${escapeAttr(fullUrl)}" style="color: var(--accent); text-decoration: underline;">${escapeHtml(maskedTitle)}</a>${trailing}`;
+    const maskedTitle = formatLinkTitle(fullUrl, '') + linkHostSuffix(fullUrl);
+    return `<a href="${escapeAttr(fullUrl)}" target="_blank" rel="noopener noreferrer nofollow" title="${escapeAttr(fullUrl)}" style="color: var(--accent); text-decoration: underline;">${escapeHtml(maskedTitle)}</a>${trailing}`;
   });
 }
 
 function inlineMarkdown(text) {
   let escaped = escapeHtml(text);
   escaped = escaped.replace(/\[Audio\]\(([^)]+)\)/g, (match, url) => {
+    if (!isOwnUploadUrl(url)) return blockedMediaHtml('audio', url);
     const safeUrl = escapeAttr(url);
     const playerId = 'vp_' + Math.random().toString(36).substr(2, 9);
     return `<div class="voice-player" id="${playerId}" data-src="${safeUrl}">` +
@@ -2504,14 +2577,18 @@ function inlineMarkdown(text) {
     `</div>`;
   });
   escaped = escaped.replace(/\[Video\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
+    if (!isOwnUploadUrl(url)) return blockedMediaHtml('video', url);
     return `<video controls src="${escapeAttr(url)}" style="max-width: 100%; display: block; margin: 8px 0; border-radius: 8px;"></video>`;
   });
   escaped = escaped.replace(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g, (match, url) => {
+    // A remote <img> is a tracking pixel / data-exfiltration channel (the URL can
+    // carry data and loads automatically). Only our own uploads are inlined.
+    if (!isOwnUploadUrl(url)) return blockedMediaHtml('image', url);
     return `<img src="${escapeAttr(url)}" class="chat-lightbox-image" alt="Image" loading="lazy" onclick="openLightbox(this.src)" />`;
   });
   escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, (match, linkText, url) => {
-    const maskedTitle = formatLinkTitle(url, linkText);
-    return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer" title="${escapeAttr(url)}" style="color: var(--accent); text-decoration: underline;">${escapeHtml(maskedTitle)}</a>`;
+    const maskedTitle = formatLinkTitle(url, linkText) + linkHostSuffix(url);
+    return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer nofollow" title="${escapeAttr(url)}" style="color: var(--accent); text-decoration: underline;">${escapeHtml(maskedTitle)}</a>`;
   });
   escaped = linkifyRawUrls(escaped);
   escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
@@ -2536,7 +2613,11 @@ function escapeAttr(text) {
 function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text;
-  return div.innerHTML;
+  // Escape quotes too: many call sites interpolate the result into
+  // "double-quoted" attributes (data-content, href, title). Without this, a
+  // message containing a literal " could inject attributes / event handlers
+  // (stored XSS in the agent dashboard).
+  return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 // --- Voice Player Logic ---

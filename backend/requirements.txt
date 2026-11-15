@@ -54,3 +54,4 @@ httpx==0.28.1
 # raises ZoneInfoNotFoundError. Linux/Render/Docker usually have system
 # tzdata already, so this is mainly for local Windows dev.
 tzdata==2025.2
+cryptography>=43,<51

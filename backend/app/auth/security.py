@@ -43,27 +43,43 @@ def create_access_token(subject: str, token_version: int) -> str:
     expire = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) + datetime.timedelta(
         minutes=settings.jwt_expire_minutes
     )
-    payload = {"sub": subject, "exp": expire, "tv": token_version}
+    payload = {"sub": subject, "exp": expire, "tv": token_version, "typ": "agent"}
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
 def decode_access_token(token: str) -> dict | None:
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        if payload.get("typ", "agent") != "agent":   # a customer token must never act as an agent token
+            return None
         return {"sub": payload.get("sub"), "tv": payload.get("tv")}
     except JWTError:
         return None
 
 
-def create_session_token(session_id: str) -> str:
-    expire = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) + datetime.timedelta(hours=72)
-    payload = {"session_id": session_id, "exp": expire}
+def create_session_token(session_id: str, tenant_id: str = "default") -> str:
+    now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    expire = now + datetime.timedelta(hours=settings.customer_session_ttl_hours)
+    payload = {"session_id": session_id, "exp": expire, "iat": now, "typ": "customer", "tid": tenant_id}
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
 def decode_session_token(token: str) -> str | None:
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        if payload.get("typ", "customer") != "customer":
+            return None
         return payload.get("session_id")
     except JWTError:
         return None
+
+def decode_session_claims(token: str) -> dict | None:
+    """Like decode_session_token but also returns the tenant the token was minted for."""
+    sid = decode_session_token(token)
+    if not sid:
+        return None
+    try:
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+    except JWTError:
+        return None
+    return {"session_id": sid, "tenant_id": payload.get("tid") or "default"}

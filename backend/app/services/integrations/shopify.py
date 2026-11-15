@@ -9,6 +9,7 @@ Money-moving operations (refunds, subscription changes) are intentionally NOT
 implemented: they return an explicit "unsupported" result instead of the old
 stub that claimed an approved refund without calling Shopify.
 """
+import hmac
 import json
 import re
 import time
@@ -139,7 +140,9 @@ class ShopifyProvider(EcommerceProvider):
         for node in ((data or {}).get("orders") or {}).get("nodes") or []:
             if (node.get("name") or "").lstrip("#") != number:
                 continue
-            if verify_email is not None and (node.get("email") or "").strip().lower() != verify_email.strip().lower():
+            if verify_email is not None and not hmac.compare_digest(
+                (node.get("email") or "").strip().lower().encode(), verify_email.strip().lower().encode()
+            ):
                 return None  # same result as "not found": don't confirm the order exists
             return self._map_order(node, include_email)
         return None

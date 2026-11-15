@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from app.services.analytics import get_stats
-from app.auth.dependencies import get_current_agent
+from app.auth.access import require_permission
 from app.db.models import Agent
 from sqlalchemy.orm import Session
 from app.db.session import get_db
@@ -9,7 +9,7 @@ import json
 router = APIRouter()
 
 @router.get("/stats")
-async def analytics_stats(agent: Agent = Depends(get_current_agent)):
+async def analytics_stats(agent: Agent = Depends(require_permission("view_analytics"))):
     """Returns outcome-based analytics and revenue tracking data."""
     return get_stats()
 
@@ -17,7 +17,7 @@ async def analytics_stats(agent: Agent = Depends(get_current_agent)):
 def get_dashboard_metrics(
     date_range: str = Query("all", alias="range", description="Date range: today, 7d, 30d, quarter, ytd, all"),
     db: Session = Depends(get_db), 
-    agent: Agent = Depends(get_current_agent)
+    agent: Agent = Depends(require_permission("view_analytics"))
 ):
     from sqlalchemy import func
     from datetime import datetime, timedelta

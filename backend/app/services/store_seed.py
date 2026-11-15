@@ -15,6 +15,7 @@ from typing import Dict
 from sqlalchemy.orm import Session
 
 import random
+from typing import NamedTuple
 from app.db.models import SystemSetting
 from app.db.store_models import StoreCustomer, StoreInventory, StoreOrder, StoreOrderEvent, StoreOrderItem, StoreProduct, StoreRefund
 from app.services.customer_auth import hash_pw
@@ -82,18 +83,18 @@ def _pick_items(total: Decimal, count: int):
 
 
 def seed_orders(db: Session) -> int:
-    names = {c["email"].lower(): c for c in MOCK_CUSTOMERS}
     created = 0
     for order_id, o in sorted(MOCK_ORDERS.items()):
         if db.get(StoreOrder, order_id):
             continue
-        email = o["email"].lower()
-        cust_src = names.get(email, {})
+        person = person_for(o["email"])
+        email = person.email if person else o["email"].lower()
         customer = db.query(StoreCustomer).filter_by(email=email).first()
         if not customer:
-            customer = StoreCustomer(email=email, name=cust_src.get("name") or email.split("@")[0].replace(".", " ").title(), phone=cust_src.get("phone"))
+            customer = StoreCustomer(email=email, name=person.name if person else email.split("@")[0].replace(".", " ").title(), phone=person.phone if person else None)
             db.add(customer)
             db.flush()
+        trk_no, trk_url = svc.make_tracking(o["carrier"], random.Random(int(order_id))) if o.get("carrier") else (None, None)
         total = _money(o["total_amount"])
         combo = _pick_items(total, int(o.get("items_count") or 1))
         subtotal = sum(p for _, p in combo)
@@ -102,10 +103,9 @@ def seed_orders(db: Session) -> int:
         status = "processing" if o["status"] == "placed" else o["status"]
         order = StoreOrder(
             order_id=order_id, customer_id=customer.id, email=email, customer_name=customer.name, phone=customer.phone,
-            ship_address="123 Demo Street", ship_city="Springfield", ship_zip="10001", ship_country="US",
+            ship_address=person.street if person else "123 Demo Street", ship_city=person.city if person else "Springfield", ship_zip=person.zip if person else "10001", ship_country="US",
             status=status, payment_status={"cancelled": "voided"}.get(status, "paid"), payment_method=o.get("payment_method"),
-            shipping_method=o.get("shipping_method"), carrier=o.get("carrier"), tracking_url=o.get("tracking_url"),
-            tracking_number=(o.get("tracking_url") or "").rsplit("/", 1)[-1] or None,
+            shipping_method=o.get("shipping_method"), carrier=o.get("carrier"), tracking_url=trk_url, tracking_number=trk_no,
             eta=datetime.date.fromisoformat(o["eta"]) if o.get("eta") else None,
             subtotal=subtotal, shipping_cost=total - subtotal, tax=Decimal("0"), total=total, currency="USD", created_at=created_at,
         )
@@ -121,18 +121,81 @@ def seed_orders(db: Session) -> int:
 
 
 DEMO_PASSWORD = "northbound123"   # every seeded demo customer signs in with this
-_EXTRA_CUSTOMERS = [
-    ("Priya Nair", "priya.nair@example.com", "+1-555-0311"), ("Daniel Okafor", "d.okafor@example.com", "+1-555-0327"),
-    ("Sofia Ramirez", "sofia.r@example.com", "+1-555-0342"), ("Hannah Berg", "hannah.berg@example.com", "+1-555-0368"),
-    ("Tomas Silva", "tomas.silva@example.com", "+1-555-0379"),
-]
-_CITIES = [("Springfield", "10001"), ("Portland", "97201"), ("Austin", "73301"), ("Denver", "80202"), ("Seattle", "98101"), ("Boston", "02108")]
 _HISTORY_FLAG = "store_history_seeded"
 
 
+class Person(NamedTuple):
+    name: str
+    email: str
+    phone: str
+    street: str
+    city: str     # "City, ST"
+    zip: str
+    old: str      # placeholder identity this person replaces (earlier seeds used example.com addresses)
+
+
+# Fictional people with realistic details. Phone numbers use the 555-01xx range that is reserved for fiction,
+# so none of them can ring a real person. The streets and ZIPs are plausible for each city, not real homes.
+DEMO_PEOPLE = [
+    Person("Emma Richardson", "emma.richardson@gmail.com", "+1 503-555-0147", "2418 NW Lovejoy St, Apt 3", "Portland, OR", "97209", "eleanor.v@example.com"),
+    Person("Marcus Johnson", "marcus.t.johnson@outlook.com", "+1 404-555-0132", "815 Peachtree St NE, Unit 12", "Atlanta, GA", "30308", "mchang.tech@example.com"),
+    Person("Priya Raman", "priya.raman@gmail.com", "+1 206-555-0175", "1627 N 45th St", "Seattle, WA", "98103", "sjenkins88@example.com"),
+    Person("Daniel Kowalski", "dkowalski84@yahoo.com", "+1 312-555-0164", "2203 N Clark St, Apt 2R", "Chicago, IL", "60614", "drodriguez@example.com"),
+    Person("Sofia Hernandez", "sofia.hdz@icloud.com", "+1 512-555-0128", "1104 S 1st St", "Austin, TX", "78704", "emily.c@example.com"),
+    Person("Jamal Washington", "jwash.designs@gmail.com", "+1 718-555-0191", "342 7th Ave, Apt 4B", "Brooklyn, NY", "11215", "jwilson@example.com"),
+    Person("Hannah Lindqvist", "hannah.lindqvist@proton.me", "+1 612-555-0143", "3809 Grand Ave S", "Minneapolis, MN", "55409", "omartinez99@example.com"),
+    Person("Ethan Brooks", "ethanbrooks22@gmail.com", "+1 303-555-0186", "1560 Pearl St, Unit 5", "Denver, CO", "80203", "wtaylor.biz@example.com"),
+    Person("Olivia Chen", "olivia.chen.sf@gmail.com", "+1 415-555-0159", "917 Valencia St", "San Francisco, CA", "94110", "sanderson@example.com"),
+    Person("Liam O'Connor", "liam.oconnor@outlook.com", "+1 617-555-0173", "48 Tremont St, Apt 6", "Boston, MA", "02108", "athomas.design@example.com"),
+    Person("Aisha Khan", "aisha.khan91@gmail.com", "+1 713-555-0138", "2710 Westheimer Rd, Apt 118", "Houston, TX", "77098", "priya.nair@example.com"),
+    Person("Mateo Alvarez", "mateo.alvarez@yahoo.com", "+1 602-555-0126", "4412 N 7th Ave", "Phoenix, AZ", "85013", "d.okafor@example.com"),
+    Person("Grace Thompson", "gracethompson@icloud.com", "+1 615-555-0152", "1803 Church St", "Nashville, TN", "37203", "sofia.r@example.com"),
+    Person("Noah Fischer", "noah.fischer@gmail.com", "+1 614-555-0167", "987 N High St", "Columbus, OH", "43201", "hannah.berg@example.com"),
+    Person("Chloe Dubois", "chloe.dubois@outlook.com", "+1 215-555-0114", "1305 S 9th St", "Philadelphia, PA", "19147", "tomas.silva@example.com"),
+]
+_BY_OLD = {p.old: p for p in DEMO_PEOPLE}
+_BY_EMAIL = {p.email: p for p in DEMO_PEOPLE}
+
+
+def person_for(email: str) -> Person | None:
+    e = (email or "").lower()
+    return _BY_EMAIL.get(e) or _BY_OLD.get(e)
+
+
 def demo_customers() -> list:
-    base = [(c["name"], c["email"].lower(), c.get("phone")) for c in MOCK_CUSTOMERS]
-    return base + [(n, e, p) for n, e, p in _EXTRA_CUSTOMERS]
+    return [(p.name, p.email, p.phone) for p in DEMO_PEOPLE]
+
+
+def upgrade_demo_identities(db: Session) -> int:
+    """Databases seeded earlier hold placeholder customers (example.com). Give them their realistic identity in place,
+    so their orders, logins and chat conversations carry over. Idempotent."""
+    from sqlalchemy import func
+    from app.db.models import Conversation
+    changed = 0
+    for p in DEMO_PEOPLE:
+        old = svc.customer_by_email(db, p.old)
+        if not old:
+            continue
+        orders = db.query(StoreOrder).filter(StoreOrder.email == p.old).all()
+        new = svc.customer_by_email(db, p.email)
+        if new and new.id != old.id:      # the new identity already exists: move everything onto it
+            if not new.password_hash:
+                new.password_hash = old.password_hash
+            for o in orders:
+                o.customer_id = new.id
+            db.flush()
+            db.delete(old)
+        else:
+            old.email = p.email
+            new = old
+        new.name, new.phone = p.name, p.phone
+        for o in orders:
+            o.email, o.customer_name, o.phone = p.email, p.name, p.phone
+            o.ship_address, o.ship_city, o.ship_zip, o.ship_country, o.customer_id = p.street, p.city, p.zip, "US", new.id
+        db.query(Conversation).filter(func.lower(Conversation.customer_email) == p.old).update({"customer_email": p.email}, synchronize_session=False)
+        changed += 1
+    db.commit()
+    return changed
 
 
 def seed_customers(db: Session) -> int:
@@ -166,7 +229,7 @@ def seed_history(db: Session, today: datetime.date | None = None) -> int:
     for name, email, phone in demo_customers():
         c = svc.customer_by_email(db, email)
         want = rng.randint(2, 6) if rng.random() > .15 else 1
-        city, zip_code = rng.choice(_CITIES)
+        person = person_for(email)
         for _ in range(max(0, want - db.query(StoreOrder).filter_by(email=email).count())):
             placed = datetime.datetime.combine(today - datetime.timedelta(days=rng.randint(3, 400)), datetime.time(rng.randint(8, 21), rng.randint(0, 59)))
             age = (datetime.datetime.combine(today, datetime.time(12)) - placed).days
@@ -181,14 +244,14 @@ def seed_history(db: Session, today: datetime.date | None = None) -> int:
                 status = "shipped"
             else:
                 status = "cancelled" if roll < .05 else "delivered"
-            carrier = rng.choice(["FedEx", "UPS", "DHL"])
-            tracking = f"{carrier[:2].upper()}{rng.randint(10**9, 10**10 - 1)}"
+            carrier = rng.choice(["FedEx", "UPS", "USPS"])
+            tracking, track_url = svc.make_tracking(carrier, rng)
             order = StoreOrder(
-                order_id=str(nxt), customer_id=c.id, email=email, customer_name=name, phone=phone, ship_address=f"{rng.randint(10, 990)} {rng.choice(['Maple', 'Oak', 'Cedar', 'Pine', 'Elm'])} Street",
-                ship_city=city, ship_zip=zip_code, ship_country="US", status=status, payment_status="voided" if status == "cancelled" else "paid",
+                order_id=str(nxt), customer_id=c.id, email=email, customer_name=name, phone=phone, ship_address=person.street,
+                ship_city=person.city, ship_zip=person.zip, ship_country="US", status=status, payment_status="voided" if status == "cancelled" else "paid",
                 payment_method=rng.choice(["Credit Card (Visa)", "Credit Card (Mastercard)", "PayPal"]), shipping_method="Standard Delivery",
                 carrier=carrier if status in ("shipped", "delivered") else None, tracking_number=tracking if status in ("shipped", "delivered") else None,
-                tracking_url=f"https://example.com/track/{tracking}" if status in ("shipped", "delivered") else None,
+                tracking_url=track_url if status in ("shipped", "delivered") else None,
                 eta=(placed + datetime.timedelta(days=5)).date() if status == "shipped" else None,
                 subtotal=subtotal, shipping_cost=Decimal("0"), tax=Decimal("0"), total=subtotal, currency="USD", created_at=placed, items=lines,
             )
@@ -214,9 +277,22 @@ def seed_history(db: Session, today: datetime.date | None = None) -> int:
     return created
 
 
+def refresh_tracking(db: Session) -> int:
+    """Earlier seeds used placeholder tracking links; give those orders real-format numbers and carrier links."""
+    n = 0
+    for o in db.query(StoreOrder).filter(StoreOrder.tracking_url.isnot(None)).all():
+        if "example.com" in o.tracking_url or "fedex.com/track/" in o.tracking_url or "wrennon" in o.tracking_url:
+            o.tracking_number, o.tracking_url = svc.make_tracking(o.carrier or "FedEx", random.Random(int(o.order_id) if o.order_id.isdigit() else 7))
+            n += 1
+    db.commit()
+    return n
+
+
 def seed_store(db: Session, with_orders: bool = True, with_history: bool = True) -> dict:
     products = seed_products(db)
+    renamed = upgrade_demo_identities(db)
     customers = seed_customers(db)
     orders = seed_orders(db) if with_orders else 0
+    refresh_tracking(db)
     history = seed_history(db) if (with_orders and with_history) else 0
-    return {"products_created": products, "customers_created": customers, "orders_created": orders, "history_orders_created": history}
+    return {"products_created": products, "customers_renamed": renamed, "customers_created": customers, "orders_created": orders, "history_orders_created": history}

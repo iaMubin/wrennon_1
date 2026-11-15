@@ -24,7 +24,9 @@ def api_key(db_session: Session):
         name="Test API Key",
         key_hash=key_hash,
         prefix=raw_key[:16],
-        created_by_username="testadmin"
+        created_by_username="testadmin",
+        # Keys are least-privilege by default; this one opts in to what the tests exercise.
+        scopes='["conversations:read", "conversations:resolve", "messages:send", "notes:write"]',
     )
     db_session.add(api_key)
     db_session.commit()
@@ -36,7 +38,8 @@ import uuid
 @pytest.fixture
 def conversation(db_session: Session):
     conv = Conversation(
-        session_id=f"test-public-api-{uuid.uuid4()}"
+        session_id=f"test-public-api-{uuid.uuid4()}",
+        handoff_active=True,  # customer-visible API messages are only allowed during a human handoff
     )
     db_session.add(conv)
     db_session.commit()

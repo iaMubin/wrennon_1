@@ -25,6 +25,7 @@ class ConversationState(TypedDict):
     # --- Core conversation state (used from L1 onward) ---
     messages: list[BaseMessage]
     customer_email: Optional[str]
+    page_context: NotRequired[Optional[str]]  # live storefront context (see app/services/store_context.py)
     current_intent: Optional[str]
     conversation_summary: Optional[str]
 
@@ -93,8 +94,18 @@ class ConversationState(TypedDict):
     language: NotRequired[str]
     include_suggestion: NotRequired[bool]
 
+    # Trusted, server-set request context (never derived from model output)
+    session_id: NotRequired[str]
+    tenant_id: NotRequired[str]
+    client_ip: NotRequired[str]
 
-def initial_state(customer_email: Optional[str] = None, include_suggestion: bool = True) -> ConversationState:
+def initial_state(
+    customer_email: Optional[str] = None,
+    include_suggestion: bool = True,
+    session_id: Optional[str] = None,
+    client_ip: Optional[str] = None,
+    tenant_id: Optional[str] = None,
+) -> ConversationState:
     """Factory for a fresh conversation state. Keeps the TypedDict literal
     out of node code, so adding a field here is the only place that needs
     to change when new levels are switched on."""
@@ -133,4 +144,7 @@ def initial_state(customer_email: Optional[str] = None, include_suggestion: bool
         language="English",
         direct_reply=None,
         include_suggestion=include_suggestion,
+        session_id=session_id or "",
+        tenant_id=tenant_id or "default",
+        client_ip=client_ip or "",
     )
