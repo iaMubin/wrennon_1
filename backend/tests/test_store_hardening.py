@@ -27,7 +27,11 @@ def _seed_and_reset():
 
 
 def test_correct_email_works_and_response_is_not_cacheable():
-    r = client.get("/api/store/orders/1001", params={"email": "ELEANOR.V@example.com"})
+    from app.db.store_models import StoreOrder
+    with SessionLocal() as s:
+        o = s.query(StoreOrder).order_by(StoreOrder.order_id).first()
+        order_id, email = o.order_id, o.email          # whatever the seed contains: do not hard-code demo data
+    r = client.get(f"/api/store/orders/{order_id}", params={"email": email})
     assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
 
 

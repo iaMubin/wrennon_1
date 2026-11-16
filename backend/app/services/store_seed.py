@@ -21,7 +21,7 @@ from app.db.store_models import StoreCustomer, StoreInventory, StoreOrder, Store
 from app.services.customer_auth import hash_pw
 from app.services import store_service as svc
 from app.services.integrations.mock_provider import PRODUCT_CATALOG
-from app.services.mock_apis import MOCK_CUSTOMERS, MOCK_ORDERS
+from app.services.mock_apis import MOCK_ORDERS
 
 # Presentation/merchandising data the old mock catalog didn't have.
 _EXTRA: Dict[str, dict] = {
@@ -94,7 +94,7 @@ def seed_orders(db: Session) -> int:
             customer = StoreCustomer(email=email, name=person.name if person else email.split("@")[0].replace(".", " ").title(), phone=person.phone if person else None)
             db.add(customer)
             db.flush()
-        trk_no, trk_url = svc.make_tracking(o["carrier"], random.Random(int(order_id))) if o.get("carrier") else (None, None)
+        trk_no, trk_url = svc.make_tracking(o["carrier"], random.Random(int(order_id)))  # nosec B311  # deterministic demo data if o.get("carrier") else (None, None)
         total = _money(o["total_amount"])
         combo = _pick_items(total, int(o.get("items_count") or 1))
         subtotal = sum(p for _, p in combo)
@@ -120,7 +120,7 @@ def seed_orders(db: Session) -> int:
     return created
 
 
-DEMO_PASSWORD = "northbound123"   # every seeded demo customer signs in with this
+DEMO_PASSWORD = "northbound123"  # nosec B105  # every seeded demo customer signs in with this (demo data only)
 _HISTORY_FLAG = "store_history_seeded"
 
 
@@ -217,9 +217,15 @@ def seed_customers(db: Session) -> int:
 
 def seed_history(db: Session, today: datetime.date | None = None) -> int:
     """Realistic past orders for the demo customers (1-6 each, spread over the last year). Runs once."""
+    # The demo accounts all share one PUBLISHED password (DEMO_PASSWORD). Seeding them into a production
+    # database would create 15 accounts whose credentials anyone can read in the repo.
+    from app.config import settings
+    import os
+    if settings.app_env == "production" and os.environ.get("ALLOW_DEMO_SEED", "").lower() != "true":
+        raise RuntimeError("Refusing to seed demo customers (public password) in production. Set ALLOW_DEMO_SEED=true to override.")
     if db.query(SystemSetting).filter_by(key=_HISTORY_FLAG).first():
         return 0
-    rng = random.Random(2026)
+    rng = random.Random(2026)  # nosec B311  # deterministic demo data, not security-sensitive
     today = today or datetime.date.today()
     products = db.query(StoreProduct).order_by(StoreProduct.product_id).all()
     if not products:
@@ -282,7 +288,7 @@ def refresh_tracking(db: Session) -> int:
     n = 0
     for o in db.query(StoreOrder).filter(StoreOrder.tracking_url.isnot(None)).all():
         if "example.com" in o.tracking_url or "fedex.com/track/" in o.tracking_url or "wrennon" in o.tracking_url:
-            o.tracking_number, o.tracking_url = svc.make_tracking(o.carrier or "FedEx", random.Random(int(o.order_id) if o.order_id.isdigit() else 7))
+            o.tracking_number, o.tracking_url = svc.make_tracking(o.carrier or "FedEx", random.Random(int(o.order_id) if o.order_id.isdigit() else 7))  # nosec B311  # deterministic demo data
             n += 1
     db.commit()
     return n

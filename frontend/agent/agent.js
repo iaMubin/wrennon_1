@@ -1357,8 +1357,16 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
       nameHtml = `<div class="msg-sender-bar"><span class="msg-author-name">${escapeHtml(displayName)}</span><span class="msg-role-chip">${cleanRole}</span></div>`;
     }
   } else if ((actualSender === "human" || actualSender === "user") && !isGrouped) {
-    const custEmail = (document.getElementById("conversation-email")?.textContent || "").trim();
-    const custDisplay = (custEmail && custEmail !== "Unknown Customer") ? custEmail.split("@")[0].toUpperCase() : "CUSTOMER";
+    const rawHeaderName = (document.getElementById("conversation-email")?.textContent || "").trim();
+    let custDisplay = "Customer";
+    if (rawHeaderName && rawHeaderName !== "Unknown Customer") {
+      if (rawHeaderName.includes('@')) {
+        const parts = rawHeaderName.split('@')[0].replace(/[._-]+/g, ' ').trim();
+        custDisplay = parts ? parts.replace(/\b\w/g, c => c.toUpperCase()) : "Customer";
+      } else {
+        custDisplay = rawHeaderName;
+      }
+    }
     nameHtml = `<div class="msg-sender-bar msg-sender-bar--human"><span class="msg-author-name">${escapeHtml(custDisplay)}</span></div>`;
   }
   
@@ -2366,10 +2374,12 @@ function sanitizeSuggestion(text) {
 }
 
 function renderMarkdown(text) {
+  if (!text) return "";
   const lines = text.split("\n");
   let html = "";
   let inList = false;
   let listTag = "ul";
+  let prevWasEmpty = false;
 
   const closeList = () => {
     if (inList) {
@@ -2382,11 +2392,12 @@ function renderMarkdown(text) {
     const line = rawLine.trim();
     if (!line) {
       closeList();
+      prevWasEmpty = true;
       continue;
     }
 
     const numbered = line.match(/^(\d+)[.)]\s+(.*)/);
-    const bulleted = line.match(/^[-*]\s+(.*)/);
+    const bulleted = line.match(/^[-*•]\s+(.*)/);
     const blockquoted = line.match(/^>\s*(.*)/);
 
     if (numbered || bulleted) {
@@ -2404,8 +2415,10 @@ function renderMarkdown(text) {
       html += `<blockquote>${inlineMarkdown(blockquoted[1])}</blockquote>`;
     } else {
       closeList();
-      html += `<p>${inlineMarkdown(line)}</p>`;
+      const pClass = prevWasEmpty ? ' class="msg-p--para-break"' : '';
+      html += `<p${pClass}>${inlineMarkdown(line)}</p>`;
     }
+    prevWasEmpty = false;
   }
   closeList();
   return html;

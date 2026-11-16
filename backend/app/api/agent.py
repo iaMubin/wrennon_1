@@ -34,6 +34,7 @@ from app.services.integrations import USE_MOCK, get_ecommerce_provider
 from app.services.integrations import store_db_enabled as _store_db_enabled
 _STORE_DB = _store_db_enabled()
 from app.services.uploads import resign_text
+from app.security.totp_store import read_secret, upgrade_if_plaintext, write_secret
 from app.services import ratelimit
 from app.services.audit import add_audit, audit_now
 
@@ -88,8 +89,10 @@ async def _totp_valid_once(agent: Agent, code: str) -> bool:
     valid_window=1 tolerates one 30s step of clock drift. Replay tracking uses the
     shared counter helper, which falls back to an in-process store if Redis is down
     (so replay protection does not silently disappear)."""
-    if not code or not agent.totp_secret or not pyotp.TOTP(agent.totp_secret).verify(code, valid_window=1):
+    secret = read_secret(agent)
+    if not code or not secret or not pyotp.TOTP(secret).verify(code, valid_window=1):
         return False
+    upgrade_if_plaintext(agent)   # legacy plaintext secret -> encrypted at rest (committed with the caller's next commit)
     return await ratelimit.hit(f"totp_used:{agent.username}:{code}", 120) == 1
 
 
@@ -288,7 +291,7 @@ async def setup_2fa(
         audit_now(db, agent.username, "2fa_setup_denied", details="bad_code", ip=client_ip)
         raise HTTPException(status_code=401, detail="Invalid 2FA code")
     secret = pyotp.random_base32()
-    agent.totp_secret = secret
+    write_secret(agent, secret)
     agent.totp_enabled = False
     add_audit(db, agent.username, "2fa_setup_started", ip=client_ip)
     db.commit()

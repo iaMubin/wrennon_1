@@ -52,12 +52,22 @@ def customer_email_from_header(authorization: Optional[str]) -> Optional[str]:
     return str(p["sub"]).lower() if p.get("typ") == "customer" and p.get("sub") else None
 
 
-def session_token_for_customer(session_id: str, authorization: Optional[str]) -> Optional[str]:
-    """Chat session token carrying the verified customer email, or None for guests."""
+def session_token_for_customer(session_id: str, authorization: Optional[str], tenant_id: str = "default") -> Optional[str]:
+    """Chat session token carrying the verified customer email, or None for guests.
+
+    The storefront accounts live in the built-in store database, which is single-merchant:
+    only the DEFAULT tenant may attach such an identity to a chat session (a widget for
+    another tenant must never be told "this visitor is customer X of the default store").
+    The token carries the same typ/tid/iat claims as a guest session token so tenant
+    binding and revocation behave identically."""
+    if tenant_id != "default":
+        return None
     email = customer_email_from_header(authorization)
     if not email:
         return None
-    payload = {"session_id": session_id, "customer_email": email, "exp": _exp(hours=72)}
+    now = _exp()   # naive UTC "now"
+    payload = {"session_id": session_id, "customer_email": email, "typ": "customer", "tid": tenant_id,
+               "iat": now, "exp": _exp(hours=settings.customer_session_ttl_hours)}
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 

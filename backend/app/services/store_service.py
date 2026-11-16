@@ -7,6 +7,7 @@ website and the bot can never disagree about a price, a stock level or an order.
 from __future__ import annotations
 
 import datetime
+import hmac
 import uuid
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Dict, List, Optional
@@ -143,7 +144,7 @@ def get_order(db: Session, order_id: Any, email: Optional[str] = None) -> Option
     order = db.get(StoreOrder, clean_order_id(order_id))
     if not order:
         return None
-    if email is not None and order.email.lower() != email.strip().lower():
+    if email is not None and not hmac.compare_digest(order.email.lower().encode(), email.strip().lower().encode()):
         return None
     return order
 

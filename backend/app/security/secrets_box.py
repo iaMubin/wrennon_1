@@ -7,7 +7,7 @@ Without it, storing a tenant credential is refused rather than saved in clear te
 
 from __future__ import annotations
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 
 from app.config import settings
 
@@ -16,10 +16,15 @@ class SecretsUnavailable(RuntimeError):
     pass
 
 
-def _fernet() -> Fernet:
-    if not settings.tenant_secrets_key:
-        raise SecretsUnavailable("TENANT_SECRETS_KEY is not configured; refusing to store or read tenant credentials.")
-    return Fernet(settings.tenant_secrets_key.encode())
+def is_configured() -> bool:
+    return bool(settings.tenant_secrets_key and settings.tenant_secrets_key.strip())
+
+
+def _fernet() -> MultiFernet:
+    if not is_configured():
+        raise SecretsUnavailable("SECRETS_ENCRYPTION_KEY (or TENANT_SECRETS_KEY) is not configured; refusing to store or read secrets.")
+    # Comma-separated keys = rotation: the first key encrypts, every key can decrypt.
+    return MultiFernet([Fernet(k.strip().encode()) for k in settings.tenant_secrets_key.split(",") if k.strip()])
 
 
 def encrypt(plain: str) -> str:

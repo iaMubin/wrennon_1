@@ -7,7 +7,10 @@ this moves from local dev to a real deployment.
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import model_validator
+from pydantic import AliasChoices, Field, model_validator
+
+
+_SSL_MODES = {"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}
 
 
 class Settings(BaseSettings):
@@ -69,7 +72,20 @@ class Settings(BaseSettings):
 
     # --- Multi-tenancy ------------------------------------------------
     # Fernet key used to encrypt per-tenant credentials at rest.
-    tenant_secrets_key: str | None = None
+    # General at-rest encryption key (Fernet). Encrypts per-tenant credentials AND agents' 2FA secrets.
+    # Several keys may be comma-separated for rotation: the FIRST encrypts, all of them decrypt.
+    # Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    tenant_secrets_key: str | None = Field(
+        None, validation_alias=AliasChoices("SECRETS_ENCRYPTION_KEY", "TENANT_SECRETS_KEY", "tenant_secrets_key")
+    )
+
+    # --- Database transport + retention ---------------------------------
+    # TLS mode for Postgres connections: disable|allow|prefer|require|verify-ca|verify-full. Unset =
+    # "require" in production, driver default elsewhere. A sslmode already present in DATABASE_URL wins.
+    database_sslmode: str | None = None
+    # Automatically delete RESOLVED conversations (+ messages, uploads) older than this many days.
+    # 0 = off (default: deleting data is never something to switch on by surprise); otherwise 30..3650.
+    conversation_retention_days: int = 0
     # Widgets that send no tenant key land in the built-in "default" tenant
     # (single-merchant deployments). Set false once every storefront sends its key.
     allow_default_tenant: bool = True
@@ -100,6 +116,21 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_allowed_origins.split(",")]
+
+    @model_validator(mode="after")
+    def _validate_data_protection(self):
+        if self.database_sslmode is not None and self.database_sslmode not in _SSL_MODES:
+            raise ValueError(f"DATABASE_SSLMODE must be one of {sorted(_SSL_MODES)}")
+        if self.conversation_retention_days and not 30 <= self.conversation_retention_days <= 3650:
+            raise ValueError("CONVERSATION_RETENTION_DAYS must be 0 (off) or between 30 and 3650; "
+                             "a smaller value would risk deleting conversations people still rely on.")
+        if self.app_env == "production" and not self.database_url.startswith("sqlite"):
+            from urllib.parse import parse_qs, urlparse
+            in_url = (parse_qs(urlparse(self.database_url).query).get("sslmode") or [None])[0]
+            if (in_url or self.database_sslmode) in ("disable", "allow"):
+                raise ValueError("Production database connections must use TLS: remove sslmode=disable/allow "
+                                 "(DATABASE_URL / DATABASE_SSLMODE).")
+        return self
 
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":

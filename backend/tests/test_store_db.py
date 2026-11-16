@@ -198,7 +198,8 @@ def test_chat_session_token_carries_only_a_verified_customer(full):
     assert auth.customer_email_from_header("Bearer " + sess) is None   # a chat session token is not a customer login token
 
 
-def test_agent_profile_and_get_my_orders(full, provider):
+def test_agent_profile_and_get_my_orders(full, provider, monkeypatch):
+    monkeypatch.setenv("ECOMMERCE_PROVIDER", "store_db")   # was only passing where a local .env set it
     info = provider.get_customer_info(email="sarah.fake@example.com")
     assert info is None
     info = provider.get_customer_info(email="priya.raman@gmail.com")

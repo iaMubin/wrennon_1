@@ -22,9 +22,27 @@ from app.db.tenancy import TenantSession
 # allows the thread that created a connection to use it, which breaks
 # under FastAPI's async request handling. This is safe here because
 # SQLAlchemy's session handling still serializes access correctly.
-_connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
+def build_connect_args(url: str, sslmode: str | None, app_env: str) -> dict:
+    """Driver arguments for the database connection.
 
-engine = create_engine(settings.database_url, connect_args=_connect_args)
+    Postgres: TLS is requested explicitly (``require`` in production) unless the URL already carries its own
+    ``sslmode``. Without this, psycopg2 defaults to ``prefer``, which silently falls back to an UNENCRYPTED
+    connection, so a misconfigured server or a network attacker downgrades it with no error. The conversation
+    text, emails, phones and addresses in this database must not cross the network in clear."""
+    if url.startswith("sqlite"):
+        return {"check_same_thread": False}
+    if "sslmode=" in url:
+        return {}
+    mode = sslmode or ("require" if app_env == "production" else None)
+    return {"sslmode": mode} if mode else {}
+
+
+_connect_args = build_connect_args(settings.database_url, settings.database_sslmode, settings.app_env)
+
+# pool_pre_ping: transparently replace connections the server/proxy has dropped (idle timeouts on PaaS
+# Postgres otherwise surface as random 500s).
+engine = create_engine(settings.database_url, connect_args=_connect_args,
+                       pool_pre_ping=not settings.database_url.startswith("sqlite"))
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=TenantSession)
 

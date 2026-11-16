@@ -253,25 +253,22 @@ scrollToBottomBtn.innerHTML = `New Message <svg width="14" height="14" viewBox="
 document.getElementById("panel").appendChild(scrollToBottomBtn);
 
 // --- Transparency notice: AI disclosure + data-use statement -----------------
-// Customers must be told they are talking to an AI (EU AI Act Art. 50, several US
-// state bot-disclosure laws) and that the chat is stored. Set PRIVACY_URL to your
-// privacy policy (https only); the link is rendered only when it is set.
+// Set PRIVACY_URL to your privacy policy (https only); the link is rendered only when it is set.
 const PRIVACY_URL = "";
 (function addTransparencyNotice() {
   const panel = document.getElementById("panel");
   if (!panel || document.getElementById("ai-disclosure")) return;
-  const note = document.createElement("div");
-  note.id = "ai-disclosure";
-  note.style.cssText = "font-size:11px;line-height:1.4;padding:6px 14px 8px;text-align:center;color:var(--text-muted,#6b7280);";
-  note.append("You\u2019re chatting with an AI assistant; a human teammate can join if needed. Chats are stored to help resolve your request.");
   if (PRIVACY_URL.startsWith("https://")) {
+    const note = document.createElement("div");
+    note.id = "ai-disclosure";
+    note.style.cssText = "font-size:11px;line-height:1.4;padding:6px 14px 8px;text-align:center;color:var(--text-muted,#6b7280);";
     const a = document.createElement("a");
     a.href = PRIVACY_URL; a.target = "_blank"; a.rel = "noopener noreferrer";
-    a.textContent = " Privacy policy";
+    a.textContent = "Privacy policy";
     a.style.color = "inherit"; a.style.textDecoration = "underline";
     note.append(a);
+    panel.appendChild(note);
   }
-  panel.appendChild(note);
 })();
 
 // Fixed typing-indicator bar, sitting between #messages and #input-row.

@@ -3640,15 +3640,17 @@ textarea:focus,
   html[data-theme] .msg-content--ai .msg,
   [data-theme] .msg-content--ai .msg {
     position: relative !important;
-    max-width: 82% !important;
-    min-width: 75px !important;
+    max-width: 100% !important;
+    min-width: 60px !important;
     width: fit-content !important;
-    padding: 6px 9px 8px 9px !important;
-    box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13) !important;
-    font-size: 14.5px !important;
-    line-height: 19px !important;
-    word-break: break-word !important;
-    display: inline-block !important;
+    padding: 8px 13px 9px 13px !important;
+    box-shadow: 0 1px 2px rgba(11, 20, 26, 0.08) !important;
+    font-size: 14px !important;
+    line-height: 1.55 !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    display: block !important;
+    box-sizing: border-box !important;
     border: none !important;
     border-left: none !important;
     border-right: none !important;
@@ -3658,8 +3660,17 @@ textarea:focus,
   .msg p {
     margin: 0 !important;
     padding: 0 !important;
-    display: inline !important;
+    display: block !important;
     white-space: pre-wrap !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    line-height: 1.55 !important;
+  }
+  .msg p:last-child {
+    margin-bottom: 0 !important;
+  }
+  .msg p.msg-p--para-break {
+    margin-top: 8px !important;
   }
 
   /* Left Bubble (Customer) - Pure White with 2px Accent Border */
@@ -4428,11 +4439,12 @@ textarea:focus,
 /* ── Containment Guarantee: Message Bubble Sender Bar & Zero Overflow ── */
 .msg,
 [data-theme] .msg {
-  min-width: 165px !important;
-  max-width: 72% !important;
+  min-width: 60px !important;
+  max-width: 100% !important;
+  width: fit-content !important;
   box-sizing: border-box !important;
   overflow-wrap: break-word !important;
-  word-break: break-word !important;
+  word-break: normal !important;
   position: relative !important;
 }
 
@@ -4778,4 +4790,240 @@ textarea:focus,
 .msg-content--agent .msg--voice-only .msg-dropdown-container {
   right: auto !important;
   left: -26px !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PREMIUM REDESIGNED CUSTOMER MESSAGE BUBBLE & NATURAL LINE-BREAK ENGINE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* 1. Customer & Agent Message Container Layout */
+.msg-content,
+[data-theme] .msg-content {
+  display: flex !important;
+  flex-direction: column !important;
+  max-width: 78% !important;
+  width: fit-content !important;
+  margin-bottom: 6px !important;
+}
+
+.msg-content--human,
+.msg-content--user,
+[data-theme] .msg-content--human,
+[data-theme] .msg-content--user {
+  align-self: flex-start !important;
+  align-items: flex-start !important;
+  max-width: 78% !important;
+  width: fit-content !important;
+  margin-bottom: 6px !important;
+}
+
+.msg-content--agent,
+.msg-content--ai,
+.msg-content--bot,
+.msg-content--internal,
+[data-theme] .msg-content--agent,
+[data-theme] .msg-content--ai,
+[data-theme] .msg-content--bot,
+[data-theme] .msg-content--internal {
+  align-self: flex-end !important;
+  align-items: flex-end !important;
+  max-width: 78% !important;
+  width: fit-content !important;
+  margin-bottom: 6px !important;
+}
+
+/* 2. Customer Message Bubble Styling (Clean, Professional, Elevated) */
+.msg--human,
+.msg--user,
+.msg-content--human .msg,
+.msg-content--user .msg,
+html[data-theme] .msg--human,
+html[data-theme] .msg--user,
+html[data-theme] .msg-content--human .msg,
+html[data-theme] .msg-content--user .msg,
+[data-theme] .msg--human,
+[data-theme] .msg--user,
+[data-theme] .msg-content--human .msg,
+[data-theme] .msg-content--user .msg {
+  align-self: flex-start !important;
+  display: block !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #1e293b !important;
+  border: 1px solid rgba(226, 232, 240, 0.95) !important;
+  border-left: 3.5px solid var(--accent, #0d9488) !important;
+  border-radius: 4px 16px 16px 16px !important;
+  padding: 10px 14px 10px 14px !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 3px 8px rgba(15, 23, 42, 0.02) !important;
+  box-sizing: border-box !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  hyphens: manual !important;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+
+/* Dark Mode Bubble Palette */
+html[data-theme^="dark"] .msg--human,
+html[data-theme^="dark"] .msg--user,
+html[data-theme^="dark"] .msg-content--human .msg,
+html[data-theme^="dark"] .msg-content--user .msg,
+[data-theme^="dark"] .msg--human,
+[data-theme^="dark"] .msg--user,
+[data-theme^="dark"] .msg-content--human .msg,
+[data-theme^="dark"] .msg-content--user .msg {
+  background: #1e293b !important;
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-left: 3.5px solid var(--accent, #14b8a6) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28) !important;
+}
+
+/* 3. Natural Text Flow, Paragraphs & Line Breaks */
+.msg p,
+.msg-content .msg p,
+.msg--human p,
+.msg--user p,
+.msg-content--human .msg p,
+.msg-content--user .msg p,
+[data-theme] .msg p,
+[data-theme] .msg--human p,
+[data-theme] .msg--user p,
+[data-theme] .msg-content--human .msg p,
+[data-theme] .msg-content--user .msg p {
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 13.5px !important;
+  line-height: 1.55 !important;
+  letter-spacing: -0.005em !important;
+  white-space: pre-wrap !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+}
+
+.msg--human p:last-child,
+.msg--user p:last-child,
+.msg-content--human .msg p:last-child,
+.msg-content--user .msg p:last-child {
+  margin-bottom: 0 !important;
+}
+
+.msg p.msg-p--para-break,
+.msg-content .msg p.msg-p--para-break,
+.msg--human p.msg-p--para-break,
+.msg--user p.msg-p--para-break,
+.msg-content--human .msg p.msg-p--para-break,
+.msg-content--user .msg p.msg-p--para-break,
+[data-theme] .msg p.msg-p--para-break {
+  margin-top: 8px !important;
+}
+
+/* 4. Customer Header / Sender Bar */
+.msg-sender-bar--human,
+.msg--human .msg-sender-bar,
+.msg--user .msg-sender-bar,
+[data-theme] .msg-sender-bar--human {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  margin-bottom: 5px !important;
+  padding-bottom: 3px !important;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.05) !important;
+  line-height: 1 !important;
+}
+
+html[data-theme^="dark"] .msg-sender-bar--human,
+[data-theme^="dark"] .msg-sender-bar--human {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
+}
+
+.msg-sender-bar--human .msg-author-name {
+  font-family: var(--font-body, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif) !important;
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em !important;
+  color: var(--accent, #0d9488) !important;
+  text-transform: none !important;
+}
+
+html[data-theme^="dark"] .msg-sender-bar--human .msg-author-name {
+  color: var(--accent, #14b8a6) !important;
+}
+
+.msg-role-chip--customer {
+  display: none !important;
+}
+
+/* 5. Customer Timestamp & Metadata */
+.msg-content--human .msg-meta,
+.msg-content--user .msg-meta,
+[data-theme] .msg-content--human .msg-meta,
+[data-theme] .msg-content--user .msg-meta {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 6px !important;
+  padding-left: 6px !important;
+  margin-top: 3px !important;
+  margin-bottom: 2px !important;
+  font-size: 11px !important;
+  color: var(--text-dim, #64748b) !important;
+  font-weight: 500 !important;
+}
+
+/* 6. Grouped Consecutive Bubbles */
+.msg-content--grouped-prev.msg-content--human .msg,
+.msg-content--grouped-prev.msg-content--user .msg,
+.msg--grouped-prev.msg--human,
+.msg--grouped-prev.msg--user {
+  border-bottom-left-radius: 4px !important;
+  margin-bottom: 2px !important;
+}
+
+.msg-content--grouped.msg-content--human .msg,
+.msg-content--grouped.msg-content--user .msg,
+.msg--grouped-next.msg--human,
+.msg--grouped-next.msg--user {
+  border-top-left-radius: 4px !important;
+}
+
+/* 7. Lists, Blockquotes and Links inside Customer Messages */
+.msg--human ul,
+.msg--user ul,
+.msg--human ol,
+.msg--user ol {
+  margin: 4px 0 6px 0 !important;
+  padding-left: 20px !important;
+}
+
+.msg--human li,
+.msg--user li {
+  margin-bottom: 2px !important;
+  line-height: 1.55 !important;
+}
+
+.msg--human blockquote,
+.msg--user blockquote {
+  margin: 6px 0 !important;
+  padding: 4px 10px !important;
+  border-left: 3px solid var(--accent, #0d9488) !important;
+  background: color-mix(in srgb, var(--accent, #0d9488) 6%, transparent) !important;
+  border-radius: 0 6px 6px 0 !important;
+  font-style: italic !important;
+}
+
+.msg--human a,
+.msg--user a {
+  color: var(--accent, #0d9488) !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+  font-weight: 500 !important;
+}
+
+html[data-theme^="dark"] .msg--human a,
+html[data-theme^="dark"] .msg--user a {
+  color: var(--accent, #2dd4bf) !important;
 }

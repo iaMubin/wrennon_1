@@ -97,6 +97,42 @@ async def _upload_retention_loop() -> None:
         await asyncio.sleep(3600)
 
 
+async def _conversation_retention_loop() -> None:
+    """Daily, cluster-wide (one worker wins the Redis-guarded slot), opt-in via CONVERSATION_RETENTION_DAYS."""
+    from app.services import ratelimit
+    from app.services.retention import purge_resolved_conversations
+
+    if not settings.conversation_retention_days:
+        return
+    while True:
+        try:
+            if await ratelimit.hit("retention:daily-slot", 86400) == 1:
+                await asyncio.to_thread(purge_resolved_conversations, settings.conversation_retention_days)
+        except Exception as e:  # noqa: BLE001 - a failed sweep must never take the app down
+            logger.warning(f"Conversation retention sweep failed: {e}")
+        await asyncio.sleep(3600)
+
+
+def _warn_about_plaintext_2fa_secrets() -> None:
+    """Loud startup hint when 2FA secrets sit unencrypted in the database."""
+    from app.db.models import Agent
+    from app.db.session import SessionLocal
+    from app.security import secrets_box
+    from app.security.totp_store import PREFIX
+
+    try:
+        with SessionLocal() as db:
+            n = db.query(Agent).filter(Agent.totp_secret.isnot(None), ~Agent.totp_secret.like(PREFIX + "%")).count()
+    except Exception:  # noqa: BLE001 - never block startup on a diagnostic  # nosec B110
+        return
+    if n and secrets_box.is_configured():
+        logger.info(f"{n} agent(s) still have a plaintext 2FA secret; they are encrypted at their next login "
+                    f"(or now: python scripts/encrypt_totp_secrets.py)")
+    elif n:
+        logger.warning(f"{n} agent(s) have an UNENCRYPTED 2FA secret in the database. Set SECRETS_ENCRYPTION_KEY, "
+                       f"then run: python scripts/encrypt_totp_secrets.py")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Connecting to Redis Pub/Sub...")
@@ -105,8 +141,11 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Failed to connect to Redis Pub/Sub: {e}. Running in single-instance mode without Redis.")
     purge_task = asyncio.create_task(_upload_retention_loop())
+    retention_task = asyncio.create_task(_conversation_retention_loop())
+    await asyncio.to_thread(_warn_about_plaintext_2fa_secrets)
     yield
     purge_task.cancel()
+    retention_task.cancel()
     logger.info("Disconnecting from Redis Pub/Sub...")
     try:
         await broadcast.disconnect()

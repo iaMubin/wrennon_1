@@ -18,8 +18,16 @@ class RedactingFilter(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:
         try:
-            msg = record.getMessage()
-            record.msg, record.args = redact_for_log(msg), ()
+            if record.name == "uvicorn.access" and isinstance(record.args, (tuple, list)) and len(record.args) == 5:
+                # Uvicorn's AccessFormatter unpacks: (client_addr, method, full_path, http_version, status_code)
+                # Keep the 5-element tuple intact so AccessFormatter doesn't crash with ValueError.
+                record.args = tuple(
+                    redact_for_log(str(arg)) if isinstance(arg, str) else arg
+                    for arg in record.args
+                )
+            else:
+                msg = record.getMessage()
+                record.msg, record.args = redact_for_log(msg), ()
         except Exception:  # noqa: BLE001,S110 - logging must never raise  # nosec B110
             pass
         return True
