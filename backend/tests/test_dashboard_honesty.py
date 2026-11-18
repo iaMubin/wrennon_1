@@ -33,7 +33,7 @@ FABRICATED = [
 @pytest.fixture(scope="module")
 def seeded():
     db = SessionLocal()
-    for u in ("honest_mgr", "honest_a"):
+    for u in ("honest_mgr", "honest_a", "honest_scope"):
         old = db.query(Agent).filter_by(username=u).first()
         if old:
             db.delete(old)
@@ -42,7 +42,9 @@ def seeded():
                 password_hash=hash_password("SecureAdmin!123"))
     a = Agent(username="honest_a", full_name="Ada Agent", employee_id="HON-2", role="agent",
               password_hash=hash_password("SecureAdmin!123"))
-    db.add_all([mgr, a])
+    scoped = Agent(username="honest_scope", full_name="Scope Agent", employee_id="HON-3", role="agent",
+                   password_hash=hash_password("SecureAdmin!123"))
+    db.add_all([mgr, a, scoped])
     db.commit()
 
     # A: resolved by a human in 60 min, replied after 2 min, rated 5
@@ -56,7 +58,10 @@ def seeded():
     # C: still open, urgent, first human reply took 20 min (urgent SLA is 15)
     cc = Conversation(session_id="honest-c", customer_email="c@example.com", resolved=False,
                       created_at=DAY + timedelta(hours=2), priority="urgent")
-    db.add_all([ca, cb, cc])
+    # D: belongs to someone else, so honest_scope must not see it through the profile either
+    cd = Conversation(session_id="honest-d", customer_email="scope@example.com", resolved=False, handled_by="someone_else",
+                      assigned_agent="someone_else", handoff_active=True, created_at=datetime(2001, 2, 1, 10, 0, 0))
+    db.add_all([ca, cb, cc, cd])
     db.commit()
     db.add_all([
         Message(conversation_id=ca.id, sender="agent", content="on it", created_at=DAY + timedelta(minutes=2)),
@@ -68,9 +73,9 @@ def seeded():
     db.commit()
     yield db
     db.query(CSATResponse).filter(CSATResponse.conversation_id.in_([ca.id, cb.id])).delete(synchronize_session=False)
-    db.query(Message).filter(Message.conversation_id.in_([ca.id, cb.id, cc.id])).delete(synchronize_session=False)
-    db.query(Conversation).filter(Conversation.id.in_([ca.id, cb.id, cc.id])).delete(synchronize_session=False)
-    for u in ("honest_mgr", "honest_a"):
+    db.query(Message).filter(Message.conversation_id.in_([ca.id, cb.id, cc.id, cd.id])).delete(synchronize_session=False)
+    db.query(Conversation).filter(Conversation.id.in_([ca.id, cb.id, cc.id, cd.id])).delete(synchronize_session=False)
+    for u in ("honest_mgr", "honest_a", "honest_scope"):
         row = db.query(Agent).filter_by(username=u).first()
         if row:
             db.delete(row)
@@ -87,8 +92,8 @@ def mock_redis():
         yield inst
 
 
-def _token():
-    r = client.post("/api/agent/login", data={"username": "honest_mgr", "password": "SecureAdmin!123"})
+def _token(user="honest_mgr"):
+    r = client.post("/api/agent/login", data={"username": user, "password": "SecureAdmin!123"})
     assert r.status_code == 200
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
@@ -211,3 +216,33 @@ def test_customers_have_no_invented_contact_details(seeded):
     assert rec["health_score"] is not None             # measurable, so present
     none_yet = next(c for c in r.json() if c["email"] == "c@example.com")
     assert none_yet["avg_csat"] is None and none_yet["health_score"] is None and none_yet["sentiment"] is None
+
+
+def test_customer_profile_is_exact_and_cheap(seeded):
+    r = client.get("/api/agent/customers/profile", params={"email": "A@Example.com"}, headers=_token())
+    assert r.status_code == 200
+    p = r.json()
+    assert p["total_tickets"] == 1 and p["resolved_ratio"] == 1.0 and p["avg_csat"] == 5.0 and p["csat_count"] == 1
+    assert p["health_score"] is not None and p["health_label"] == "Healthy"
+    assert p["phone"] is None and p["tier"] is None and p["lifetime_value"] is None
+    assert [c["session_id"] for c in p["recent_conversations"]] == ["honest-a"]
+    assert p["first_seen"] and p["last_active"]
+
+
+def test_customer_profile_for_an_unknown_email_is_empty_not_invented(seeded):
+    p = client.get("/api/agent/customers/profile", params={"email": "nobody-at-all@example.com"}, headers=_token()).json()
+    assert p["total_tickets"] == 0 and p["recent_conversations"] == []
+    for k in ("resolved_ratio", "avg_csat", "health_score", "sentiment", "first_seen", "last_active", "phone", "tier"):
+        assert p[k] is None, k
+
+
+def test_customer_profile_respects_what_the_agent_may_see(seeded):
+    url, q = "/api/agent/customers/profile", {"email": "scope@example.com"}
+    manager = client.get(url, params=q, headers=_token("honest_mgr")).json()
+    assert manager["total_tickets"] == 1
+    other = client.get(url, params=q, headers=_token("honest_scope")).json()
+    assert other["total_tickets"] == 0 and other["recent_conversations"] == []
+
+
+def test_customer_profile_requires_login():
+    assert client.get("/api/agent/customers/profile", params={"email": "a@example.com"}).status_code in (401, 403)

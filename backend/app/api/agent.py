@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Body, status, Response, Form, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, Body, status, Response, Form, BackgroundTasks, Request, Query
 from fastapi.security import OAuth2PasswordRequestForm
 import pyotp
 from app.services.qa import process_resolved_conversation_tasks
@@ -435,6 +435,20 @@ def dashboard_summary(
         },
     }
 
+def _customer_health(avg_csat, resolved_ratio):
+    """Health only exists once there is a rating and a resolution history to base it on."""
+    if avg_csat is None or resolved_ratio is None:
+        return None, None
+    score = max(0, min(100, int((avg_csat / 5.0) * 70 + (resolved_ratio * 30))))
+    return score, ("Healthy" if score >= 82 else ("Neutral" if score >= 62 else "At Risk"))
+
+
+def _customer_sentiment(avg_csat):
+    if avg_csat is None:
+        return None
+    return "Delighted" if avg_csat >= 4.6 else ("Satisfied" if avg_csat >= 4.0 else ("Neutral" if avg_csat >= 3.2 else "Frustrated"))
+
+
 @router.get("/agent/customers")
 def get_customers(
     db: Session = Depends(get_db),
@@ -528,15 +542,8 @@ def get_customers(
         orders = [o for o in MOCK_ORDERS.values() if o.get("email", "").lower() == email_lower] if USE_MOCK and not _STORE_DB else []
         total_orders = mock_c.get("total_orders", len(orders) if orders else None)
 
-        # Health only exists once there is a rating and a resolution history to base it on
-        health_score = health_label = None
-        if avg_csat is not None and resolved_ratio is not None:
-            health_score = max(0, min(100, int((avg_csat / 5.0) * 70 + (resolved_ratio * 30))))
-            health_label = "Healthy" if health_score >= 82 else ("Neutral" if health_score >= 62 else "At Risk")
-
-        sentiment = None
-        if avg_csat is not None:
-            sentiment = "Delighted" if avg_csat >= 4.6 else ("Satisfied" if avg_csat >= 4.0 else ("Neutral" if avg_csat >= 3.2 else "Frustrated"))
+        health_score, health_label = _customer_health(avg_csat, resolved_ratio)
+        sentiment = _customer_sentiment(avg_csat)
 
         return {
             "name": name,
@@ -590,6 +597,63 @@ def get_customers(
     results.sort(key=lambda x: x["total_tickets"], reverse=True)
     
     return results
+
+@router.get("/agent/customers/profile")
+def get_customer_profile(
+    email: str = Query(..., min_length=3, max_length=254),
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent),
+):
+    """One customer's facts for the conversation side panel.
+
+    Cheap on purpose (queries only this email) so the panel can open instantly. Everything is
+    limited to conversations this agent may see, and nothing is invented: an unknown email
+    simply comes back with zero tickets and null ratings."""
+    from sqlalchemy import func
+    from app.services.mock_apis import MOCK_CUSTOMERS, MOCK_ORDERS
+
+    em = email.strip().lower()
+    base = scope_conversations(db.query(Conversation).filter(func.lower(Conversation.customer_email) == em), agent)
+    total = base.count()
+    resolved = base.filter(Conversation.resolved == True).count()  # noqa: E712
+    first_seen, last_active = base.with_entities(func.min(Conversation.created_at), func.max(Conversation.created_at)).one()
+    ids = [i for (i,) in base.with_entities(Conversation.id).all()]
+    avg_csat = db.query(func.avg(CSATResponse.rating)).filter(CSATResponse.conversation_id.in_(ids)).scalar() if ids else None
+    avg_csat = float(avg_csat) if avg_csat is not None else None
+    resolved_ratio = (resolved / total) if total else None
+    health_score, health_label = _customer_health(avg_csat, resolved_ratio)
+
+    demo_mode = bool(USE_MOCK and not _STORE_DB)
+    mock_c = next((c for c in (MOCK_CUSTOMERS if demo_mode else []) if (c.get("email") or "").strip().lower() == em), {})
+    orders = [o for o in MOCK_ORDERS.values() if o.get("email", "").lower() == em] if demo_mode else []
+
+    recent = base.order_by(Conversation.created_at.desc()).limit(8).all()
+    return {
+        "email": email.strip(),
+        "name": mock_c.get("name"),
+        "phone": mock_c.get("phone") or None,
+        "tier": mock_c.get("loyalty_tier") or None,
+        "lifetime_value": mock_c.get("lifetime_value") or None,
+        "total_orders": mock_c.get("total_orders", len(orders) if orders else None),
+        "tags": list(mock_c.get("tags", [])),
+        "orders": orders,
+        "total_tickets": total,
+        "resolved_ratio": resolved_ratio,
+        "avg_csat": avg_csat,
+        "csat_count": int(db.query(func.count(CSATResponse.id)).filter(CSATResponse.conversation_id.in_(ids)).scalar() or 0) if ids else 0,
+        "health_score": health_score,
+        "health_label": health_label,
+        "sentiment": _customer_sentiment(avg_csat),
+        "first_seen": first_seen.isoformat() if first_seen else None,
+        "last_active": last_active.isoformat() if last_active else None,
+        "demo": demo_mode and bool(mock_c or orders),
+        "recent_conversations": [{
+            "session_id": c.session_id, "short_id": c.short_id, "resolved": bool(c.resolved), "priority": c.priority or "normal",
+            "created_at": c.created_at.isoformat() if c.created_at else None, "summary": c.summary,
+            "customer_email": c.customer_email,
+        } for c in recent],
+    }
+
 
 class CreateSavedViewRequest(BaseModel):
     name: str = Field(..., max_length=80)

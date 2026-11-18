@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="agent.css?v=250">
 <link rel="stylesheet" href="ui-polish.css?v=250">
 <link rel="stylesheet" href="professional-override.css?v=251">
-<link rel="stylesheet" href="skin.css?v=2">
+<link rel="stylesheet" href="skin.css?v=5">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   (function() {
@@ -513,7 +513,6 @@
               <span id="collision-badge" class="collision-badge hidden"></span>
             </div>
             <div class="conv-header-meta-row">
-              <span id="conversation-session" class="short-id">CUST-XXXX</span>
               <div id="ticket-properties-bar" class="ticket-properties-bar">
               <div class="tp-item tp-item--priority">
                 <button id="priority-badge" class="priority-badge priority-badge--normal" type="button" aria-haspopup="true" aria-expanded="false">
@@ -969,15 +968,15 @@
         <div class="view-header-enterprise">
           <div class="view-header-meta">
             <div class="breadcrumbs-bar">
-              <span class="breadcrumb-item">WORKSPACE</span>
+              <span class="breadcrumb-item">Workspace</span>
               <span class="breadcrumb-sep">/</span>
-              <span class="breadcrumb-item active">CUSTOMER INTELLIGENCE 360°</span>
+              <span class="breadcrumb-item active">Customers</span>
             </div>
             <div class="view-title-row">
               <h1 class="view-title">Customer Accounts Directory</h1>
               <span class="count-pill" id="customer-total-badge">10 Verified Accounts</span>
             </div>
-            <p class="view-subtitle">Global accounts, lifetime value, relationship health, churn risk, and omnichannel conversation history.</p>
+            <p class="view-subtitle">Everyone who has contacted you, with ticket history, ratings and account health. Plan, spend and region appear when your store provides them.</p>
           </div>
           <div class="header-actions">
             <button class="btn-enterprise-primary" id="customer-export-btn">
@@ -1063,7 +1062,7 @@
       <div class="drawer-header">
         <div class="drawer-header-info">
           <div class="drawer-avatar-wrap">
-            <img id="drawer-customer-avatar" src="images/default-avatar.png?v=2" class="drawer-avatar" alt="Avatar">
+            <span id="drawer-customer-avatar" class="drawer-avatar av av-0" style="--av:56px" aria-hidden="true"></span>
           </div>
           <div>
             <div style="display: flex; align-items: center; gap: 8px;">
@@ -1149,9 +1148,9 @@
         <div class="view-header-enterprise">
           <div class="view-header-meta">
             <div class="breadcrumbs-bar">
-              <span class="breadcrumb-item">WORKSPACE</span>
+              <span class="breadcrumb-item">Workspace</span>
               <span class="breadcrumb-sep">/</span>
-              <span class="breadcrumb-item active">ANALYTICS</span>
+              <span class="breadcrumb-item active">Analytics</span>
             </div>
             <div class="view-title-row">
               <h1 class="view-title">Analytics</h1>
@@ -1185,7 +1184,7 @@
         <div class="dashboard-grid dashboard-grid-6">
           <div class="metric-card-enterprise">
             <div class="metric-header-enterprise">
-              <span class="metric-label-enterprise">TOTAL VOLUME</span>
+              <span class="metric-label-enterprise">Total volume</span>
               <span class="status-chip chip-info" id="kpi-volume-chip">Inbound</span>
             </div>
             <div class="metric-main-enterprise">
@@ -1200,7 +1199,7 @@
 
           <div class="metric-card-enterprise">
             <div class="metric-header-enterprise">
-              <span class="metric-label-enterprise">SLA COMPLIANCE</span>
+              <span class="metric-label-enterprise">SLA compliance</span>
               
             </div>
             <div class="metric-main-enterprise">
@@ -1215,7 +1214,7 @@
 
           <div class="metric-card-enterprise">
             <div class="metric-header-enterprise">
-              <span class="metric-label-enterprise">FIRST RESPONSE (FRT)</span>
+              <span class="metric-label-enterprise">First response (FRT)</span>
               
             </div>
             <div class="metric-main-enterprise">
@@ -1230,7 +1229,7 @@
 
           <div class="metric-card-enterprise">
             <div class="metric-header-enterprise">
-              <span class="metric-label-enterprise">MEAN RESOLUTION TIME</span>
+              <span class="metric-label-enterprise">Mean resolution time</span>
               <span class="status-chip chip-info">MTTR</span>
             </div>
             <div class="metric-main-enterprise">
@@ -1245,7 +1244,7 @@
 
           <div class="metric-card-enterprise">
             <div class="metric-header-enterprise">
-              <span class="metric-label-enterprise">FIRST CONTACT RESOLUTION</span>
+              <span class="metric-label-enterprise">First contact resolution</span>
               <span class="status-chip chip-success">One-touch</span>
             </div>
             <div class="metric-main-enterprise">
@@ -1260,7 +1259,7 @@
 
           <div class="metric-card-enterprise">
             <div class="metric-header-enterprise">
-              <span class="metric-label-enterprise">CSAT SATISFACTION</span>
+              <span class="metric-label-enterprise">CSAT satisfaction</span>
               <span class="status-chip chip-gold" id="analytics-csat-count">—</span>
             </div>
             <div class="metric-main-enterprise">
@@ -1472,7 +1471,9 @@
     </div>
   </div>
 
-  <script src="agent.js?v=250"></script>
+  <script src="agent.js?v=254"></script>
+  <script src="palette.js?v=4"></script>
+  <script src="customer-panel.js?v=1"></script>
 </body>
 </html>
 

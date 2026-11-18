@@ -59,10 +59,29 @@ let socket = null;
 window.WRENNON_DEMO = false;
 // Customer avatars come from a third-party service keyed by the customer's email, so that
 // is demo-only. Real customers get the local default avatar (no PII leaves the browser).
-function customerAvatarUrl(key) {
-  return window.WRENNON_DEMO
-    ? `https://i.pravatar.cc/150?u=${encodeURIComponent(key)}`
-    : 'images/default-avatar.png?v=2';
+function customerAvatarUrl() {
+  // Customers have no photo on record; initials are drawn locally (see initialsAvatar).
+  return 'images/default-avatar.png?v=2';
+}
+
+// Initials avatar. Nothing is requested from an image service, so no customer email leaves the browser.
+function avatarInitials(label) {
+  let s = String(label || '').trim();
+  if (s.includes('@')) s = s.split('@')[0];
+  const words = s.split(/[\s._\-+]+/).filter(w => /[\p{L}\p{N}]/u.test(w));
+  if (!words.length) return '?';
+  const first = (w) => (Array.from(w.replace(/[^\p{L}\p{N}]/gu, ''))[0] || '');
+  const out = words.length === 1 ? first(words[0]) : first(words[0]) + first(words[1]);
+  return (out || '?').toUpperCase();
+}
+function avatarTone(key) {
+  let h = 0; const s = String(key || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h) % 7;
+}
+function initialsAvatar(label, key, size) {
+  const px = size || 28;
+  return `<span class="av av-${avatarTone(key || label)}" style="--av:${px}px" aria-hidden="true">${avatarInitials(label)}</span>`;
 }
 let activeSessionId = null;
 // SECURITY: the JWT lives ONLY in the httpOnly access_token cookie. It must never be
@@ -104,7 +123,6 @@ const activeCount = document.getElementById("active-count");
 const emptyState = document.getElementById("empty-state");
 const activeConversationEl = document.getElementById("active-conversation");
 const conversationEmail = document.getElementById("conversation-email");
-const conversationSession = document.getElementById("conversation-session");
 const agentMessages = document.getElementById("agent-messages");
 const agentInput = document.getElementById("agent-message-input");
 
@@ -635,9 +653,8 @@ function connectSocket() {
       }
     } else if (data.type === "presence") {
       const badge = document.getElementById("team-online-badge");
-      if (badge) {
-        const count = Array.isArray(data.online_agents) ? Math.max(4, data.online_agents.length) : 4;
-        badge.textContent = `${count} Specialists Online`;
+      if (badge && Array.isArray(data.online_agents)) {
+        badge.textContent = `${data.online_agents.length} online`;
       }
     } else {
       console.warn("Unrecognized WebSocket message:", data);
@@ -732,6 +749,9 @@ async function loadConversations() {
   };
   
   let endpoint = endpoints[activeSection] || endpoints["my_cases"];
+  if (!conversationList.querySelector('.conv-item')) {
+    conversationList.innerHTML = Array.from({ length: 6 }, () => '<div class="conv-skel"><span class="skeleton sk-avatar"></span><span class="sk-lines"><span class="skeleton sk-line"></span><span class="skeleton sk-line sk-short"></span></span></div>').join('');
+  }
   
   const pri = document.getElementById("filter-priority")?.value;
   const ass = document.getElementById("filter-assignee")?.value;
@@ -755,6 +775,7 @@ async function loadConversations() {
   ]);
 
   if (!conversations) {
+    if (conversationList.querySelector('.conv-skel')) conversationList.innerHTML = '<div class="list-empty">Could not load conversations.</div>';
     return;
   }
 
@@ -770,6 +791,7 @@ async function loadConversations() {
 }
 
 function renderConversationList(conversations) {
+  window.__wrennonConversations = conversations;   // read by the command palette
   conversationList.innerHTML = "";
   selectedConversations.clear();
   updateBulkActionBar();
@@ -777,12 +799,13 @@ function renderConversationList(conversations) {
   for (const conv of conversations) {
     const item = document.createElement("div");
     item.className = "conv-item";
+    item.dataset.email = conv.customer_email || "";
     item.dataset.sessionId = conv.session_id;
     item.dataset.updatedAt = conv.updated_at || '';
     item.setAttribute("role", "group");
     item.tabIndex = 0;
     item.setAttribute("aria-label", `Conversation with ${conv.customer_name || conv.customer_email || "unknown customer"}`);
-    if (conv.handoff_active && !conv.resolved) item.classList.add("conv-item--urgent");
+    if (conv.sla_status === "breached" && !conv.resolved) item.classList.add("conv-item--urgent");
     if (conv.session_id === activeSessionId) {
       item.classList.add("conv-item--selected");
       item.setAttribute("aria-current", "true");
@@ -836,13 +859,24 @@ function renderConversationList(conversations) {
     }
 
     const customerDisplayName = conv.customer_name || conv.customer_email || "Customer";
-    let avatarHtml = "";
-    if (!conv.customer_name && !conv.customer_email) {
-      avatarHtml = `<img src="images/default-avatar.png?v=2" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border-light); box-shadow: 0 1px 3px rgba(0,0,0,0.1);" alt="Avatar">`;
-    } else {
-      const dpId = conv.customer_email || conv.customer_id || conv.session_id || hash;
-      avatarHtml = `<img src="https://i.pravatar.cc/150?u=${encodeURIComponent(dpId)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border-light); box-shadow: 0 1px 3px rgba(0,0,0,0.1);" alt="Avatar" onerror="this.src='images/default-avatar.png?v=2'">`;
-    }
+    const avatarHtml = initialsAvatar(customerDisplayName, conv.customer_email || conv.customer_id || conv.session_id, 28);
+
+    // One badge at a time, the most urgent first; the rest are summarised as "+N" with a tooltip.
+    const stageBadge = `<span class="badge ${badgeClass}">${escapeHtml(stageText)}</span>`;
+    const needsHuman = !conv.resolved && conv.handoff_active && !conv.handled_by;
+    const sentRank = /badge--sent-neg|badge--sent-warn/.test(sentimentBadge) ? 60 : (/badge--sent-pos/.test(sentimentBadge) ? 20 : 30);
+    const ranked = [
+      conv.sla_status === 'breached' && [100, slaBadge, 'SLA breached'],
+      conv.sla_status === 'warning' && [90, slaBadge, 'SLA at risk'],
+      [needsHuman ? 80 : 40, stageBadge, stageText],
+      conv.is_mentioned && [75, mentionedBadge, 'Mentioned'],
+      sentimentBadge && [sentRank, sentimentBadge, conv.sentiment],
+      conv.reopen_count > 0 && [50, reopenBadge, 'Reopened'],
+      languageBadge && [30, languageBadge, conv.language],
+    ].filter(Boolean).sort((x, y) => y[0] - x[0]);
+    const restBadges = ranked.slice(1);
+    const badgeRowHtml = ranked[0][1] + (restBadges.length
+      ? `<span class="badge badge-more" title="${escapeHtml(restBadges.map(r => r[2]).join(' · '))}">+${restBadges.length}</span>` : '');
 
     const unreadCount = conv.unread_count || (conv.handoff_active && !conv.resolved ? 1 : 0);
     const unreadBadgeHtml = unreadCount > 0 
@@ -868,14 +902,7 @@ function renderConversationList(conversations) {
           <span class="conv-item-snippet" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${formatPreview(conv)}</span>
           ${unreadBadgeHtml}
         </div>
-        <div class="badge-row">
-          <span class="badge ${badgeClass}">${stageText}</span>
-          ${mentionedBadge}
-          ${slaBadge}
-          ${sentimentBadge}
-          ${languageBadge}
-          ${reopenBadge}
-        </div>
+        <div class="badge-row">${badgeRowHtml}        </div>
       </div>
     `;
 
@@ -888,6 +915,9 @@ function renderConversationList(conversations) {
       }
     });
     conversationList.appendChild(item);
+  }
+  if (!conversations.length) {
+    conversationList.innerHTML = '<div class="list-empty">No conversations here yet.</div>';
   }
 }
 
@@ -995,21 +1025,19 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
   const headerAvatarEl = document.getElementById("conv-header-avatar");
   if (headerAvatarEl) {
     const dpId = customerEmail || sessionId || "Customer";
-    headerAvatarEl.innerHTML = `<img src="https://i.pravatar.cc/150?u=${encodeURIComponent(dpId)}" onerror="this.onerror=null; this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='block';" alt="" style="width:100%; height:100%; border-radius:50%; object-fit:cover;"><span style="display:none; font-weight:700;">${(customerEmail ? customerEmail.substring(0, 2) : 'CU').toUpperCase()}</span>`;
+    headerAvatarEl.innerHTML = initialsAvatar(customerEmail || sessionId, dpId, 36);
   }
   const ticketIdBadge = document.getElementById("ticket-id-badge");
   if (ticketIdBadge) {
     const idStr = shortId || sessionId;
     ticketIdBadge.textContent = `#${idStr.substring(0, 8).toUpperCase()}`;
   }
-  conversationSession.innerHTML = '';
-  conversationSession.style.display = 'none';
     updateViaMediaPosition();
   
   updateResolveUI(isResolved, updatedAt);
 
-  // Clear sidebars immediately to prevent showing old data while loading
-  clearCustomerSidebar();
+  // Draw the customer panel right now from what is on screen; it fills in as data arrives
+  if (window.CustomerPanel) window.CustomerPanel.open(sessionId, customerEmail);
   hideOrderPopup();
   resetTicketPropertiesBar();
   document.getElementById("slash-command-popup")?.classList.remove("active");
@@ -1023,12 +1051,13 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
   
   agentMessages.innerHTML = "<div class='loading-spinner'></div>";
   hasUnreadIndicator = false;
-  agentInput.focus();
+  // Keyboard navigation (J/K) keeps focus out of the composer so the next keypress still navigates
+  if (!(window.__kbdNavUntil > Date.now())) agentInput.focus();
 
-  await fetchAndRenderMessages(sessionId);
-
+  // These don't depend on the messages, so start them together instead of one after another
   fetchOrderContext(sessionId);
   loadTicketProperties(sessionId);
+  await fetchAndRenderMessages(sessionId);
   loadConversations();
 }
 
@@ -2136,11 +2165,10 @@ async function fetchOrderContext(sessionId) {
         }
       }
     } else {
-      clearCustomerSidebar();
+      showCustomerSidebar(null, false);
     }
   } else {
     hideOrderPopup();
-    clearCustomerSidebar();
   }
 }
 
@@ -3373,296 +3401,14 @@ function handleLightboxKeydown(e) {
 
 // ── Customer Details Logic ──
 
-let currentlyShowingCustomerId = null;
-
 function extractAndShowCustomerDetails(text) {
   // Handled entirely by the backend now; UI auto-updates on fetchOrderContext.
 }
 
-function showCustomerSidebar(customer, isDemo = false) {
-  currentlyShowingCustomerId = customer.id;
-  const sidebar = document.getElementById("customer-sidebar");
-  const content = document.getElementById("customer-sidebar-content");
-  
-  if (!sidebar || !content) return;
-  
-  const interactions = [
-    { action: `Conversation with ${customer.name || 'Agent'}`, time: 'Active now', status: 'O', highlight: true }
-  ];
-
-  const totalOrders = customer.total_orders || 0;
-  const recentOrderStr = customer.recent_order || '12965';
-  let recentOrderNum = parseInt(recentOrderStr.toString().replace(/\D/g, ''));
-  if (isNaN(recentOrderNum)) recentOrderNum = 12965;
-  
-  const cId = customer.id || "CUST";
-  let hash = 0;
-  for (let c = 0; c < cId.length; c++) {
-    hash = ((hash << 5) - hash) + cId.charCodeAt(c);
-    hash |= 0;
-  }
-  const mulberry32 = (a) => {
-      return function() {
-        var t = a += 0x6D2B79F5;
-        t = Math.imul(t ^ t >>> 15, t | 1);
-        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-        return ((t ^ t >>> 14) >>> 0) / 4294967296;
-      }
-  }
-  const prng = mulberry32(Math.abs(hash));
-  
-  const formatDate = (d) => {
-       const hour = d.getHours();
-       const minute = d.getMinutes();
-       const ampm = hour >= 12 ? 'PM' : 'AM';
-       const hour12 = hour % 12 || 12;
-       const month = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getMonth()];
-       const day = String(d.getDate()).padStart(2, '0');
-       return `${month} ${day}, ${hour12}:${String(minute).padStart(2, '0')} ${ampm}`;
-  };
-
-  const possibleActions = [
-      { action: 'Left a 5-star review', status: 'empty' },
-      { action: 'Added items to Wishlist', status: 'empty' },
-      { action: 'Contacted support via Email', status: 'P' },
-      { action: 'Requested a return (RMA)', status: 'empty' },
-      { action: 'Browsed Help Center articles', status: 'empty' },
-      { action: 'Subscribed to Newsletter', status: 'empty' },
-      { action: 'Used a discount code', status: 'empty' },
-      { action: 'Reported a delayed shipment', status: 'O' }
-  ];
-
-  let currentPastOrderId = (recentOrderNum * 10000) + Math.floor(prng() * 9000);
-  const currentDate = new Date(2026, 7, 8, 9, 5); // Aug 08, 9:05 AM
-  
-  if (!isDemo) {
-    // Real store: show only what we actually know. The generated history below is demo-only.
-    if (customer.recent_order) interactions.push({ action: `Most recent order #${customer.recent_order}`, time: '', status: 'empty' });
-  } else if (totalOrders > 0) {
-    interactions.push({ action: `Ordered #${recentOrderStr}`, time: formatDate(currentDate), status: 'empty' });
-    
-    for (let i = 1; i < totalOrders; i++) {
-       currentDate.setDate(currentDate.getDate() - (10 + Math.floor(prng() * 30)));
-       currentDate.setHours(8 + Math.floor(prng() * 12), Math.floor(prng() * 60));
-       
-       currentPastOrderId -= (1500 + Math.floor(prng() * 3500));
-       
-       interactions.push({ action: `Ordered #${currentPastOrderId}`, time: formatDate(currentDate), status: 'empty' });
-       
-       const numInteractions = Math.floor(prng() * 2) + 1;
-       for (let j = 0; j < numInteractions; j++) {
-           const actObj = possibleActions[Math.floor(prng() * possibleActions.length)];
-           const interactionDate = new Date(currentDate);
-           interactionDate.setDate(interactionDate.getDate() - Math.floor(prng() * 5));
-           interactions.push({ action: actObj.action, time: formatDate(interactionDate), status: actObj.status });
-       }
-    }
-  }
-
-  if (isDemo) {
-    currentDate.setDate(currentDate.getDate() - (30 + Math.floor(prng() * 60)));
-    interactions.push({ action: 'Account created / Sign up', time: formatDate(currentDate), status: 'S' });
-  }
-
-  window.addCustomerNote = function(inputElem, event) {
-    if (event.key !== 'Enter') return;
-    const text = inputElem.value.trim();
-    if (!text) return;
-    inputElem.value = '';
-    const container = inputElem.parentElement.previousElementSibling;
-    const noteDiv = document.createElement('div');
-    noteDiv.style.cssText = 'background: color-mix(in srgb, var(--accent) 8%, transparent); padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--ink); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; line-height: 1.4; margin-bottom: 6px;';
-    const escapedText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    noteDiv.innerHTML = `
-      <span style="flex:1;word-break:break-word;">${escapedText}</span>
-      <button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:2px;margin:-2px;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:color 0.2s, background 0.2s;" onmouseover="this.style.color='var(--danger)';this.style.background='color-mix(in srgb, var(--danger) 10%, transparent)'" onmouseout="this.style.color='var(--text-muted)';this.style.background='none'">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-      </button>
-    `;
-    container.appendChild(noteDiv);
-  };
-
-  const getStatusIcon = (item) => {
-    const act = item.action.toLowerCase();
-    let bgClass = "bg-gray";
-    if (item.status === 'O') bgClass = "bg-red";
-    if (item.status === 'P') bgClass = "bg-blue";
-    if (item.status === 'empty') bgClass = "border-only";
-    
-    let iconSvg = '';
-    if (act.includes('conversation') || act.includes('chat')) {
-      iconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
-    }
-    else if (act.includes('order') || act.includes('receipt')) {
-      iconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>`;
-    }
-    else if (act.includes('email') || act.includes('address')) {
-      iconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>`;
-    }
-    else if (act.includes('article') || act.includes('viewed')) {
-      iconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`;
-    }
-    else {
-      iconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
-    }
-
-    if (bgClass === "border-only") {
-      return `<div class="status-icon" style="background:transparent; border:1px solid var(--line); color:var(--text-muted); width:20px; height:20px; border-radius:4px;">${iconSvg}</div>`;
-    }
-
-    return `<div class="status-icon ${bgClass}">${iconSvg}</div>`;
-  };
-
-  content.innerHTML = `
-    <div class="mobile-customer-sidebar-header">
-      <button id="customer-sidebar-close" class="mobile-back-btn" onclick="hideCustomerSidebar()" aria-label="Close" title="Back">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
-      <span style="font-size:16px; font-weight:600; color:var(--text-main);">Customer Details</span>
-    </div>
-    <div class="customer-details-box">
-      <div class="customer-profile-compact">
-        <div class="customer-profile__avatar-small">
-          <img src="${customerAvatarUrl(customer.email || customer.id)}" alt="Avatar" onerror="this.src='images/default-avatar.png?v=2'">
-        </div>
-        <div class="customer-profile-info">
-          <div style="display:flex; flex-direction:column; gap:2px; flex:1; overflow:hidden;">
-            <div class="customer-profile__name" style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(customer.name)}</div>
-            <div class="customer-profile__id" style="display:inline-block; width:fit-content; margin-top:2px; font-size:11px; color:var(--text-muted); font-weight:normal;">#${escapeHtml(customer.id)}</div>
-          </div>
-          <div class="customer-profile-actions" style="margin-top:2px;">
-             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
-           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-        </div>
-      </div>
-    </div>
-    
-    <div class="customer-contact-list">
-      <div class="contact-item">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-        <span class="value link">${escapeHtml(customer.email)}</span>
-      </div>
-      <div class="contact-item">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-        <span class="value">${escapeHtml(customer.phone || (isDemo ? '+1 (415) 123-2399' : 'Not available'))}</span>
-      </div>
-      <div class="contact-item">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-        <span class="value">${isDemo ? 'United States' : 'Not available'}</span>
-      </div>
-      <div class="contact-item">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
-        <span class="value">Total Orders: <strong>${customer.total_orders || 0}</strong></span>
-      </div>
-      <div class="contact-item tags">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
-        <div class="customer-tags-inline">
-          ${(customer.tags || (isDemo ? ['premium', 'priority shopping'] : [])).map(tag => `<span class="customer-tag">${escapeHtml(tag.toLowerCase())}</span>`).join('')}
-        </div>
-      </div>
-      <div class="contact-item note" style="flex-direction: column; align-items: flex-start; margin-top: -4px; width: 100%;">
-        <div id="saved-notes-container" style="display: flex; flex-direction: column; width: 100%;"></div>
-        <div style="display: flex; gap: 10px; width: 100%; align-items: center;">
-          <svg style="flex-shrink: 0; color: var(--text-muted);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-          <input type="text" class="note-input-field" placeholder="Add user notes..." style="flex: 1; border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); border-radius: 6px; background: color-mix(in srgb, var(--bg-surface) 50%, transparent); color: var(--ink); font-size: 13px; outline: none; padding: 8px 12px; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='color-mix(in srgb, var(--line) 80%, transparent)'" onkeydown="window.addCustomerNote(this, event)">
-        </div>
-      </div>
-    </div>
-
-    <div class="interactions-section">
-      <div class="interactions-header">
-        <div class="customer-section__title">Interactions</div>
-        <div class="interactions-actions">
-           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Wishlist"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Cart"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
-           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Filter"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
-           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Refresh"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-        </div>
-      </div>
-      <div class="interactions-timeline-compact">
-        ${interactions.map((item, index) => `
-          <div class="timeline-item-compact ${item.highlight ? 'highlight' : ''}">
-            <div class="timeline-status-col">
-               ${getStatusIcon(item)}
-               ${index < interactions.length - 1 ? '<div class="timeline-line"></div>' : ''}
-            </div>
-            <div class="timeline-content">
-              <div class="timeline-action">${escapeHtml(item.action)}</div>
-              <div class="timeline-time">${escapeHtml(item.time)}</div>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-    </div>
-  `;
-  
-  sidebar.classList.remove("hidden");
-  
-  const toggleBtn = document.getElementById("customer-sidebar-toggle");
-  if (toggleBtn) {
-    const avatarUrl = customerAvatarUrl(customer.email || customer.id);
-    toggleBtn.innerHTML = `<img src="${avatarUrl}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" alt="Customer Details" onerror="this.src='images/default-avatar.png?v=2'">`;
-    toggleBtn.style.padding = "2px";
-    toggleBtn.style.borderRadius = "50%";
-  }
-}
-
-function hideCustomerSidebar() {
-  const sidebar = document.getElementById("customer-sidebar");
-  if (sidebar) {
-    sidebar.classList.add("hidden");
-  }
-}
-
-function clearCustomerSidebar() {
-  hideCustomerSidebar();
-  currentlyShowingCustomerId = null;
-  
-  const toggleBtn = document.getElementById("customer-sidebar-toggle");
-  if (toggleBtn) {
-    toggleBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
-    toggleBtn.style.padding = "0";
-    toggleBtn.style.borderRadius = "10px";
-  }
-}
-
-// Toggle Sidebar Buttons
-(function setupSidebarToggles() {
-  const toggleBtn = document.getElementById("customer-sidebar-toggle");
-  const closeBtn = document.getElementById("customer-sidebar-close");
-  const sidebar = document.getElementById("customer-sidebar");
-  
-  if (toggleBtn) {
-    toggleBtn.addEventListener("click", () => {
-      if (sidebar && sidebar.classList.contains("hidden")) {
-        // If no customer is detected yet, do nothing. Backend handles context auto-open.
-        if (!currentlyShowingCustomerId) {
-          // Do nothing
-        } else {
-          sidebar.classList.remove("hidden");
-        }
-      } else {
-        hideCustomerSidebar();
-      }
-    });
-  }
-  
-  // Auto-hide customer sidebar when screen becomes too small
-  window.addEventListener("resize", () => {
-    if (window.innerWidth <= 820) {
-      hideCustomerSidebar();
-    }
-  });
-  if (closeBtn) {
-    closeBtn.addEventListener("click", hideCustomerSidebar);
-  }
-})();
+// The panel itself lives in customer-panel.js; these keep the older call sites working.
+function showCustomerSidebar(customer, isDemo = false) { if (window.CustomerPanel) window.CustomerPanel.setOrderContext(customer, isDemo); }
+function hideCustomerSidebar() { if (window.CustomerPanel) window.CustomerPanel.hide(); }
+function clearCustomerSidebar() { if (window.CustomerPanel) window.CustomerPanel.reset(); }
 
 // ── Ticket Properties Bar: priority / assignee / tags ──
 // State for whichever conversation is currently open. Kept separate from
@@ -4511,6 +4257,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // 1. Dashboard loading. Every number comes from /agent/dashboard-summary, which only reports
   //    what it measured; null means "nothing to measure yet" and is shown as an em dash.
   window.loadDashboard = async function() {
+    const view = document.getElementById('view-dashboard');
+    if (view) view.classList.add('is-loading');
     try {
       const res = await fetch(`${API_BASE}/agent/dashboard-summary`, { headers: getAuthHeaders(), credentials: 'include' });
       if (!res.ok) { setText('dash-updated', 'Could not load'); return; }
@@ -4643,7 +4391,7 @@ document.addEventListener('DOMContentLoaded', () => {
           return `
             <div class="team-agent-row">
               <div class="team-agent-left">
-                <img src="${ink(m.avatar || 'images/default-avatar.png?v=2')}" class="team-agent-avatar" alt="" onerror="this.src='images/default-avatar.png?v=2'">
+                ${m.is_ai ? '<img src="images/wren-mark.svg" class="team-agent-avatar" alt="">' : (m.avatar && !/default-avatar/.test(m.avatar) ? `<img src="${ink(m.avatar)}" class="team-agent-avatar" alt="" onerror="this.src='images/default-avatar.png?v=2'">` : initialsAvatar(m.name, m.username || m.name, 32))}
                 <div>
                   <div class="team-agent-name">${ink(m.name)}</div>
                   <div class="team-agent-role">${ink(m.role)}</div>
@@ -4691,11 +4439,15 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {
       console.error("Failed to load dashboard summary", e);
       setText('dash-updated', 'Could not load');
+    } finally {
+      if (view) view.classList.remove('is-loading');
     }
   };
 
   // 2. Analytics Loading Logic
   window.loadAnalytics = async function(overrideRange) {
+    const aView = document.getElementById('view-analytics');
+    if (aView) aView.classList.add('is-loading');
     try {
       const rangeSelect = document.getElementById('analytics-date-range');
       if (overrideRange && rangeSelect) rangeSelect.value = overrideRange;
@@ -4801,7 +4553,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.innerHTML = `
               <td>
                 <div style="display: flex; align-items: center; gap: 10px;">
-                  <img src="${avatarUrl}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="">
+                  ${isAi ? '<img src="images/wren-mark.svg" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;" alt="">' : initialsAvatar(ag.handled_by, ag.handled_by, 28)}
                   <strong style="color: var(--ink);">${ink(ag.handled_by)}</strong>
                 </div>
               </td>
@@ -4817,6 +4569,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (e) {
       console.error("Failed to load analytics", e);
+    } finally {
+      if (aView) aView.classList.remove('is-loading');
     }
 
     // Fetch system revenue & scorecards
@@ -5358,11 +5112,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const customersPerPage = 10;
 
     window.loadCustomers = async function() {
+        const body = document.getElementById('customers-table-body');
+        if (body && !window.customersData) {
+            body.innerHTML = Array.from({ length: 8 }, () => '<tr><td colspan="9"><span class="skeleton sk-row"></span></td></tr>').join('');
+        }
         try {
             const res = await fetch(`${API_BASE}/agent/customers`, {
                 headers: getAuthHeaders(),
                 credentials: 'include'
             });
+            if (!res.ok && body) body.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 24px; color: var(--ink-muted);">Could not load customers.</td></tr>';
             if (res.ok) {
                 window.customersData = await res.json();
                 const totalBadge = document.getElementById('customer-total-badge');
@@ -5439,6 +5198,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return `${days}d ago`;
         }
 
+        const all = window.customersData || [];
+        const table = document.getElementById('customers-table');
+        if (table) {
+            table.classList.toggle('hide-col-tier', !all.some(c => c.tier));
+            table.classList.toggle('hide-col-ltv', !all.some(c => c.lifetime_value || c.total_orders != null));
+            table.classList.toggle('hide-col-region', !all.some(c => c.location));
+        }
         tbody.innerHTML = paginated.map(c => {
             const avatarUrl = c.email ? customerAvatarUrl(c.email) : 'images/default-avatar.png?v=2';
             const resRatio = c.resolved_ratio != null ? Math.round(c.resolved_ratio * 100) : 0;
@@ -5448,7 +5214,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const tier = c.tier || '';
             const tierClass = tier.toLowerCase().includes('enterprise') ? 'enterprise' : (tier.toLowerCase().includes('gold') ? 'gold' : (tier.toLowerCase().includes('silver') ? 'silver' : (tier.toLowerCase().includes('bronze') ? 'bronze' : 'starter')));
             
-            let healthClass = 'healthy';
+            let healthClass = c.health_score == null ? 'nodata' : 'healthy';
             if ((c.health_label || '').toLowerCase().includes('risk')) healthClass = 'risk';
             else if ((c.health_label || '').toLowerCase().includes('neutral')) healthClass = 'neutral';
 
@@ -5458,7 +5224,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <tr onclick="openCustomerDrawer('${safeEmail}')" style="cursor: pointer;">
                     <td>
                         <div class="customer-cell" style="display: flex; align-items: center; gap: 10px;">
-                            <img src="${avatarUrl}" class="avatar" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="Avatar" onerror="this.src='images/default-avatar.png?v=2'">
+                            ${initialsAvatar(c.name || c.email, c.email, 32)}
                             <div>
                                 <div class="name" style="font-weight: 600; color: var(--text-main, var(--ink)); font-size: 13.5px;">${escapeHtml(c.name || safeEmail)}${c.demo ? ' <span class="badge" title="Sample data from demo mode (USE_MOCK_INTEGRATIONS)">Demo</span>' : ''}</div>
                                 <div class="email" style="font-size: 11.5px; color: var(--text-dim); font-family: var(--font-mono, monospace);">${safeEmail}</div>
@@ -5486,7 +5252,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </td>
                     <td>
-                        <span style="display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: var(--warning); font-size: 13px;">
+                        <span class="${c.avg_csat == null ? 'no-rating' : ''}" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: var(--warning); font-size: 13px;">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
                             ${avgCsatVal}
                         </span>
@@ -5559,7 +5325,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tierEl.className = `badge badge-tier badge-tier-${tierClass}`;
         }
         const avatarEl = document.getElementById('drawer-customer-avatar');
-        if (avatarEl) avatarEl.src = customerAvatarUrl(cust.email);
+        if (avatarEl) { avatarEl.className = `drawer-avatar av av-${avatarTone(cust.email)}`; avatarEl.style.setProperty('--av', '56px'); avatarEl.textContent = avatarInitials(cust.name || cust.email); }
 
         // KPI cards
         const ltvEl = document.getElementById('drawer-kpi-ltv');
