@@ -4853,7 +4853,7 @@ html[data-theme] .msg-content--user .msg,
   background-color: #ffffff !important;
   color: #1e293b !important;
   border: 1px solid rgba(226, 232, 240, 0.95) !important;
-  border-left: 3.5px solid var(--accent, #0d9488) !important;
+  border-left: 2px solid var(--accent, #0d9488) !important;
   border-radius: 4px 16px 16px 16px !important;
   padding: 10px 14px 10px 14px !important;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 3px 8px rgba(15, 23, 42, 0.02) !important;
@@ -4877,8 +4877,70 @@ html[data-theme^="dark"] .msg-content--user .msg,
   background-color: #1e293b !important;
   color: #f1f5f9 !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-left: 3.5px solid var(--accent, #14b8a6) !important;
+  border-left: 2px solid var(--accent, #14b8a6) !important;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28) !important;
+}
+
+/* Ensure voice and photo messages have zero bubble/box wrapper */
+.msg--voice-only,
+.msg:has(.voice-player),
+.msg--image-only,
+.msg:has(.chat-lightbox-image),
+.msg:has(> p:only-child > .chat-lightbox-image:only-child),
+.msg:has(> .chat-lightbox-image:only-child),
+.msg:has(> p:only-child > .voice-player:only-child),
+.msg:has(> .voice-player:only-child),
+.msg-content--human .msg--voice-only,
+.msg-content--human .msg:has(.voice-player),
+.msg-content--human .msg--image-only,
+.msg-content--human .msg:has(.chat-lightbox-image),
+.msg-content--user .msg--voice-only,
+.msg-content--user .msg:has(.voice-player),
+.msg-content--user .msg--image-only,
+.msg-content--user .msg:has(.chat-lightbox-image),
+.msg-content--agent .msg--voice-only,
+.msg-content--agent .msg:has(.voice-player),
+.msg-content--agent .msg--image-only,
+.msg-content--agent .msg:has(.chat-lightbox-image),
+[data-theme] .msg--voice-only,
+[data-theme] .msg:has(.voice-player),
+[data-theme] .msg--image-only,
+[data-theme] .msg:has(.chat-lightbox-image),
+[data-theme] .msg-content .msg--voice-only,
+[data-theme] .msg-content .msg:has(.voice-player),
+[data-theme] .msg-content .msg--image-only,
+[data-theme] .msg-content .msg:has(.chat-lightbox-image) {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+.msg--voice-only::before,
+.msg:has(.voice-player)::before,
+.msg--image-only::before,
+.msg:has(.chat-lightbox-image)::before,
+.msg--voice-only::after,
+.msg:has(.voice-player)::after,
+.msg--image-only::after,
+.msg:has(.chat-lightbox-image)::after,
+html[data-theme] .msg--voice-only::before,
+html[data-theme] .msg:has(.voice-player)::before,
+html[data-theme] .msg--image-only::before,
+html[data-theme] .msg:has(.chat-lightbox-image)::before,
+[data-theme] .msg--voice-only::before,
+[data-theme] .msg:has(.voice-player)::before,
+[data-theme] .msg--image-only::before,
+[data-theme] .msg:has(.chat-lightbox-image)::before {
+  display: none !important;
+  content: none !important;
+  border: none !important;
 }
 
 /* 3. Natural Text Flow, Paragraphs & Line Breaks */

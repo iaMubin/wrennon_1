@@ -88,9 +88,8 @@ def render(db: Session, ctx: Dict[str, Any]) -> Optional[str]:
     lines.append("- Bag: " + ("; ".join(cart) + f". Subtotal {svc.money(total)}." if cart else "empty."))
     if not lines:
         return None
-    return ("Live storefront context (sent by the website, not typed by the customer; names, prices and stock are read from the database). "
-            "Use it to resolve words like 'this', 'it', 'the one I'm looking at' or 'my bag', and to answer stock/size/price questions. "
-            "Do not recite it unprompted.\n" + "\n".join(lines))
+    return ("Live storefront context (from the website; prices and stock from the database). Use it for 'this', 'it', 'my bag'; don't recite it.\n"
+            + "\n".join(lines))
 
 
 def page_context_for(session_id: str) -> Optional[str]:

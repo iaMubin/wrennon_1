@@ -1,14 +1,25 @@
 // ── Backend URL detection ──────────────────────────────────────────
 const _RENDER_HOST = "wrennon-1.onrender.com";
-const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const BACKEND_URL = IS_LOCAL ? `http://127.0.0.1:8000` : `https://${_RENDER_HOST}`;
+const IS_LOCAL = window.location.hostname === 'localhost' || 
+                 window.location.hostname === '127.0.0.1' || 
+                 window.location.hostname === '0.0.0.0' || 
+                 window.location.protocol === 'file:' || 
+                 !window.location.hostname;
+
+const LOCAL_HOST = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? window.location.host
+  : '127.0.0.1:8000';
+
+const BACKEND_URL = IS_LOCAL 
+  ? `${window.location.protocol === 'https:' ? 'https:' : 'http:'}//${LOCAL_HOST}`
+  : `https://${_RENDER_HOST}`;
 
 const API_BASE = `${BACKEND_URL}/api`;
 // Multi-tenant installs: <script src=".../widget.js" data-tenant-key="wt_..."> picks the store.
 // (document.currentScript is only valid while the script first runs, so capture it here.)
 const TENANT_KEY = (document.currentScript && document.currentScript.dataset.tenantKey) || window.WRENNON_TENANT_KEY || "";
 const WS_URL = IS_LOCAL 
-  ? `ws://127.0.0.1:8000/ws/customer`
+  ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${LOCAL_HOST}/ws/customer`
   : `wss://${_RENDER_HOST}/ws/customer`;
 
 const STORAGE_KEY = "wrennon_session_id";
@@ -334,6 +345,8 @@ async function resolveSessionId() {
     } catch (err) {
       console.error("Failed to check session status:", err);
     }
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(TOKEN_KEY);
   }
 
   // No valid stored session — create a new one via backend
@@ -359,7 +372,7 @@ launcher.addEventListener("click", async (e) => {
     setPanelOpen(true);
     clearUnreadIndicator();
     scrollToBottom(true);
-    if (!hasLoadedHistory) {
+    if (!hasLoadedHistory || !socket || socket.readyState !== WebSocket.OPEN) {
       await resolveSessionId();
       await loadHistory();
       connectSocket();
@@ -645,6 +658,10 @@ let widgetReconnectTimeout = null;
 
 function connectSocket() {
   if (widgetReconnectTimeout) clearTimeout(widgetReconnectTimeout);
+  if (!SESSION_ID || !SESSION_TOKEN) {
+    console.warn("connectSocket: Missing session ID or token.");
+    return;
+  }
   // Session token goes in the Sec-WebSocket-Protocol header, not the URL, so it
   // never lands in access logs / history / Referer.
   socket = new WebSocket(`${WS_URL}/${SESSION_ID}`, ["wrennon.v1", SESSION_TOKEN]);
@@ -731,6 +748,8 @@ function connectSocket() {
     // the same dead token will never succeed. Let the person know instead
     // of silently retrying forever.
     if (event.code === 4401) {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(TOKEN_KEY);
       appendMessage("system", "Your session has expired. Please refresh the page to start a new conversation.", false);
       return;
     }
@@ -1349,6 +1368,11 @@ function sendMessage() {
   } else {
     // Backend is down or disconnected
     addToOfflineQueue(text);
+    if (!SESSION_ID || !SESSION_TOKEN) {
+      resolveSessionId().then(() => connectSocket());
+    } else if (!socket || socket.readyState === WebSocket.CLOSED) {
+      connectSocket();
+    }
   }
 }
 

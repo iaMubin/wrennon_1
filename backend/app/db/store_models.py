@@ -180,3 +180,25 @@ class StoreUiAction(Base):
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
     delivered: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=_now)
+
+
+class StorePendingMessage(Base):
+    """A message the assistant should say to a customer (e.g. "your order shipped"). Delivered into their chat when it is open."""
+    __tablename__ = "store_pending_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    customer_email: Mapped[str] = mapped_column(String(254), index=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    text: Mapped[str] = mapped_column(Text)
+    delivered: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=_now)
+
+
+class StoreNudgeLog(Base):
+    """Which proactive nudges a chat session has already received (so the assistant never nags)."""
+    __tablename__ = "store_nudge_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String(64), index=True)
+    kind: Mapped[str] = mapped_column(String(24))
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=_now)

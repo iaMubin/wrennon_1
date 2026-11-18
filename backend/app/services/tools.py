@@ -154,6 +154,16 @@ TOOL_EXECUTORS = {
     "get_my_orders": _store_tools.execute_get_my_orders,
     "add_to_bag": _store_actions.execute_add_to_bag,
     "show_page": _store_actions.execute_show_page,
+    "get_my_bag": _store_actions.execute_get_my_bag,
+    "cancel_order": _store_actions.execute_cancel_order,
+    "change_order_address": _store_actions.execute_change_order_address,
+    "change_order_size": _store_actions.execute_change_order_size,
+    "add_item_to_order": _store_actions.execute_add_item_to_order,
+    "reorder": _store_actions.execute_reorder,
+    "complete_the_look": _store_actions.execute_complete_the_look,
     # check_refund_policy / send_otp / verify_otp were unregistered: they are stubs
     # (eligibility always True, any 4-6 digit OTP accepted) and no prompt exposes them.
 }
+
+from app.services import store_activity as _store_activity  # live chips on the storefront
+_store_activity.instrument(TOOL_EXECUTORS)

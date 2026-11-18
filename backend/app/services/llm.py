@@ -20,6 +20,16 @@ from groq import AsyncGroq, BadRequestError
 import openai
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_not_exception_type
 
+
+def _groq_wait(retry_state):
+    """Wait as long as the provider says ("try again in 9.96s"), at most 15 s; otherwise back off 2/4/8 s."""
+    import re as _re
+    exc = retry_state.outcome.exception() if getattr(retry_state, "outcome", None) else None
+    m = _re.search(r"try again in ([0-9.]+)\s*(ms|s)", str(exc or ""))
+    if m:
+        return min(float(m.group(1)) / (1000 if m.group(2) == "ms" else 1) + 0.5, 15.0)
+    return min(2 * (2 ** (retry_state.attempt_number - 1)), 10)
+
 from app.config import settings
 from app.logger import logger
 from app.security.sanitize import sanitize_llm_derived
@@ -58,7 +68,7 @@ from app.security.pii import mask_pii  # noqa: E402,F401
 
 @retry(
     stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
+    wait=_groq_wait,
     reraise=True,
     retry=retry_if_not_exception_type(BadRequestError)
 )
@@ -81,7 +91,7 @@ async def _safe_groq_call(messages: list, temperature: float = 0.2, max_tokens: 
 
 @retry(
     stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
+    wait=_groq_wait,
     reraise=True,
     retry=retry_if_not_exception_type(BadRequestError)
 )

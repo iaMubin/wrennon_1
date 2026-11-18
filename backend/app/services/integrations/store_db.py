@@ -10,13 +10,14 @@ to the chatbot, with real stock levels and real prices.
 from __future__ import annotations
 
 import datetime
+import os
 from typing import Any, Callable, Dict, List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.db.store_models import StoreCustomer, StoreProduct
+from app.db.store_models import StoreCustomer, StoreOrder, StoreProduct
 from app.services import store_service as svc
 
 from .base import EcommerceProvider
@@ -53,7 +54,7 @@ class StoreDBProvider(EcommerceProvider):
 
     def list_orders(self, email: str, limit: int = 5) -> List[Dict[str, Any]]:
         with self._session() as db:
-            return [svc.order_to_dict(o) for o in svc.orders_for_email(db, email)[:limit]]
+            return [svc.order_to_dict(o, include_address=True) for o in svc.orders_for_email(db, email)[:limit]]
 
     def get_customer_info(self, email: Optional[str] = None, phone: Optional[str] = None,
                           customer_id: Optional[str] = None) -> Optional[Dict[str, Any]]:

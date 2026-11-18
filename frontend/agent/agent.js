@@ -14,8 +14,9 @@ window.showToast = function(msg, type = 'info') {
     toast.style.bottom = '24px';
     toast.style.right = '24px';
     toast.style.padding = '12px 24px';
-    toast.style.background = type === 'error' ? 'var(--accent-alert, #ef4444)' : 'var(--accent, #6366f1)';
-    toast.style.color = '#ffffff';
+    toast.style.background = type === 'error' ? 'var(--danger-bg)' : 'var(--bg-elevated)';
+    toast.style.color = type === 'error' ? 'var(--danger-ink)' : 'var(--ink)';
+    toast.style.border = '1px solid ' + (type === 'error' ? 'var(--danger-border)' : 'var(--border)');
     toast.style.borderRadius = '8px';
     toast.style.boxShadow = 'var(--shadow-lg)';
     toast.style.zIndex = '99999';
@@ -814,34 +815,25 @@ function renderConversationList(conversations) {
     let sentimentBadge = '';
     if (conv.sentiment) {
       const s = conv.sentiment.trim().toLowerCase();
-      let color = 'var(--ink-soft)';
-      if (s.includes('angry') || s.includes('upset') || s.includes('mad')) color = 'var(--accent-alert)';
-      else if (s.includes('frustrated') || s.includes('annoyed') || s.includes('sad')) color = 'var(--warning)';
-      else if (s.includes('happy') || s.includes('delighted') || s.includes('satisfied') || s.includes('glad')) color = 'var(--accent-success)';
-      else if (s.includes('neutral') || s.includes('mixed')) color = 'var(--ink-soft)';
-      sentimentBadge = `<span class="badge" style="border-color:${color}; color:${color}">${escapeHtml(conv.sentiment)}</span>`;
+      let cls = '';
+      if (s.includes('angry') || s.includes('upset') || s.includes('mad')) cls = 'badge--sent-neg';
+      else if (s.includes('frustrated') || s.includes('annoyed') || s.includes('sad')) cls = 'badge--sent-warn';
+      else if (s.includes('happy') || s.includes('delighted') || s.includes('satisfied') || s.includes('glad')) cls = 'badge--sent-pos';
+      sentimentBadge = `<span class="badge ${cls}">${escapeHtml(conv.sentiment)}</span>`;
     }
-    
-    // Feature 6: SLA Warning
+
+    // SLA warning
     let slaBadge = "";
     if (conv.sla_status === "breached") {
-      slaBadge = `<span class="badge" style="background: var(--danger); color:white;">Breached SLA</span>`;
+      slaBadge = `<span class="badge badge--sla-breached">SLA breached</span>`;
     } else if (conv.sla_status === "warning") {
-      slaBadge = `<span class="badge" style="background: var(--warning); color:white;">SLA Warning</span>`;
+      slaBadge = `<span class="badge badge--sla-warning">SLA at risk</span>`;
     }
-    
+
     let languageBadge = '';
     if (conv.language && conv.language.toUpperCase() !== 'ENGLISH') {
       languageBadge = `<span class="badge badge--agent">${escapeHtml(conv.language)}</span>`;
     }
-
-    const webSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
-    const waSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>`;
-    const igSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>`;
-    
-    const platforms = [webSvg, waSvg, igSvg];
-    const hash = conv.short_id ? conv.short_id.split('').reduce((a, b) => {a = ((a << 5) - a) + b.charCodeAt(0); return a & a}, 0) : 0;
-    const platformIcon = platforms[Math.abs(hash) % platforms.length];
 
     const customerDisplayName = conv.customer_name || conv.customer_email || "Customer";
     let avatarHtml = "";
@@ -883,7 +875,6 @@ function renderConversationList(conversations) {
           ${sentimentBadge}
           ${languageBadge}
           ${reopenBadge}
-          <span class="badge badge--platform" title="Source">${platformIcon}</span>
         </div>
       </div>
     `;
@@ -1011,18 +1002,9 @@ async function openConversation(sessionId, customerEmail, shortId, isResolved, u
     const idStr = shortId || sessionId;
     ticketIdBadge.textContent = `#${idStr.substring(0, 8).toUpperCase()}`;
   }
-  const webSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
-  const waSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>`;
-  const igSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:text-bottom;"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>`;
-  const platformsInfo = [
-    { svg: webSvg, text: "via Web Widget" },
-    { svg: waSvg, text: "via WhatsApp" },
-    { svg: igSvg, text: "via Instagram" }
-  ];
-  const hash = shortId ? shortId.split('').reduce((a, b) => {a = ((a << 5) - a) + b.charCodeAt(0); return a & a}, 0) : 0;
-  const platform = platformsInfo[Math.abs(hash) % platformsInfo.length];
-  conversationSession.innerHTML = `${platform.svg} ${platform.text}`;
-  updateViaMediaPosition();
+  conversationSession.innerHTML = '';
+  conversationSession.style.display = 'none';
+    updateViaMediaPosition();
   
   updateResolveUI(isResolved, updatedAt);
 
@@ -1427,6 +1409,14 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
     clone.querySelectorAll('.voice-player, .msg-name, .msg-sender-bar, details, .msg-dropdown-container, .msg-pin-indicator').forEach(el => el.remove());
     if (!clone.textContent.trim()) {
       div.classList.add("msg--voice-only");
+    }
+  }
+
+  if (div.querySelector('.chat-lightbox-image')) {
+    const clone = div.cloneNode(true);
+    clone.querySelectorAll('.chat-lightbox-image, .msg-name, .msg-sender-bar, details, .msg-dropdown-container, .msg-pin-indicator').forEach(el => el.remove());
+    if (!clone.textContent.trim()) {
+      div.classList.add("msg--image-only");
     }
   }
 
@@ -1895,7 +1885,7 @@ if (agentVoiceBtn) {
         
         agentMediaRecorder.start();
         agentIsRecording = true;
-        agentVoiceBtn.style.color = "#EF4444";
+        agentVoiceBtn.style.color = "var(--danger)";
         agentVoiceBtn.style.animation = "pulse-glow 1s infinite";
       } catch (err) {
         console.error("Error accessing microphone:", err);
@@ -1904,7 +1894,7 @@ if (agentVoiceBtn) {
     } else {
       agentMediaRecorder.stop();
       agentIsRecording = false;
-      agentVoiceBtn.style.color = "#9CA3AF";
+      agentVoiceBtn.style.color = "";
       agentVoiceBtn.style.animation = "none";
     }
   });
@@ -4452,301 +4442,255 @@ document.addEventListener('DOMContentLoaded', () => {
     const line = cs.getPropertyValue('--line').trim() || (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)');
     const surface = cs.getPropertyValue('--bg-surface').trim() || (isDark ? '#111827' : '#ffffff');
     const elevated = cs.getPropertyValue('--bg-elevated').trim() || surface;
-    let accent = cs.getPropertyValue('--accent').trim() || '#3b82f6';
-    if ((accent === '#111827' || accent === '#000000' || accent === '#1e293b') && isDark) {
-      accent = '#38bdf8';
-    }
-    const successColor = isDark ? '#34d399' : '#10b981';
-    const warningColor = isDark ? '#fbbf24' : '#f59e0b';
-    const dangerColor = isDark ? '#f87171' : '#ef4444';
-    const infoColor = isDark ? '#38bdf8' : '#0284c7';
-    const aiColor = isDark ? '#a78bfa' : '#7c3aed';
+    const tok = (name, fallback) => cs.getPropertyValue(name).trim() || fallback;
+    const accent = tok('--chart-1', tok('--accent', '#3b82f6'));
+    const successColor = tok('--success', '#10b981');
+    const warningColor = tok('--warning', '#f59e0b');
+    const dangerColor = tok('--danger', '#ef4444');
+    const infoColor = tok('--info', '#0284c7');
+    const aiColor = tok('--ai', '#7c3aed');
 
     return { isDark, ink, inkMuted, inkSoft, line, surface, elevated, accent, successColor, warningColor, dangerColor, infoColor, aiColor };
   }
+  // charts are initialised from a different DOMContentLoaded closure, so share this one
+  window.getThemeColors = getThemeColors;
 
-  // 1. Dashboard Loading Logic (Visual-First, High Contrast)
+  // ── Honest-number helpers ──────────────────────────────────────────────
+  // A figure is either measured or shown as an em dash. Nothing here invents a value.
+  const NO_DATA = '—';
+  const fmtInt = (n) => (n === null || n === undefined) ? NO_DATA : Number(n).toLocaleString();
+  const fmtPct = (n) => (n === null || n === undefined) ? NO_DATA : `${Number(n).toFixed(1)}%`;
+  const sumArr = (a) => (Array.isArray(a) ? a.reduce((x, y) => x + (Number(y) || 0), 0) : 0);
+  const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+  const ink = (s) => escapeHtml(String(s ?? ''));
+
+  // Show a short message over a chart that has nothing to draw, instead of drawing sample data.
+  window.setChartEmpty = function(canvasId, isEmpty, message) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !canvas.parentElement) return;
+    const box = canvas.parentElement;
+    let el = box.querySelector(':scope > .chart-empty-state');
+    if (isEmpty) {
+      if (!el) { el = document.createElement('div'); el.className = 'chart-empty-state'; box.appendChild(el); }
+      el.textContent = message || 'No data yet';
+      el.style.display = 'flex';
+      canvas.style.visibility = 'hidden';
+    } else {
+      if (el) el.style.display = 'none';
+      canvas.style.visibility = 'visible';
+    }
+  };
+
+  // Period-over-period chip: only shown when the API could really compute a comparison.
+  function setDelta(id, text, lowerIsBetter) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!text) { el.style.display = 'none'; el.textContent = ''; return; }
+    const down = text.trim().startsWith('-');
+    const good = lowerIsBetter ? down : !down;
+    el.className = 'metric-badge-enterprise ' + (good ? 'badge-up' : 'badge-down');
+    el.textContent = text;
+    el.title = 'Compared with the previous period of the same length';
+    el.style.display = '';
+  }
+
+  const statusStyle = {
+    Autonomous: { badge: 'badge-auto', chip: 'copilot-chip-autonomous', label: 'AI resolved' },
+    Active:     { badge: 'badge-appr', chip: 'copilot-chip-approved',   label: 'AI active' },
+    Escalated:  { badge: 'badge-escl', chip: 'copilot-chip-escalated',  label: 'Escalated' },
+    Resolved:   { badge: 'badge-reso', chip: 'copilot-chip-resolved',   label: 'Resolved' },
+  };
+  const statusIcon = {
+    Autonomous: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>',
+    Active: '<circle cx="12" cy="12" r="3"></circle><path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path>',
+    Escalated: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4M12 17h.01"></path>',
+    Resolved: '<polyline points="20 6 9 17 4 12"></polyline>',
+  };
+  const emptyNote = (text) => `<div style="padding: 24px; color: var(--ink-muted); text-align: center; font-size: 12px;">${text}</div>`;
+
+  // 1. Dashboard loading. Every number comes from /agent/dashboard-summary, which only reports
+  //    what it measured; null means "nothing to measure yet" and is shown as an em dash.
   window.loadDashboard = async function() {
     try {
-      const res = await fetch(`${API_BASE}/agent/dashboard-summary`, {
-        headers: getAuthHeaders(),
-        credentials: 'include'
-      });
-      if (res.ok) {
-        const data = await res.json();
-        
-        // 6 Top Metric Counters
-        const openEl = document.getElementById('metric-open-tickets');
-        if (openEl) openEl.textContent = data.open_tickets || 14;
-        const unassignedBadge = document.getElementById('metric-unassigned-badge');
-        if (unassignedBadge) unassignedBadge.textContent = `${data.unassigned || 3} Unassigned`;
-        
-        const solvedEl = document.getElementById('metric-solved-today');
-        if (solvedEl) solvedEl.textContent = data.solved_today || 28;
-        
-        const csatEl = document.getElementById('metric-csat');
-        if (csatEl) {
-          csatEl.textContent = data.csat_score ? data.csat_score.toFixed(1) + ' ★' : '4.8 ★';
+      const res = await fetch(`${API_BASE}/agent/dashboard-summary`, { headers: getAuthHeaders(), credentials: 'include' });
+      if (!res.ok) { setText('dash-updated', 'Could not load'); return; }
+      const data = await res.json();
+      const tele = data.operational_telemetry || {};
+      const team = Array.isArray(data.live_team_status) ? data.live_team_status : [];
+      const people = team.filter(m => !m.is_ai);
+      const colors = getThemeColors();
+
+      setText('dash-updated', 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+
+      // queue strip
+      setText('tele-open', fmtInt(tele.open_now));
+      setText('tele-ai', fmtInt(tele.ai_handling));
+      setText('tele-wait', fmtInt(tele.awaiting_human));
+      setText('tele-p95', formatDuration(tele.p95_first_response_seconds));
+      setText('tele-agents', fmtInt(people.filter(m => m.active_chats > 0).length));
+
+      // KPI cards
+      setText('metric-open-tickets', fmtInt(data.open_tickets));
+      setText('metric-unassigned-badge', `${fmtInt(data.unassigned)} unassigned`);
+      setText('metric-sla-compliance', fmtPct(data.sla_compliance_rate));
+      setText('metric-first-response', formatDuration(data.first_response_time_seconds));
+      setText('metric-solved-today', fmtInt(data.solved_today));
+      setText('metric-csat', data.csat_score == null ? NO_DATA : `${Number(data.csat_score).toFixed(1)} ★`);
+      setText('metric-csat-count', data.csat_count ? `${data.csat_count} rating${data.csat_count === 1 ? '' : 's'}` : 'No ratings yet');
+      setText('metric-ai-deflection', fmtPct(data.ai_deflection_rate_pct));
+
+      // today's volume chart
+      const hv = data.hourly_volume || [], hai = data.hourly_ai_resolved || [], hyd = data.hourly_volume_yesterday || [];
+      const totalToday = sumArr(hv);
+      const aiRow = team.find(m => m.is_ai);
+      const aiToday = aiRow ? (aiRow.resolved_today || 0) : sumArr(hai);
+      const humanToday = people.reduce((n, m) => n + (m.resolved_today || 0), 0);
+      const mainChart = window.dashboardMainChartInstance || (typeof Chart !== 'undefined' ? Chart.getChart('dashboardMainChart') : null);
+      if (mainChart && mainChart.data && Array.isArray(mainChart.data.datasets)) {
+        mainChart.data.labels = hv.map((_, i) => `${String(i).padStart(2, '0')}:00`);
+        if (mainChart.data.datasets[0]) mainChart.data.datasets[0].data = hv;
+        if (mainChart.data.datasets[1]) mainChart.data.datasets[1].data = hai;
+        if (mainChart.data.datasets[2]) mainChart.data.datasets[2].data = hyd;
+        mainChart.update();
+      }
+      window.setChartEmpty('dashboardMainChart', totalToday === 0 && sumArr(hyd) === 0, 'No conversations yet today');
+      setText('dash-stat-total', fmtInt(totalToday));
+      setText('dash-stat-deflected', fmtInt(aiToday));
+      setText('dash-stat-escalated', fmtInt(humanToday));
+      const resolvedToday = aiToday + humanToday;
+      const aiShare = resolvedToday ? Math.round((aiToday / resolvedToday) * 100) : 0;
+      setText('dash-ratio-label', resolvedToday ? `${aiShare}% by AI` : 'No resolutions yet');
+      const rAi = document.getElementById('dash-ratio-ai'); if (rAi) rAi.style.width = resolvedToday ? `${aiShare}%` : '0%';
+      const rHu = document.getElementById('dash-ratio-human'); if (rHu) rHu.style.width = resolvedToday ? `${100 - aiShare}%` : '0%';
+
+      // SLA health: conversations waiting on a human
+      const risks = Array.isArray(data.sla_risks) ? data.sla_risks : [];
+      const breached = risks.filter(r => r.sla_status === 'breached').length;
+      const warning = risks.filter(r => r.sla_status === 'warning').length;
+      const waiting = tele.handoff_open || 0;
+      const slaChart = window.dashboardSlaChartInstance || (typeof Chart !== 'undefined' ? Chart.getChart('dashboardSlaChart') : null);
+      if (slaChart && slaChart.data && slaChart.data.datasets && slaChart.data.datasets[0]) {
+        slaChart.data.datasets[0].data = [Math.max(0, waiting - breached - warning), warning, breached];
+        slaChart.data.datasets[0].backgroundColor = [colors.successColor, colors.warningColor, colors.dangerColor];
+        slaChart.data.datasets[0].borderColor = colors.surface;
+        slaChart.update();
+      }
+      window.setChartEmpty('dashboardSlaChart', waiting === 0, 'No conversations are waiting on a human');
+
+      const slaList = document.getElementById('sla-risk-list');
+      if (slaList) {
+        slaList.innerHTML = '';
+        if (risks.length === 0) {
+          if (waiting > 0) slaList.innerHTML = emptyNote('No SLA risks. Everything waiting is on track.');
         }
-
-        const slaEl = document.getElementById('metric-sla-compliance');
-        if (slaEl) {
-          slaEl.textContent = (data.sla_compliance_rate || 97.4).toFixed(1) + '%';
-        }
-
-        const frtEl = document.getElementById('metric-first-response');
-        if (frtEl) {
-          frtEl.textContent = formatDuration(data.first_response_time_seconds || 92);
-        }
-
-        const deflEl = document.getElementById('metric-ai-deflection');
-        if (deflEl) {
-          deflEl.textContent = (data.ai_deflection_rate_pct || 71.8).toFixed(1) + '%';
-        }
-
-        // Priority SLA risks queue (Visual countdown bars, zero text clutter)
-        const slaList = document.getElementById('sla-risk-list');
-        if (slaList && data.sla_risks) {
-          slaList.innerHTML = '';
-          if (data.sla_risks.length === 0) {
-            slaList.innerHTML = '<div style="padding: 24px; color: var(--ink-muted); text-align: center; font-size: 12px;">No SLA risks detected. All queues on track!</div>';
-          } else {
-            data.sla_risks.forEach(risk => {
-              let badgeHtml = '';
-              let fillClass = 'ok';
-              let progressPct = 85;
-              let minsText = 'On Track';
-
-              if (risk.sla_status === 'breached') {
-                const mins = Math.abs(risk.minutes_remaining || 15);
-                badgeHtml = `<span class="metric-badge-enterprise badge-down">Breached (${mins}m)</span>`;
-                fillClass = 'breached';
-                progressPct = 100;
-                minsText = `<span style="color: #ef4444; font-weight: 600;">Breached ${mins}m ago</span>`;
-              } else if (risk.sla_status === 'warning') {
-                const mins = risk.minutes_remaining || 10;
-                badgeHtml = `<span class="metric-badge-enterprise" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b;">Urgent (${mins}m)</span>`;
-                fillClass = 'warning';
-                progressPct = Math.min(95, Math.max(30, 100 - (mins * 2)));
-                minsText = `<span style="color: #f59e0b; font-weight: 600;">${mins}m left</span>`;
-              } else {
-                badgeHtml = `<span class="metric-badge-enterprise badge-up">On Track</span>`;
-                fillClass = 'ok';
-                progressPct = 40;
-                minsText = `<span style="color: #10b981; font-weight: 600;">On Track</span>`;
-              }
-
-              const ticketId = risk.short_id ? `#${risk.short_id.toUpperCase()}` : (risk.session_id ? `#${risk.session_id.substring(0,8).toUpperCase()}` : '#TICKET');
-              const customerName = risk.customer_name || (risk.customer_email ? risk.customer_email.split('@')[0] : 'Customer');
-              const tier = risk.customer_tier || 'Gold VIP';
-              const tierClass = tier.toLowerCase().includes('enterprise') ? 'enterprise' : (tier.toLowerCase().includes('gold') ? 'gold' : 'silver');
-
-              const div = document.createElement('div');
-              div.className = 'activity-item';
-              div.style.cursor = 'pointer';
-              div.innerHTML = `
-                <div style="flex: 1; min-width: 0;">
-                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px;">
-                    <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
-                      <span style="font-family: var(--font-mono, monospace); font-size: 11px; font-weight: 700; color: var(--accent);">${ticketId}</span>
-                      <span class="badge-tier badge-tier-${tierClass}">${escapeHtml(tier)}</span>
-                      <strong style="font-size: 12px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(customerName)}</strong>
-                    </div>
-                    ${badgeHtml}
-                  </div>
-                  <div class="sla-progress-track">
-                    <div class="sla-progress-fill ${fillClass}" style="width: ${progressPct}%;"></div>
-                  </div>
-                  <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10.5px; color: var(--text-dim); margin-top: 3px;">
-                    <span>${minsText}</span>
-                    <span>Assigned: <strong style="color: var(--text-muted);">${escapeHtml(risk.assigned_agent || 'Copilot')}</strong></span>
-                  </div>
+        risks.forEach(risk => {
+          const mins = Math.abs(risk.minutes_remaining || 0);
+          const isBreach = risk.sla_status === 'breached';
+          const badge = isBreach
+            ? `<span class="metric-badge-enterprise badge-down">Breached ${mins}m ago</span>`
+            : `<span class="metric-badge-enterprise" style="background: var(--warning-bg); color: var(--warning-ink);">${mins}m left</span>`;
+          const pct = isBreach ? 100 : Math.min(95, Math.max(30, 100 - mins * 2));
+          const ticketId = risk.short_id ? `#${String(risk.short_id).toUpperCase()}` : `#${String(risk.session_id || '').substring(0, 8).toUpperCase()}`;
+          const who = risk.customer_email ? risk.customer_email.split('@')[0] : 'Customer';
+          const div = document.createElement('div');
+          div.className = 'activity-item';
+          div.style.cursor = 'pointer';
+          div.innerHTML = `
+            <div style="flex: 1; min-width: 0;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px;">
+                <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                  <span style="font-family: var(--font-mono, monospace); font-size: 11px; font-weight: 700; color: var(--accent);">${ink(ticketId)}</span>
+                  <strong style="font-size: 12px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${ink(who)}</strong>
                 </div>
-              `;
-              div.onclick = () => {
-                switchView('conversations');
-                openConversation(risk.session_id, risk.customer_email, risk.short_id, false, risk.created_at);
-              };
-              slaList.appendChild(div);
-            });
-          }
-        }
+                ${badge}
+              </div>
+              <div class="sla-progress-track"><div class="sla-progress-fill ${isBreach ? 'breached' : 'warning'}" style="width: ${pct}%;"></div></div>
+              <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-dim); margin-top: 3px;">
+                <span>${ink(risk.priority || 'normal')} priority</span>
+                <span>${risk.assigned_agent ? `Assigned: <strong style="color: var(--text-muted);">${ink(risk.assigned_agent)}</strong>` : 'Unassigned'}</span>
+              </div>
+            </div>`;
+          div.onclick = () => { switchView('conversations'); openConversation(risk.session_id, risk.customer_email, risk.short_id, false, risk.created_at); };
+          slaList.appendChild(div);
+        });
+      }
 
-        // Live Team Status roster (Visual capacity workload meters)
-        const teamList = document.getElementById('team-status-list');
-        if (teamList) {
-          const specialists = (data.live_team_status && data.live_team_status.length > 0) ? data.live_team_status : [
-            { name: "Sarah Jenkins", role: "Senior Escalation Lead", status: "active", active_chats: 3, resolved_today: 16, csat: 4.95, avatar: "images/default-avatar.png?v=2" },
-            { name: "Michael Chang", role: "Technical Support Lead", status: "active", active_chats: 4, resolved_today: 19, csat: 4.91, avatar: "images/default-avatar.png?v=2" },
-            { name: "Elena Rostova", role: "Billing Specialist", status: "active", active_chats: 2, resolved_today: 14, csat: 4.88, avatar: "images/default-avatar.png?v=2" },
-            { name: "Marcus Vance", role: "VIP Success Specialist", status: "active", active_chats: 3, resolved_today: 12, csat: 4.98, avatar: "images/default-avatar.png?v=2" }
-          ];
-          teamList.innerHTML = specialists.map(member => {
-            const avatarUrl = member.avatar || 'images/default-avatar.png?v=2';
-            const chats = member.active_chats || 0;
-            const loadPct = Math.min(100, Math.max(15, (chats / 5) * 100));
-            const fillClass = loadPct >= 80 ? 'critical' : (loadPct >= 60 ? 'high' : '');
-            return `
-              <div class="team-agent-row">
-                <div class="team-agent-left">
-                  <img src="${avatarUrl}" class="team-agent-avatar" alt="Avatar" onerror="this.src='images/default-avatar.png?v=2'">
-                  <div>
-                    <div class="team-agent-name">${escapeHtml(member.name)}</div>
-                    <div class="team-agent-role">${escapeHtml(member.role)}</div>
-                  </div>
-                </div>
-                <div style="text-align: right;">
-                  <div style="display: flex; align-items: center; gap: 8px; justify-content: flex-end; margin-bottom: 2px;">
-                    <div class="team-capacity-track" title="${chats}/5 active chats">
-                      <div class="team-capacity-fill ${fillClass}" style="width: ${loadPct}%;"></div>
-                    </div>
-                    <span style="font-size: 11px; font-weight: 700; color: var(--text-main); font-family: var(--font-mono, monospace);">${chats}/5</span>
-                  </div>
-                  <div style="font-size: 10px; color: var(--text-dim); display: flex; align-items: center; gap: 4px; justify-content: flex-end; font-family: var(--font-mono, monospace);">
-                    <span>${member.resolved_today} Solved</span>
-                    <span>•</span>
-                    <span style="color: #f59e0b; font-weight: 700;">★ ${member.csat}</span>
-                  </div>
+      // open conversations by handler
+      const open = tele.open_now || 0, aiOpen = tele.ai_handling || 0, waitOpen = tele.awaiting_human || 0;
+      const withAgent = Math.max(0, open - aiOpen - waitOpen);
+      setText('omni-total-badge', `${fmtInt(open)} open`);
+      setText('dash-channel-total', fmtInt(open));
+      setText('handler-ai-count', fmtInt(aiOpen));
+      setText('handler-wait-count', fmtInt(waitOpen));
+      setText('handler-agent-count', fmtInt(withAgent));
+      const chChart = window.dashboardChannelChartInstance || (typeof Chart !== 'undefined' ? Chart.getChart('dashboardChannelChart') : null);
+      if (chChart && chChart.data && chChart.data.datasets && chChart.data.datasets[0]) {
+        chChart.data.labels = ['AI handling', 'Waiting for human', 'With an agent'];
+        chChart.data.datasets[0].data = [aiOpen, waitOpen, withAgent];
+        chChart.data.datasets[0].backgroundColor = [colors.aiColor, colors.warningColor, colors.accent];
+        chChart.data.datasets[0].borderColor = colors.surface;
+        chChart.update();
+      }
+      window.setChartEmpty('dashboardChannelChart', open === 0, 'Nothing is open');
+      const donutCenter = document.querySelector('.channel-donut-center'); if (donutCenter) donutCenter.style.display = open === 0 ? 'none' : '';
+
+      // team roster: real accounts only, no invented capacity figure
+      setText('team-online-badge', `${people.length} agent${people.length === 1 ? '' : 's'}`);
+      const teamList = document.getElementById('team-status-list');
+      if (teamList) {
+        teamList.innerHTML = team.length ? team.map(m => {
+          const rating = m.csat == null ? NO_DATA : `★ ${Number(m.csat).toFixed(2)}`;
+          return `
+            <div class="team-agent-row">
+              <div class="team-agent-left">
+                <img src="${ink(m.avatar || 'images/default-avatar.png?v=2')}" class="team-agent-avatar" alt="" onerror="this.src='images/default-avatar.png?v=2'">
+                <div>
+                  <div class="team-agent-name">${ink(m.name)}</div>
+                  <div class="team-agent-role">${ink(m.role)}</div>
                 </div>
               </div>
-            `;
-          }).join('');
-        }
-
-        // Update Dashboard Main Chart (24H Inbound vs Copilot Deflected)
-        const mainChart = window.dashboardMainChartInstance || (typeof Chart !== 'undefined' ? Chart.getChart('dashboardMainChart') : null);
-        if (mainChart && mainChart.data && Array.isArray(mainChart.data.datasets)) {
-          if (data.hourly_volume && mainChart.data.datasets[0]) {
-            mainChart.data.labels = data.hourly_volume.map((_, i) => `${String(i).padStart(2, '0')}:00`);
-            mainChart.data.datasets[0].data = data.hourly_volume;
-            const defPct = (data.ai_deflection_rate_pct || 71.8) / 100;
-            if (mainChart.data.datasets[1]) {
-              mainChart.data.datasets[1].data = data.hourly_volume.map(v => Math.round(v * defPct));
-            }
-          }
-          if (data.hourly_volume_yesterday && mainChart.data.datasets[2]) {
-            mainChart.data.datasets[2].data = data.hourly_volume_yesterday;
-          }
-          mainChart.update();
-
-          // Update summary counters below chart
-          const totalVol = data.hourly_volume ? data.hourly_volume.reduce((a, b) => a + b, 0) : 448;
-          const defVol = Math.round(totalVol * ((data.ai_deflection_rate_pct || 71.8) / 100));
-          const escVol = totalVol - defVol;
-          const totalEl = document.getElementById('dash-stat-total');
-          if (totalEl) totalEl.textContent = totalVol;
-          const defEl = document.getElementById('dash-stat-deflected');
-          if (defEl) defEl.textContent = `${defVol} (${(data.ai_deflection_rate_pct || 71.8).toFixed(1)}%)`;
-          const escEl = document.getElementById('dash-stat-escalated');
-          if (escEl) escEl.textContent = `${escVol} (${(100 - (data.ai_deflection_rate_pct || 71.8)).toFixed(1)}%)`;
-        }
-
-        // Update Dashboard SLA Donut Chart
-        const slaChart = window.dashboardSlaChartInstance || (typeof Chart !== 'undefined' ? Chart.getChart('dashboardSlaChart') : null);
-        if (slaChart && slaChart.data && slaChart.data.datasets && slaChart.data.datasets[0]) {
-          let breached = 0;
-          let warning = 0;
-          if (Array.isArray(data.sla_risks)) {
-            data.sla_risks.forEach(r => {
-              if (r.sla_status === 'breached') breached++;
-              else if (r.sla_status === 'warning') warning++;
-            });
-          }
-          const totalOpen = data.open_tickets || 14;
-          const onTrack = Math.max(1, totalOpen - breached - warning);
-          slaChart.data.datasets[0].data = [onTrack, warning, breached];
-          slaChart.update();
-        }
-
-        // Update Dashboard Channel Donut Chart & Micro-Cards
-        const chChart = window.dashboardChannelChartInstance || (typeof Chart !== 'undefined' ? Chart.getChart('dashboardChannelChart') : null);
-        const liveChatCount = data.channel_distribution ? Math.round(448 * ((data.channel_distribution.live_chat || 48) / 100)) : 215;
-        const widgetCount = data.channel_distribution ? Math.round(448 * ((data.channel_distribution.support_widget || 34) / 100)) : 152;
-        const emailCount = data.channel_distribution ? (448 - liveChatCount - widgetCount) : 81;
-        const totalChannelSessions = liveChatCount + widgetCount + emailCount;
-
-        const totalChanBadge = document.getElementById('omni-total-badge');
-        if (totalChanBadge) totalChanBadge.textContent = `${totalChannelSessions} Inbound`;
-        const totalChanCenter = document.getElementById('dash-channel-total');
-        if (totalChanCenter) totalChanCenter.textContent = totalChannelSessions;
-
-        const chatEl = document.getElementById('omni-chat-count');
-        if (chatEl) chatEl.textContent = liveChatCount;
-        const widgetEl = document.getElementById('omni-widget-count');
-        if (widgetEl) widgetEl.textContent = widgetCount;
-        const emailEl = document.getElementById('omni-email-count');
-        if (emailEl) emailEl.textContent = emailCount;
-
-        if (chChart && chChart.data && chChart.data.datasets && chChart.data.datasets[0]) {
-          chChart.data.datasets[0].data = [
-            data.channel_distribution?.live_chat || 48,
-            data.channel_distribution?.support_widget || 34,
-            data.channel_distribution?.email || 18
-          ];
-          chChart.update();
-        }
-
-        // Live Copilot AI Telemetry Stream (High-Precision Log Style)
-        const copilotList = document.getElementById('copilot-stream-list');
-        if (copilotList) {
-          const streamItems = data.copilot_stream || [
-            { id: "evt-1", time: "2m ago", type: "deflection", title: "Carrier Tracking & ETA Dispatched", ref: "#WR-9021", status: "Autonomous", metric: "99.4% Conf • 140ms" },
-            { id: "evt-2", time: "5m ago", type: "draft", title: "Warranty Return Label Authorized", ref: "#TK-8492", status: "Approved", metric: "Zero-Fee Policy • 220ms" },
-            { id: "evt-3", time: "11m ago", type: "escalation", title: "VIP Sentiment Threshold Escalated", ref: "#VIP-771", status: "Escalated", metric: "Routed to Tier-2 • 90ms" },
-            { id: "evt-4", time: "19m ago", type: "knowledge", title: "Customs Declaration Policy Retrieved", ref: "#DOC-04", status: "Resolved", metric: "Vector Search • 1.4s" }
-          ];
-
-          copilotList.innerHTML = streamItems.map((item, idx) => {
-            const status = item.status || 'Autonomous';
-            const statusClass = status === 'Autonomous' ? 'badge-auto' :
-                               (status === 'Approved' ? 'badge-appr' :
-                               (status === 'Escalated' ? 'badge-escl' : 'badge-reso'));
-            
-            let iconSvg = '';
-            if (status === 'Autonomous') {
-              iconSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
-            } else if (status === 'Approved') {
-              iconSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-            } else if (status === 'Escalated') {
-              iconSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
-            } else {
-              iconSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path></svg>`;
-            }
-
-            const refCode = item.ref || (item.detail && item.detail.match(/#[A-Z0-9-]+/) ? item.detail.match(/#[A-Z0-9-]+/)[0] : `#EVT-0${idx+1}`);
-            const telemetryMetric = item.metric || (status === 'Autonomous' ? '99.4% Conf • 140ms' : (status === 'Approved' ? 'Pre-authorized • 210ms' : (status === 'Escalated' ? 'Routed to Lead • 85ms' : 'Knowledge Retr • 1.2s')));
-
-            return `
-              <div class="copilot-event-row">
-                <div class="copilot-icon-badge ${statusClass}">
-                  ${iconSvg}
-                </div>
-                <div class="copilot-event-body">
-                  <div class="copilot-event-meta-top">
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                      <span class="copilot-ref-code">${refCode}</span>
-                      <span class="copilot-status-chip ${status === 'Autonomous' ? 'copilot-chip-autonomous' : (status === 'Approved' ? 'copilot-chip-approved' : (status === 'Escalated' ? 'copilot-chip-escalated' : 'copilot-chip-resolved'))}">${escapeHtml(status)}</span>
-                    </div>
-                    <span class="copilot-event-time" style="font-family: var(--font-mono, monospace); font-size: 10px; color: var(--text-dim);">${escapeHtml(item.time)}</span>
-                  </div>
-                  <div class="copilot-action-line">${escapeHtml(item.title)}</div>
-                  <div class="copilot-telemetry-row">
-                    <span>${telemetryMetric}</span>
-                  </div>
+              <div style="text-align: right;">
+                <div style="font-size: 12px; font-weight: 700; color: var(--text-main);">${fmtInt(m.active_chats)} open</div>
+                <div style="font-size: 10px; color: var(--text-dim); display: flex; gap: 4px; justify-content: flex-end;">
+                  <span>${fmtInt(m.resolved_today)} solved today</span><span>•</span><span>${rating}</span>
                 </div>
               </div>
-            `;
-          }).join('');
-        }
+            </div>`;
+        }).join('') : emptyNote('No team members yet.');
+      }
 
-        // Operational Telemetry update
-        const velEl = document.getElementById('telemetry-velocity');
-        if (velEl && data.operational_telemetry?.throughput_req_min) {
-          velEl.textContent = `${data.operational_telemetry.throughput_req_min}/min`;
-        }
+      // recent activity: the latest real conversation events
+      const stream = document.getElementById('copilot-stream-list');
+      if (stream) {
+        const items = Array.isArray(data.copilot_stream) ? data.copilot_stream : [];
+        stream.innerHTML = items.length ? items.map((item, idx) => {
+          const st = statusStyle[item.status] || statusStyle.Resolved;
+          return `
+            <div class="copilot-event-row" data-idx="${idx}" style="cursor: pointer;">
+              <div class="copilot-icon-badge ${st.badge}">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">${statusIcon[item.status] || statusIcon.Resolved}</svg>
+              </div>
+              <div class="copilot-event-body">
+                <div class="copilot-event-meta-top">
+                  <div style="display: flex; align-items: center; gap: 5px;">
+                    <span class="copilot-ref-code">${ink(item.ref)}</span>
+                    <span class="copilot-status-chip ${st.chip}">${st.label}</span>
+                  </div>
+                  <span class="copilot-event-time" style="font-size: 10px; color: var(--text-dim);">${ink(item.time)}</span>
+                </div>
+                <div class="copilot-action-line">${ink(item.title)}</div>
+                ${item.metric ? `<div class="copilot-telemetry-row"><span>${ink(item.metric)}</span></div>` : ''}
+              </div>
+            </div>`;
+        }).join('') : emptyNote('No conversations yet.');
+        stream.querySelectorAll('.copilot-event-row').forEach(row => {
+          const ev = items[Number(row.dataset.idx)];
+          row.onclick = () => { switchView('conversations'); openConversation(ev.session_id, ev.customer_email, ev.short_id, ev.resolved, ev.created_at); };
+        });
       }
     } catch (e) {
       console.error("Failed to load dashboard summary", e);
+      setText('dash-updated', 'Could not load');
     }
   };
 
@@ -4759,171 +4703,114 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Sync active segmented button
       const segBtns = document.querySelectorAll('#analytics-range-selector .segment-btn');
-      if (segBtns.length > 0) {
-        segBtns.forEach(b => {
-          if (b.getAttribute('data-range') === rangeVal) b.classList.add('active');
-          else b.classList.remove('active');
-        });
-      }
+      segBtns.forEach(b => b.classList.toggle('active', b.getAttribute('data-range') === rangeVal));
 
-      const res = await fetch(`${API_BASE}/analytics/dashboard-metrics?range=${rangeVal}`, {
-        headers: getAuthHeaders(),
-        credentials: 'include'
-      });
+      const res = await fetch(`${API_BASE}/analytics/dashboard-metrics?range=${rangeVal}`, { headers: getAuthHeaders(), credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
-        
-        // Executive KPIs
-        const volEl = document.getElementById('kpi-total-volume');
-        if (volEl) volEl.textContent = (data.total_tickets_period || (Array.isArray(data.hourly_volume) ? data.hourly_volume.reduce((a,b)=>a+b,0) : 1040)).toLocaleString();
-        
-        const frtEl = document.getElementById('analytics-first-response');
-        if (frtEl) frtEl.textContent = formatDuration(data.first_response_time_seconds || 92);
-        
-        const artEl = document.getElementById('analytics-avg-resolution-time');
-        if (artEl) artEl.textContent = formatDuration(data.avg_resolution_time_seconds || 840);
-        
-        const otEl = document.getElementById('analytics-one-touch');
-        if (otEl) otEl.textContent = (data.one_touch_resolutions_pct ? data.one_touch_resolutions_pct.toFixed(1) : '84.6') + '%';
-        
-        const slaEl = document.getElementById('kpi-sla-compliance');
-        if (slaEl) slaEl.textContent = (data.sla_compliance_rate_pct || 97.4).toFixed(1) + '%';
-        
-        const rcEl = document.getElementById('analytics-rolling-csat');
-        if (rcEl) rcEl.textContent = (data.rolling_weekly_csat ? data.rolling_weekly_csat.toFixed(2) : '4.85') + ' ★';
+        const colors = getThemeColors();
 
-        // KPI Deltas
-        if (data.kpi_deltas) {
-          const vd = document.getElementById('kpi-volume-delta');
-          if (vd) vd.textContent = data.kpi_deltas.volume_delta || '+8.4%';
-          const sd = document.getElementById('kpi-sla-delta');
-          if (sd) sd.textContent = data.kpi_deltas.sla_delta || '+1.8%';
-          const fd = document.getElementById('kpi-frt-delta');
-          if (fd) fd.textContent = data.kpi_deltas.frt_delta || '-24s faster';
-          const md = document.getElementById('kpi-mttr-delta');
-          if (md) md.textContent = data.kpi_deltas.mttr_delta || '-3.2m faster';
-          const fcd = document.getElementById('kpi-fcr-delta');
-          if (fcd) fcd.textContent = data.kpi_deltas.fcr_delta || '+4.6%';
-          const cd = document.getElementById('kpi-csat-delta');
-          if (cd) cd.textContent = data.kpi_deltas.csat_delta || '+0.3';
-        }
+        // KPIs: a dash means the API had nothing to measure
+        setText('kpi-total-volume', fmtInt(data.total_tickets_period));
+        setText('kpi-sla-compliance', fmtPct(data.sla_compliance_rate_pct));
+        setText('analytics-first-response', formatDuration(data.first_response_time_seconds));
+        setText('analytics-avg-resolution-time', formatDuration(data.avg_resolution_time_seconds));
+        setText('analytics-one-touch', fmtPct(data.one_touch_resolutions_pct));
+        setText('analytics-rolling-csat', data.rolling_weekly_csat == null ? NO_DATA : `${Number(data.rolling_weekly_csat).toFixed(2)} ★`);
+        setText('analytics-csat-count', data.csat_responses ? `${data.csat_responses} rating${data.csat_responses === 1 ? '' : 's'}` : 'No ratings yet');
 
-        // Copilot & System stats
-        const tTickets = document.getElementById('analytics-total-tickets');
-        if (tTickets) tTickets.innerText = (data.total_tickets_period || 1040).toLocaleString();
-        
-        const defRate = document.getElementById('analytics-deflection-rate');
-        if (defRate) defRate.innerText = (data.ai_deflection_rate_pct || 72.8).toFixed(1) + '%';
-        
-        const aiRes = document.getElementById('analytics-ai-resolved');
-        if (aiRes) {
-          const resolvedCount = data.resolved_tickets_period ? Math.round(data.resolved_tickets_period * 0.73) : 757;
-          aiRes.innerText = `(${resolvedCount} resolved by AI)`;
-        }
+        const d = data.kpi_deltas || {};
+        setDelta('kpi-volume-delta', d.volume_delta, false);
+        setDelta('kpi-sla-delta', d.sla_delta, false);
+        setDelta('kpi-frt-delta', d.frt_delta, true);
+        setDelta('kpi-mttr-delta', d.mttr_delta, true);
+        setDelta('kpi-fcr-delta', d.fcr_delta, false);
+        setDelta('kpi-csat-delta', d.csat_delta, false);
 
-        // Update Volume Chart (Dual Line / Area)
+        // AI resolution block
+        setText('analytics-total-tickets', fmtInt(data.total_tickets_period));
+        setText('analytics-deflection-rate', fmtPct(data.ai_deflection_rate_pct));
+        const aiN = data.ai_resolved_tickets_period || 0;
+        setText('analytics-ai-resolved', data.resolved_tickets_period ? `(${aiN} of ${data.resolved_tickets_period} resolved)` : '');
+
+        // Volume chart: real buckets only
         const volChart = window.volumeChartInstance || (typeof Chart !== 'undefined' ? Chart.getChart('volumeChart') : null);
+        const created = data.hourly_volume || [], resolvedSeries = data.resolved_volume || [];
         if (volChart && volChart.data && Array.isArray(volChart.data.datasets)) {
-          if (data.volume_labels) volChart.data.labels = data.volume_labels;
-          if (data.hourly_volume && volChart.data.datasets[0]) {
-            volChart.data.datasets[0].data = data.hourly_volume;
-          }
-          if (volChart.data.datasets[1]) {
-            volChart.data.datasets[1].data = data.resolved_volume || data.hourly_volume.map(v => Math.max(0, v - Math.round(v * 0.05)));
-          }
+          volChart.data.labels = data.volume_labels || [];
+          if (volChart.data.datasets[0]) volChart.data.datasets[0].data = created;
+          if (volChart.data.datasets[1]) volChart.data.datasets[1].data = resolvedSeries;
           volChart.update();
         }
+        window.setChartEmpty('volumeChart', sumArr(created) === 0 && sumArr(resolvedSeries) === 0, 'No conversations in this period');
 
-        // Update CSAT Donut Chart
+        // CSAT donut
+        const counts = data.csat_distribution || [0, 0, 0, 0, 0];     // index 0..4 = 1..5 stars
+        const csatMapped = [counts[4] || 0, counts[3] || 0, counts[2] || 0, (counts[0] || 0) + (counts[1] || 0)];
         const csatCh = window.csatChartInstance || (typeof Chart !== 'undefined' ? Chart.getChart('csatChart') : null);
-        if (csatCh && csatCh.data && Array.isArray(csatCh.data.datasets) && csatCh.data.datasets[0]) {
-          const counts = data.csat_distribution || [0,0,0,0,0];
-          // Backend is [1, 2, 3, 4, 5], frontend donut is ['5 Stars', '4 Stars', '3 Stars', '1-2 Stars']
-          const mapped = [
-            counts[4] || 312,
-            counts[3] || 84,
-            counts[2] || 18,
-            (counts[0] || 0) + (counts[1] || 0) || 9
-          ];
-          csatCh.data.datasets[0].data = mapped;
+        if (csatCh && csatCh.data && csatCh.data.datasets && csatCh.data.datasets[0]) {
+          csatCh.data.datasets[0].data = csatMapped;
           csatCh.update();
         }
+        window.setChartEmpty('csatChart', sumArr(csatMapped) === 0, 'No customer ratings in this period');
 
-        // Update Sentiment Meter
-        if (data.sentiment_breakdown) {
-          const posPct = data.sentiment_breakdown.positive || 78;
-          const neuPct = data.sentiment_breakdown.neutral || 15;
-          const negPct = data.sentiment_breakdown.negative || 7;
-          const posEl = document.getElementById('sentiment-positive-pct');
-          if (posEl) posEl.textContent = `${posPct}% Positive`;
-          const segPos = document.getElementById('sentiment-seg-pos');
-          if (segPos) segPos.style.width = `${posPct}%`;
-          const segNeu = document.getElementById('sentiment-seg-neu');
-          if (segNeu) segNeu.style.width = `${neuPct}%`;
-          const segNeg = document.getElementById('sentiment-seg-neg');
-          if (segNeg) segNeg.style.width = `${negPct}%`;
+        // Sentiment meter
+        const sb = data.sentiment_breakdown;
+        const seg = (id, pct) => { const el = document.getElementById(id); if (el) el.style.width = `${pct || 0}%`; };
+        if (sb) {
+          setText('sentiment-positive-pct', `${sb.positive}% Positive`);
+          seg('sentiment-seg-pos', sb.positive); seg('sentiment-seg-neu', sb.neutral); seg('sentiment-seg-neg', sb.negative);
+        } else {
+          setText('sentiment-positive-pct', 'No sentiment recorded yet');
+          seg('sentiment-seg-pos', 0); seg('sentiment-seg-neu', 0); seg('sentiment-seg-neg', 0);
         }
 
-        // Update Categories / Tags Chart
+        // Contact drivers: intent categories when the AI classified any, otherwise tags
         const tagCh = window.tagsChartInstance || (typeof Chart !== 'undefined' ? Chart.getChart('tagsChart') : null);
-        if (tagCh && tagCh.data && Array.isArray(tagCh.data.datasets) && tagCh.data.datasets[0]) {
-          const categories = data.tag_frequency || [
-            { tag: "Billing & Payments", count: 142 },
-            { tag: "Shipping & Delivery", count: 118 },
-            { tag: "Returns & Refunds", count: 86 },
-            { tag: "Technical Setup", count: 72 },
-            { tag: "Account Access", count: 48 }
-          ];
-          tagCh.data.labels = categories.map(t => t.tag);
-          tagCh.data.datasets[0].data = categories.map(t => t.count);
+        const drivers = (data.category_metrics && data.category_metrics.length)
+          ? data.category_metrics.map(c => ({ label: c.category, count: c.count }))
+          : (data.tag_frequency || []).map(t => ({ label: t.tag, count: t.count }));
+        if (tagCh && tagCh.data && tagCh.data.datasets && tagCh.data.datasets[0]) {
+          tagCh.data.labels = drivers.map(x => x.label);
+          tagCh.data.datasets[0].data = drivers.map(x => x.count);
           tagCh.update();
         }
+        window.setChartEmpty('tagsChart', drivers.length === 0, 'No categories or tags recorded yet');
 
-        // Update Channels Chart
+        // Resolved by AI vs human (conversations carry no channel, so there is no channel chart)
         const chChart = window.channelChartInstance || (typeof Chart !== 'undefined' ? Chart.getChart('channelChart') : null);
-        if (chChart && chChart.data && Array.isArray(chChart.data.datasets) && chChart.data.datasets[0]) {
-          const channels = data.channel_breakdown || [
-            { channel: "Live Chat", pct: 47 },
-            { channel: "Storefront Widget", pct: 33 },
-            { channel: "Direct Email", pct: 16 },
-            { channel: "Public API", pct: 4 }
-          ];
-          chChart.data.labels = channels.map(c => c.channel);
-          chChart.data.datasets[0].data = channels.map(c => c.pct);
+        const resolvedN = data.resolved_tickets_period || 0;
+        if (chChart && chChart.data && chChart.data.datasets && chChart.data.datasets[0]) {
+          chChart.data.labels = ['Resolved by AI', 'Resolved by humans'];
+          chChart.data.datasets[0].data = [aiN, Math.max(0, resolvedN - aiN)];
+          chChart.data.datasets[0].backgroundColor = [colors.aiColor, colors.accent];
+          chChart.data.datasets[0].borderColor = colors.surface;
           chChart.update();
         }
+        window.setChartEmpty('channelChart', resolvedN === 0, 'Nothing resolved in this period');
 
-        // Update Specialist Leaderboard Table
+        // Team table
         const lbBody = document.getElementById('analytics-leaderboard-body');
         if (lbBody) {
-          const agents = data.agent_leaderboard || [];
-          lbBody.innerHTML = '';
-          agents.forEach(ag => {
-            const tr = document.createElement('tr');
-            const avgTime = formatDuration(ag.avg_res_time_seconds || 600);
-            const isAi = (ag.handled_by || '').toLowerCase().includes('copilot') || (ag.handled_by || '').toLowerCase().includes('wren');
+          const rows = data.agent_leaderboard || [];
+          lbBody.innerHTML = rows.length ? '' : `<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--ink-muted);">Nothing resolved in this period.</td></tr>`;
+          rows.forEach(ag => {
+            const isAi = ag.role === 'AI assistant';
             const avatarUrl = isAi ? 'images/wren-mark.svg' : 'images/default-avatar.png?v=2';
+            const tr = document.createElement('tr');
             tr.innerHTML = `
               <td>
                 <div style="display: flex; align-items: center; gap: 10px;">
-                  <img src="${avatarUrl}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="Avatar">
-                  <strong style="color: var(--ink);">${escapeHtml(ag.handled_by || 'Specialist')}</strong>
+                  <img src="${avatarUrl}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="">
+                  <strong style="color: var(--ink);">${ink(ag.handled_by)}</strong>
                 </div>
               </td>
-              <td style="color: var(--ink-soft); font-size: 12.5px;">${escapeHtml(ag.role || 'Support Specialist')}</td>
-              <td style="text-align: center; font-weight: 600; color: var(--ink);">${ag.resolved_count}</td>
-              <td style="text-align: center; color: var(--ink-soft);">${avgTime}</td>
-              <td style="text-align: center; font-weight: 600; color: #10b981;">${ag.fcr_pct || 86}%</td>
-              <td style="text-align: center;">
-                <span style="display: inline-flex; align-items: center; gap: 3px; font-weight: 700; color: #f59e0b;">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                  ${ag.csat ? ag.csat.toFixed(2) : '4.90'}
-                </span>
-              </td>
-              <td style="text-align: center;">
-                <span class="metric-chip chip-accent">${ag.ai_assisted_pct || 72}% Assisted</span>
-              </td>
-            `;
+              <td style="color: var(--ink-soft); font-size: 12.5px;">${ink(ag.role)}</td>
+              <td style="text-align: center; font-weight: 600; color: var(--ink);">${fmtInt(ag.resolved_count)}</td>
+              <td style="text-align: center; color: var(--ink-soft);">${formatDuration(ag.avg_res_time_seconds)}</td>
+              <td style="text-align: center; font-weight: 600; color: var(--success-ink);">${fmtPct(ag.fcr_pct)}</td>
+              <td style="text-align: center; font-weight: 700; color: var(--ink);">${ag.csat == null ? NO_DATA : '★ ' + Number(ag.csat).toFixed(2)}</td>
+              <td style="text-align: center; color: var(--ink-muted);">${ag.ai_assisted_pct == null ? NO_DATA : fmtPct(ag.ai_assisted_pct)}</td>`;
             lbBody.appendChild(tr);
           });
         }
@@ -4969,26 +4856,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const tbody = document.getElementById('qa-scorecards-list');
         if (!tbody) return;
         if (!data || data.length === 0) {
-          tbody.innerHTML = `
-            <tr>
-              <td style="font-size: 12.5px; color: var(--ink-soft);">Just now</td>
-              <td><code style="font-family: var(--font-mono, monospace); font-size: 12px; font-weight: 600; color: var(--accent);">#TK-8492</code></td>
-              <td style="text-align: center;"><span class="metric-chip chip-success">9.5/10</span></td>
-              <td style="text-align: center;"><span class="metric-chip chip-success">10/10</span></td>
-              <td style="text-align: center;"><span class="metric-chip chip-success">9.8/10</span></td>
-              <td style="text-align: center;"><span style="display:inline-flex; align-items:center; gap:2px; font-weight:700; color:#f59e0b;"><svg width="10" height="10" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg> 5.0</span></td>
-              <td style="font-size: 12.5px; color: var(--text-muted); line-height: 1.4;">Outstanding empathy regarding delayed international shipment. Proactively provided FedEx tracking and issued return guarantee.</td>
-            </tr>
-            <tr>
-              <td style="font-size: 12.5px; color: var(--text-dim);">28m ago</td>
-              <td><code style="font-family: var(--font-mono, monospace); font-size: 12px; font-weight: 600; color: var(--accent);">#TK-3914</code></td>
-              <td style="text-align: center;"><span class="metric-chip chip-info">9.0/10</span></td>
-              <td style="text-align: center;"><span class="metric-chip chip-success">9.5/10</span></td>
-              <td style="text-align: center;"><span class="metric-chip chip-info">9.2/10</span></td>
-              <td style="text-align: center;"><span style="display:inline-flex; align-items:center; gap:2px; font-weight:700; color:#f59e0b;"><svg width="10" height="10" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg> 4.8</span></td>
-              <td style="font-size: 12.5px; color: var(--text-muted); line-height: 1.4;">Resolved payment verification timeout smoothly. Verified invoice webhook and restored customer cart instantly.</td>
-            </tr>
-          `;
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--ink-muted);">No scorecards yet. Resolve a conversation to generate one.</td></tr>`;
           return;
         }
         tbody.innerHTML = '';
@@ -5002,7 +4870,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td style="text-align: center;"><span class="metric-chip chip-info">${card.empathy_score}/10</span></td>
               <td style="text-align: center;"><span class="metric-chip chip-info">${card.accuracy_score}/10</span></td>
               <td style="text-align: center;"><span class="metric-chip chip-info">${card.resolution_score}/10</span></td>
-              <td style="text-align: center;"><span style="display:inline-flex; align-items:center; gap:2px; font-weight:700; color:#f59e0b;"><svg width="10" height="10" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg> ${card.csat_prediction}/5</span></td>
+              <td style="text-align: center;"><span style="display:inline-flex; align-items:center; gap:2px; font-weight:700; color: var(--warning);"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg> ${card.csat_prediction}/5</span></td>
               <td style="font-size: 12.5px; color: var(--text-muted); line-height: 1.4;">${escapeHtml(card.feedback_notes || 'Accurate resolution with standard policy compliance.')}</td>
             </tr>
           `;
@@ -5069,7 +4937,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const commonTooltip = {
-          backgroundColor: colors.isDark ? 'rgba(15, 23, 42, 0.96)' : 'rgba(255, 255, 255, 0.98)',
+          backgroundColor: colors.elevated,
           titleColor: colors.ink,
           bodyColor: colors.inkSoft,
           borderColor: colors.line,
@@ -5087,8 +4955,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if(ctxMain && !isChartInstance(window.dashboardMainChartInstance)) {
             const existing = Chart.getChart(ctxMain);
             if (existing) existing.destroy();
-            let gInbound = 'rgba(14, 165, 233, 0.2)';
-            let gAi = 'rgba(16, 185, 129, 0.2)';
+            let gInbound = colors.accent + '33';
+            let gAi = colors.aiColor + '33';
             if (ctxMain.getContext) {
                 const ctx = ctxMain.getContext('2d');
                 const g1 = ctx.createLinearGradient(0, 0, 0, 220);
@@ -5097,44 +4965,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 gInbound = g1;
 
                 const g2 = ctx.createLinearGradient(0, 0, 0, 220);
-                g2.addColorStop(0, 'rgba(16, 185, 129, 0.45)');
-                g2.addColorStop(1, 'rgba(16, 185, 129, 0.02)');
+                g2.addColorStop(0, colors.aiColor + '73');
+                g2.addColorStop(1, colors.aiColor + '05');
                 gAi = g2;
             }
             window.dashboardMainChartInstance = new Chart(ctxMain, {
                 type: 'line',
                 data: {
-                    labels: ['00:00', '02:00', '04:00', '06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'],
+                    labels: [],
                     datasets: [
                         {
-                            label: 'Total Inbound',
-                            data: [1, 0, 1, 3, 16, 38, 42, 52, 48, 31, 18, 6],
+                            label: 'New conversations',
+                            data: [],
                             borderColor: colors.accent,
                             backgroundColor: gInbound,
                             borderWidth: 2,
-                            tension: 0.38,
+                            tension: 0,
                             fill: true,
                             pointRadius: 0,
                             pointHoverRadius: 4
                         },
                         {
-                            label: 'Copilot Deflected',
-                            data: [1, 0, 1, 2, 11, 27, 30, 37, 34, 22, 13, 4],
-                            borderColor: '#10b981',
+                            label: 'Resolved by AI',
+                            data: [],
+                            borderColor: colors.aiColor,
                             backgroundColor: gAi,
                             borderWidth: 2,
-                            tension: 0.38,
+                            tension: 0,
                             fill: true,
                             pointRadius: 0,
                             pointHoverRadius: 4
                         },
                         {
-                            label: 'Yesterday Baseline',
-                            data: [0, 0, 1, 2, 14, 32, 38, 46, 42, 28, 15, 4],
+                            label: 'Yesterday',
+                            data: [],
                             borderColor: colors.inkMuted + '70',
                             borderWidth: 1.5,
                             borderDash: [3, 3],
-                            tension: 0.38,
+                            tension: 0,
                             fill: false,
                             pointRadius: 0,
                             pointHoverRadius: 3
@@ -5186,8 +5054,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 data: {
                     labels: ['On Track', 'Warning', 'Breached'],
                     datasets: [{
-                        data: [88, 8, 4],
-                        backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                        data: [0, 0, 0],
+                        backgroundColor: [colors.successColor, colors.warningColor, colors.dangerColor],
                         borderColor: colors.surface,
                         borderWidth: 2,
                         hoverOffset: 4
@@ -5223,10 +5091,10 @@ document.addEventListener('DOMContentLoaded', () => {
             window.dashboardChannelChartInstance = new Chart(ctxDashChannel, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Live Web Chat', 'Storefront Widget', 'Direct Email'],
+                    labels: ['AI handling', 'Waiting for human', 'With an agent'],
                     datasets: [{
-                        data: [48, 34, 18],
-                        backgroundColor: [colors.accent, '#0284c7', '#10b981'],
+                        data: [0, 0, 0],
+                        backgroundColor: [colors.accent, colors.infoColor, colors.successColor],
                         borderColor: colors.surface,
                         borderWidth: 2,
                         hoverOffset: 4
@@ -5266,11 +5134,11 @@ document.addEventListener('DOMContentLoaded', () => {
             window.volumeChartInstance = new Chart(ctxVol, {
                 type: 'line',
                 data: {
-                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    labels: [],
                     datasets: [
                         {
                             label: 'Inbound Tickets',
-                            data: [138, 165, 152, 184, 192, 114, 95],
+                            data: [],
                             borderColor: colors.accent,
                             backgroundColor: gradientInbound,
                             borderWidth: 2.5,
@@ -5284,7 +5152,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         },
                         {
                             label: 'Resolved Tickets',
-                            data: [130, 158, 147, 179, 185, 110, 92],
+                            data: [],
                             borderColor: colors.successColor,
                             backgroundColor: gradientResolved,
                             borderWidth: 2.5,
@@ -5321,8 +5189,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 data: {
                     labels: ['5 Stars', '4 Stars', '3 Stars', '1-2 Stars'],
                     datasets: [{
-                        data: [312, 84, 18, 9],
-                        backgroundColor: [colors.successColor, '#84cc16', '#eab308', colors.dangerColor],
+                        data: [0, 0, 0, 0],
+                        backgroundColor: [colors.successColor, colors.infoColor, colors.warningColor, colors.dangerColor],
                         borderColor: colors.surface,
                         borderWidth: 2
                     }]
@@ -5382,10 +5250,10 @@ document.addEventListener('DOMContentLoaded', () => {
             window.tagsChartInstance = new Chart(ctxTags, {
                 type: 'bar',
                 data: {
-                    labels: ['Billing & Payments', 'Shipping & Delivery', 'Returns & Refunds', 'Technical Setup', 'Account Access'],
+                    labels: [],
                     datasets: [{
                         label: 'Conversations',
-                        data: [142, 118, 86, 72, 48],
+                        data: [],
                         backgroundColor: colors.accent,
                         borderRadius: 6
                     }]
@@ -5421,9 +5289,9 @@ document.addEventListener('DOMContentLoaded', () => {
             window.channelChartInstance = new Chart(ctxChannel, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Live Chat', 'Storefront Widget', 'Direct Email', 'Public API'],
+                    labels: ['Resolved by AI', 'Resolved by humans'],
                     datasets: [{
-                        data: [47, 33, 16, 4],
+                        data: [0, 0],
                         backgroundColor: [colors.accent, colors.infoColor, colors.successColor, colors.aiColor],
                         borderColor: colors.surface,
                         borderWidth: 2
@@ -5574,19 +5442,17 @@ document.addEventListener('DOMContentLoaded', () => {
         tbody.innerHTML = paginated.map(c => {
             const avatarUrl = c.email ? customerAvatarUrl(c.email) : 'images/default-avatar.png?v=2';
             const resRatio = c.resolved_ratio != null ? Math.round(c.resolved_ratio * 100) : 0;
-            const avgCsatVal = c.avg_csat != null ? c.avg_csat.toFixed(1) : '4.8';
+            const avgCsatVal = c.avg_csat != null ? c.avg_csat.toFixed(1) : '—';
+            const resText = c.resolved_ratio != null ? resRatio + '%' : '—';
             const lastActive = formatAgo(c.last_active);
-            const tier = c.tier || 'Gold VIP';
+            const tier = c.tier || '';
             const tierClass = tier.toLowerCase().includes('enterprise') ? 'enterprise' : (tier.toLowerCase().includes('gold') ? 'gold' : (tier.toLowerCase().includes('silver') ? 'silver' : (tier.toLowerCase().includes('bronze') ? 'bronze' : 'starter')));
             
             let healthClass = 'healthy';
             if ((c.health_label || '').toLowerCase().includes('risk')) healthClass = 'risk';
             else if ((c.health_label || '').toLowerCase().includes('neutral')) healthClass = 'neutral';
 
-            const flag = c.location?.flag || '🌐';
-            const countryCode = c.location?.code || 'US';
-            const city = c.location?.city || '';
-            const safeEmail = escapeHtml(c.email || '');
+                        const safeEmail = escapeHtml(c.email || '');
 
             return `
                 <tr onclick="openCustomerDrawer('${safeEmail}')" style="cursor: pointer;">
@@ -5594,43 +5460,39 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="customer-cell" style="display: flex; align-items: center; gap: 10px;">
                             <img src="${avatarUrl}" class="avatar" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="Avatar" onerror="this.src='images/default-avatar.png?v=2'">
                             <div>
-                                <div class="name" style="font-weight: 600; color: var(--text-main, var(--ink)); font-size: 13.5px;">${escapeHtml(c.name || safeEmail)}</div>
+                                <div class="name" style="font-weight: 600; color: var(--text-main, var(--ink)); font-size: 13.5px;">${escapeHtml(c.name || safeEmail)}${c.demo ? ' <span class="badge" title="Sample data from demo mode (USE_MOCK_INTEGRATIONS)">Demo</span>' : ''}</div>
                                 <div class="email" style="font-size: 11.5px; color: var(--text-dim); font-family: var(--font-mono, monospace);">${safeEmail}</div>
                             </div>
                         </div>
                     </td>
-                    <td><span class="badge-tier badge-tier-${tierClass}">${escapeHtml(tier)}</span></td>
+                    <td>${tier ? `<span class="badge-tier badge-tier-${tierClass}">${escapeHtml(tier)}</span>` : '<span style="color: var(--text-dim);">—</span>'}</td>
                     <td>
                         <span class="health-badge ${healthClass}">
                             <span class="status-dot"></span>
-                            <span>${c.health_score || 85}% ${escapeHtml(c.health_label || 'Healthy')}</span>
+                            <span>${c.health_score != null ? `${c.health_score}% ${escapeHtml(c.health_label || '')}` : 'Not enough data'}</span>
                         </span>
                     </td>
                     <td>
-                        <div style="font-weight: 700; color: var(--text-main, var(--ink)); font-variant-numeric: tabular-nums;">${escapeHtml(c.lifetime_value || '$0.00')}</div>
-                        <div style="font-size: 11px; color: var(--text-dim);">${c.total_orders || 1} orders</div>
+                        <div style="font-weight: 700; color: var(--text-main, var(--ink)); font-variant-numeric: tabular-nums;">${escapeHtml(c.lifetime_value || '—')}</div>
+                        <div style="font-size: 11px; color: var(--text-dim);">${c.total_orders != null ? c.total_orders + ' orders' : ''}</div>
                     </td>
                     <td>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="font-weight: 600; color: var(--text-main, var(--ink)); min-width: 18px; font-variant-numeric: tabular-nums;">${c.total_tickets}</span>
                             <div style="width: 48px; height: 4px; border-radius: 999px; background: var(--bg-hover); overflow: hidden;">
-                                <div style="height: 100%; width: ${resRatio}%; background: #10b981; border-radius: 999px;"></div>
+                                <div style="height: 100%; width: ${resRatio}%; background: var(--success); border-radius: 999px;"></div>
                             </div>
-                            <span style="font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums;">${resRatio}%</span>
+                            <span style="font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums;">${resText}</span>
                         </div>
                     </td>
                     <td>
-                        <span style="display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: #f59e0b; font-size: 13px;">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                        <span style="display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: var(--warning); font-size: 13px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
                             ${avgCsatVal}
                         </span>
                     </td>
                     <td>
-                        <span class="country-chip" title="${escapeHtml(c.location?.country || '')}">
-                            <span class="flag-icon">${flag}</span>
-                            <span class="country-code" style="font-weight: 600;">${countryCode}</span>
-                            <span style="color: var(--text-dim); font-size: 11px;">${escapeHtml(city)}</span>
-                        </span>
+                        ${c.location ? `<span class="country-chip" title="${escapeHtml(c.location.country || '')}"><span class="flag-icon">${c.location.flag || ''}</span><span class="country-code" style="font-weight: 600;">${c.location.code || ''}</span><span style="color: var(--text-dim); font-size: 11px;">${escapeHtml(c.location.city || '')}</span></span>` : '<span style="color: var(--text-dim);">—</span>'}
                     </td>
                     <td style="font-size: 12px; color: var(--text-dim);">${lastActive}</td>
                     <td style="text-align: right;">
@@ -5686,12 +5548,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Header info
         const nameEl = document.getElementById('drawer-customer-name');
-        if (nameEl) nameEl.textContent = cust.name || cust.email;
+        if (nameEl) nameEl.textContent = (cust.name || cust.email) + (cust.demo ? '  (demo data)' : '');
         const emailEl = document.getElementById('drawer-customer-email');
         if (emailEl) emailEl.textContent = cust.email;
         const tierEl = document.getElementById('drawer-customer-tier');
         if (tierEl) {
-            tierEl.textContent = cust.tier || 'Gold VIP';
+            tierEl.style.display = cust.tier ? '' : 'none';
+            tierEl.textContent = cust.tier || '';
             const tierClass = (cust.tier || 'gold').toLowerCase().includes('enterprise') ? 'enterprise' : 'gold';
             tierEl.className = `badge badge-tier badge-tier-${tierClass}`;
         }
@@ -5700,29 +5563,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // KPI cards
         const ltvEl = document.getElementById('drawer-kpi-ltv');
-        if (ltvEl) ltvEl.textContent = cust.lifetime_value || '$0.00';
+        if (ltvEl) ltvEl.textContent = cust.lifetime_value || '—';
         const ordersEl = document.getElementById('drawer-kpi-orders');
-        if (ordersEl) ordersEl.textContent = cust.total_orders || 1;
+        if (ordersEl) ordersEl.textContent = cust.total_orders != null ? cust.total_orders : '—';
         const healthEl = document.getElementById('drawer-kpi-health');
-        if (healthEl) healthEl.textContent = `${cust.health_score || 85}%`;
+        if (healthEl) healthEl.textContent = cust.health_score != null ? `${cust.health_score}%` : '—';
         const csatEl = document.getElementById('drawer-kpi-csat');
-        if (csatEl) csatEl.textContent = `${cust.avg_csat ? cust.avg_csat.toFixed(1) : '4.8'} ★`;
+        if (csatEl) csatEl.textContent = cust.avg_csat != null ? `${cust.avg_csat.toFixed(1)} ★` : '—';
 
         // Profile Details
         const phoneEl = document.getElementById('drawer-info-phone');
-        if (phoneEl) phoneEl.textContent = cust.phone || '+1 (555) 019-2834';
+        if (phoneEl) phoneEl.textContent = cust.phone || 'Not on file';
         const locEl = document.getElementById('drawer-info-location');
-        if (locEl) locEl.textContent = `${cust.location?.flag || '🌐'} ${cust.location?.city || cust.location?.country || 'International'}`;
+        if (locEl) locEl.textContent = cust.location ? `${cust.location.flag || ''} ${cust.location.city || cust.location.country || ''}`.trim() : 'Not on file';
         const sentEl = document.getElementById('drawer-info-sentiment');
-        if (sentEl) sentEl.textContent = cust.sentiment || 'Satisfied';
+        if (sentEl) sentEl.textContent = cust.sentiment || '—';
         const activeEl = document.getElementById('drawer-info-last-active');
-        if (activeEl) activeEl.textContent = cust.last_active ? new Date(cust.last_active).toLocaleString() : 'Recently';
+        if (activeEl) activeEl.textContent = cust.last_active ? new Date(cust.last_active).toLocaleString() : '—';
 
         // Tags list
         const tagsEl = document.getElementById('drawer-info-tags');
         if (tagsEl) {
             tagsEl.innerHTML = '';
-            (cust.tags || ['Enterprise', 'Priority']).forEach(t => {
+            (cust.tags || []).forEach(t => {
                 const sp = document.createElement('span');
                 sp.className = 'metric-chip chip-accent';
                 sp.style.marginRight = '6px';
@@ -5734,7 +5597,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // AI relationship summary
         const aiEl = document.getElementById('drawer-ai-summary');
         if (aiEl) {
-            aiEl.textContent = `${cust.name || 'Customer'} has a ${cust.health_label || 'Healthy'} account health score (${cust.health_score || 85}%) with ${cust.total_tickets || 3} support interactions. Average CSAT rating is ${cust.avg_csat || 4.8}★ with ${cust.sentiment || 'Satisfied'} sentiment.`;
+            const n = cust.total_tickets || 0;
+            const bits = [`${n} support conversation${n === 1 ? '' : 's'}`];
+            if (cust.resolved_ratio != null) bits.push(`${Math.round(cust.resolved_ratio * 100)}% resolved`);
+            if (cust.avg_csat != null) bits.push(`average rating ${cust.avg_csat.toFixed(1)}★`);
+            if (cust.health_label) bits.push(`account health: ${cust.health_label}`);
+            aiEl.textContent = `${cust.name || 'Customer'}: ${bits.join(' · ')}.`;
         }
 
         // Tickets history tab
@@ -5775,18 +5643,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ordersList.innerHTML = '';
             const orders = cust.orders || [];
             if (orders.length === 0) {
-                ordersList.innerHTML = `
-                    <div class="drawer-record-card">
-                        <div>
-                            <div style="font-weight: 600; color: var(--ink); font-size: 13px;">Order #100${Math.abs(cust.total_orders || 1)}</div>
-                            <div style="font-size: 11.5px; color: var(--ink-soft);">Express Delivery • FedEx</div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div style="font-weight: 700; color: var(--ink);">${cust.lifetime_value || '$120.00'}</div>
-                            <span class="metric-chip chip-success">Delivered</span>
-                        </div>
-                    </div>
-                `;
+                ordersList.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--ink-muted); font-size: 12.5px;">No orders on file for this customer.</div>';
             } else {
                 orders.forEach(o => {
                     const card = document.createElement('div');
@@ -5873,7 +5730,7 @@ document.addEventListener('DOMContentLoaded', () => {
             filtered.forEach(c => {
                 const resRatio = c.resolved_ratio != null ? (c.resolved_ratio * 100).toFixed(0) + '%' : '';
                 const avgCsat = c.avg_csat != null ? c.avg_csat.toFixed(1) : '';
-                csv += `"${c.name || ''}","${c.email || ''}","${c.phone || ''}","${c.tier || ''}",${c.health_score || 0},"${c.health_label || ''}","${c.lifetime_value || ''}",${c.total_orders || 0},${c.total_tickets || 0},"${resRatio}","${avgCsat}","${c.location?.country || ''}","${c.last_active || ''}"\n`;
+                csv += `"${c.name || ''}","${c.email || ''}","${c.phone || ''}","${c.tier || ''}",${c.health_score ?? ''},"${c.health_label || ''}","${c.lifetime_value || ''}",${c.total_orders || 0},${c.total_tickets || 0},"${resRatio}","${avgCsat}","${c.location?.country || ''}","${c.last_active || ''}"\n`;
             });
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);

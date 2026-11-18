@@ -21,7 +21,6 @@ from app.api.chat import router as chat_router
 from app.api.uploads import router as uploads_router
 from app.api.analytics import router as analytics_router
 from app.api.copilot import router as copilot_router
-from app.api.kb import router as kb_router
 from app.api.public_kb import router as public_kb_router
 from app.api.store import router as store_router
 from app.config import settings
@@ -316,7 +315,6 @@ app.include_router(agent_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(analytics_router, prefix="/api/analytics")
 app.include_router(copilot_router, prefix="/api/copilot")
-app.include_router(kb_router, prefix="/api/kb")
 app.include_router(public_kb_router, prefix="/api/public/kb")
 app.include_router(store_router, prefix="/api/store")
 from app.api.v1_public import router as v1_public_router

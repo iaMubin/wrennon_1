@@ -4,6 +4,7 @@
 """
 import inspect
 
+from sqlalchemy import func
 
 from app.db.models import Conversation
 from app.db.session import SessionLocal
@@ -35,6 +36,7 @@ if __name__ == "__main__":
     check("reply node is told when a customer is signed in", "signed in to the store" in source("app.graph.nodes.final_reply_node"), "run apply_store_db.py")
     check("chatbot receives the live storefront context", "page_context_for" in source("app.realtime.websocket_routes") and "page_context" in source("app.graph.state"), "run apply_store_db.py")
     check("bot can add to the bag / open pages (add_to_bag, show_page)", "add_to_bag" in source("app.services.tools") and "add_to_bag(" in source("app.graph.nodes.manager_node") and "_session_id" in source("app.graph.nodes.tool_executor"), "run apply_store_db.py")
+    check("bot can cancel orders (with confirmation) and read the bag", "cancel_order" in source("app.services.tools") and "change_order_size" in source("app.services.tools") and "add_item_to_order" in source("app.services.tools") and "reorder" in source("app.services.tools") and "cancel_order(" in source("app.graph.nodes.manager_node") and "Honesty rule" in source("app.graph.nodes.final_reply_node"), "run apply_store_db.py")
     check("agent dashboard reads the store database", "_STORE_DB" in source("app.api.agent"), "run apply_store_db.py")
     print("Database")
     with SessionLocal() as db:
@@ -46,7 +48,8 @@ if __name__ == "__main__":
         for c in db.query(StoreCustomer).order_by(StoreCustomer.id).all():
             pr = svc.customer_profile(db, c)
             print(f"    {c.name:<18} {c.email:<32} orders={pr['total_orders']:<2} {pr['lifetime_value']:>10}  {pr['loyalty_tier']}")
-        from app.db.store_models import StoreSessionContext
+        from app.db.store_models import StoreSessionContext, StorePendingMessage, StoreNudgeLog
+        print(f"Proactive messages: {db.query(StorePendingMessage).filter_by(delivered=True).count()} delivered, {db.query(StorePendingMessage).filter_by(delivered=False).count()} waiting for the customer to open the chat; {db.query(StoreNudgeLog).count()} storefront nudges sent")
         print("Latest storefront context received from visitors:")
         ctxs = db.query(StoreSessionContext).order_by(StoreSessionContext.updated_at.desc()).limit(3).all()
         for c in ctxs:

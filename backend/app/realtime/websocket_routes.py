@@ -757,6 +757,11 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             raise
         except Exception as e:
             logger.error(f"Error processing AI turn for {session_id}: {e}", exc_info=True)
+            try:
+                await manager.send_to_customer(session_id, {"type": "new_message", "sender": "bot", "reply": "Sorry, I'm having trouble answering right now. Please try again in a moment, or ask for a team member and I'll bring one in."})
+                await manager.broadcast_to_agents({"type": "new_message", "session_id": session_id, "sender": "agent_internal", "content": "The AI assistant failed on a turn (see the server log). The customer was told to retry.", "is_resolved": False, "message_id": None})
+            except Exception:
+                pass
 
     def _start_turn() -> asyncio.Task:
         nonlocal current_turn_task

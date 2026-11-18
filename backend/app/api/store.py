@@ -11,10 +11,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-import hashlib
-
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
-from starlette.concurrency import run_in_threadpool
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -23,7 +20,8 @@ from app.limiter import limiter
 from app.services import customer_auth as auth
 from app.services import store_actions as actions_svc
 from app.services import store_context as ctx_svc
-from app.services import ratelimit
+from app.services import store_demo as demo
+from app.services import store_proactive as proactive
 from app.services import store_service as svc
 
 router = APIRouter(tags=["store"])
@@ -77,32 +75,13 @@ def create_order(request: Request, payload: OrderIn, db: Session = Depends(get_d
     return svc.order_to_dict(order, include_email=True)
 
 
-# Order ids are sequential (1001, 1002, ...), so "order id + email" is the only secret. Without
-# a failure budget anyone who knows a victim's email can walk the id space and read their name,
-# address and phone. Only FAILED lookups are counted; the same generic 404 is returned either way.
-_TRACK_WINDOW = 3600
-_TRACK_LIMITS = {"ip": 20, "email": 6, "order": 15}
-
-
-def _h(v: str) -> str:
-    return hashlib.sha256(v.strip().lower().encode()).hexdigest()[:24]
-
-
 @router.get("/orders/{order_id}")
 @limiter.limit("30/minute")
-async def track_order(request: Request, response: Response, order_id: str,
-                      email: str = Query(min_length=3, max_length=254), db: Session = Depends(get_db)):
-    ip = request.client.host if request.client else "unknown"
-    keys = {"ip": f"trk_fail:i:{ip}", "email": f"trk_fail:e:{_h(email)}", "order": f"trk_fail:o:{_h(order_id)}"}
-    for name, key in keys.items():
-        if await ratelimit.peek(key) >= _TRACK_LIMITS[name]:
-            raise HTTPException(status_code=429, detail="Too many attempts. Please try again later.")
-    order = await run_in_threadpool(svc.get_order, db, order_id, email)
+def track_order(request: Request, order_id: str, email: str = Query(min_length=3, max_length=254),
+                db: Session = Depends(get_db)):
+    order = svc.get_order(db, order_id, email=email)
     if not order:  # same answer for "no such order" and "wrong email"
-        for key in keys.values():
-            await ratelimit.hit(key, _TRACK_WINDOW)
         raise HTTPException(status_code=404, detail="Order not found")
-    response.headers["Cache-Control"] = "no-store"   # the body contains name/address/phone
     return svc.order_to_dict(order, include_email=True)
 
 
@@ -132,29 +111,13 @@ def register(request: Request, payload: RegisterIn, db: Session = Depends(get_db
     return _session_payload(c)
 
 
-# Credential-stuffing / brute-force budget. The 10/min per-IP slowapi limit alone lets a botnet (or a
-# patient attacker) guess one account's password indefinitely; failures are therefore also counted per
-# account and per IP over a longer window. Only FAILED logins consume budget.
-_LOGIN_WINDOW = 900
-_LOGIN_LIMITS = {"email": 8, "ip": 30}
-
-
 @router.post("/auth/login")
 @limiter.limit("10/minute")
-async def login(request: Request, payload: LoginIn, db: Session = Depends(get_db)):
-    ip = request.client.host if request.client else "unknown"
-    keys = {"email": f"cust_login_fail:e:{_h(payload.email)}", "ip": f"cust_login_fail:i:{ip}"}
-    for name, key in keys.items():
-        if await ratelimit.peek(key) >= _LOGIN_LIMITS[name]:
-            raise HTTPException(status_code=429, detail={"code": "too_many_attempts", "message": "Too many attempts. Please try again later."})
-    c = await run_in_threadpool(svc.customer_by_email, db, payload.email)
-    ok = await run_in_threadpool(auth.check_pw, payload.password, c.password_hash if c else None)
-    if not ok:  # same answer for "no account" and "wrong password"
-        for key in keys.values():
-            await ratelimit.hit(key, _LOGIN_WINDOW)
+def login(request: Request, payload: LoginIn, db: Session = Depends(get_db)):
+    c = svc.customer_by_email(db, payload.email)
+    if not auth.check_pw(payload.password, c.password_hash if c else None):  # same answer for "no account" and "wrong password"
         raise HTTPException(status_code=401, detail={"code": "bad_credentials", "message": "Incorrect email or password."})
-    await ratelimit.clear(keys["email"])
-    await run_in_threadpool(svc.mark_login, db, c)
+    svc.mark_login(db, c)
     return _session_payload(c)
 
 
@@ -165,7 +128,7 @@ def me(request: Request, db: Session = Depends(get_db), authorization: Optional[
     c = svc.customer_by_email(db, email) if email else None
     if not c:
         raise HTTPException(status_code=401, detail="Please sign in.")
-    return {"customer": svc.customer_profile(db, c), "orders": [svc.order_to_dict(o) for o in svc.orders_for_email(db, c.email)]}
+    return {"customer": svc.customer_profile(db, c), "orders": [svc.order_to_dict(o, include_address=True) for o in svc.orders_for_email(db, c.email)]}
 
 
 # --------------------------------------------------------- chatbot page context
@@ -199,10 +162,135 @@ def set_context(request: Request, payload: ContextIn, db: Session = Depends(get_
 
 @router.get("/actions")
 @limiter.limit("180/minute")
-def pending_actions(request: Request, session_id: str = Query(min_length=8, max_length=64), db: Session = Depends(get_db),
+async def pending_actions(request: Request, session_id: str = Query(min_length=8, max_length=64), db: Session = Depends(get_db),
                     x_chat_token: Optional[str] = Header(default=None)):
     """Things the chatbot asked this page to do (add to bag, open a page). Delivered once, to the session's owner only."""
     from app.auth.security import decode_session_token
     if not x_chat_token or decode_session_token(x_chat_token) != session_id:
         raise HTTPException(status_code=401, detail="Invalid chat session")
+    try:
+        await proactive.deliver_pending(session_id)   # order updates the assistant wants to tell this customer
+    except Exception:  # a failed courtesy message must never break the page's polling
+        pass
     return {"actions": actions_svc.pop_actions(db, session_id)}
+
+
+class NudgeIn(BaseModel):
+    session_id: str = Field(min_length=8, max_length=64)
+    kind: str = Field(max_length=24)
+
+
+@router.post("/nudge")
+@limiter.limit("30/minute")
+async def nudge(request: Request, payload: NudgeIn, x_chat_token: Optional[str] = Header(default=None)):
+    """The page noticed the visitor hesitating; ask the assistant to speak first. Only the chat's owner can ask, the message is
+    written server-side from the database, and it is rate-limited (see services/store_proactive.py)."""
+    from app.auth.security import decode_session_token
+    if not x_chat_token or decode_session_token(x_chat_token) != payload.session_id:
+        raise HTTPException(status_code=401, detail="Invalid chat session")
+    return await proactive.send_nudge(payload.session_id, payload.kind)
+
+
+@router.post("/orders/{order_id}/cancel")
+@limiter.limit("10/minute")
+async def cancel_my_order(request: Request, order_id: str, db: Session = Depends(get_db), authorization: Optional[str] = Header(default=None)):
+    """A signed-in customer cancels their own order (only while it is still 'processing')."""
+    email = auth.customer_email_from_header(authorization)
+    if not email:
+        raise HTTPException(status_code=401, detail="Please sign in.")
+    try:
+        order = svc.cancel_order(db, order_id, email=email)
+    except svc.StoreError as e:
+        raise HTTPException(status_code=404 if e.code == "not_found" else 409, detail={"code": e.code, "message": str(e)})
+    result = svc.order_to_dict(order, include_email=True)
+    try:   # an open chat (and the agent looking at it) hears about it straight away
+        await proactive.announce_to_customer(email, f"I can see you just cancelled order #{order.order_id} from your account. It's done: the payment is voided and the items are back in stock. Anything else I can help with?")
+    except Exception:
+        pass
+    return result
+
+
+class LinkIn(BaseModel):
+    session_id: str = Field(min_length=8, max_length=64)
+
+
+@router.post("/chat/link")
+@limiter.limit("30/minute")
+async def link_chat(request: Request, payload: LinkIn, authorization: Optional[str] = Header(default=None),
+                    x_chat_token: Optional[str] = Header(default=None)):
+    """A customer signs in while a chat is already running: attach the account to THAT conversation instead of starting a new one.
+    Needs both proofs: the customer's login token and the chat's own session token."""
+    from app.auth.security import decode_session_token
+    email = auth.customer_email_from_header(authorization)
+    if not email:
+        raise HTTPException(status_code=401, detail="Please sign in.")
+    if not x_chat_token or decode_session_token(x_chat_token) != payload.session_id:
+        raise HTTPException(status_code=401, detail="Invalid chat session")
+    result = await proactive.link_session(payload.session_id, email)
+    if result == "conflict":   # this conversation already belongs to somebody else: the page starts a fresh one
+        raise HTTPException(status_code=409, detail={"code": "chat_belongs_to_another_customer", "message": "This chat belongs to another account."})
+    return {"linked": True, "first_time": result == "linked"}
+
+
+# ------------------------------------------------------------- presenter controls (only with STORE_DEMO_MODE=1)
+def _demo_only():
+    if not demo.enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+
+
+class DemoLoginIn(BaseModel):
+    email: str = Field(pattern=_EMAIL, max_length=254)
+
+
+class DemoOrderIn(BaseModel):
+    action: str = Field(max_length=16)
+
+
+class DemoStockIn(BaseModel):
+    preset: str = Field(max_length=32)
+
+
+@router.get("/demo/status")
+def demo_status():
+    return {"enabled": True, "customers": demo.customers()} if demo.enabled() else {"enabled": False}
+
+
+@router.post("/demo/login")
+@limiter.limit("30/minute")
+def demo_login(request: Request, payload: DemoLoginIn, db: Session = Depends(get_db)):
+    _demo_only()
+    c = svc.customer_by_email(db, payload.email) if payload.email.lower() in demo.DEMO_EMAILS else None
+    if not c:
+        raise HTTPException(status_code=404, detail="Not found")
+    svc.mark_login(db, c)
+    return _session_payload(c)
+
+
+@router.post("/demo/order")
+@limiter.limit("60/minute")
+def demo_order(request: Request, payload: DemoOrderIn, db: Session = Depends(get_db), authorization: Optional[str] = Header(default=None)):
+    _demo_only()
+    email = auth.customer_email_from_header(authorization)
+    if not email:
+        raise HTTPException(status_code=401, detail="Sign in first.")
+    try:
+        return demo.new_test_order(db, email) if payload.action == "new" else demo.order_action(db, email, payload.action)
+    except svc.StoreError as e:
+        raise HTTPException(status_code=409, detail={"code": e.code, "message": str(e)})
+
+
+@router.post("/demo/stock")
+@limiter.limit("60/minute")
+def demo_stock(request: Request, payload: DemoStockIn, db: Session = Depends(get_db)):
+    _demo_only()
+    try:
+        return {"message": demo.stock_preset(db, payload.preset)}
+    except svc.StoreError as e:
+        raise HTTPException(status_code=422, detail={"code": e.code, "message": str(e)})
+
+
+@router.post("/demo/reset")
+@limiter.limit("10/minute")
+def demo_reset(request: Request, db: Session = Depends(get_db)):
+    _demo_only()
+    return demo.reset(db, chats=False)

@@ -21,7 +21,7 @@ from app.db.store_models import StoreCustomer, StoreInventory, StoreOrder, Store
 from app.services.customer_auth import hash_pw
 from app.services import store_service as svc
 from app.services.integrations.mock_provider import PRODUCT_CATALOG
-from app.services.mock_apis import MOCK_ORDERS
+from app.services.mock_apis import MOCK_CUSTOMERS, MOCK_ORDERS
 
 # Presentation/merchandising data the old mock catalog didn't have.
 _EXTRA: Dict[str, dict] = {
@@ -75,7 +75,9 @@ def _pick_items(total: Decimal, count: int):
     """Choose catalog items whose prices sum as close to (but not over) the mock order total as possible."""
     catalog = [(i["product_id"], Decimal(str(i["price"]))) for i in PRODUCT_CATALOG if i["product_id"] in _EXTRA]
     best, best_gap = None, None
-    for combo in itertools.combinations_with_replacement(catalog, max(1, count)):
+    n = max(1, count)
+    combos = itertools.combinations(catalog, n) if n <= len(catalog) else itertools.combinations_with_replacement(catalog, n)   # distinct items: no "Parka x1, Parka x1"
+    for combo in combos:
         s = sum(p for _, p in combo)
         if s <= total and (best_gap is None or total - s < best_gap):
             best, best_gap = combo, total - s
@@ -94,7 +96,7 @@ def seed_orders(db: Session) -> int:
             customer = StoreCustomer(email=email, name=person.name if person else email.split("@")[0].replace(".", " ").title(), phone=person.phone if person else None)
             db.add(customer)
             db.flush()
-        trk_no, trk_url = svc.make_tracking(o["carrier"], random.Random(int(order_id)))  # nosec B311  # deterministic demo data if o.get("carrier") else (None, None)
+        trk_no, trk_url = svc.make_tracking(o["carrier"], random.Random(int(order_id))) if o.get("carrier") else (None, None)
         total = _money(o["total_amount"])
         combo = _pick_items(total, int(o.get("items_count") or 1))
         subtotal = sum(p for _, p in combo)
@@ -120,7 +122,7 @@ def seed_orders(db: Session) -> int:
     return created
 
 
-DEMO_PASSWORD = "northbound123"  # nosec B105  # every seeded demo customer signs in with this (demo data only)
+DEMO_PASSWORD = "northbound123"   # every seeded demo customer signs in with this
 _HISTORY_FLAG = "store_history_seeded"
 
 
@@ -217,15 +219,9 @@ def seed_customers(db: Session) -> int:
 
 def seed_history(db: Session, today: datetime.date | None = None) -> int:
     """Realistic past orders for the demo customers (1-6 each, spread over the last year). Runs once."""
-    # The demo accounts all share one PUBLISHED password (DEMO_PASSWORD). Seeding them into a production
-    # database would create 15 accounts whose credentials anyone can read in the repo.
-    from app.config import settings
-    import os
-    if settings.app_env == "production" and os.environ.get("ALLOW_DEMO_SEED", "").lower() != "true":
-        raise RuntimeError("Refusing to seed demo customers (public password) in production. Set ALLOW_DEMO_SEED=true to override.")
     if db.query(SystemSetting).filter_by(key=_HISTORY_FLAG).first():
         return 0
-    rng = random.Random(2026)  # nosec B311  # deterministic demo data, not security-sensitive
+    rng = random.Random(2026)
     today = today or datetime.date.today()
     products = db.query(StoreProduct).order_by(StoreProduct.product_id).all()
     if not products:
@@ -288,10 +284,53 @@ def refresh_tracking(db: Session) -> int:
     n = 0
     for o in db.query(StoreOrder).filter(StoreOrder.tracking_url.isnot(None)).all():
         if "example.com" in o.tracking_url or "fedex.com/track/" in o.tracking_url or "wrennon" in o.tracking_url:
-            o.tracking_number, o.tracking_url = svc.make_tracking(o.carrier or "FedEx", random.Random(int(o.order_id) if o.order_id.isdigit() else 7))  # nosec B311  # deterministic demo data
+            o.tracking_number, o.tracking_url = svc.make_tracking(o.carrier or "FedEx", random.Random(int(o.order_id) if o.order_id.isdigit() else 7))
             n += 1
     db.commit()
     return n
+
+
+def merge_duplicate_lines(db: Session) -> int:
+    """Earlier seeds could list the same product twice in one order ("Parka x1" twice). Merge them into one line with a quantity."""
+    merged = 0
+    for o in db.query(StoreOrder).all():
+        seen = {}
+        for it in list(o.items):
+            key = (it.product_id, it.size)
+            if key in seen:
+                seen[key].quantity += it.quantity
+                o.items.remove(it)
+                merged += 1
+            else:
+                seen[key] = it
+    db.commit()
+    return merged
+
+
+_SHIFT_FLAG = "store_mock_dates_shifted"
+
+
+def refresh_mock_dates(db: Session, today: datetime.date | None = None) -> int:
+    """The ten original demo orders carry dates from when the mock data was written. Slide them forward (once) so the newest is
+    yesterday - otherwise a 'processing' order from months ago and an ETA in the past look wrong."""
+    if db.query(SystemSetting).filter_by(key=_SHIFT_FLAG).first():
+        return 0
+    orders = [o for o in (db.get(StoreOrder, i) for i in MOCK_ORDERS) if o]
+    if not orders:
+        return 0
+    today = today or datetime.date.today()
+    gap = (today - max(o.created_at for o in orders).date()).days - 1
+    if gap > 14:
+        shift = datetime.timedelta(days=gap)
+        for o in orders:
+            o.created_at += shift
+            if o.eta:
+                o.eta += shift
+            for e in o.events:
+                e.occurred_at += shift
+    db.add(SystemSetting(key=_SHIFT_FLAG, value=str(max(gap, 0))))
+    db.commit()
+    return len(orders) if gap > 14 else 0
 
 
 def seed_store(db: Session, with_orders: bool = True, with_history: bool = True) -> dict:
@@ -300,5 +339,7 @@ def seed_store(db: Session, with_orders: bool = True, with_history: bool = True)
     customers = seed_customers(db)
     orders = seed_orders(db) if with_orders else 0
     refresh_tracking(db)
+    merge_duplicate_lines(db)
+    refresh_mock_dates(db)
     history = seed_history(db) if (with_orders and with_history) else 0
     return {"products_created": products, "customers_renamed": renamed, "customers_created": customers, "orders_created": orders, "history_orders_created": history}

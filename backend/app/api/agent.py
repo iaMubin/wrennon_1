@@ -328,79 +328,68 @@ def dashboard_summary(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
 ):
+    """Live dashboard. Every figure is measured from the database; anything that cannot be
+    measured is returned as null (or an empty list) and the UI shows an honest empty state."""
     from sqlalchemy import func
-    from datetime import datetime, timedelta
-    from zoneinfo import ZoneInfo
-    from datetime import timezone
+    from datetime import datetime, timedelta, timezone
+    from app.services import dashboard_stats as ds
+
+    now = datetime.now(ds.TZ)
+    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_today_utc_naive = ds.to_utc_naive(start_of_today)
 
     open_tickets = db.query(Conversation).filter(Conversation.resolved == False).count()
-
     unassigned = db.query(Conversation).filter(
         Conversation.assigned_agent == None,
         Conversation.resolved == False
     ).count()
-
-    tz = ZoneInfo('Asia/Dhaka')
-    now = datetime.now(tz)
-    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    start_of_today_utc_naive = start_of_today.astimezone(timezone.utc).replace(tzinfo=None)
-    
     solved_today = db.query(Conversation).filter(
         Conversation.resolved == True,
         Conversation.resolved_at >= start_of_today_utc_naive
     ).count()
+    ai_handling = db.query(Conversation).filter(
+        Conversation.resolved == False, Conversation.handoff_active == False
+    ).count()
+    awaiting_human = db.query(Conversation).filter(
+        Conversation.resolved == False, Conversation.handoff_active == True, Conversation.handled_by == None
+    ).count()
+    handoff_open = db.query(Conversation).filter(
+        Conversation.resolved == False, Conversation.handoff_active == True
+    ).count()
 
     csat_avg = db.query(func.avg(CSATResponse.rating)).scalar()
-    csat_score = round(csat_avg, 1) if csat_avg is not None else 4.8
+    csat_score = round(csat_avg, 1) if csat_avg is not None else None
+    csat_count = db.query(func.count(CSATResponse.id)).scalar() or 0
 
     chat_counts = db.query(
-        Conversation.assigned_agent, 
+        Conversation.assigned_agent,
         func.count(Conversation.id)
     ).filter(
         Conversation.resolved == False,
         Conversation.assigned_agent != None
     ).group_by(Conversation.assigned_agent).all()
-    
     agent_chat_counts = {agent_name: count for agent_name, count in chat_counts}
-    
-    todays_convs = db.query(Conversation.created_at).filter(
-        Conversation.created_at >= start_of_today_utc_naive
-    ).all()
 
-    hourly_volume = [0] * 24
-    for c in todays_convs:
-        if c.created_at.tzinfo is None:
-             local_dt = c.created_at.replace(tzinfo=timezone.utc).astimezone(tz)
-        else:
-             local_dt = c.created_at.astimezone(tz)
-        if 0 <= local_dt.hour < 24:
-            hourly_volume[local_dt.hour] += 1
+    today_hours = ds.hourly_for_day(db, start_of_today)
+    yesterday_hours = ds.hourly_for_day(db, start_of_today - timedelta(days=1))
 
-    # SLA Risks: tickets closest to or past breach, ordered by urgency
+    # SLA risks: open conversations waiting on a human, closest to (or past) breach first
     open_convs = scope_conversations(db.query(Conversation).filter(
         Conversation.resolved == False,
         Conversation.handoff_active == True
     ), agent).all()
-    
     sla_policy = get_sla_policy(db)
-    
     sla_list = []
     for c in open_convs:
         status = get_sla_status(c, sla_policy)
         if status == "ok":
             continue
-            
-        if c.created_at.tzinfo is None:
-            created_utc = c.created_at.replace(tzinfo=timezone.utc)
-        else:
-            created_utc = c.created_at.astimezone(timezone.utc)
-            
+        created_utc = c.created_at.replace(tzinfo=timezone.utc) if c.created_at.tzinfo is None else c.created_at.astimezone(timezone.utc)
         age_minutes = (datetime.now(timezone.utc) - created_utc).total_seconds() / 60
         priority = getattr(c, "priority", None) or "normal"
         threshold = sla_policy.get(priority, 240)
         ratio = age_minutes / threshold if threshold > 0 else 0
         minutes_remaining = max(0, int(threshold - age_minutes)) if ratio < 1.0 else -int(age_minutes - threshold)
-        
         sla_list.append({
             "session_id": c.session_id,
             "short_id": c.short_id,
@@ -411,189 +400,39 @@ def dashboard_summary(
             "sla_status": status,
             "ratio": ratio,
             "minutes_remaining": minutes_remaining,
-            "subject": f"Inquiry regarding order or account ({priority.capitalize()} Priority)",
-            "customer_tier": "Enterprise" if priority == "urgent" else "Gold VIP"
+            "subject": c.summary or None,
+            "assigned_agent": c.assigned_agent,
         })
-        
-    # sort by ratio descending
     sla_list.sort(key=lambda x: x["ratio"], reverse=True)
-    sla_risks = sla_list[:6]
 
-    # Baseline production showcase data if DB volume is low
-    if open_tickets < 5:
-        open_tickets = 14
-    if unassigned < 1:
-        unassigned = 3
-    if solved_today < 3:
-        solved_today = 28
-    if not agent_chat_counts:
-        agent_chat_counts = {"Sarah Jenkins": 4, "Michael Chang": 3, agent.username: 2}
-
-    if sum(hourly_volume) < 10:
-        hourly_volume = [1, 0, 0, 0, 1, 3, 8, 16, 24, 38, 42, 36, 45, 52, 48, 39, 31, 22, 18, 14, 9, 6, 3, 2]
-    
-    hourly_volume_yesterday = [0, 0, 0, 0, 1, 2, 6, 14, 20, 32, 38, 30, 40, 46, 42, 35, 28, 19, 15, 11, 7, 4, 2, 1]
-
-    if len(sla_risks) == 0:
-        sla_risks = [
-            {
-                "session_id": "mock-risk-1",
-                "short_id": "TK-8492",
-                "customer_email": "eleanor.v@example.com",
-                "customer_name": "Eleanor Vance",
-                "customer_tier": "Enterprise",
-                "subject": "Delayed shipment on international order #1001",
-                "created_at": (datetime.now(timezone.utc) - timedelta(minutes=48)).isoformat(),
-                "reopen_count": 1,
-                "priority": "urgent",
-                "sla_status": "breached",
-                "ratio": 1.45,
-                "minutes_remaining": -18,
-                "assigned_agent": "Sarah Jenkins"
-            },
-            {
-                "session_id": "mock-risk-2",
-                "short_id": "TK-3914",
-                "customer_email": "mchang.tech@example.com",
-                "customer_name": "Michael Chang",
-                "customer_tier": "Gold VIP",
-                "subject": "Payment webhook timeout and checkout verification",
-                "created_at": (datetime.now(timezone.utc) - timedelta(minutes=26)).isoformat(),
-                "reopen_count": 0,
-                "priority": "high",
-                "sla_status": "warning",
-                "ratio": 0.86,
-                "minutes_remaining": 8,
-                "assigned_agent": agent.username
-            },
-            {
-                "session_id": "mock-risk-3",
-                "short_id": "TK-9021",
-                "customer_email": "jwilson@example.com",
-                "customer_name": "James Wilson",
-                "customer_tier": "Gold VIP",
-                "subject": "Custom enterprise invoice VAT calculation discrepancy",
-                "created_at": (datetime.now(timezone.utc) - timedelta(minutes=18)).isoformat(),
-                "reopen_count": 0,
-                "priority": "normal",
-                "sla_status": "warning",
-                "ratio": 0.72,
-                "minutes_remaining": 22,
-                "assigned_agent": "Michael Chang"
-            }
-        ]
-
-    # Team roster with live operational metrics
-    live_team_status = [
-        {
-            "name": "Sarah Jenkins",
-            "role": "Senior Escalation Lead",
-            "status": "active",
-            "status_text": "In Live Chat (3)",
-            "active_chats": 3,
-            "resolved_today": 16,
-            "csat": 4.95,
-            "avatar": "images/default-avatar.png?v=2"
-        },
-        {
-            "name": "Michael Chang",
-            "role": "Technical Support Engineer",
-            "status": "active",
-            "status_text": "In Live Chat (2)",
-            "active_chats": 2,
-            "resolved_today": 12,
-            "csat": 4.88,
-            "avatar": "images/default-avatar.png?v=2"
-        },
-        {
-            "name": "Wren Autonomous Copilot",
-            "role": "AI Support Specialist (Tier 1)",
-            "status": "active",
-            "status_text": "Autonomous Queue (7)",
-            "active_chats": 7,
-            "resolved_today": 42,
-            "csat": 4.82,
-            "avatar": "images/wren-mark.svg"
-        },
-        {
-            "name": agent.full_name or agent.username.capitalize(),
-            "role": "Support Operations Specialist",
-            "status": "active",
-            "status_text": "Available (Ready)",
-            "active_chats": 1,
-            "resolved_today": 9,
-            "csat": 4.90,
-            "avatar": "images/default-avatar.png?v=2"
-        }
-    ]
+    window_days = 7
+    kpis = ds.compute_period(db, sla_policy, ds.to_utc_naive(now - timedelta(days=window_days)))
 
     return {
         "open_tickets": open_tickets,
         "unassigned": unassigned,
         "solved_today": solved_today,
         "csat_score": csat_score,
-        "sla_compliance_rate": 97.4,
-        "first_response_time_seconds": 92,
-        "fcr_rate_pct": 84.6,
-        "ai_deflection_rate_pct": 71.8,
-        "channel_distribution": {
-            "live_chat": 48,
-            "support_widget": 34,
-            "email": 18
-        },
+        "csat_count": csat_count,
+        "kpi_window_days": window_days,
+        "sla_compliance_rate": ds._fmt(kpis["sla_compliance_pct"]),
+        "first_response_time_seconds": ds._fmt(kpis["first_response_seconds"], 0),
+        "fcr_rate_pct": ds._fmt(kpis["one_touch_pct"]),
+        "ai_deflection_rate_pct": ds._fmt(kpis["ai_resolution_pct"]),
         "agent_chat_counts": agent_chat_counts,
-        "hourly_volume": hourly_volume,
-        "hourly_volume_yesterday": hourly_volume_yesterday,
-        "sla_risks": sla_risks,
-        "live_team_status": live_team_status,
-        "copilot_stream": [
-            {
-                "id": "evt-1",
-                "time": "2m ago",
-                "type": "deflection",
-                "title": "Instant Order Status Deflection",
-                "detail": "Provided carrier tracking & delivery estimate for James Wilson (#WR-9021).",
-                "status": "Autonomous"
-            },
-            {
-                "id": "evt-2",
-                "time": "5m ago",
-                "type": "draft",
-                "title": "Return Label Authorization Generated",
-                "detail": "Computed zero-fee return warranty for Elena Rostova (#TK-8492).",
-                "status": "Approved"
-            },
-            {
-                "id": "evt-3",
-                "time": "11m ago",
-                "type": "escalation",
-                "title": "Sentiment Velocity Threshold Triggered",
-                "detail": "Detected frustration in billing query from Marcus Vance; routed to Sarah Jenkins.",
-                "status": "Escalated"
-            },
-            {
-                "id": "evt-4",
-                "time": "19m ago",
-                "type": "knowledge",
-                "title": "Knowledge Graph Retrieval Match",
-                "detail": "Answered customs declaration policy for Hiroshi Tanaka in 1.4s.",
-                "status": "Resolved"
-            }
-        ],
-        "queue_tier_distribution": {
-            "enterprise": 4,
-            "gold_vip": 5,
-            "silver": 3,
-            "starter": 2
-        },
+        "hourly_volume": today_hours["created"],
+        "hourly_ai_resolved": today_hours["ai_resolved"],
+        "hourly_volume_yesterday": yesterday_hours["created"],
+        "sla_risks": sla_list[:6],
+        "live_team_status": ds.team_status(db, start_of_today_utc_naive),
+        "copilot_stream": ds.recent_activity(db),
         "operational_telemetry": {
-            "system_status": "All Systems Operational",
-            "uptime_pct": 99.98,
-            "throughput_req_min": 42.8,
-            "p95_frt_seconds": 184,
-            "active_ai_threads": 7,
-            "cost_savings_month": "$12,480"
-        }
+            "open_now": open_tickets,
+            "ai_handling": ai_handling,
+            "awaiting_human": awaiting_human,
+            "handoff_open": handoff_open,
+            "p95_first_response_seconds": ds._fmt(kpis["p95_first_response_seconds"], 0),
+        },
     }
 
 @router.get("/agent/customers")
@@ -603,9 +442,6 @@ def get_customers(
 ):
     from sqlalchemy import func, case
     from app.services.mock_apis import MOCK_CUSTOMERS, MOCK_ORDERS
-    import hashlib
-    from datetime import datetime, timedelta, timezone
-
     # Group by customer_email using SQL aggregations
     query = db.query(
         Conversation.customer_email.label("email"),
@@ -665,121 +501,62 @@ def get_customers(
                 "created_at": cr.created_at.isoformat() if cr.created_at else None
             })
 
-    # International locations table for production grade customer intelligence
-    locations = [
-        {"country": "United States", "code": "US", "flag": "🇺🇸", "city": "San Francisco, CA"},
-        {"country": "United Kingdom", "code": "GB", "flag": "🇬🇧", "city": "London"},
-        {"country": "Germany", "code": "DE", "flag": "🇩🇪", "city": "Berlin"},
-        {"country": "Canada", "code": "CA", "flag": "🇨🇦", "city": "Toronto, ON"},
-        {"country": "Bangladesh", "code": "BD", "flag": "🇧🇩", "city": "Dhaka"},
-        {"country": "Australia", "code": "AU", "flag": "🇦🇺", "city": "Sydney"},
-        {"country": "Singapore", "code": "SG", "flag": "🇸🇬", "city": "Singapore"},
-        {"country": "Netherlands", "code": "NL", "flag": "🇳🇱", "city": "Amsterdam"},
-        {"country": "Japan", "code": "JP", "flag": "🇯🇵", "city": "Tokyo"},
-        {"country": "France", "code": "FR", "flag": "🇫🇷", "city": "Paris"}
-    ]
+    demo_mode = bool(USE_MOCK and not _STORE_DB)
 
-    def build_customer_record(email_str, mock_c=None):
+    def build_customer_record(email_str, mock_c=None, demo=False):
+        """Facts only. Phone, plan, lifetime value and order count come from the store (or the
+        explicit demo data) when it has them; a customer is never given invented contact details,
+        a made-up location or a guessed spend. What the helpdesk itself measured (tickets,
+        resolution rate, ratings) comes from the database; if there is nothing, the field is null."""
         email_clean = email_str.strip()
         email_lower = email_clean.lower()
-        hash_val = int(hashlib.md5(email_lower.encode(), usedforsecurity=False).hexdigest(), 16)
-        
-        # Name resolution
-        if mock_c and mock_c.get("name"):
+        mock_c = mock_c or {}
+
+        if mock_c.get("name"):
             name = mock_c["name"]
         else:
             local = email_clean.split('@')[0]
             words = [w.capitalize() for w in local.replace('.', ' ').replace('_', ' ').replace('-', ' ').split()]
             name = " ".join(words) if words else "Customer"
 
-        # International Location
-        loc = locations[hash_val % len(locations)]
-
-        # Phone
-        phone = mock_c.get("phone") if mock_c and mock_c.get("phone") else f"+1 ({200 + (hash_val % 700)}) {100 + (hash_val % 899)}-{1000 + (hash_val % 8999)}"
-
-        # Stats from DB or deterministic mock
         stats = db_stats.get(email_lower)
-        if stats and stats.get("total_tickets", 0) > 0:
-            total_tickets = stats["total_tickets"]
-            resolved_ratio = stats["resolved_ratio"]
-            avg_csat = stats["avg_csat"] if stats.get("avg_csat") is not None else round(((hash_val % 15) + 35) / 10.0, 1)
-            last_active = stats["last_active"].isoformat() if stats.get("last_active") else None
-        else:
-            total_tickets = (hash_val % 14) + 1
-            resolved_ratio = ((hash_val % 35) + 65) / 100.0
-            avg_csat = round(((hash_val % 16) + 34) / 10.0, 1)
-            days_ago = (hash_val % 10)
-            hours_ago = (hash_val % 24)
-            last_active = (datetime.now(timezone.utc) - timedelta(days=days_ago, hours=hours_ago)).isoformat()
+        total_tickets = stats["total_tickets"] if stats else 0
+        resolved_ratio = stats["resolved_ratio"] if stats and total_tickets > 0 else None
+        avg_csat = stats["avg_csat"] if stats else None
+        last_active = stats["last_active"].isoformat() if stats and stats.get("last_active") else None
 
-        # Tier / Loyalty plan
-        if mock_c and mock_c.get("loyalty_tier"):
-            lt = mock_c["loyalty_tier"]
-            tier = "Gold VIP" if lt == "Gold" else ("Enterprise" if "VIP" in mock_c.get("tags", []) else "Silver")
-        else:
-            tiers = ["Enterprise", "Gold VIP", "Silver", "Bronze", "Starter"]
-            tier = tiers[hash_val % len(tiers)]
+        orders = [o for o in MOCK_ORDERS.values() if o.get("email", "").lower() == email_lower] if USE_MOCK and not _STORE_DB else []
+        total_orders = mock_c.get("total_orders", len(orders) if orders else None)
 
-        # Lifetime Value & Orders
-        if mock_c and mock_c.get("lifetime_value"):
-            ltv = mock_c["lifetime_value"]
-            total_orders = mock_c.get("total_orders", (hash_val % 8) + 1)
-        else:
-            val = (hash_val % 2100) + 240
-            ltv = f"${val:,.2f}"
-            total_orders = (hash_val % 12) + 1
+        # Health only exists once there is a rating and a resolution history to base it on
+        health_score = health_label = None
+        if avg_csat is not None and resolved_ratio is not None:
+            health_score = max(0, min(100, int((avg_csat / 5.0) * 70 + (resolved_ratio * 30))))
+            health_label = "Healthy" if health_score >= 82 else ("Neutral" if health_score >= 62 else "At Risk")
 
-        # Health Score & Churn Risk
-        base_h = int((avg_csat / 5.0) * 70 + (resolved_ratio * 30))
-        health_score = max(30, min(99, base_h))
-        if health_score >= 82:
-            health_label = "Healthy"
-        elif health_score >= 62:
-            health_label = "Neutral"
-        else:
-            health_label = "At Risk"
-
-        # Sentiment label
-        if avg_csat >= 4.6:
-            sentiment = "Delighted"
-        elif avg_csat >= 4.0:
-            sentiment = "Satisfied"
-        elif avg_csat >= 3.2:
-            sentiment = "Neutral"
-        else:
-            sentiment = "Frustrated"
-
-        # Customer tags
-        tags = list(mock_c.get("tags", [])) if mock_c else []
-        if not tags:
-            tag_options = ["Priority Support", "High LTV", "Active Subscriber", "Frequent Buyer", "Wholesale", "SLA Guarded"]
-            tags = [tag_options[hash_val % len(tag_options)], tier]
-
-        # Customer orders from MOCK_ORDERS
-        orders = []
-        for o in MOCK_ORDERS.values():
-            if o.get("email", "").lower() == email_lower:
-                orders.append(o)
+        sentiment = None
+        if avg_csat is not None:
+            sentiment = "Delighted" if avg_csat >= 4.6 else ("Satisfied" if avg_csat >= 4.0 else ("Neutral" if avg_csat >= 3.2 else "Frustrated"))
 
         return {
             "name": name,
             "email": email_clean,
-            "phone": phone,
-            "tier": tier,
+            "phone": mock_c.get("phone") or None,
+            "tier": mock_c.get("loyalty_tier") or None,
             "health_score": health_score,
             "health_label": health_label,
-            "lifetime_value": ltv,
+            "lifetime_value": mock_c.get("lifetime_value") or None,
             "total_orders": total_orders,
-            "location": loc,
-            "tags": tags,
+            "location": None,
+            "tags": list(mock_c.get("tags", [])),
             "total_tickets": total_tickets,
             "resolved_ratio": resolved_ratio,
             "avg_csat": avg_csat,
             "sentiment": sentiment,
             "last_active": last_active,
             "recent_conversations": convs_by_email.get(email_lower, []),
-            "orders": orders
+            "orders": orders,
+            "demo": demo,
         }
 
     results = []
@@ -791,7 +568,7 @@ def get_customers(
         if not em or em.lower() in seen_emails:
             continue
         seen_emails.add(em.lower())
-        results.append(build_customer_record(em, cust))
+        results.append(build_customer_record(em, cust, demo=demo_mode))
         
     # 2. Add emails from MOCK_ORDERS not in MOCK_CUSTOMERS
     for order in (MOCK_ORDERS.values() if (USE_MOCK and not _STORE_DB) else []):
@@ -799,7 +576,7 @@ def get_customers(
         if not em or em.lower() in seen_emails:
             continue
         seen_emails.add(em.lower())
-        results.append(build_customer_record(em))
+        results.append(build_customer_record(em, demo=demo_mode))
         
     # 3. Add any customers from DB
     for r in rows:

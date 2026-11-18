@@ -96,6 +96,10 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
         )
     if state.get("page_context"):
         context_parts.append(state["page_context"])
+    context_parts.append(
+        "Honesty rule: only say you did something (cancelled, refunded, added to the bag, opened a page, changed an order) if the tool results "
+        "show it was done. If a tool result says it was not done or needs the customer's confirmation, say exactly that. Never claim an action you did not perform."
+    )
     if state.get("gathered_context"):
         context_parts.append("Tool/policy results:\n" + "\n".join(state["gathered_context"]))
 

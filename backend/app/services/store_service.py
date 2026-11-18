@@ -7,7 +7,6 @@ website and the bot can never disagree about a price, a stock level or an order.
 from __future__ import annotations
 
 import datetime
-import hmac
 import uuid
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Dict, List, Optional
@@ -28,9 +27,9 @@ MAX_LINES, MAX_QTY = 20, 10
 
 LABELS = {
     "placed": "Order Placed", "processing": "Processing", "shipped": "Shipped", "delivered": "Delivered",
-    "cancelled": "Cancelled", "refunded": "Refunded", "partially_refunded": "Partially Refunded",
+    "cancelled": "Cancelled", "delayed": "Delayed", "refunded": "Refunded", "partially_refunded": "Partially Refunded",
 }
-STATUSES = ("processing", "shipped", "delivered", "cancelled")
+STATUSES = ("processing", "shipped", "delivered", "delayed", "cancelled")
 
 
 _TRACK_URL = {
@@ -107,7 +106,7 @@ def get_product(db: Session, product_id: str) -> Optional[Dict[str, Any]]:
 
 
 # ----------------------------------------------------------------- orders
-def order_to_dict(o: StoreOrder, include_email: bool = False) -> Dict[str, Any]:
+def order_to_dict(o: StoreOrder, include_email: bool = False, include_address: bool = False) -> Dict[str, Any]:
     refunded = sum((r.amount for r in o.refunds if r.status == "approved"), Decimal("0"))
     d: Dict[str, Any] = {
         "order_id": o.order_id,
@@ -132,6 +131,8 @@ def order_to_dict(o: StoreOrder, include_email: bool = False) -> Dict[str, Any]:
     }
     if refunded > 0:
         d["refunded_amount"] = money(refunded, o.currency)
+    if include_address:
+        d["ship_to"] = ", ".join(x for x in (o.ship_address, f"{o.ship_city} {o.ship_zip}".strip()) if x)
     if include_email:
         d["email"] = o.email
         d["customer_name"] = o.customer_name
@@ -144,7 +145,7 @@ def get_order(db: Session, order_id: Any, email: Optional[str] = None) -> Option
     order = db.get(StoreOrder, clean_order_id(order_id))
     if not order:
         return None
-    if email is not None and not hmac.compare_digest(order.email.lower().encode(), email.strip().lower().encode()):
+    if email is not None and order.email.lower() != email.strip().lower():
         return None
     return order
 
@@ -231,7 +232,7 @@ def create_order(db: Session, *, email: str, name: str, address: str, city: str,
 
 def set_status(db: Session, order_id: Any, status: str, *, carrier: Optional[str] = None,
                tracking_number: Optional[str] = None, tracking_url: Optional[str] = None,
-               eta: Optional[datetime.date] = None) -> StoreOrder:
+               eta: Optional[datetime.date] = None, delay_days: int = 3, reason: Optional[str] = None) -> StoreOrder:
     """Move an order through its lifecycle (what a warehouse/carrier webhook would do)."""
     if status not in STATUSES:
         raise StoreError("invalid_status", f"Status must be one of: {', '.join(STATUSES)}.")
@@ -245,12 +246,19 @@ def set_status(db: Session, order_id: Any, status: str, *, carrier: Optional[str
         order.tracking_number = tracking_number or order.tracking_number or auto_no
         order.tracking_url = tracking_url or order.tracking_url or (_TRACK_URL.get(order.carrier, _TRACK_URL["FedEx"]).format(n=order.tracking_number) if tracking_number or order.tracking_number else auto_url)
         order.eta = eta or order.eta or (_now() + datetime.timedelta(days=4)).date()
+    if status == "delayed":
+        order.eta = eta or ((order.eta or _now().date()) + datetime.timedelta(days=delay_days))
     if status == "delivered":
         order.eta = None
     if status == "cancelled":
         order.payment_status = "voided"
     add_event(order, status)
     db.commit()
+    if status in ("shipped", "delivered", "delayed", "cancelled"):   # the assistant tells the customer in their chat
+        from app.services import store_proactive
+        text = store_proactive.order_event_text(db, order, status, reason)
+        if text:
+            store_proactive.queue_message(db, order.email, f"order_{status}", text)
     return order
 
 
@@ -318,3 +326,116 @@ def register_customer(db: Session, *, name: str, email: str, password_hash: str)
 def mark_login(db: Session, c: StoreCustomer) -> None:
     c.last_login_at = _now()
     db.commit()
+
+
+def cancel_order(db: Session, order_id: Any, email: Optional[str] = None) -> StoreOrder:
+    """Cancel an order that has not shipped. Puts the stock back, voids the payment and records the event.
+    If `email` is given it must be the order's owner (same answer as 'not found' otherwise)."""
+    order = get_order(db, order_id, email=email)
+    if not order:
+        raise StoreError("not_found", "Order not found.")
+    if order.status == "cancelled":
+        raise StoreError("already_cancelled", f"Order #{order.order_id} is already cancelled.")
+    if order.status != "processing":
+        raise StoreError("not_cancellable", f"Order #{order.order_id} is {order.status}, so it can no longer be cancelled. "
+                         "You can return it once it arrives (30-day return window).")
+    for item in order.items:   # put the stock back
+        row = db.execute(select(StoreInventory).where(StoreInventory.product_id == item.product_id, StoreInventory.size == item.size)).scalars().first()
+        if row:
+            row.quantity += item.quantity
+    order.status = "cancelled"
+    order.payment_status = "voided"
+    order.eta = None
+    add_event(order, "cancelled")
+    db.commit()
+    return order
+
+
+# ------------------------------------------------ changing an order that has not shipped
+def _edit_event(order: StoreOrder, label: str) -> None:
+    order.events.append(StoreOrderEvent(status="updated", label=label[:80], occurred_at=_now()))
+
+
+def _editable(db: Session, order_id: Any, email: Optional[str]) -> StoreOrder:
+    order = get_order(db, order_id, email=email)
+    if not order:
+        raise StoreError("not_found", "Order not found.")
+    if order.status != "processing":
+        raise StoreError("not_editable", f"Order #{order.order_id} is {order.status}, so it can no longer be changed here.")
+    return order
+
+
+def update_order_address(db: Session, order_id: Any, *, email: Optional[str], address: str, city: str, zip_code: str,
+                         country: Optional[str] = None) -> StoreOrder:
+    order = _editable(db, order_id, email)
+    address, city, zip_code = (address or "").strip(), (city or "").strip(), (zip_code or "").strip()
+    if not (address and city and zip_code) or len(address) > 300 or len(city) > 120 or len(zip_code) > 32:
+        raise StoreError("invalid_address", "A delivery address needs a street address, a city and a ZIP/postal code.")
+    order.ship_address, order.ship_city, order.ship_zip = address, city, zip_code
+    if country:
+        order.ship_country = country.strip()[:80]
+    _edit_event(order, "Delivery address updated")
+    db.commit()
+    return order
+
+
+def change_order_size(db: Session, order_id: Any, *, email: Optional[str], new_size: str, product: Optional[str] = None) -> StoreOrder:
+    """Swap one item's size. The new size must be in stock; the old size goes back on the shelf."""
+    order = _editable(db, order_id, email)
+    items = list(order.items)
+    if product:
+        low = str(product).strip().lower()
+        items = [i for i in items if (i.product_id or "").lower() == low or low in i.name.lower()]
+    if len(items) != 1:
+        raise StoreError("which_item", "Which item should change size? " + ", ".join(i.name for i in order.items))
+    item = items[0]
+    prod = db.get(StoreProduct, item.product_id) if item.product_id else None
+    if not prod:
+        raise StoreError("unknown_product", "That item can no longer be changed.")
+    size = next((s_ for s_ in (prod.sizes or []) if s_.lower() == str(new_size or "").strip().lower()), None)
+    if not size:
+        raise StoreError("invalid_size", f"{prod.name} comes in sizes {', '.join(prod.sizes or [])}.")
+    if size == item.size:
+        raise StoreError("same_size", f"That item is already size {size}.")
+    taken = db.execute(update(StoreInventory).where(StoreInventory.product_id == prod.product_id, StoreInventory.size == size,
+                                                    StoreInventory.quantity >= item.quantity).values(quantity=StoreInventory.quantity - item.quantity))
+    if taken.rowcount != 1:
+        db.rollback()
+        raise StoreError("out_of_stock", f"Sorry, {prod.name} in size {size} doesn't have enough stock left.")
+    old = db.execute(select(StoreInventory).where(StoreInventory.product_id == prod.product_id, StoreInventory.size == item.size)).scalars().first()
+    if old:
+        old.quantity += item.quantity
+    old_size, item.size = item.size, size
+    _edit_event(order, f"Size changed: {item.name} {old_size} to {size}")
+    db.commit()
+    return order
+
+
+def add_order_item(db: Session, order_id: Any, *, email: Optional[str], product_id: str, size: str, quantity: int = 1) -> StoreOrder:
+    """Add an item to an order that has not shipped. Stock is taken atomically; the order's totals are recalculated."""
+    order = _editable(db, order_id, email)
+    product = db.get(StoreProduct, product_id)
+    if not product or not product.active:
+        raise StoreError("unknown_product", "That product is no longer available.")
+    size_ok = next((x for x in (product.sizes or []) if x.lower() == str(size or "").strip().lower()), None)
+    if not size_ok:
+        raise StoreError("invalid_size", f"{product.name} comes in sizes {', '.join(product.sizes or [])}.")
+    qty = int(quantity or 1)
+    if qty < 1 or qty > MAX_QTY:
+        raise StoreError("invalid_quantity", f"Quantity must be between 1 and {MAX_QTY}.")
+    taken = db.execute(update(StoreInventory).where(StoreInventory.product_id == product_id, StoreInventory.size == size_ok,
+                                                    StoreInventory.quantity >= qty).values(quantity=StoreInventory.quantity - qty))
+    if taken.rowcount != 1:
+        db.rollback()
+        raise StoreError("out_of_stock", f"Sorry, {product.name} in size {size_ok} doesn't have enough stock left.")
+    line = next((i for i in order.items if i.product_id == product_id and i.size == size_ok), None)
+    if line:
+        line.quantity += qty
+    else:
+        order.items.append(StoreOrderItem(product_id=product_id, name=product.name, size=size_ok, quantity=qty, unit_price=product.price))
+    order.subtotal = sum((i.unit_price * i.quantity for i in order.items), Decimal("0"))
+    order.tax = (order.subtotal * TAX_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    order.total = order.subtotal + order.shipping_cost + order.tax
+    _edit_event(order, f"Item added: {product.name} ({size_ok}) x{qty}")
+    db.commit()
+    return order

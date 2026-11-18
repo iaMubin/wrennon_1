@@ -1,0 +1,26 @@
+[
+  {
+    "scenario": "cancel_flow",
+    "what": "cancels an unshipped order, but only after asking to confirm",
+    "result": "FAIL",
+    "detail": "did not use the cancel_order tool (used [])",
+    "seconds": 1.6,
+    "last_reply": "Sure, would you like to confirm cancellation of order #1068?"
+  },
+  {
+    "scenario": "change_address",
+    "what": "changes the delivery address after confirmation",
+    "result": "FAIL",
+    "detail": "customer confirmed but the address was not changed",
+    "seconds": 24.1,
+    "last_reply": "Got it! Just to confirm, you’d like to change the delivery address for order #1068 to [ADDRESS HIDDEN], Seattle, WA 98103. Is that correct?"
+  },
+  {
+    "scenario": "add_to_bag",
+    "what": "adds a product to the bag on request",
+    "result": "FAIL",
+    "detail": "did not add the beanie to the bag (actions: [])",
+    "seconds": 1.2,
+    "last_reply": "Sure! Which size would you like for the Wool Beanie?"
+  }
+]

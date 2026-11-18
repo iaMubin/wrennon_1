@@ -39,15 +39,6 @@
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  /* Semantic Core (Google Functional Tokens) */
-  --success-500: #1E8E3E;
-  --warning-500: #E37400;
-  --error-500: #D93025;
-  --danger: #D93025;
-  --success: #1E8E3E;
-  --warning: #E37400;
-  --accent-alert: #D93025;
-  --accent-success: #1E8E3E;
 }
 
 * {
@@ -60,549 +51,835 @@
   display: none !important;
 }
 
-/* --------------------------------------------------------------------------
-   DEFAULT FALLBACK (:root)
-   -------------------------------------------------------------------------- */
-:root {
-  --bg-base: #F7F8FA;
-  --bg-surface: #FFFFFF;
-  --bg-nav: #FFFFFF;
-  --bg-header: #FFFFFF;
-  --bg-hover: #F1F3F5;
-  --bg-active: #E8EAED;
-  --bg-elevated: #FFFFFF;
-  --bg-glass: rgba(255, 255, 255, 0.96);
-
-  --ink: #111827;
-  --ink-main: #111827;
-  --ink-soft: #4B5563;
-  --ink-secondary: #4B5563;
-  --ink-header: #030712;
-  --ink-muted: #6B7280;
-  --text-main: #111827;
-  --text-muted: #4B5563;
-  --text-dim: #9CA3AF;
-
-  --line: #E1E4E8;
-  --border: #E1E4E8;
-  --border-light: #E1E4E8;
-  --border-subtle: #F1F3F5;
-  --border-focus: #111827;
-
-  --accent: #111827;
-  --accent-rgb: 17, 24, 39;
-  --accent-hover: #1F2937;
-  --accent-active: #030712;
-  --accent-light: #F3F4F6;
-  --accent-muted: #6B7280;
-  --accent-ink: #FFFFFF;
-  --accent-glow: rgba(17, 24, 39, 0.08);
-  --shadow-glow: 0 0 0 2px rgba(17, 24, 39, 0.16);
-
-  --bg-panel-header: #FFFFFF;
-  --bg-brand: #FFFFFF;
-  --bg-admin-brand: #FFFFFF;
-  --bg-admin-base: #F7F8FA;
-  --input-outline: var(--accent);
-}
-
 /* ==========================================================================
-   LIGHT MOOD (3 Calibrated Executive Standards)
-   1. Mono (Titanium Minimalist Monochrome)
-   2. Chrome Grey (Google Chrome Customize Settings - Grey Light)
-   3. Chrome Viridian (Google Chrome Customize Settings - Viridian Light)
+   WRENNON THEME SYSTEM
+   Six themes, each designed on its own in OKLCH so every shade belongs to the
+   same family:  Soft Mono / Chrome Grey / Viridian  x  Light / Dark (Matte Black).
+
+   Surface order, light and dark alike:   rail  <  canvas  <  panel  <  surface  <  raised
+   Who-said-it order in a conversation:   customer (neutral)  /  AI (tonal tint)
+                                          /  agent (solid accent)  /  note (amber)
+   This file is generated; edit the recipe, not the hex values.
    ========================================================================== */
 
-/* ── Light Theme 1: Mono (Titanium Minimalist Monochrome) ── */
+:root,
 [data-theme="light-mono"],
 [data-theme="light-neutral-gray"],
 [data-theme="light-professional"],
 [data-theme="light-pure-white"],
 [data-theme="light-graphite"],
 [data-theme="light-zinc"] {
-  --bg-base: #F7F8FA;
-  --bg-surface: #FFFFFF;
-  --bg-nav: #FFFFFF;
-  --bg-header: #FFFFFF;
-  --bg-hover: #F1F3F5;
-  --bg-active: #E8EAED;
+  color-scheme: light;
+
+  /* Surfaces: rail < canvas < panel < surface < raised */
+  --bg-nav: #E6E7EA;
+  --bg-base: #F3F3F6;
+  --bg-panel: #FAFBFD;
+  --bg-surface: #FEFEFF;
   --bg-elevated: #FFFFFF;
-  --bg-glass: rgba(255, 255, 255, 0.96);
+  --bg-sunken: #EBECEF;
+  --bg-hover: #F3F4F6;
+  --bg-active: #EAEBEE;
+  --bg-selected: #E8E9ED;
+  --rail-hover: #DDDEE1;
+  --rail-active: #D4D5D7;
+  --bg-header: #FEFEFF;
+  --bg-panel-header: #FAFBFD;
+  --bg-brand: #FAFBFD;
+  --bg-admin-brand: #FAFBFD;
+  --bg-admin-base: #F3F3F6;
+  --bg-glass: rgba(255, 255, 255, 0.92);
 
-  --ink: #111827;
-  --ink-main: #111827;
-  --ink-soft: #4B5563;
-  --ink-secondary: #4B5563;
-  --ink-header: #030712;
-  --ink-muted: #6B7280;
-  --text-main: #111827;
-  --text-muted: #4B5563;
-  --text-dim: #9CA3AF;
+  /* Text */
+  --ink: #19191B;
+  --ink-main: #19191B;
+  --ink-header: #19191B;
+  --ink-soft: #47484A;
+  --ink-secondary: #47484A;
+  --ink-muted: #646467;
+  --text-main: #19191B;
+  --text-muted: #47484A;
+  --text-dim: #8B8C8E;
 
-  --line: #E1E4E8;
-  --border: #E1E4E8;
-  --border-light: #E1E4E8;
-  --border-subtle: #F1F3F5;
-  --border-focus: #111827;
+  /* Borders */
+  --border-subtle: #E8E9EB;
+  --border-light: #E8E9EB;
+  --line: #DADBDE;
+  --border: #DADBDE;
+  --border-strong: #BDBEC0;
+  --border-focus: #5E69CB;
 
-  --accent: #111827;
-  --accent-rgb: 17, 24, 39;
-  --accent-hover: #1F2937;
-  --accent-active: #030712;
-  --accent-light: #F3F4F6;
-  --accent-muted: #6B7280;
-  --accent-ink: #FFFFFF;
-  --accent-glow: rgba(17, 24, 39, 0.08);
-  --shadow-glow: 0 0 0 2px rgba(17, 24, 39, 0.16);
+  /* Accent family (solid / hover / pressed / soft container / text on container) */
+  --accent: #262628;
+  --accent-hover: #1A1A1C;
+  --accent-active: #111213;
+  --accent-ink: #F9FAFB;
+  --accent-soft: #E8E9ED;
+  --accent-soft-hover: #E1E3E6;
+  --accent-border: #CFD1D6;
+  --accent-soft-ink: #393A3E;
+  --accent-light: #E8E9ED;
+  --accent-muted: #646467;
+  --accent-rgb: 38, 38, 40;
+  --accent-glow: rgba(38, 38, 40, 0.14);
+  --signal: #5E69CB;
+  --shadow-glow: 0 0 0 3px rgba(94, 105, 203, 0.3);
+  --ui-focus-ring: 0 0 0 3px rgba(94, 105, 203, 0.3);
+  --input-outline: #5E69CB;
 
-  --bg-panel-header: #FFFFFF;
-  --bg-brand: #FFFFFF;
-  --bg-admin-brand: #FFFFFF;
-  --bg-admin-base: #F7F8FA;
-  --input-outline: var(--accent);
+  /* Who said it: customer = neutral, AI = tonal tint, agent = solid accent, note = amber */
+  --msg-customer-bg: #FEFEFF;
+  --msg-customer-border: #DADBDE;
+  --msg-customer-text: #19191B;
+  --msg-ai-bg: #E9ECFC;
+  --msg-ai-border: #D1D6F2;
+  --msg-ai-text: #323570;
+  --msg-ai-label: #5459AB;
+  --msg-agent-bg: #262628;
+  --msg-agent-border: #262628;
+  --msg-agent-text: #F9FAFB;
+  --msg-note-bg: #FEF1D8;
+  --msg-note-border: #ECD29C;
+  --msg-note-text: #573905;
+  --msg-user-bg: #FEFEFF;
+  --msg-user-border: #DADBDE;
+  --msg-user-text: #19191B;
+  --ai: #636AC2;
+  --ai-bg: #E9ECFC;
+  --ai-border: #D1D6F2;
+  --ai-ink: #323570;
+  --note: #CA9423;
+  --note-bg: #FEF1D8;
+  --note-border: #ECD29C;
+  --note-ink: #573905;
 
-  /* Specific Component Tokens */
-  --tab-active-bg: #FFFFFF;
-  --tab-active-text: #111827;
-  --tab-active-border: #D1D5DB;
-  --tab-badge-bg: #F1F3F5;
-  --tab-badge-text: #111827;
+  /* Semantic: solid / soft background / border / text on soft */
+  --success: #2B8245;  --success-bg: #E2F7E6;  --success-border: #B8E3C0;  --success-ink: #034E21;
+  --warning: #B67700;  --warning-bg: #FFEEDA;  --warning-border: #F1D0A7;  --warning-ink: #593800;
+  --danger:  #C8433C;   --danger-bg:  #FFECE9;   --danger-border:  #FEC6BF;   --danger-ink:  #6B2621;
+  --info:    #2677B2;     --info-bg:    #E5F3FF;     --info-border:    #B3DBFF;     --info-ink:    #00436D;
+  --accent-success: #2B8245;
+  --accent-alert: #C8433C;
+  --success-500: #2B8245;
+  --warning-500: #B67700;
+  --error-500: #C8433C;
 
-  --msg-user-bg: #FFFFFF;
-  --msg-user-border: #E1E4E8;
-  --msg-user-text: #111827;
+  /* Component tokens */
+  --tab-active-bg: #FEFEFF;
+  --tab-active-text: #19191B;
+  --tab-active-border: #DADBDE;
+  --tab-badge-bg: #EAEBEE;
+  --tab-badge-text: #47484A;
+  --btn-primary-bg: #262628;
+  --btn-primary-text: #F9FAFB;
+  --btn-primary-hover: #1A1A1C;
+  --btn-secondary-bg: #FEFEFF;
+  --btn-secondary-text: #19191B;
+  --btn-secondary-border: #BDBEC0;
+  --btn-secondary-hover: #F3F4F6;
+  --table-th-bg: #FAFBFD;
+  --table-th-text: #47484A;
+  --table-border: #DADBDE;
+  --table-row-hover: #F3F4F6;
 
-  --msg-agent-bg: #F0F2F5;
-  --msg-agent-border: #D1D5DB;
-  --msg-agent-text: #111827;
+  /* Data-viz */
+  --chart-1: #5E69CB;
+  --chart-2: #636AC2;
+  --chart-3: #2677B2;
+  --chart-4: #B67700;
+  --chart-5: #2B8245;
+  --chart-grid: #E8E9EB;
 
-  --btn-primary-bg: #111827;
-  --btn-primary-text: #FFFFFF;
-  --btn-primary-hover: #1F2937;
-
-  --btn-secondary-bg: #FFFFFF;
-  --btn-secondary-text: #111827;
-  --btn-secondary-border: #E1E4E8;
-  --btn-secondary-hover: #F1F3F5;
-
-  --table-th-bg: #F8F9FA;
-  --table-th-text: #4B5563;
-  --table-border: #E1E4E8;
-  --table-row-hover: #F9FAFB;
+  /* Elevation */
+  --shadow-rgb: 36, 40, 53;
+  --shadow-xs: 0 1px 2px rgba(36, 40, 53, 0.06);
+  --shadow-sm: 0 1px 3px rgba(36, 40, 53, 0.08), 0 1px 2px rgba(36, 40, 53, 0.04);
+  --shadow-md: 0 3px 8px rgba(36, 40, 53, 0.1), 0 1px 3px rgba(36, 40, 53, 0.05);
+  --shadow-lg: 0 8px 20px rgba(36, 40, 53, 0.11), 0 2px 6px rgba(36, 40, 53, 0.06);
+  --shadow-xl: 0 14px 32px rgba(36, 40, 53, 0.13), 0 4px 10px rgba(36, 40, 53, 0.06);
+  --shadow-2xl: 0 24px 56px rgba(36, 40, 53, 0.18);
 }
 
-/* ── Light Theme 2: Chrome Grey (Official Customize Chrome - Grey) ── */
+/* ── Chrome Grey (Light) ── */
 [data-theme="light-chrome-grey"],
 [data-theme="light-grey"],
 [data-theme="light-corporate-blue"],
 [data-theme="light-offwhite"] {
-  --bg-base: #F1F3F4;       /* Authentic Chrome Frame Grey */
-  --bg-surface: #FFFFFF;    /* Chrome Active Tab / Omnibox White */
-  --bg-nav: #E8EAED;        /* Chrome Inactive Tab Strip / Toolbar Grey */
-  --bg-header: #FFFFFF;
-  --bg-hover: #E8EAED;
-  --bg-active: #DFE1E5;
+  color-scheme: light;
+
+  /* Surfaces: rail < canvas < panel < surface < raised */
+  --bg-nav: #E0E3E7;
+  --bg-base: #EBEEF2;
+  --bg-panel: #F2F5F9;
+  --bg-surface: #FCFDFF;
   --bg-elevated: #FFFFFF;
-  --bg-glass: rgba(255, 255, 255, 0.96);
+  --bg-sunken: #E5E8EC;
+  --bg-hover: #EDF0F3;
+  --bg-active: #E5E7EB;
+  --bg-selected: #E1EAF9;
+  --rail-hover: #D8DBDF;
+  --rail-active: #CFD2D5;
+  --bg-header: #FCFDFF;
+  --bg-panel-header: #F2F5F9;
+  --bg-brand: #F2F5F9;
+  --bg-admin-brand: #F2F5F9;
+  --bg-admin-base: #EBEEF2;
+  --bg-glass: rgba(255, 255, 255, 0.92);
 
-  --ink: #202124;           /* Google High Emphasis Charcoal */
-  --ink-main: #202124;
-  --ink-soft: #5F6368;      /* Google Medium Emphasis Grey */
-  --ink-secondary: #5F6368;
-  --ink-header: #1F1F1F;
-  --ink-muted: #80868B;
-  --text-main: #202124;
-  --text-muted: #5F6368;
-  --text-dim: #80868B;
+  /* Text */
+  --ink: #181A1C;
+  --ink-main: #181A1C;
+  --ink-header: #181A1C;
+  --ink-soft: #46484B;
+  --ink-secondary: #46484B;
+  --ink-muted: #626568;
+  --text-main: #181A1C;
+  --text-muted: #46484B;
+  --text-dim: #8A8C90;
 
-  --line: #DADCE0;          /* Google Standard Divider */
-  --border: #DADCE0;
-  --border-light: #DADCE0;
-  --border-subtle: #E8EAED;
-  --border-focus: #1A73E8;
+  /* Borders */
+  --border-subtle: #E4E6EA;
+  --border-light: #E4E6EA;
+  --line: #D6D9DD;
+  --border: #D6D9DD;
+  --border-strong: #BBBEC1;
+  --border-focus: #4369A2;
 
-  --accent: #1A73E8;        /* Google Chrome Blue */
-  --accent-rgb: 26, 115, 232;
-  --accent-hover: #1765CC;
-  --accent-active: #155724;
-  --accent-light: #E8F0FE;  /* Google Blue Light Tint */
-  --accent-muted: #4285F4;
+  /* Accent family (solid / hover / pressed / soft container / text on container) */
+  --accent: #4369A2;
+  --accent-hover: #355B92;
+  --accent-active: #2A4F86;
   --accent-ink: #FFFFFF;
-  --accent-glow: rgba(26, 115, 232, 0.14);
-  --shadow-glow: 0 0 0 2px rgba(26, 115, 232, 0.22);
+  --accent-soft: #E1EAF9;
+  --accent-soft-hover: #D9E4F4;
+  --accent-border: #C2D2EA;
+  --accent-soft-ink: #1C3A66;
+  --accent-light: #E1EAF9;
+  --accent-muted: #626568;
+  --accent-rgb: 67, 105, 162;
+  --accent-glow: rgba(67, 105, 162, 0.14);
+  --signal: #4369A2;
+  --shadow-glow: 0 0 0 3px rgba(67, 105, 162, 0.3);
+  --ui-focus-ring: 0 0 0 3px rgba(67, 105, 162, 0.3);
+  --input-outline: #4369A2;
 
-  --bg-panel-header: #FFFFFF;
-  --bg-brand: #E8EAED;
-  --bg-admin-brand: #FFFFFF;
-  --bg-admin-base: #F1F3F4;
-  --input-outline: var(--accent);
+  /* Who said it: customer = neutral, AI = tonal tint, agent = solid accent, note = amber */
+  --msg-customer-bg: #FCFDFF;
+  --msg-customer-border: #D6D9DD;
+  --msg-customer-text: #181A1C;
+  --msg-ai-bg: #F0EAF9;
+  --msg-ai-border: #DDD1ED;
+  --msg-ai-text: #4A2D66;
+  --msg-ai-label: #754D9E;
+  --msg-agent-bg: #4369A2;
+  --msg-agent-border: #4369A2;
+  --msg-agent-text: #FFFFFF;
+  --msg-note-bg: #FEF1D8;
+  --msg-note-border: #ECD29C;
+  --msg-note-text: #573905;
+  --msg-user-bg: #FCFDFF;
+  --msg-user-border: #D6D9DD;
+  --msg-user-text: #181A1C;
+  --ai: #875DB3;
+  --ai-bg: #F0EAF9;
+  --ai-border: #DDD1ED;
+  --ai-ink: #4A2D66;
+  --note: #CA9423;
+  --note-bg: #FEF1D8;
+  --note-border: #ECD29C;
+  --note-ink: #573905;
 
-  /* Specific Component Tokens */
-  --tab-active-bg: #FFFFFF;
-  --tab-active-text: #202124;
-  --tab-active-border: #DADCE0;
-  --tab-badge-bg: #E8F0FE;
-  --tab-badge-text: #1A73E8;
+  /* Semantic: solid / soft background / border / text on soft */
+  --success: #2B8245;  --success-bg: #E2F7E6;  --success-border: #B8E3C0;  --success-ink: #034E21;
+  --warning: #B67700;  --warning-bg: #FFEEDA;  --warning-border: #F1D0A7;  --warning-ink: #593800;
+  --danger:  #C8433C;   --danger-bg:  #FFECE9;   --danger-border:  #FEC6BF;   --danger-ink:  #6B2621;
+  --info:    #1479B0;     --info-bg:    #E4F3FF;     --info-border:    #B0DCFD;     --info-ink:    #004468;
+  --accent-success: #2B8245;
+  --accent-alert: #C8433C;
+  --success-500: #2B8245;
+  --warning-500: #B67700;
+  --error-500: #C8433C;
 
-  --msg-user-bg: #FFFFFF;
-  --msg-user-border: #DADCE0;
-  --msg-user-text: #202124;
-
-  --msg-agent-bg: #E8F0FE;
-  --msg-agent-border: #C8DCF5;
-  --msg-agent-text: #174EA6;
-
-  --btn-primary-bg: #1A73E8;
+  /* Component tokens */
+  --tab-active-bg: #FCFDFF;
+  --tab-active-text: #181A1C;
+  --tab-active-border: #D6D9DD;
+  --tab-badge-bg: #E5E7EB;
+  --tab-badge-text: #46484B;
+  --btn-primary-bg: #4369A2;
   --btn-primary-text: #FFFFFF;
-  --btn-primary-hover: #1765CC;
+  --btn-primary-hover: #355B92;
+  --btn-secondary-bg: #FCFDFF;
+  --btn-secondary-text: #181A1C;
+  --btn-secondary-border: #BBBEC1;
+  --btn-secondary-hover: #EDF0F3;
+  --table-th-bg: #F2F5F9;
+  --table-th-text: #46484B;
+  --table-border: #D6D9DD;
+  --table-row-hover: #EDF0F3;
 
-  --btn-secondary-bg: #FFFFFF;
-  --btn-secondary-text: #202124;
-  --btn-secondary-border: #DADCE0;
-  --btn-secondary-hover: #F1F3F4;
+  /* Data-viz */
+  --chart-1: #4369A2;
+  --chart-2: #875DB3;
+  --chart-3: #1479B0;
+  --chart-4: #B67700;
+  --chart-5: #2B8245;
+  --chart-grid: #E4E6EA;
 
-  --table-th-bg: #F8F9FA;
-  --table-th-text: #5F6368;
-  --table-border: #DADCE0;
-  --table-row-hover: #F1F3F4;
+  /* Elevation */
+  --shadow-rgb: 33, 42, 53;
+  --shadow-xs: 0 1px 2px rgba(33, 42, 53, 0.06);
+  --shadow-sm: 0 1px 3px rgba(33, 42, 53, 0.08), 0 1px 2px rgba(33, 42, 53, 0.04);
+  --shadow-md: 0 3px 8px rgba(33, 42, 53, 0.1), 0 1px 3px rgba(33, 42, 53, 0.05);
+  --shadow-lg: 0 8px 20px rgba(33, 42, 53, 0.11), 0 2px 6px rgba(33, 42, 53, 0.06);
+  --shadow-xl: 0 14px 32px rgba(33, 42, 53, 0.13), 0 4px 10px rgba(33, 42, 53, 0.06);
+  --shadow-2xl: 0 24px 56px rgba(33, 42, 53, 0.18);
 }
 
-/* ── Light Theme 3: Chrome Viridian (Official Customize Chrome - Viridian) ── */
+/* ── Viridian (Light) ── */
 [data-theme="light-viridian"],
 [data-theme="light-chrome-viridian"],
 [data-theme="light-slate-teal"],
 [data-theme="light-blue"],
 [data-theme="light-indigo"] {
-  --bg-base: #EBF3EF;       /* Authentic Chrome Viridian Light Frame */
-  --bg-surface: #FFFFFF;    /* Clean Porcelain White */
-  --bg-nav: #DFECE6;        /* Chrome Viridian Toolbar Tint */
-  --bg-header: #FFFFFF;
-  --bg-hover: #E3EEE8;
-  --bg-active: #D4E5DC;
+  color-scheme: light;
+
+  /* Surfaces: rail < canvas < panel < surface < raised */
+  --bg-nav: #DFE6E3;
+  --bg-base: #EAF1EE;
+  --bg-panel: #F2F9F5;
+  --bg-surface: #FAFFFC;
   --bg-elevated: #FFFFFF;
-  --bg-glass: rgba(255, 255, 255, 0.96);
+  --bg-sunken: #E4EBE7;
+  --bg-hover: #ECF3EF;
+  --bg-active: #E3EAE7;
+  --bg-selected: #DFEDE7;
+  --rail-hover: #D7DEDA;
+  --rail-active: #CED4D1;
+  --bg-header: #FAFFFC;
+  --bg-panel-header: #F2F9F5;
+  --bg-brand: #F2F9F5;
+  --bg-admin-brand: #F2F9F5;
+  --bg-admin-base: #EAF1EE;
+  --bg-glass: rgba(255, 255, 255, 0.92);
 
-  --ink: #122E23;           /* Deep Forest Charcoal */
-  --ink-main: #122E23;
-  --ink-soft: #416353;      /* Muted Eucalyptus Sage */
-  --ink-secondary: #416353;
-  --ink-header: #0A1E16;
-  --ink-muted: #6B8B7C;
-  --text-main: #122E23;
-  --text-muted: #416353;
-  --text-dim: #6B8B7C;
+  /* Text */
+  --ink: #161B18;
+  --ink-main: #161B18;
+  --ink-header: #161B18;
+  --ink-soft: #444946;
+  --ink-secondary: #444946;
+  --ink-muted: #606663;
+  --text-main: #161B18;
+  --text-muted: #444946;
+  --text-dim: #878E8B;
 
-  --line: #C4D8CE;          /* Soft Eucalyptus Divider */
-  --border: #C4D8CE;
-  --border-light: #C4D8CE;
-  --border-subtle: #D8E8E0;
-  --border-focus: #20654D;
+  /* Borders */
+  --border-subtle: #E2E9E5;
+  --border-light: #E2E9E5;
+  --line: #D5DCD8;
+  --border: #D5DCD8;
+  --border-strong: #B9C0BC;
+  --border-focus: #2E715B;
 
-  --accent: #20654D;        /* Rich Authentic Viridian Jewel */
-  --accent-rgb: 32, 101, 77;
-  --accent-hover: #1A4F3C;
-  --accent-active: #133B2C;
-  --accent-light: #E1F0E8;
-  --accent-muted: #3B8C6E;
+  /* Accent family (solid / hover / pressed / soft container / text on container) */
+  --accent: #2E715B;
+  --accent-hover: #1D634D;
+  --accent-active: #0D5842;
   --accent-ink: #FFFFFF;
-  --accent-glow: rgba(32, 101, 77, 0.14);
-  --shadow-glow: 0 0 0 2px rgba(32, 101, 77, 0.22);
+  --accent-soft: #DFEDE7;
+  --accent-soft-hover: #D7E7E0;
+  --accent-border: #C0D7CD;
+  --accent-soft-ink: #094534;
+  --accent-light: #DFEDE7;
+  --accent-muted: #606663;
+  --accent-rgb: 46, 113, 91;
+  --accent-glow: rgba(46, 113, 91, 0.14);
+  --signal: #2E715B;
+  --shadow-glow: 0 0 0 3px rgba(46, 113, 91, 0.3);
+  --ui-focus-ring: 0 0 0 3px rgba(46, 113, 91, 0.3);
+  --input-outline: #2E715B;
 
-  --bg-panel-header: #FFFFFF;
-  --bg-brand: #DFECE6;
-  --bg-admin-brand: #FFFFFF;
-  --bg-admin-base: #EBF3EF;
-  --input-outline: var(--accent);
+  /* Who said it: customer = neutral, AI = tonal tint, agent = solid accent, note = amber */
+  --msg-customer-bg: #FAFFFC;
+  --msg-customer-border: #D5DCD8;
+  --msg-customer-text: #161B18;
+  --msg-ai-bg: #DFF0FA;
+  --msg-ai-border: #BEDDEE;
+  --msg-ai-text: #00435D;
+  --msg-ai-label: #006C93;
+  --msg-agent-bg: #2E715B;
+  --msg-agent-border: #2E715B;
+  --msg-agent-text: #FFFFFF;
+  --msg-note-bg: #FEF1D8;
+  --msg-note-border: #ECD29C;
+  --msg-note-text: #573905;
+  --msg-user-bg: #FAFFFC;
+  --msg-user-border: #D5DCD8;
+  --msg-user-text: #161B18;
+  --ai: #007FAC;
+  --ai-bg: #DFF0FA;
+  --ai-border: #BEDDEE;
+  --ai-ink: #00435D;
+  --note: #CA9423;
+  --note-bg: #FEF1D8;
+  --note-border: #ECD29C;
+  --note-ink: #573905;
 
-  /* Specific Component Tokens */
-  --tab-active-bg: #FFFFFF;
-  --tab-active-text: #122E23;
-  --tab-active-border: #C4D8CE;
-  --tab-badge-bg: #E1F0E8;
-  --tab-badge-text: #20654D;
+  /* Semantic: solid / soft background / border / text on soft */
+  --success: #597C1F;  --success-bg: #EBF5DF;  --success-border: #C9DFB1;  --success-ink: #304900;
+  --warning: #B67700;  --warning-bg: #FFEEDA;  --warning-border: #F1D0A7;  --warning-ink: #593800;
+  --danger:  #C8433C;   --danger-bg:  #FFECE9;   --danger-border:  #FEC6BF;   --danger-ink:  #6B2621;
+  --info:    #007BAB;     --info-bg:    #E2F4FF;     --info-border:    #ADDEFB;     --info-ink:    #004563;
+  --accent-success: #597C1F;
+  --accent-alert: #C8433C;
+  --success-500: #597C1F;
+  --warning-500: #B67700;
+  --error-500: #C8433C;
 
-  --msg-user-bg: #FFFFFF;
-  --msg-user-border: #C4D8CE;
-  --msg-user-text: #122E23;
-
-  --msg-agent-bg: #E1F0E8;
-  --msg-agent-border: #BBD9CA;
-  --msg-agent-text: #123627;
-
-  --btn-primary-bg: #20654D;
+  /* Component tokens */
+  --tab-active-bg: #FAFFFC;
+  --tab-active-text: #161B18;
+  --tab-active-border: #D5DCD8;
+  --tab-badge-bg: #E3EAE7;
+  --tab-badge-text: #444946;
+  --btn-primary-bg: #2E715B;
   --btn-primary-text: #FFFFFF;
-  --btn-primary-hover: #1A4F3C;
+  --btn-primary-hover: #1D634D;
+  --btn-secondary-bg: #FAFFFC;
+  --btn-secondary-text: #161B18;
+  --btn-secondary-border: #B9C0BC;
+  --btn-secondary-hover: #ECF3EF;
+  --table-th-bg: #F2F9F5;
+  --table-th-text: #444946;
+  --table-border: #D5DCD8;
+  --table-row-hover: #ECF3EF;
 
-  --btn-secondary-bg: #FFFFFF;
-  --btn-secondary-text: #122E23;
-  --btn-secondary-border: #C4D8CE;
-  --btn-secondary-hover: #EBF3EF;
+  /* Data-viz */
+  --chart-1: #2E715B;
+  --chart-2: #007FAC;
+  --chart-3: #007BAB;
+  --chart-4: #B67700;
+  --chart-5: #597C1F;
+  --chart-grid: #E2E9E5;
 
-  --table-th-bg: #F3F8F5;
-  --table-th-text: #416353;
-  --table-border: #C4D8CE;
-  --table-row-hover: #EAF3EE;
+  /* Elevation */
+  --shadow-rgb: 29, 45, 38;
+  --shadow-xs: 0 1px 2px rgba(29, 45, 38, 0.06);
+  --shadow-sm: 0 1px 3px rgba(29, 45, 38, 0.08), 0 1px 2px rgba(29, 45, 38, 0.04);
+  --shadow-md: 0 3px 8px rgba(29, 45, 38, 0.1), 0 1px 3px rgba(29, 45, 38, 0.05);
+  --shadow-lg: 0 8px 20px rgba(29, 45, 38, 0.11), 0 2px 6px rgba(29, 45, 38, 0.06);
+  --shadow-xl: 0 14px 32px rgba(29, 45, 38, 0.13), 0 4px 10px rgba(29, 45, 38, 0.06);
+  --shadow-2xl: 0 24px 56px rgba(29, 45, 38, 0.18);
 }
 
-/* ==========================================================================
-   DARK MOOD (3 Calibrated Executive Standards)
-   1. Obsidian Carbon (Pure Velvet Matte Black - Google Antigravity & Linear)
-   2. Chrome Grey (Google Chrome Customize Settings - Grey Dark)
-   3. Chrome Viridian (Google Chrome Customize Settings - Viridian Dark)
-   ========================================================================== */
-
-/* ── Dark Theme 1: Obsidian Carbon (Pure Velvet Matte Black) ── */
+/* ── Matte Black (Dark) ── */
 [data-theme="dark-matte"],
 [data-theme="dark-carbon"],
 [data-theme="dark-pure-black"],
 [data-theme="dark-charcoal"],
 [data-theme="dark-professional"] {
-  --bg-base: #0B0C0E;       /* Velvety Ground Canvas */
-  --bg-surface: #14161C;    /* Clean Visible Card / Header Surface */
-  --bg-nav: #0E0F13;        /* Unified Rail Dock */
-  --bg-header: #14161C;
-  --bg-hover: #1F222B;
-  --bg-active: #282C37;
-  --bg-elevated: #1B1E26;  /* Elevated Container & Input Box */
-  --bg-glass: rgba(20, 22, 28, 0.94);
+  color-scheme: dark;
 
-  --ink: #F2F4F7;           /* High Contrast Crisp White */
-  --ink-main: #F2F4F7;
-  --ink-soft: #9297A6;      /* Medium Contrast Slate Grey */
-  --ink-secondary: #9297A6;
-  --ink-header: #FFFFFF;
-  --ink-muted: #666A78;
-  --text-main: #F2F4F7;
-  --text-muted: #9297A6;
-  --text-dim: #646979;
+  /* Surfaces: rail < canvas < panel < surface < raised */
+  --bg-nav: #060607;
+  --bg-base: #0D0D0E;
+  --bg-panel: #131314;
+  --bg-surface: #191A1B;
+  --bg-elevated: #232324;
+  --bg-sunken: #080909;
+  --bg-hover: #212122;
+  --bg-active: #2A2B2C;
+  --bg-selected: #353639;
+  --rail-hover: #121314;
+  --rail-active: #1B1C1D;
+  --bg-header: #191A1B;
+  --bg-panel-header: #131314;
+  --bg-brand: #131314;
+  --bg-admin-brand: #131314;
+  --bg-admin-base: #0D0D0E;
+  --bg-glass: rgba(35, 35, 36, 0.92);
 
-  --line: #262934;          /* Calibrated Hairline Border */
-  --border: #262934;
-  --border-light: #323644;
-  --border-subtle: #191B22;
-  --border-focus: #52586B;
+  /* Text */
+  --ink: #ECEDEE;
+  --ink-main: #ECEDEE;
+  --ink-header: #ECEDEE;
+  --ink-soft: #B6B6B8;
+  --ink-secondary: #B6B6B8;
+  --ink-muted: #929394;
+  --text-main: #ECEDEE;
+  --text-muted: #B6B6B8;
+  --text-dim: #646566;
 
-  --accent: #E2E6EE;        /* Frosted Silver-White Accent CTA */
-  --accent-rgb: 226, 230, 238;
-  --accent-hover: #FFFFFF;
-  --accent-active: #CAD0DC;
-  --accent-light: rgba(226, 230, 238, 0.12);
-  --accent-muted: #828796;
-  --accent-ink: #0B0C0E;    /* Ink Inside Light Accent Button */
-  --accent-glow: rgba(226, 230, 238, 0.14);
-  --shadow-glow: 0 0 0 2px rgba(226, 230, 238, 0.22);
+  /* Borders */
+  --border-subtle: #252526;
+  --border-light: #252526;
+  --line: #343435;
+  --border: #343435;
+  --border-strong: #4E4E4F;
+  --border-focus: #95A3FC;
 
-  --bg-panel-header: #14161C;
-  --bg-brand: #1B1E26;
-  --bg-admin-brand: #14161C;
-  --bg-admin-base: #0B0C0E;
-  --input-outline: var(--accent);
+  /* Accent family (solid / hover / pressed / soft container / text on container) */
+  --accent: #E0E1E4;
+  --accent-hover: #F1F2F4;
+  --accent-active: #D0D1D4;
+  --accent-ink: #0D0D0F;
+  --accent-soft: #353639;
+  --accent-soft-hover: #3F4044;
+  --accent-border: #505155;
+  --accent-soft-ink: #DCDEE2;
+  --accent-light: #353639;
+  --accent-muted: #929394;
+  --accent-rgb: 224, 225, 228;
+  --accent-glow: rgba(224, 225, 228, 0.2);
+  --signal: #95A3FC;
+  --shadow-glow: 0 0 0 3px rgba(149, 163, 252, 0.3);
+  --ui-focus-ring: 0 0 0 3px rgba(149, 163, 252, 0.3);
+  --input-outline: #95A3FC;
 
-  /* Specific Component Tokens */
-  --tab-active-bg: #222631;
-  --tab-active-text: #FFFFFF;
-  --tab-active-border: rgba(255, 255, 255, 0.16);
-  --tab-badge-bg: rgba(255, 255, 255, 0.12);
-  --tab-badge-text: #FFFFFF;
+  /* Who said it: customer = neutral, AI = tonal tint, agent = solid accent, note = amber */
+  --msg-customer-bg: #191A1B;
+  --msg-customer-border: #343435;
+  --msg-customer-text: #ECEDEE;
+  --msg-ai-bg: #292C45;
+  --msg-ai-border: #3E4265;
+  --msg-ai-text: #D6DCFC;
+  --msg-ai-label: #A8B1F7;
+  --msg-agent-bg: #47494D;
+  --msg-agent-border: #47494D;
+  --msg-agent-text: #F6F7FA;
+  --msg-note-bg: #3A2D13;
+  --msg-note-border: #614B16;
+  --msg-note-text: #EBD6A3;
+  --msg-user-bg: #191A1B;
+  --msg-user-border: #343435;
+  --msg-user-text: #ECEDEE;
+  --ai: #A3ADFD;
+  --ai-bg: #292C45;
+  --ai-border: #3E4265;
+  --ai-ink: #D6DCFC;
+  --note: #E4B750;
+  --note-bg: #3A2D13;
+  --note-border: #614B16;
+  --note-ink: #EBD6A3;
 
-  --msg-user-bg: #181B24;
-  --msg-user-border: #282C3A;
-  --msg-user-text: #F2F4F7;
+  /* Semantic: solid / soft background / border / text on soft */
+  --success: #79C68A;  --success-bg: #18331E;  --success-border: #255531;  --success-ink: #B5E6BE;
+  --warning: #F1AF58;  --warning-bg: #3B280C;  --warning-border: #64410C;  --warning-ink: #F7D0A1;
+  --danger:  #FF8B7F;   --danger-bg:  #42221E;   --danger-border:  #6E3731;   --danger-ink:  #FFC8C1;
+  --info:    #72B8F3;     --info-bg:    #142E43;     --info-border:    #1E4D71;     --info-ink:    #B5DDFF;
+  --accent-success: #79C68A;
+  --accent-alert: #FF8B7F;
+  --success-500: #79C68A;
+  --warning-500: #F1AF58;
+  --error-500: #FF8B7F;
 
-  --msg-agent-bg: #222735;
-  --msg-agent-border: #353B4E;
-  --msg-agent-text: #F2F4F7;
+  /* Component tokens */
+  --tab-active-bg: #191A1B;
+  --tab-active-text: #ECEDEE;
+  --tab-active-border: #343435;
+  --tab-badge-bg: #2A2B2C;
+  --tab-badge-text: #B6B6B8;
+  --btn-primary-bg: #E0E1E4;
+  --btn-primary-text: #0D0D0F;
+  --btn-primary-hover: #F1F2F4;
+  --btn-secondary-bg: #191A1B;
+  --btn-secondary-text: #ECEDEE;
+  --btn-secondary-border: #4E4E4F;
+  --btn-secondary-hover: #212122;
+  --table-th-bg: #131314;
+  --table-th-text: #B6B6B8;
+  --table-border: #343435;
+  --table-row-hover: #212122;
 
-  --btn-primary-bg: #E2E6EE;
-  --btn-primary-text: #0B0C0E;
-  --btn-primary-hover: #FFFFFF;
+  /* Data-viz */
+  --chart-1: #95A3FC;
+  --chart-2: #A3ADFD;
+  --chart-3: #72B8F3;
+  --chart-4: #F1AF58;
+  --chart-5: #79C68A;
+  --chart-grid: #252526;
 
-  --btn-secondary-bg: #161820;
-  --btn-secondary-text: #F2F4F7;
-  --btn-secondary-border: #2E3240;
-  --btn-secondary-hover: #222632;
-
-  --table-th-bg: #111318;
-  --table-th-text: #9297A6;
-  --table-border: #262934;
-  --table-row-hover: #191B22;
+  /* Elevation */
+  --shadow-rgb: 0, 0, 0;
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.38), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 3px 8px rgba(0, 0, 0, 0.46), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.52), 0 2px 6px rgba(0, 0, 0, 0.34);
+  --shadow-xl: 0 14px 32px rgba(0, 0, 0, 0.58), 0 4px 10px rgba(0, 0, 0, 0.4);
+  --shadow-2xl: 0 24px 56px rgba(0, 0, 0, 0.7);
 }
 
-/* ── Dark Theme 2: Chrome Grey (Official Customize Chrome - Grey Dark) ── */
+/* ── Chrome Grey (Dark) ── */
 [data-theme="dark-chrome-grey"],
 [data-theme="dark-grey"],
 [data-theme="dark-navy"],
 [data-theme="dark-corporate-blue"],
 [data-theme="dark-indigo"] {
-  --bg-base: #1F2023;       /* Chrome New Tab Page Dark Frame */
-  --bg-surface: #28292D;    /* Chrome Dark Toolbar */
-  --bg-nav: #1B1C1F;        /* Chrome Frame Border */
-  --bg-header: #28292D;
-  --bg-hover: #35373B;
-  --bg-active: #3C4043;
-  --bg-elevated: #323438;  /* Chrome Dark Omnibox / Card Surface */
-  --bg-glass: rgba(40, 41, 45, 0.94);
+  color-scheme: dark;
 
-  --ink: #E8EAED;           /* Google High-Emphasis White */
-  --ink-main: #E8EAED;
-  --ink-soft: #9AA0A6;      /* Google Medium-Emphasis Grey */
-  --ink-secondary: #9AA0A6;
-  --ink-header: #FFFFFF;
-  --ink-muted: #80868B;
-  --text-main: #E8EAED;
-  --text-muted: #9AA0A6;
-  --text-dim: #80868B;
+  /* Surfaces: rail < canvas < panel < surface < raised */
+  --bg-nav: #16181B;
+  --bg-base: #1E2023;
+  --bg-panel: #25272A;
+  --bg-surface: #2C2E31;
+  --bg-elevated: #36383B;
+  --bg-sunken: #191B1E;
+  --bg-hover: #343639;
+  --bg-active: #3E4044;
+  --bg-selected: #2F4057;
+  --rail-hover: #242629;
+  --rail-active: #2E3033;
+  --bg-header: #2C2E31;
+  --bg-panel-header: #25272A;
+  --bg-brand: #25272A;
+  --bg-admin-brand: #25272A;
+  --bg-admin-base: #1E2023;
+  --bg-glass: rgba(54, 56, 59, 0.92);
 
-  --line: #3E4044;          /* Google Standard Dark Divider */
-  --border: #3E4044;
-  --border-light: #4A4D51;
-  --border-subtle: #2A2B2F;
-  --border-focus: #8AB4F8;
+  /* Text */
+  --ink: #EAEDF1;
+  --ink-main: #EAEDF1;
+  --ink-header: #EAEDF1;
+  --ink-soft: #B6B9BD;
+  --ink-secondary: #B6B9BD;
+  --ink-muted: #999CA0;
+  --text-main: #EAEDF1;
+  --text-muted: #B6B9BD;
+  --text-dim: #6A6C70;
 
-  --accent: #8AB4F8;        /* Google Chrome Blue 300 */
-  --accent-rgb: 138, 180, 248;
-  --accent-hover: #AECBFA;
-  --accent-active: #D2E3FC;
-  --accent-light: rgba(138, 180, 248, 0.14);
-  --accent-muted: #4285F4;
-  --accent-ink: #202124;
-  --accent-glow: rgba(138, 180, 248, 0.16);
-  --shadow-glow: 0 0 0 2px rgba(138, 180, 248, 0.28);
+  /* Borders */
+  --border-subtle: #383A3E;
+  --border-light: #383A3E;
+  --line: #484A4E;
+  --border: #484A4E;
+  --border-strong: #63666A;
+  --border-focus: #95BDF3;
 
-  --bg-panel-header: #28292D;
-  --bg-brand: #35363A;
-  --bg-admin-brand: #28292D;
-  --bg-admin-base: #1F2023;
-  --input-outline: var(--accent);
+  /* Accent family (solid / hover / pressed / soft container / text on container) */
+  --accent: #95BDF3;
+  --accent-hover: #A8CDFF;
+  --accent-active: #86ADE2;
+  --accent-ink: #0E1217;
+  --accent-soft: #2F4057;
+  --accent-soft-hover: #394B62;
+  --accent-border: #465A74;
+  --accent-soft-ink: #D1DFF3;
+  --accent-light: #2F4057;
+  --accent-muted: #999CA0;
+  --accent-rgb: 149, 189, 243;
+  --accent-glow: rgba(149, 189, 243, 0.2);
+  --signal: #95BDF3;
+  --shadow-glow: 0 0 0 3px rgba(149, 189, 243, 0.3);
+  --ui-focus-ring: 0 0 0 3px rgba(149, 189, 243, 0.3);
+  --input-outline: #95BDF3;
 
-  /* Specific Component Tokens */
-  --tab-active-bg: #3E4045;
-  --tab-active-text: #FFFFFF;
-  --tab-active-border: #5F6368;
-  --tab-badge-bg: rgba(138, 180, 248, 0.20);
-  --tab-badge-text: #8AB4F8;
+  /* Who said it: customer = neutral, AI = tonal tint, agent = solid accent, note = amber */
+  --msg-customer-bg: #2C2E31;
+  --msg-customer-border: #484A4E;
+  --msg-customer-text: #EAEDF1;
+  --msg-ai-bg: #3C314A;
+  --msg-ai-border: #544466;
+  --msg-ai-text: #E5D7F7;
+  --msg-ai-label: #C6A7EB;
+  --msg-agent-bg: #395B88;
+  --msg-agent-border: #395B88;
+  --msg-agent-text: #F5F7F9;
+  --msg-note-bg: #403419;
+  --msg-note-border: #69521E;
+  --msg-note-text: #EBD6A3;
+  --msg-user-bg: #2C2E31;
+  --msg-user-border: #484A4E;
+  --msg-user-text: #EAEDF1;
+  --ai: #C5A1EF;
+  --ai-bg: #3C314A;
+  --ai-border: #544466;
+  --ai-ink: #E5D7F7;
+  --note: #E4B750;
+  --note-bg: #403419;
+  --note-border: #69521E;
+  --note-ink: #EBD6A3;
 
-  --msg-user-bg: #28292D;
-  --msg-user-border: #3E4044;
-  --msg-user-text: #E8EAED;
+  /* Semantic: solid / soft background / border / text on soft */
+  --success: #79C68A;  --success-bg: #213C27;  --success-border: #2C5C38;  --success-ink: #B5E6BE;
+  --warning: #F1AF58;  --warning-bg: #443015;  --warning-border: #6B4816;  --warning-ink: #F7D0A1;
+  --danger:  #FF8B7F;   --danger-bg:  #4B2A26;   --danger-border:  #763D38;   --danger-ink:  #FFC8C1;
+  --info:    #6BBAF0;     --info-bg:    #1A384C;     --info-border:    #1F5577;     --info-ink:    #B1DEFF;
+  --accent-success: #79C68A;
+  --accent-alert: #FF8B7F;
+  --success-500: #79C68A;
+  --warning-500: #F1AF58;
+  --error-500: #FF8B7F;
 
-  --msg-agent-bg: #33363D;
-  --msg-agent-border: #4A4D56;
-  --msg-agent-text: #E8EAED;
+  /* Component tokens */
+  --tab-active-bg: #2C2E31;
+  --tab-active-text: #EAEDF1;
+  --tab-active-border: #484A4E;
+  --tab-badge-bg: #3E4044;
+  --tab-badge-text: #B6B9BD;
+  --btn-primary-bg: #95BDF3;
+  --btn-primary-text: #0E1217;
+  --btn-primary-hover: #A8CDFF;
+  --btn-secondary-bg: #2C2E31;
+  --btn-secondary-text: #EAEDF1;
+  --btn-secondary-border: #63666A;
+  --btn-secondary-hover: #343639;
+  --table-th-bg: #25272A;
+  --table-th-text: #B6B9BD;
+  --table-border: #484A4E;
+  --table-row-hover: #343639;
 
-  --btn-primary-bg: #8AB4F8;
-  --btn-primary-text: #202124;
-  --btn-primary-hover: #AECBFA;
+  /* Data-viz */
+  --chart-1: #95BDF3;
+  --chart-2: #C5A1EF;
+  --chart-3: #6BBAF0;
+  --chart-4: #F1AF58;
+  --chart-5: #79C68A;
+  --chart-grid: #383A3E;
 
-  --btn-secondary-bg: #28292D;
-  --btn-secondary-text: #E8EAED;
-  --btn-secondary-border: #3E4044;
-  --btn-secondary-hover: #35373B;
-
-  --table-th-bg: #232427;
-  --table-th-text: #9AA0A6;
-  --table-border: #3E4044;
-  --table-row-hover: #2E3034;
+  /* Elevation */
+  --shadow-rgb: 0, 0, 0;
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.38), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 3px 8px rgba(0, 0, 0, 0.46), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.52), 0 2px 6px rgba(0, 0, 0, 0.34);
+  --shadow-xl: 0 14px 32px rgba(0, 0, 0, 0.58), 0 4px 10px rgba(0, 0, 0, 0.4);
+  --shadow-2xl: 0 24px 56px rgba(0, 0, 0, 0.7);
 }
 
-/* ── Dark Theme 3: Chrome Viridian (Official Customize Chrome - Viridian Dark) ── */
+/* ── Viridian (Dark) ── */
 [data-theme="dark-viridian"],
 [data-theme="dark-chrome-viridian"],
 [data-theme="dark-ocean"] {
-  --bg-base: #111815;       /* Deep Eucalyptus Frame */
-  --bg-surface: #18221D;    /* Chrome Viridian Dark Toolbar */
-  --bg-nav: #0F1613;
-  --bg-header: #18221D;
-  --bg-hover: #24342D;
-  --bg-active: #2D4138;
-  --bg-elevated: #202D26;  /* Elevated Viridian Surface */
-  --bg-glass: rgba(24, 34, 29, 0.94);
+  color-scheme: dark;
 
-  --ink: #E6F2EC;           /* Clean Mint White */
-  --ink-main: #E6F2EC;
-  --ink-soft: #94B0A2;      /* Soft Sage Grey */
-  --ink-secondary: #94B0A2;
-  --ink-header: #FFFFFF;
-  --ink-muted: #657D72;
-  --text-main: #E6F2EC;
-  --text-muted: #94B0A2;
-  --text-dim: #637C70;
+  /* Surfaces: rail < canvas < panel < surface < raised */
+  --bg-nav: #0A0F0D;
+  --bg-base: #111714;
+  --bg-panel: #181E1B;
+  --bg-surface: #1E2421;
+  --bg-elevated: #282E2B;
+  --bg-sunken: #0C1210;
+  --bg-hover: #262C29;
+  --bg-active: #303633;
+  --bg-selected: #204234;
+  --rail-hover: #171D1A;
+  --rail-active: #202623;
+  --bg-header: #1E2421;
+  --bg-panel-header: #181E1B;
+  --bg-brand: #181E1B;
+  --bg-admin-brand: #181E1B;
+  --bg-admin-base: #111714;
+  --bg-glass: rgba(40, 46, 43, 0.92);
 
-  --line: #2E3E36;          /* Rich Eucalyptus Border */
-  --border: #2E3E36;
-  --border-light: #385044;
-  --border-subtle: #17211C;
-  --border-focus: #4EAF87;
+  /* Text */
+  --ink: #E7EFEB;
+  --ink-main: #E7EFEB;
+  --ink-header: #E7EFEB;
+  --ink-soft: #B2BAB6;
+  --ink-secondary: #B2BAB6;
+  --ink-muted: #919995;
+  --text-main: #E7EFEB;
+  --text-muted: #B2BAB6;
+  --text-dim: #636A67;
 
-  --accent: #4EAF87;        /* Chrome Viridian Primary Jewel */
-  --accent-rgb: 78, 175, 135;
-  --accent-hover: #60C49B;
-  --accent-active: #429B75;
-  --accent-light: rgba(78, 175, 135, 0.16);
-  --accent-muted: #336B53;
-  --accent-ink: #0A1812;
-  --accent-glow: rgba(78, 175, 135, 0.20);
-  --shadow-glow: 0 0 0 2px rgba(78, 175, 135, 0.28);
+  /* Borders */
+  --border-subtle: #2A302D;
+  --border-light: #2A302D;
+  --line: #39403C;
+  --border: #39403C;
+  --border-strong: #545B57;
+  --border-focus: #74C0A0;
 
-  --bg-panel-header: #18221D;
-  --bg-brand: #202D26;
-  --bg-admin-brand: #18221D;
-  --bg-admin-base: #111815;
-  --input-outline: var(--accent);
+  /* Accent family (solid / hover / pressed / soft container / text on container) */
+  --accent: #74C0A0;
+  --accent-hover: #84D1AF;
+  --accent-active: #65B090;
+  --accent-ink: #0D1310;
+  --accent-soft: #204234;
+  --accent-soft-hover: #2B4D3E;
+  --accent-border: #385E4D;
+  --accent-soft-ink: #CCE5D9;
+  --accent-light: #204234;
+  --accent-muted: #919995;
+  --accent-rgb: 116, 192, 160;
+  --accent-glow: rgba(116, 192, 160, 0.2);
+  --signal: #74C0A0;
+  --shadow-glow: 0 0 0 3px rgba(116, 192, 160, 0.3);
+  --ui-focus-ring: 0 0 0 3px rgba(116, 192, 160, 0.3);
+  --input-outline: #74C0A0;
 
-  /* Specific Component Tokens */
-  --tab-active-bg: #283931;
-  --tab-active-text: #E6F2EC;
-  --tab-active-border: #3B5347;
-  --tab-badge-bg: rgba(78, 175, 135, 0.22);
-  --tab-badge-text: #4EAF87;
+  /* Who said it: customer = neutral, AI = tonal tint, agent = solid accent, note = amber */
+  --msg-customer-bg: #1E2421;
+  --msg-customer-border: #39403C;
+  --msg-customer-text: #E7EFEB;
+  --msg-ai-bg: #183645;
+  --msg-ai-border: #224E63;
+  --msg-ai-text: #C1E4F7;
+  --msg-ai-label: #71C3EC;
+  --msg-agent-bg: #19664B;
+  --msg-agent-border: #19664B;
+  --msg-agent-text: #F4F8F6;
+  --msg-note-bg: #3D3016;
+  --msg-note-border: #654E1A;
+  --msg-note-text: #EBD6A3;
+  --msg-user-bg: #1E2421;
+  --msg-user-border: #39403C;
+  --msg-user-text: #E7EFEB;
+  --ai: #5EC1F1;
+  --ai-bg: #183645;
+  --ai-border: #224E63;
+  --ai-ink: #C1E4F7;
+  --note: #E4B750;
+  --note-bg: #3D3016;
+  --note-border: #654E1A;
+  --note-ink: #EBD6A3;
 
-  --msg-user-bg: #18221D;
-  --msg-user-border: #2E3E36;
-  --msg-user-text: #E6F2EC;
+  /* Semantic: solid / soft background / border / text on soft */
+  --success: #9CBF6E;  --success-bg: #283518;  --success-border: #405421;  --success-ink: #C9E2AD;
+  --warning: #F1AF58;  --warning-bg: #3F2B11;  --warning-border: #674411;  --warning-ink: #F7D0A1;
+  --danger:  #FF8B7F;   --danger-bg:  #462522;   --danger-border:  #723A34;   --danger-ink:  #FFC8C1;
+  --info:    #64BCED;     --info-bg:    #123445;     --info-border:    #125371;     --info-ink:    #ABE0FF;
+  --accent-success: #9CBF6E;
+  --accent-alert: #FF8B7F;
+  --success-500: #9CBF6E;
+  --warning-500: #F1AF58;
+  --error-500: #FF8B7F;
 
-  --msg-agent-bg: #203127;
-  --msg-agent-border: #354F3F;
-  --msg-agent-text: #E6F2EC;
+  /* Component tokens */
+  --tab-active-bg: #1E2421;
+  --tab-active-text: #E7EFEB;
+  --tab-active-border: #39403C;
+  --tab-badge-bg: #303633;
+  --tab-badge-text: #B2BAB6;
+  --btn-primary-bg: #74C0A0;
+  --btn-primary-text: #0D1310;
+  --btn-primary-hover: #84D1AF;
+  --btn-secondary-bg: #1E2421;
+  --btn-secondary-text: #E7EFEB;
+  --btn-secondary-border: #545B57;
+  --btn-secondary-hover: #262C29;
+  --table-th-bg: #181E1B;
+  --table-th-text: #B2BAB6;
+  --table-border: #39403C;
+  --table-row-hover: #262C29;
 
-  --btn-primary-bg: #4EAF87;
-  --btn-primary-text: #0A1812;
-  --btn-primary-hover: #60C49B;
+  /* Data-viz */
+  --chart-1: #74C0A0;
+  --chart-2: #5EC1F1;
+  --chart-3: #64BCED;
+  --chart-4: #F1AF58;
+  --chart-5: #9CBF6E;
+  --chart-grid: #2A302D;
 
-  --btn-secondary-bg: #18221D;
-  --btn-secondary-text: #E6F2EC;
-  --btn-secondary-border: #2E3E36;
-  --btn-secondary-hover: #24342D;
-
-  --table-th-bg: #141D18;
-  --table-th-text: #94B0A2;
-  --table-border: #2E3E36;
-  --table-row-hover: #1E2B24;
-}
-
-/* ==========================================================================
-   MATTE SHADOW SYSTEM
-   ========================================================================== */
-
-/* Light Mode Subtle Shadows */
-[data-theme^="light"],
-:root {
-  --shadow-xs: 0 1px 2px rgba(60, 64, 67, 0.08);
-  --shadow-sm: 0 1px 3px rgba(60, 64, 67, 0.10), 0 1px 2px rgba(60, 64, 67, 0.06);
-  --shadow-md: 0 2px 6px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.06);
-  --shadow-lg: 0 4px 12px rgba(60, 64, 67, 0.12), 0 2px 4px rgba(60, 64, 67, 0.08);
-  --shadow-xl: 0 8px 24px rgba(60, 64, 67, 0.14), 0 3px 8px rgba(60, 64, 67, 0.08);
-  --shadow-2xl: 0 12px 36px rgba(60, 64, 67, 0.16);
-}
-
-/* Dark Mode Matte Elevation Shadows */
-[data-theme^="dark"] {
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.40);
-  --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.45);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.50);
-  --shadow-lg: 0 8px 22px rgba(0, 0, 0, 0.55);
-  --shadow-xl: 0 12px 32px rgba(0, 0, 0, 0.60);
-  --shadow-2xl: 0 20px 48px rgba(0, 0, 0, 0.70);
+  /* Elevation */
+  --shadow-rgb: 0, 0, 0;
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.38), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 3px 8px rgba(0, 0, 0, 0.46), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.52), 0 2px 6px rgba(0, 0, 0, 0.34);
+  --shadow-xl: 0 14px 32px rgba(0, 0, 0, 0.58), 0 4px 10px rgba(0, 0, 0, 0.4);
+  --shadow-2xl: 0 24px 56px rgba(0, 0, 0, 0.7);
 }
 
 /* ==========================================================================
