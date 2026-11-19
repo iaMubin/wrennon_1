@@ -27,6 +27,12 @@ if __name__ == "__main__":
     prov = integrations.get_ecommerce_provider()
     check(f"chatbot provider is {type(prov).__name__}", type(prov).__name__ == "StoreDBProvider",
           "set ECOMMERCE_PROVIDER=store_db (in .env or the environment) and restart the backend")
+    print("Language model")
+    from app.config import settings as _settings
+    check("Groq key set", bool(_settings.groq_api_key), "set GROQ_API_KEY")
+    check("a fallback model is configured (OPENROUTER_API_KEY)", bool(getattr(_settings, "openrouter_api_key", None)),
+          "without it, any Groq rate limit makes the assistant hand customers to a human; add the key to backend/.env")
+    check("rate-limit protection installed (switches model, waits as asked)", "_groq_with_failover" in source("app.services.llm"), "run apply_store_db.py")
     print("Code wiring")
     check("chat sessions carry the signed-in customer", "session_token_for_customer" in source("app.api.chat"), "run apply_store_db.py")
     check("websocket stamps the customer on the conversation", "_ws_customer_email" in source("app.realtime.websocket_routes"), "run apply_store_db.py")

@@ -23,6 +23,7 @@ class Settings(BaseSettings):
 
     # LLM
     openrouter_api_key: str | None = None
+    openrouter_model: str = "nvidia/nemotron-3.5-super-vl:free"
     groq_api_key: str
     openai_api_key: str | None = None
     cohere_api_key: str

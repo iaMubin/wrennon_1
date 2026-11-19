@@ -41,6 +41,8 @@ class GoodBot:
             tool, args = "add_item_to_order", {"order_id": oid, "product": "wool beanie", "size": "One size"}
         elif "in my bag" in t:
             tool, args = "get_my_bag", {}
+        elif "goes well with" in t:
+            tool, args = "complete_the_look", {"product": "summit insulated parka"}
         elif "same thing again" in t:
             tool, args = "reorder", {}
         elif "bag" in t and "add" in t:
@@ -51,7 +53,7 @@ class GoodBot:
             return Turn("How can I help?")
         fn = {"cancel_order": sa.execute_cancel_order, "change_order_address": sa.execute_change_order_address, "change_order_size": sa.execute_change_order_size,
               "add_item_to_order": sa.execute_add_item_to_order, "get_my_bag": sa.execute_get_my_bag, "reorder": sa.execute_reorder,
-              "add_to_bag": sa.execute_add_to_bag}[tool]
+              "add_to_bag": sa.execute_add_to_bag, "complete_the_look": sa.execute_complete_the_look}[tool]
         out = await fn({**args, **trusted, "_claimed_emails": []})
         if out.startswith("NOT"):
             self.pending = (tool, {k: v for k, v in args.items() if k != "confirmed"})
@@ -146,3 +148,51 @@ def test_groq_waits_as_long_as_it_asks_before_trying_again():
     assert _groq_wait(State("Please try again in 250ms.")) < 1
     assert _groq_wait(State("Please try again in 90s.")) <= 15              # a chat never hangs for a minute
     assert _groq_wait(State("some other error", 1)) == 2 and _groq_wait(State("some other error", 3)) == 8
+
+
+# ---------------------------------------------------------------- Groq rate-limit handling
+def test_groq_rate_limit_switches_model_first_then_waits_then_gives_up(monkeypatch):
+    from app.services import llm
+    seen, slept = [], []
+    class Throttled(Exception):
+        pass
+    async def fake_sleep(s): slept.append(s)
+    monkeypatch.setattr(llm.asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr(llm, "DISABLE_GPT_OSS_20B", False)
+
+    def make(limited_models, fail_always=False):
+        async def call(messages, temperature, max_tokens, model):
+            seen.append(model)
+            if fail_always or model in limited_models:
+                raise Throttled("Error code: 429 - rate_limit_exceeded ... Please try again in 6.5s.")
+            return f"answer from {model}"
+        return call
+
+    monkeypatch.setattr(llm, "_safe_groq_json_call", make({"openai/gpt-oss-20b"}))
+    assert asyncio.run(llm._groq_with_failover([], 0.1, 100, True, "openai/gpt-oss-20b")) == "answer from openai/gpt-oss-120b"
+    assert seen == ["openai/gpt-oss-20b", "openai/gpt-oss-120b"] and slept == []                  # switched at once, no waiting
+
+    seen.clear()
+    monkeypatch.setattr(llm, "_safe_groq_json_call", make(set(), fail_always=True))
+    with pytest.raises(Throttled):
+        asyncio.run(llm._groq_with_failover([], 0.1, 100, True, "openai/gpt-oss-120b"))
+    assert seen == ["openai/gpt-oss-120b", "openai/gpt-oss-20b"] * 2 and slept == [7.0]            # both limited: waited as Groq asked, tried again, then gave up
+
+    seen.clear(); slept.clear()
+    async def broken(messages, temperature, max_tokens, model):
+        seen.append(model); raise ValueError("bad request body")
+    monkeypatch.setattr(llm, "_safe_groq_call", broken)
+    with pytest.raises(ValueError):
+        asyncio.run(llm._groq_with_failover([], 0.1, 100, False, None))
+    assert seen == [None] and slept == []                                                         # other errors are not retried or switched
+
+
+def test_rate_limit_errors_are_not_retried_on_the_same_model():
+    from app.services import llm
+    assert llm._groq_should_retry(Exception("some timeout")) is True
+    assert llm._groq_should_retry(Exception("Error code: 429 - rate_limit_exceeded")) is False
+    assert llm._retry_hint(Exception("Please try again in 250ms.")) < 1 and llm._retry_hint(Exception("try again in 90s")) == 15.0
+
+
+def test_the_ui_visible_quick_set_of_scenarios_exists():
+    assert set(ev.QUICK) <= set(ev.SCENARIOS) and "complete_the_look" in ev.SCENARIOS and len(ev.SCENARIOS) == 17

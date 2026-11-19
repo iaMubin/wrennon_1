@@ -621,6 +621,12 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             client_ip=websocket.client.host if websocket.client else "unknown",
             tenant_id=current_tenant.get() or "default",
         )
+        state["session_id"] = session_id  # chat session (lets tools act on the right page)
+        try:
+            from app.services.store_context import page_context_for
+            state["page_context"] = await asyncio.to_thread(page_context_for, session_id)
+        except Exception:
+            state["page_context"] = None  # context is a nicety; it must never break a reply
 
         if phase1_data["handoff_ticket_id"]:
             state["existing_ticket_id"] = phase1_data["handoff_ticket_id"]

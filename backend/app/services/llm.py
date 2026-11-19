@@ -19,6 +19,23 @@ import base64
 from groq import AsyncGroq, BadRequestError
 import openai
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_not_exception_type
+from tenacity import retry_if_exception as _retry_if_exception
+
+_ALT_GROQ = {"openai/gpt-oss-20b": "openai/gpt-oss-120b", "openai/gpt-oss-120b": "openai/gpt-oss-20b"}   # each model has its own per-minute allowance
+
+
+def _is_rate_limit(exc) -> bool:
+    text = str(exc).lower()
+    return type(exc).__name__ == "RateLimitError" or "rate_limit" in text or "rate limit" in text or "429" in text
+
+
+def _retry_hint(exc, default: float = 5.0) -> float:
+    m = re.search(r"try again in ([0-9.]+)\s*(ms|s)", str(exc))
+    return min((float(m.group(1)) / (1000 if m.group(2) == "ms" else 1) + 0.5) if m else default, 15.0)
+
+
+def _groq_should_retry(exc) -> bool:
+    return not isinstance(exc, BadRequestError) and not _is_rate_limit(exc)   # rate limits are handled by switching model, not by retrying the same one
 
 
 def _groq_wait(retry_state):
@@ -53,7 +70,8 @@ _openrouter_client = openai.AsyncOpenAI(
         "X-Title": "Wrennon Showcase",
     }
 ) if settings.openrouter_api_key else None
-OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
+OPENROUTER_MODEL = getattr(settings, "openrouter_model", None) or "nvidia/nemotron-3.5-super-vl:free"
+DISABLE_GPT_OSS_20B = True
 
 
 def _read_bytes(path: str) -> bytes:
@@ -70,7 +88,7 @@ from app.security.pii import mask_pii  # noqa: E402,F401
     stop=stop_after_attempt(3),
     wait=_groq_wait,
     reraise=True,
-    retry=retry_if_not_exception_type(BadRequestError)
+    retry=_retry_if_exception(_groq_should_retry)
 )
 async def _safe_groq_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, model_override: str = None) -> str:
     """Wrapper around Groq API calls with retry logic."""
@@ -93,7 +111,7 @@ async def _safe_groq_call(messages: list, temperature: float = 0.2, max_tokens: 
     stop=stop_after_attempt(3),
     wait=_groq_wait,
     reraise=True,
-    retry=retry_if_not_exception_type(BadRequestError)
+    retry=_retry_if_exception(_groq_should_retry)
 )
 async def _safe_groq_json_call(messages: list, temperature: float = 0.2, max_tokens: int = 1000, model_override: str = None) -> str:
     """Wrapper around Groq API calls specifically for JSON output."""
@@ -186,18 +204,29 @@ async def _safe_openai_call(messages: list, temperature: float = 0.2, max_tokens
     retry=retry_if_not_exception_type(openai.RateLimitError)
 )
 async def _safe_openrouter_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, model_override: str = None) -> str:
+    if not _openrouter_client:
+        return ""
     import time
     start_time = time.time()
+    target_model = OPENROUTER_MODEL
+    if model_override and not model_override.startswith("openai/gpt-oss"):
+        target_model = model_override
+
+    effective_max_tokens = max(max_tokens, 350)
     response = await _openrouter_client.chat.completions.create(
-        model=model_override or OPENROUTER_MODEL,
+        model=target_model,
         messages=messages,
         temperature=temperature,
-        max_tokens=max_tokens,
+        max_tokens=effective_max_tokens,
     )
-    logger.info(f"[TIMING] OpenRouter Chat Completion took {time.time() - start_time:.3f}s")
+    logger.info(f"[TIMING] OpenRouter Chat Completion ({target_model}) took {time.time() - start_time:.3f}s")
     result = response.choices[0].message.content
     if result and result.strip():
-        return result.strip()
+        # Strip <think> blocks if present
+        import re
+        result = re.sub(r'<think>.*?(?:</think>|$)', '', result, flags=re.DOTALL).strip()
+        if result:
+            return result
     raise ValueError("OpenRouter returned empty response")
 
 
@@ -208,16 +237,23 @@ async def _safe_openrouter_call(messages: list, temperature: float = 0.2, max_to
     retry=retry_if_not_exception_type(openai.RateLimitError)
 )
 async def _safe_openrouter_json_call(messages: list, temperature: float = 0.2, max_tokens: int = 1000, model_override: str = None) -> str:
+    if not _openrouter_client:
+        return ""
     import time
     start_time = time.time()
+    target_model = OPENROUTER_MODEL
+    if model_override and not model_override.startswith("openai/gpt-oss"):
+        target_model = model_override
+
+    effective_max_tokens = max(max_tokens, 500)
     response = await _openrouter_client.chat.completions.create(
-        model=model_override or OPENROUTER_MODEL,
+        model=target_model,
         messages=messages,
         temperature=temperature,
-        max_tokens=max_tokens,
+        max_tokens=effective_max_tokens,
         response_format={"type": "json_object"}
     )
-    logger.info(f"[TIMING] OpenRouter JSON Completion took {time.time() - start_time:.3f}s")
+    logger.info(f"[TIMING] OpenRouter JSON Completion ({target_model}) took {time.time() - start_time:.3f}s")
     result = response.choices[0].message.content
     if result and result.strip():
         result = result.strip()
@@ -239,14 +275,39 @@ async def _safe_openrouter_json_call(messages: list, temperature: float = 0.2, m
 # OpenAI fallback disabled temporarily (no active credits; skips directly to OpenRouter)
 ENABLE_OPENAI_FALLBACK = False
 
-async def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: int = 400, is_json: bool = False, model_override: str = None) -> str:
-    """Calls Groq, falls back to OpenAI (if enabled), and then falls back to OpenRouter if previous fail."""
+async def _safe_llm_call(
+    messages: list,
+    temperature: float = 0.2,
+    max_tokens: int = 400,
+    is_json: bool = False,
+    model_override: str = None,
+    prefer_openrouter: bool = False,
+) -> str:
+    """Calls Groq (gpt-oss-120b) or OpenRouter (nvidia/nemotron-3.5-super-vl:free).
+    - If prefer_openrouter=True (turn 3+): OpenRouter is primary, Groq 120b is fallback.
+    - If prefer_openrouter=False (turns 1-2): Groq 120b is primary, OpenRouter is fallback.
+    - gpt-oss-20b is disabled.
+    """
+    if prefer_openrouter and _openrouter_client:
+        try:
+            if is_json:
+                return await _safe_openrouter_json_call(messages, temperature, max_tokens, model_override)
+            return await _safe_openrouter_call(messages, temperature, max_tokens, model_override)
+        except Exception as or_e:
+            logger.warning(f"OpenRouter ({OPENROUTER_MODEL}) failed: {or_e}. Falling back to Groq ({MODEL})...")
+            try:
+                groq_model = MODEL if (DISABLE_GPT_OSS_20B and (not model_override or model_override == "openai/gpt-oss-20b")) else (model_override or MODEL)
+                return await _groq_with_failover(messages, temperature, max_tokens, is_json, groq_model)
+            except Exception as ge:
+                logger.error(f"Groq fallback also failed: {ge}")
+                return ""
+
+    # Default flow: Groq first, OpenRouter fallback
     try:
-        if is_json:
-            return await _safe_groq_json_call(messages, temperature, max_tokens, model_override)
-        return await _safe_groq_call(messages, temperature, max_tokens, model_override)
+        groq_model = MODEL if (DISABLE_GPT_OSS_20B and (not model_override or model_override == "openai/gpt-oss-20b")) else (model_override or MODEL)
+        return await _groq_with_failover(messages, temperature, max_tokens, is_json, groq_model)
     except Exception as e:
-        logger.error(f"Groq API completely failed after retries: {e}. Falling back to {'OpenAI' if ENABLE_OPENAI_FALLBACK else 'OpenRouter'}...")
+        logger.warning(f"Groq API ({model_override or MODEL}) failed: {e}. Falling back to {'OpenAI' if ENABLE_OPENAI_FALLBACK else 'OpenRouter'}...")
         
     if ENABLE_OPENAI_FALLBACK and _openai_client:
         try:
@@ -254,6 +315,9 @@ async def _safe_llm_call(messages: list, temperature: float = 0.2, max_tokens: i
         except Exception as oe:
             logger.error(f"OpenAI fallback completely failed after retries: {oe}. Falling back to OpenRouter...")
             
+    if not _openrouter_client:
+        logger.error("No fallback model is configured: set OPENROUTER_API_KEY in backend/.env")
+        return ""
     if _openrouter_client:
         try:
             if is_json:
@@ -393,7 +457,7 @@ async def describe_image_if_present(text: str, session_id: str | None = None) ->
 
 
 MODEL = "openai/gpt-oss-120b"
-LIGHT_MODEL = "openai/gpt-oss-20b"
+LIGHT_MODEL = "openai/gpt-oss-120b"
 # Groq deprecated meta-llama/llama-4-scout-17b-16e-instruct on June 17,
 # 2026 (free/developer tier) and recommends this model as the direct
 # replacement. If Groq changes their lineup again, check
@@ -495,4 +559,29 @@ async def validate_security_intent(text: str) -> bool:
     except Exception as e:
         logger.error(f"Security validation failed: {e}")
         return True
+
+# --- Groq rate-limit handling (added by apply_store_db.py) ---
+async def _groq_with_failover(messages, temperature, max_tokens, is_json, model_override):
+    """Try the requested Groq model; if it is rate-limited try its sister model straight away; if both are, wait as long as Groq asks
+    (at most 15 s) and try once more. Only then does the caller fall back to another provider."""
+    primary = model_override or MODEL
+    alt = _ALT_GROQ.get(primary)
+    if DISABLE_GPT_OSS_20B and alt == "openai/gpt-oss-20b":
+        alt = None
+
+    candidates = [model_override] + ([alt] if alt else [])
+    call = _safe_groq_json_call if is_json else _safe_groq_call
+    last = None
+    for round_ in range(2 if alt else 1):
+        for model in candidates:
+            try:
+                return await call(messages, temperature, max_tokens, model)
+            except Exception as e:
+                last = e
+                if not _is_rate_limit(e):
+                    raise
+                logger.warning(f"Groq rate limit on {model or MODEL}; switching model")
+        if round_ == 0 and alt:
+            await asyncio.sleep(_retry_hint(last))
+    raise last
 

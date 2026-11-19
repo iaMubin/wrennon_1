@@ -2,6 +2,7 @@
 
     cd backend
     python -m scripts.bot_eval                      # every scenario with your real LLM keys
+    python -m scripts.bot_eval --quick              # the 7 scenarios that matter most (fewer model calls)
     python -m scripts.bot_eval --pause 25           # slower, for providers with a small per-minute allowance (free Groq tier)
     python -m scripts.bot_eval --only cancel_flow reorder
     python -m scripts.bot_eval --list
@@ -15,11 +16,12 @@ import asyncio
 import json
 import logging
 
-from app.services.bot_eval import SCENARIOS, GraphBot, cleanup_leftovers, report, run_all
+from app.services.bot_eval import QUICK, SCENARIOS, GraphBot, cleanup_leftovers, report, run_all
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", nargs="*", help="run just these scenarios")
+    ap.add_argument("--quick", action="store_true", help="only the %d scenarios that matter most (cancel, address, bag, honesty, privacy, outfit)" % len(QUICK))
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--cleanup", action="store_true")
     ap.add_argument("--pause", type=float, default=20.0, help="seconds to wait between turns (default 20)")
@@ -35,6 +37,8 @@ if __name__ == "__main__":
         raise SystemExit
     if not a.verbose:
         logging.getLogger("wrennon").setLevel(logging.ERROR)   # keep the report readable; throttling is detected separately
+    if a.quick and not a.only:
+        a.only = QUICK
     n = len(a.only) if a.only else len(SCENARIOS)
     print(f"Running {n} scenarios (about {max(1, round(n * 2 * (a.pause + 6) / 60))} minutes at --pause {a.pause:g}). Press Ctrl+C to stop; test data is cleaned up.")
     try:

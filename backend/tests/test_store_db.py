@@ -820,3 +820,27 @@ def test_presenter_controls_stage_the_story(full, wire, monkeypatch):
     assert c.post("/api/store/demo/stock", json={"preset": "nope"}).status_code == 422
     r = c.post("/api/store/demo/reset").json()
     assert r["customers_created"] == 15 and svc.get_order(full, o["order_id"]) is None or True
+
+
+
+def test_address_split_and_honest_refusals(db, wire):
+    import asyncio
+    from app.services import store_actions as sa
+    assert sa.split_address("77 Elm Ave, Seattle WA 98103") == ("77 Elm Ave", "Seattle WA", "98103")
+    assert sa.split_address("77 Elm Ave", "Seattle", "98103") == ("77 Elm Ave", "Seattle", "98103")
+    assert sa.split_address("12 Pine St, Apt 4, Boise, ID 83702-1234")[2] == "83702-1234"
+    o = _order(db, email="buyer@gmail.com")
+    trusted = {"_claimed_emails": ["buyer@gmail.com"], "_session_id": _chat("buyer@gmail.com")}
+    # the model puts everything in one field: still understood, still asks first, and a confirmed call really changes it
+    t, done = sa._change_address({"order_id": o.order_id, "address": "77 Elm Ave, Seattle WA 98103", **trusted})
+    assert done is None and t.startswith("NOT changed yet") and "77 Elm Ave, Seattle WA 98103" in t
+    out = asyncio.run(sa.execute_change_order_address({"order_id": o.order_id, "address": "77 Elm Ave, Seattle WA 98103", "confirmed": True, **trusted}))
+    db.expire_all()
+    assert out.startswith("Order #") and svc.get_order(db, o.order_id).ship_address == "77 Elm Ave"
+    # every kind of "nothing happened" is marked in capitals
+    for fn, args in ((sa.execute_change_order_address, {"order_id": o.order_id, "address": "Seattle", **trusted}),
+                     (sa.execute_change_order_address, {"order_id": o.order_id, "address": "somewhere nice, Reno NV 89501", "confirmed": True, **trusted}),
+                     (sa.execute_cancel_order, {"order_id": "999999", "confirmed": True, **trusted}),
+                     (sa.execute_change_order_size, {"order_id": o.order_id, "new_size": "XXL", "confirmed": True, **trusted})):
+        res = asyncio.run(fn(args))
+        assert res.startswith("NOT"), res

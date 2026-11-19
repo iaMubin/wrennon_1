@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import select
@@ -201,6 +202,7 @@ async def execute_get_my_bag(args: Dict[str, Any]) -> str:
 
 async def execute_cancel_order(args: Dict[str, Any]) -> str:
     text, cancelled = await asyncio.to_thread(_cancel_order, args)
+    text = _flag(text, bool(cancelled))
     if cancelled and args.get("_session_id"):
         from app.services import store_proactive
         await store_proactive.note_to_agents(args["_session_id"], f"Order #{cancelled} was cancelled by the customer through the AI assistant.")
@@ -217,15 +219,31 @@ def _is_yes(v: Any) -> bool:
     return v is True or str(v).lower() == "true"
 
 
+def split_address(address: str, city: str = "", zip_code: str = "") -> tuple:
+    """The model sometimes puts the whole address in one field ("77 Elm Ave, Seattle WA 98103"). Pull the ZIP and city back out."""
+    address, city, zip_code = (address or "").strip(), (city or "").strip(), (zip_code or "").strip()
+    if address and not zip_code:
+        m = re.search(r"\b\d{5}(?:-\d{4})?\b", address)
+        if m:
+            zip_code, address = m.group(0), (address[:m.start()] + address[m.end():]).strip(" ,")
+    if address and not city:
+        parts = [x.strip() for x in address.split(",") if x.strip()]
+        if len(parts) >= 2:
+            address, city = parts[0], ", ".join(parts[1:])
+    return address, city, zip_code
+
+
 def _change_address(args: Dict[str, Any]):
     """(text_for_the_bot, changed_order_id_or_None). First call asks for confirmation; only confirmed=true changes anything."""
     oid = svc.clean_order_id(args.get("order_id"))
-    address, city = str(args.get("address") or "").strip(), str(args.get("city") or "").strip()
-    zip_code = str(args.get("zip") or args.get("zip_code") or "").strip()
+    address, city, zip_code = split_address(str(args.get("address") or args.get("new_address") or ""), str(args.get("city") or ""),
+                                            str(args.get("zip") or args.get("zip_code") or args.get("postal_code") or ""))
     if not oid:
         return "Ask the customer which order number they want to change.", None
     if not (address and city and zip_code):
         return "Ask the customer for the complete new delivery address: street address, city and ZIP/postal code.", None
+    if not re.search(r"\d", address):
+        return "That does not look like a street address (it needs a number and a street name). Ask the customer for it.", None
     with SessionLocal() as db:
         order = svc.get_order(db, oid)
         if not order or order.email.lower() not in _trusted(args):
@@ -284,8 +302,14 @@ def _change_size(args: Dict[str, Any]):
         return f"Done. {last} on order #{oid}. Tell the customer it is changed.", f"Order #{oid}: {last}"
 
 
+def _flag(text: str, done: bool) -> str:
+    """A result that changed nothing must say so, in words the model cannot misread as success."""
+    return text if done or text.startswith("NOT") else "NOT DONE: " + text
+
+
 async def execute_change_order_address(args: Dict[str, Any]) -> str:
     text, note = await asyncio.to_thread(_change_address, args)
+    text = _flag(text, bool(note))
     if note and args.get("_session_id"):
         from app.services import store_proactive
         await store_proactive.note_to_agents(args["_session_id"], note + " (by the customer, through the AI assistant).")
@@ -295,6 +319,7 @@ async def execute_change_order_address(args: Dict[str, Any]) -> str:
 
 async def execute_change_order_size(args: Dict[str, Any]) -> str:
     text, note = await asyncio.to_thread(_change_size, args)
+    text = _flag(text, bool(note))
     if note and args.get("_session_id"):
         from app.services import store_proactive
         await store_proactive.note_to_agents(args["_session_id"], note + " (by the customer, through the AI assistant).")
@@ -372,6 +397,7 @@ def _reorder(args: Dict[str, Any]):
 
 async def execute_add_item_to_order(args: Dict[str, Any]) -> str:
     text, note = await asyncio.to_thread(_add_item_to_order, args)
+    text = _flag(text, bool(note))
     if note and args.get("_session_id"):
         from app.services import store_proactive
         await store_proactive.note_to_agents(args["_session_id"], note + " (by the customer, through the AI assistant).")

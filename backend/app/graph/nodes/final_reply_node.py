@@ -98,7 +98,7 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
         context_parts.append(state["page_context"])
     context_parts.append(
         "Honesty rule: only say you did something (cancelled, refunded, added to the bag, opened a page, changed an order) if the tool results "
-        "show it was done. If a tool result says it was not done or needs the customer's confirmation, say exactly that. Never claim an action you did not perform."
+        "show it was done. A tool result that starts with NOT (or NOT DONE) means nothing changed: say exactly that and why. If it says it needs the customer's confirmation, ask for it. Never claim an action you did not perform."
     )
     if state.get("gathered_context"):
         context_parts.append("Tool/policy results:\n" + "\n".join(state["gathered_context"]))
@@ -131,13 +131,11 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
 
     llm_messages = [{"role": "system", "content": system_instruction}]
     
-    # Use lightweight model for early greeting/smalltalk turns without complex tool results
-    model_override = None
-    if (
-        (state.get("turn_count", 0) <= 2 and not state.get("gathered_context") and not state.get("handoff_requested"))
-        or state.get("intent_category") in ("greeting", "smalltalk", "off-topic")
-    ):
-        model_override = LIGHT_MODEL
+    # Dynamic model selection:
+    # 1st 2 messages go to gpt-oss-120b; message 3+ to OpenRouter (nvidia/nemotron-3.5-super-vl:free)
+    human_msg_count = sum(1 for m in state.get("messages", []) if getattr(m, "type", None) == "human")
+    turn_count = state.get("turn_count", 0)
+    prefer_openrouter = human_msg_count > 2 or turn_count >= 2
 
     recent_messages = state["messages"][-6:]
     for msg in recent_messages[:-1]:
@@ -158,7 +156,7 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
     final_prompt = f"Context:\n{context_text}\n\nCustomer's message: {last_human_content}"
     llm_messages.append({"role": "user", "content": final_prompt})
 
-    reply = await _safe_llm_call(llm_messages, temperature=0.3, max_tokens=1000, model_override=model_override)
+    reply = await _safe_llm_call(llm_messages, temperature=0.3, max_tokens=1000, prefer_openrouter=prefer_openrouter)
     if not reply:
         reply = "I'm sorry, I couldn't process that right now. Could you please try again?"
 

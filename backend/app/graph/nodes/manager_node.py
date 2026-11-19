@@ -106,8 +106,8 @@ Customer: "cancel my order 1004" (not shipped: handled by me, never a human)
 -> {"tools_to_run": [{"name": "cancel_order", "args": {"order_id": "1004"}}], "ready_to_respond": false, "handoff_required": false, "handoff_reason": "", "resolved_required": false}
 (tool says NOT cancelled yet -> ask the customer to confirm; after "yes" call cancel_order again with "confirmed": true)
 
-Customer: "change the address of order 1004 to 77 Elm Ave, Seattle WA 98103"
--> {"tools_to_run": [{"name": "change_order_address", "args": {"order_id": "1004", "address": "77 Elm Ave", "city": "Seattle, WA", "zip": "98103"}}], "ready_to_respond": false, "handoff_required": false, "handoff_reason": "", "resolved_required": false}
+Customer: "change the address of order 1004 to 9 Birch Road, Denver CO 80205"
+-> {"tools_to_run": [{"name": "change_order_address", "args": {"order_id": "1004", "address": "9 Birch Road", "city": "Denver, CO", "zip": "80205"}}], "ready_to_respond": false, "handoff_required": false, "handoff_reason": "", "resolved_required": false}
  
 Customer: "I want to cancel order 1004 and get a refund"
 -> reasoning: cancellation/refund execution isn't something our tools can do, but the order might already be in a cancellable state or policy might resolve this without a human — check first.
@@ -219,19 +219,11 @@ async def manager_node(state: ConversationState) -> ConversationState:
 
         llm_messages.append({"role": role, "content": content})
 
-    # Dynamic model selection: Use light model (openai/gpt-oss-20b) for simple greetings or short early turns
-    model_override = None
-    last_human_text = ""
-    for m in reversed(state.get("messages", [])):
-        if m.type == "human":
-            last_human_text = m.content.strip().lower()
-            break
-
-    GREETING_WORDS = {"hi", "hello", "hey", "hello sir", "good morning", "good evening", "good afternoon", "hola", "yo"}
-    is_simple_greeting = last_human_text in GREETING_WORDS or (len(last_human_text.split()) <= 3 and any(w in last_human_text for w in ["hi", "hello", "hey"]))
-
-    if is_simple_greeting or (state.get("turn_count", 0) <= 1 and iteration == 0 and len(last_human_text.split()) <= 8):
-        model_override = LIGHT_MODEL
+    # Dynamic model selection:
+    # 1st 2 messages go to gpt-oss-120b; message 3+ to OpenRouter (nvidia/nemotron-3.5-super-vl:free)
+    human_msg_count = sum(1 for m in state.get("messages", []) if getattr(m, "type", None) == "human")
+    turn_count = state.get("turn_count", 0)
+    prefer_openrouter = human_msg_count > 2 or turn_count >= 2
 
     decision = None
     last_error = None
@@ -242,7 +234,7 @@ async def manager_node(state: ConversationState) -> ConversationState:
                 temperature=0.1,
                 max_tokens=600,
                 is_json=True,
-                model_override=model_override
+                prefer_openrouter=prefer_openrouter
             )
             decision = json.loads(result_str)
             break
