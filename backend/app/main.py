@@ -160,18 +160,23 @@ app.add_middleware(SlowAPIMiddleware)
 _origins = settings.cors_origins_list
 _allow_all = _origins == ["*"]
 
-# Wildcard mode (dev/staging only; config.py refuses it in production) must NOT be
-# combined with credentials: the old allow_origin_regex=".*" + allow_credentials=True
-# reflected ANY origin with credentials, i.e. any website could make authenticated,
-# cookie-bearing requests as a logged-in agent. Explicit origins get credentials;
-# the wildcard gets none.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"] if _allow_all else _origins,
-    allow_credentials=not _allow_all,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+if _allow_all:
+    # In development, dynamically reflect localhost/127.0.0.1 origins so credentials work
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 @app.middleware("http")

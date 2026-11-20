@@ -120,6 +120,7 @@ class ShopifyProvider(EcommerceProvider):
             "carrier": tracking.get("company"),
             "eta": (shipped or {}).get("estimatedDeliveryAt"),
             "tracking_url": tracking.get("url"),
+            "invoice_url": node.get("statusPageUrl") or f"https://wrennon.com/invoice/{(node.get('name') or '').lstrip('#')}",
             "payment_status": (node.get("displayFinancialStatus") or "").lower() or None,
             "timeline": timeline,
         }

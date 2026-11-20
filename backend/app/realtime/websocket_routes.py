@@ -473,9 +473,26 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
         await websocket.close(code=4401)
         return
 
-    await manager.connect_customer(session_id, websocket)
     from app.services.customer_auth import session_customer_email
     _ws_customer_email = session_customer_email(token)  # verified email of a signed-in customer, else None
+    if not _ws_customer_email:
+        try:
+            from app.db.session import SessionLocal
+            from app.db.models import Conversation
+            _s = SessionLocal()
+            _c = _s.query(Conversation).filter_by(session_id=session_id).first()
+            if _c and _c.customer_email:
+                _ws_customer_email = _c.customer_email
+            _s.close()
+        except Exception:
+            pass
+    await manager.connect_customer(session_id, websocket, email=_ws_customer_email)
+    await manager.broadcast_to_agents({
+        "type": "customer_presence",
+        "session_id": session_id,
+        "is_online": True,
+        "email": _ws_customer_email,
+    })
 
     # --- Debounce state for this connection ---
     # These are local to this function call, i.e. scoped per-connection —
@@ -487,6 +504,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
     # in since the last turn started — checked by _debounce_worker so it
     # doesn't start a turn on bare typing noise with nothing to process.
     is_typing = False
+    pending_page_event: str | None = None
 
     # --- Mid-turn interrupt/merge state ---
     # current_turn_task: the AI turn currently in flight, if any. Checked
@@ -642,6 +660,13 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             elif msg["sender"] in ("ai", "agent"):
                 state["messages"].append(AIMessage(content=msg["content"]))
 
+        nonlocal pending_page_event
+        active_page_event = pending_page_event
+        pending_page_event = None
+        if active_page_event:
+            customer_text = active_page_event
+            state["messages"].append(HumanMessage(content=active_page_event))
+
         # Update rolling summary if conversation gets long (e.g., every 6 messages)
         if len(state["messages"]) > 0 and len(state["messages"]) % 6 == 0:
             new_summary = await update_conversation_summary(state["messages"][-6:], phase1_data["summary"])
@@ -750,7 +775,10 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             from app.services.qa import process_resolved_conversation_tasks
             asyncio.create_task(process_resolved_conversation_tasks(phase3_data["conversation_id"]))
 
-        await websocket.send_json({"reply": reply_text, "sender": "bot"})
+        is_resolved = bool(phase3_data.get("resolved"))
+        await websocket.send_json({"reply": reply_text, "sender": "bot", "is_resolved": is_resolved})
+        if phase3_data.get("just_resolved"):
+            await websocket.send_json({"type": "resolved"})
 
         total_time = time.time() - msg_start_time
         logger.info(f"[TIMING] Total Message Turnaround Time: {total_time:.3f}s")
@@ -874,6 +902,39 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
                 mid_turn_typing_event.set()
                 continue
 
+            # Real-time tab visibility signal from storefront
+            if data.get("type") == "page_visibility":
+                is_vis = bool(data.get("visible", True))
+                asyncio.create_task(manager.broadcast_to_agents({
+                    "type": "customer_presence",
+                    "session_id": session_id,
+                    "is_online": is_vis,
+                    "email": _ws_customer_email,
+                }))
+                continue
+
+            # Customer identity / email binding
+            if data.get("type") == "identify":
+                c_email = data.get("email")
+                if c_email and isinstance(c_email, str) and "@" in c_email:
+                    _ws_customer_email = c_email.strip().lower()
+                    manager._customer_emails[session_id] = _ws_customer_email
+                    asyncio.create_task(manager.broadcast_to_agents({
+                        "type": "customer_presence",
+                        "session_id": session_id,
+                        "is_online": True,
+                        "email": _ws_customer_email,
+                    }))
+                continue
+
+            # Heartbeat ping
+            if data.get("type") in ("ping", "heartbeat"):
+                try:
+                    await websocket.send_json({"type": "pong"})
+                except Exception:
+                    pass
+                continue
+
             is_page_event = data.get("type") == "page_event"
             if is_page_event:
                 # Only allow-listed events, with server-owned context text. The
@@ -959,6 +1020,9 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
 
             if is_page_event:
                 seen_page_events.add(data["event"])
+                pending_page_event = customer_text
+            else:
+                pending_page_event = None
 
             # Only now that the message is accepted do we cancel any in-flight
             # turn — before this message's own Phase 1 DB write even starts — so
@@ -973,15 +1037,18 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             # grace period in _wait_until_quiet() still applies from here.
             is_typing = False
 
-            # Dispatch this message's DB write CONCURRENTLY — not queued
-            # behind any other message's write — so the receive loop stays
-            # free to react to the NEXT signal immediately, regardless of
-            # how long Phase 1 takes. _get_fresh_phase1_data() (called
-            # right before any turn actually starts) waits for every write
-            # dispatched so far and then takes one clean, authoritative
-            # read — so no message can ever be missed by a turn, no matter
-            # how writes happen to finish relative to each other.
-            pending_write_tasks.append(asyncio.create_task(_write_and_broadcast(customer_text)))
+            # Synthetic page events are internal telemetry for proactive AI triggers
+            # and MUST NEVER be saved as fake human messages or broadcast to agents.
+            if not is_page_event:
+                # Dispatch this message's DB write CONCURRENTLY — not queued
+                # behind any other message's write — so the receive loop stays
+                # free to react to the NEXT signal immediately, regardless of
+                # how long Phase 1 takes. _get_fresh_phase1_data() (called
+                # right before any turn actually starts) waits for every write
+                # dispatched so far and then takes one clean, authoritative
+                # read — so no message can ever be missed by a turn, no matter
+                # how writes happen to finish relative to each other.
+                pending_write_tasks.append(asyncio.create_task(_write_and_broadcast(customer_text)))
             has_pending_message = True
 
             if interrupting_inflight_turn:
@@ -991,10 +1058,30 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
 
     except WebSocketDisconnect:
         logger.info(f"Customer disconnected: {session_id}")
-        manager.disconnect_customer(session_id, websocket)
+        disc_email = manager.disconnect_customer(session_id, websocket) or _ws_customer_email
+        still_online = manager.is_customer_online(email=disc_email) if disc_email else False
+        try:
+            await manager.broadcast_to_agents({
+                "type": "customer_presence",
+                "session_id": session_id,
+                "is_online": still_online,
+                "email": disc_email,
+            })
+        except Exception:
+            pass
     except Exception as e:
         logger.error(f"Error in customer_websocket: {e}", exc_info=True)
-        manager.disconnect_customer(session_id, websocket)
+        disc_email = manager.disconnect_customer(session_id, websocket) or _ws_customer_email
+        still_online = manager.is_customer_online(email=disc_email) if disc_email else False
+        try:
+            await manager.broadcast_to_agents({
+                "type": "customer_presence",
+                "session_id": session_id,
+                "is_online": still_online,
+                "email": disc_email,
+            })
+        except Exception:
+            pass
     finally:
         debounce_worker_task.cancel()
         if current_turn_task is not None and not current_turn_task.done():

@@ -115,19 +115,22 @@ def session_status(
     if conversation is None:
         return {"status": "not_found"}
 
+    csat = db.query(CSATResponse).filter_by(conversation_id=conversation.id).first()
+    csat_rating = csat.rating if csat else None
+
     if not conversation.resolved:
-        return {"status": "active"}
+        return {"status": "active", "resolved": False, "csat_rating": csat_rating}
 
     # Conversation was resolved — check if within 72-hour window
     if conversation.resolved_at:
         elapsed = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - conversation.resolved_at
         if elapsed.total_seconds() < REOPEN_WINDOW_HOURS * 3600:
-            return {"status": "resolved_recent"}
+            return {"status": "resolved_recent", "resolved": True, "csat_rating": csat_rating}
         else:
-            return {"status": "expired"}
+            return {"status": "expired", "resolved": True, "csat_rating": csat_rating}
 
     # resolved=True but no resolved_at (legacy data) — treat as expired
-    return {"status": "expired"}
+    return {"status": "expired", "resolved": True, "csat_rating": csat_rating}
 
 
 @router.get("/chat/{session_id}/history")
@@ -158,7 +161,10 @@ def get_history(
         text = re.sub(r'\[INTERNAL_IMAGE_DESC\].*?\[/INTERNAL_IMAGE_DESC\]', '', text, flags=re.DOTALL)
         return upload_service.resign_text(text.strip())
 
-    visible = [m for m in conversation.messages if m.sender in CUSTOMER_VISIBLE_SENDERS]
+    visible = [
+        m for m in conversation.messages 
+        if m.sender in CUSTOMER_VISIBLE_SENDERS and not (m.content and m.content.startswith("[SYSTEM_EVENT:"))
+    ]
     authors = {m.author_username for m in visible if m.sender == "agent" and m.author_username}
     first_names = {}
     if authors:
@@ -265,17 +271,23 @@ def submit_csat(
 
     db.commit()
 
-    if rating <= 2:
-        from app.realtime.connection_manager import manager
-        
-        async def send_low_csat_alert():
+    from app.realtime.connection_manager import manager
+
+    async def broadcast_csat():
+        await manager.broadcast_to_agents({
+            "type": "csat_submitted",
+            "session_id": session_id,
+            "rating": rating,
+            "comment": comment
+        })
+        if rating <= 2:
             await manager.broadcast_to_agents({
                 "type": "low_csat_alert",
                 "session_id": session_id,
                 "rating": rating,
                 "comment": comment
             })
-            
-        background_tasks.add_task(send_low_csat_alert)
+
+    background_tasks.add_task(broadcast_csat)
 
     return {"status": "success"}

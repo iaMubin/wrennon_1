@@ -282,16 +282,14 @@ const PRIVACY_URL = "";
   }
 })();
 
-// Fixed typing-indicator bar, sitting between #messages and #input-row.
-// Deliberately NOT part of the scrolling message list (unlike the old
-// implementation) — it stays anchored right above the input box no
-// matter how many messages come in while it's visible, instead of
-// visually drifting up as new messages get appended below it.
+// Live typing indicator bubble placed inside #messages
 const typingIndicatorBar = document.createElement("div");
 typingIndicatorBar.id = "typing-indicator-bar";
-typingIndicatorBar.className = "hidden";
+typingIndicatorBar.className = "bubble bubble-bot bubble-typing hidden";
+typingIndicatorBar.setAttribute("role", "status");
+typingIndicatorBar.setAttribute("aria-live", "polite");
 typingIndicatorBar.innerHTML = `<span class="dot"></span><span class="dot"></span><span class="dot"></span>`;
-document.getElementById("panel").insertBefore(typingIndicatorBar, document.getElementById("input-row"));
+// Do not append to messagesEl at initialization; appended dynamically at the end when shown
 
 scrollToBottomBtn.addEventListener("click", () => {
   scrollToBottom(true);
@@ -339,6 +337,10 @@ async function resolveSessionId() {
         if (data.status === "active" || data.status === "resolved_recent") {
           SESSION_ID = stored;
           SESSION_TOKEN = storedToken;
+          if (data.status === "resolved_recent" || data.resolved) {
+            window.__wrennon_session_resolved = true;
+            window.__wrennon_csat_rating = data.csat_rating || null;
+          }
           return;
         }
       }
@@ -624,6 +626,9 @@ async function loadHistory() {
     
     appendMessage(msg.role, msg.text, false, msg.timestamp, msg.name); // false = don't re-save
   }
+  if (window.__wrennon_session_resolved) {
+    showCsatPrompt(window.__wrennon_csat_rating);
+  }
 }
 
 async function resyncMissedMessages() {
@@ -684,6 +689,17 @@ function connectSocket() {
       clearOfflineQueue();
     }
 
+    // Identify customer if signed in on storefront
+    try {
+      const rawUser = localStorage.getItem('nb_user');
+      if (rawUser) {
+        const u = JSON.parse(rawUser);
+        if (u && u.email && socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: "identify", email: u.email }));
+        }
+      }
+    } catch (e) {}
+
     // A reconnect has no way to redeliver anything sent while we were
     // disconnected (e.g. an agent reply). loadHistory() only reads
     // localStorage, which never received it either — so without this,
@@ -724,6 +740,9 @@ function connectSocket() {
         
         if (text) {
           appendMessage(sender, text, true, Date.now(), name);
+        }
+        if (data.is_resolved || data.resolved) {
+          showCsatPrompt();
         }
         return;
       } else {
@@ -1153,28 +1172,91 @@ function scrollToBottom(force = false) {
   }
 }
 
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && !panel.classList.contains("hidden")) {
-    clearUnreadIndicator();
+// Instant disconnect when customer closes tab or navigates away
+window.addEventListener("beforeunload", () => {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.close(1000, "tab_closed");
+  }
+});
+window.addEventListener("pagehide", () => {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.close(1000, "tab_closed");
   }
 });
 
-function showCsatPrompt() {
-  const csatKey = `wrennon_csat_submitted_${SESSION_ID}`;
-  if (localStorage.getItem(csatKey)) return; // already rated this conversation
-  if (document.getElementById("wrennon-csat-card")) return; // already showing
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    if (!panel.classList.contains("hidden")) {
+      clearUnreadIndicator();
+    }
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      if (SESSION_ID && SESSION_TOKEN) connectSocket();
+    } else {
+      socket.send(JSON.stringify({ type: "page_visibility", visible: true }));
+    }
+  } else if (document.visibilityState === "hidden") {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "page_visibility", visible: false }));
+    }
+  }
+});
 
-  const card = document.createElement("div");
+// Auto-connect presence as soon as visitor is on the website
+async function initStorePresence() {
+  try {
+    if (!SESSION_ID || !SESSION_TOKEN) {
+      await resolveSessionId();
+    }
+    if (SESSION_ID && SESSION_TOKEN) {
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        connectSocket();
+      }
+    }
+  } catch (e) {
+    console.debug("Presence connection:", e);
+  }
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initStorePresence);
+} else {
+  initStorePresence();
+}
+
+function showCsatPrompt(initialRating = null) {
+  const csatKey = `wrennon_csat_submitted_${SESSION_ID}`;
+  const storedRating = initialRating || localStorage.getItem(csatKey);
+  const alreadySubmitted = Boolean(storedRating);
+
+  let card = document.getElementById("wrennon-csat-card");
+  if (card) {
+    if (alreadySubmitted) {
+      const ratingNum = Number(storedRating);
+      const stars = card.querySelectorAll(".csat-star");
+      stars.forEach(s => {
+        s.disabled = true;
+        s.classList.toggle("csat-star--selected", Number(s.dataset.rating) <= ratingNum);
+      });
+      const question = card.querySelector(".csat-card__question");
+      if (question) question.textContent = "Thanks for your feedback!";
+    }
+    return;
+  }
+
+  card = document.createElement("div");
   card.id = "wrennon-csat-card";
   card.className = "csat-card";
+  const ratingNum = Number(storedRating) || 0;
   card.innerHTML = `
-    <div class="csat-card__question">How was your support experience?</div>
+    <div class="csat-card__question">${alreadySubmitted ? "Thanks for your feedback!" : "How was your support experience?"}</div>
     <div class="csat-card__stars" role="radiogroup" aria-label="Rate your experience">
-      ${[1, 2, 3, 4, 5].map(n => `<button type="button" class="csat-star" data-rating="${n}" aria-label="${n} star${n > 1 ? 's' : ''}">★</button>`).join("")}
+      ${[1, 2, 3, 4, 5].map(n => `<button type="button" class="csat-star${alreadySubmitted && n <= ratingNum ? ' csat-star--selected' : ''}" data-rating="${n}" ${alreadySubmitted ? 'disabled' : ''} aria-label="${n} star${n > 1 ? 's' : ''}">★</button>`).join("")}
     </div>
   `;
   messagesEl.appendChild(card);
   messagesEl.scrollTop = messagesEl.scrollHeight;
+
+  if (alreadySubmitted) return;
 
   const stars = card.querySelectorAll(".csat-star");
   stars.forEach(star => {
@@ -1185,22 +1267,22 @@ function showCsatPrompt() {
     star.addEventListener("mouseleave", () => {
       stars.forEach(s => s.classList.remove("csat-star--hover"));
     });
-    star.addEventListener("click", async () => {
+    star.addEventListener("click", () => {
       const rating = Number(star.dataset.rating);
+      // Instant optimistic UI update
       stars.forEach(s => { s.disabled = true; });
       stars.forEach(s => s.classList.toggle("csat-star--selected", Number(s.dataset.rating) <= rating));
-      try {
-        await fetch(`${API_BASE}/chat/${SESSION_ID}/csat`, {
-          method: "POST",
-          headers: { "Authorization": `Bearer ${SESSION_TOKEN}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ rating }),
-        });
-      } catch (err) {
-        console.error("Failed to submit CSAT rating:", err);
-      }
-      localStorage.setItem(csatKey, "1");
+      localStorage.setItem(csatKey, String(rating));
       const question = card.querySelector(".csat-card__question");
       if (question) question.textContent = "Thanks for your feedback!";
+
+      fetch(`${API_BASE}/chat/${SESSION_ID}/csat`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${SESSION_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ rating }),
+      }).catch(err => {
+        console.error("Failed to submit CSAT rating:", err);
+      });
     });
   });
 }
@@ -1213,6 +1295,9 @@ function formatWidgetTime(ts) {
 }
 
 function appendMessage(role, text, save = true, timestamp = Date.now(), name = null) {
+  if (text && typeof text === "string" && text.includes("[SYSTEM_EVENT:")) {
+    return;
+  }
   const wasNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 100;
   const uiRole = role === "human" ? "user" : (role === "ai" ? "bot" : role);
   
@@ -1224,14 +1309,14 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
 
   // Look for immediately preceding bubble in messagesEl
   let prevBubble = messagesEl.lastElementChild;
-  while (prevBubble && !prevBubble.classList.contains("bubble")) {
+  while (prevBubble && (!prevBubble.classList.contains("bubble") || prevBubble.id === "typing-indicator-bar")) {
     prevBubble = prevBubble.previousElementSibling;
   }
 
   const isSameSender = Boolean(
     prevBubble &&
-    (prevBubble.classList.contains(`bubble-${uiRole}`) || 
-     ((uiRole === "bot" || uiRole === "agent") && (prevBubble.classList.contains("bubble-bot") || prevBubble.classList.contains("bubble-agent"))))
+    prevBubble.classList.contains(`bubble-${uiRole}`) &&
+    (uiRole !== "agent" || (name && name === lastMsgName) || (!name && !lastMsgName))
   );
 
   const isGrouped = Boolean(
@@ -1335,12 +1420,37 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   }
 }
 
+let typingIndicatorTimeout = null;
 function showTypingIndicator() {
+  clearTimeout(typingIndicatorTimeout);
+  if (typingIndicatorBar.parentNode !== messagesEl) {
+    messagesEl.appendChild(typingIndicatorBar);
+  } else {
+    // Keep typing indicator anchored at the very bottom of messages
+    messagesEl.appendChild(typingIndicatorBar);
+  }
   typingIndicatorBar.classList.remove("hidden");
+  
+  // Smooth auto-scroll so the live indicator is fully visible in viewport
+  requestAnimationFrame(() => {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    try {
+      typingIndicatorBar.scrollIntoView({ behavior: "smooth", block: "end" });
+    } catch (_) {}
+  });
+
+  // Auto-hide after 20s if no response arrives to avoid stuck indicator
+  typingIndicatorTimeout = setTimeout(() => {
+    hideTypingIndicator();
+  }, 20000);
 }
 
 function hideTypingIndicator() {
+  clearTimeout(typingIndicatorTimeout);
   typingIndicatorBar.classList.add("hidden");
+  if (typingIndicatorBar.parentNode) {
+    typingIndicatorBar.parentNode.removeChild(typingIndicatorBar);
+  }
 }
 
 function sendMessage() {
@@ -1348,6 +1458,7 @@ function sendMessage() {
   if (!text) return;
 
   appendMessage("user", text);
+  showTypingIndicator(); // Show live indicator at the bottom while awaiting reply
   inputEl.value = "";
   inputEl.style.height = '44px';
   inputEl.style.overflowY = 'hidden';

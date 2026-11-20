@@ -224,4 +224,18 @@ async def link_session(session_id: str, email: str) -> str:
                 with SessionLocal() as db:
                     queue_message(db, email, "signed_in", hello)
             await asyncio.to_thread(_queue)
+    try:
+        from app.realtime.connection_manager import manager
+        if manager.get_customer_websocket(session_id) is not None:
+            manager._customer_emails[session_id] = email
+            await manager.broadcast_to_agents({
+                "type": "customer_presence",
+                "session_id": session_id,
+                "tenant_id": "default",
+                "is_online": True,
+                "email": email,
+            })
+    except Exception:
+        pass
+
     return result

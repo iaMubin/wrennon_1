@@ -29,7 +29,7 @@ from app.config import settings
 from app.logger import logger
 
 # Events that carry no conversation content and are fine for every agent.
-_PUBLIC_EVENTS = {"presence", "viewers_update"}
+_PUBLIC_EVENTS = {"presence", "viewers_update", "customer_presence"}
 _OWNER_TTL = 3.0
 
 
@@ -52,6 +52,7 @@ broadcast = Broadcast(settings.redis_url)
 class ConnectionManager:
     def __init__(self) -> None:
         self._customer_connections: dict[str, WebSocket] = {}
+        self._customer_emails: dict[str, str] = {}
         self._agent_connections: dict[WebSocket, str] = {}
         self._customer_tasks: dict[str, asyncio.Task] = {}
         self._customer_debounce_tasks: dict[str, asyncio.Task] = {}
@@ -68,7 +69,7 @@ class ConnectionManager:
 
     # --- Customer side ---
 
-    async def connect_customer(self, session_id: str, websocket: WebSocket) -> None:
+    async def connect_customer(self, session_id: str, websocket: WebSocket, email: str | None = None) -> None:
         old_ws = self._customer_connections.get(session_id)
         if old_ws is not None and old_ws is not websocket:
             logger.warning(f"Replacing a stale/orphaned customer connection for session {session_id}.")
@@ -84,6 +85,8 @@ class ConnectionManager:
                 logger.debug(f"Error closing old websocket for session {session_id}: {e}")
 
         self._customer_connections[session_id] = websocket
+        if email:
+            self._customer_emails[session_id] = email.strip().lower()
         
         async def listen_to_customer_channel():
             try:
@@ -107,15 +110,26 @@ class ConnectionManager:
     def get_customer_websocket(self, session_id: str) -> WebSocket | None:
         return self._customer_connections.get(session_id)
 
-    def disconnect_customer(self, session_id: str, websocket: WebSocket) -> None:
+    def disconnect_customer(self, session_id: str, websocket: WebSocket) -> str | None:
         if self._customer_connections.get(session_id) == websocket:
             self._customer_connections.pop(session_id, None)
+            email = self._customer_emails.pop(session_id, None)
             task = self._customer_tasks.pop(session_id, None)
             if task:
                 task.cancel()
             debounce_task = self._customer_debounce_tasks.pop(session_id, None)
             if debounce_task:
                 debounce_task.cancel()
+            return email
+        return None
+
+    def is_customer_online(self, session_id: str | None = None, email: str | None = None) -> bool:
+        if session_id and session_id in self._customer_connections:
+            return True
+        if email:
+            em = email.strip().lower()
+            return any(c_em == em for c_em in self._customer_emails.values())
+        return False
 
     async def send_to_customer(self, session_id: str, payload: dict) -> None:
         sender = payload.get("sender", "")
@@ -165,10 +179,13 @@ class ConnectionManager:
         owner = None
         if sid:
             owner = await self._owner(sid)
-            if owner is None:
+            if owner is not None:
+                tenant_id = owner[2]
+                claimed = [o for o in owner[:2] if o]
+            elif payload.get("type") not in _PUBLIC_EVENTS:
                 return                      # unknown conversation: nothing to deliver safely
-            tenant_id = owner[2]
-            claimed = [o for o in owner[:2] if o]
+        if not tenant_id and payload.get("type") in _PUBLIC_EVENTS:
+            tenant_id = "default"
         if not tenant_id:
             logger.error(f"Dropping dashboard event without a tenant: type={payload.get('type')}")
             return

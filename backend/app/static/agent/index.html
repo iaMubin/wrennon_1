@@ -7,11 +7,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Big+Shoulders+Display:wght@700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css?v=250">
-<link rel="stylesheet" href="agent.css?v=250">
-<link rel="stylesheet" href="ui-polish.css?v=250">
-<link rel="stylesheet" href="professional-override.css?v=251">
-<link rel="stylesheet" href="skin.css?v=5">
+<link rel="stylesheet" href="theme.css?v=260">
+<link rel="stylesheet" href="agent.css?v=260">
+<link rel="stylesheet" href="ui-polish.css?v=260">
+<link rel="stylesheet" href="professional-override.css?v=265">
+<link rel="stylesheet" href="skin.css?v=260">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   (function() {
@@ -1437,6 +1437,613 @@
       </div>
     </div>
   </div> <!-- /dashboard -->
+
+    <!-- ========================================================== -->
+  <!-- Google Antigravity 2.0 Studio - Executive Settings Modal    -->
+  <!-- ========================================================== -->
+  <div id="settings-modal" class="settings-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+    <div class="settings-modal-card ag-studio-modal">
+      
+      <!-- Executive Header Bar -->
+      <header class="ag-modal-header">
+        <div class="ag-header-left">
+          <div class="ag-header-brand">
+            <div class="ag-header-icon">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+            </div>
+            <div class="ag-title-row">
+              <h2 id="settings-modal-title" class="ag-modal-title">Settings</h2>
+              <span class="ag-version-badge">v2.4</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Center: Scope Switcher (User vs Workspace) -->
+        <div class="ag-header-center">
+          <div class="ag-scope-switcher" role="tablist">
+            <button type="button" class="ag-scope-btn active" data-scope="global" role="tab" aria-selected="true" title="User / Global Preferences">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+              <span>User</span>
+            </button>
+            <button type="button" class="ag-scope-btn" data-scope="workspace" role="tab" aria-selected="false" title="Workspace Preferences">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+              <span>Workspace</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Integrated Live Search Bar + Close Button -->
+        <div class="ag-header-right">
+          <div class="ag-search-container">
+            <svg class="ag-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="settings-search-input" placeholder="Search preferences..." autocomplete="off" spellcheck="false">
+            <kbd class="ag-kbd-shortcut">⌘K</kbd>
+          </div>
+          <button id="settings-modal-close-btn" class="ag-close-btn" aria-label="Close settings" title="Close (ESC)" onclick="window.closeSettingsModal()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Modal Body (Two-Column Split: Navigation Rail + Content Area) -->
+      <div class="ag-modal-body">
+        
+        <!-- Left Navigation Sidebar -->
+        <nav class="ag-sidebar-nav" aria-label="Settings Navigation">
+          <div class="ag-nav-group-label">PREFERENCES</div>
+          <button type="button" class="settings-nav-item ag-nav-item active" data-settings-tab="appearance">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="m4.93 4.93 4.24 4.24"></path><path d="m14.83 9.17 4.24-4.24"></path><path d="m14.83 14.83 4.24 4.24"></path><path d="m9.17 14.83-4.24 4.24"></path></svg>
+            <span>Appearance & Themes</span>
+          </button>
+          <button type="button" class="settings-nav-item ag-nav-item" data-settings-tab="notifications">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+            <span>Notifications & Audio</span>
+          </button>
+
+          <div class="ag-nav-group-label">INTELLIGENCE & ENGINE</div>
+          <button type="button" class="settings-nav-item ag-nav-item" data-settings-tab="ai-copilot">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            <span>Model & AI Engine</span>
+          </button>
+          <button type="button" class="settings-nav-item ag-nav-item" data-settings-tab="execution">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            <span>Tool Policies & Sandbox</span>
+          </button>
+          <button type="button" class="settings-nav-item ag-nav-item" data-settings-tab="shortcuts">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M6 8h.01"></path><path d="M10 8h.01"></path><path d="M14 8h.01"></path><path d="M18 8h.01"></path><path d="M8 12h.01"></path><path d="M12 12h.01"></path><path d="M16 12h.01"></path><path d="M7 16h10"></path></svg>
+            <span>Keyboard Shortcuts</span>
+          </button>
+
+          <div class="ag-nav-group-label">ACCESS & ACCOUNT</div>
+          <button type="button" class="settings-nav-item ag-nav-item" data-settings-tab="api-keys">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+            <span>Developer & API Keys</span>
+          </button>
+          <button type="button" class="settings-nav-item ag-nav-item" data-settings-tab="account">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <span>Account & Workspace</span>
+          </button>
+        </nav>
+
+        <!-- Right Content Area -->
+        <main class="ag-content-area" id="settings-content-container">
+
+          <!-- ============================================== -->
+          <!-- PANEL 1: Appearance & Themes                  -->
+          <!-- ============================================== -->
+          <div class="settings-panel active" data-settings-panel="appearance">
+            <div class="ag-panel-heading">
+              <h3 class="ag-panel-title">Appearance & Color Themes</h3>
+              <p class="ag-panel-desc">Customize the workspace color themes and storefront customer widget palette.</p>
+            </div>
+
+            <!-- Workspace Theme Palettes (Linear Swatches) -->
+            <div class="ag-group-label">WORKSPACE THEME PALETTES</div>
+            <div class="ag-theme-grid">
+              
+              <!-- 1. Dark Matte OLED -->
+              <button type="button" class="settings-theme-card ag-theme-card theme-option" data-theme-value="dark-matte">
+                <div class="theme-swatch-canvas theme-canvas-matte">
+                  <div class="theme-swatch-top">
+                    <span class="theme-swatch-chip"></span>
+                    <span class="theme-swatch-accent cyan"></span>
+                  </div>
+                  <div class="theme-swatch-columns">
+                    <div class="theme-swatch-bar"></div>
+                    <div class="theme-swatch-content">
+                      <div class="theme-swatch-line line-1"></div>
+                      <div class="theme-swatch-line line-2"></div>
+                      <div class="theme-swatch-pill cyan"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="ag-theme-caption">
+                  <div class="ag-theme-info">
+                    <span class="ag-theme-title">Dark Matte</span>
+                    <span class="ag-theme-tag">OLED Black • Cyan Accent</span>
+                  </div>
+                  <span class="ag-theme-check-badge">✓</span>
+                </div>
+              </button>
+
+              <!-- 2. Chrome Slate -->
+              <button type="button" class="settings-theme-card ag-theme-card theme-option" data-theme-value="dark-chrome-grey">
+                <div class="theme-swatch-canvas theme-canvas-slate">
+                  <div class="theme-swatch-top">
+                    <span class="theme-swatch-chip"></span>
+                    <span class="theme-swatch-accent blue"></span>
+                  </div>
+                  <div class="theme-swatch-columns">
+                    <div class="theme-swatch-bar"></div>
+                    <div class="theme-swatch-content">
+                      <div class="theme-swatch-line line-1"></div>
+                      <div class="theme-swatch-line line-2"></div>
+                      <div class="theme-swatch-pill blue"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="ag-theme-caption">
+                  <div class="ag-theme-info">
+                    <span class="ag-theme-title">Chrome Slate</span>
+                    <span class="ag-theme-tag">Studio Slate • Electric Blue</span>
+                  </div>
+                  <span class="ag-theme-check-badge">✓</span>
+                </div>
+              </button>
+
+              <!-- 3. Viridian Cyber -->
+              <button type="button" class="settings-theme-card ag-theme-card theme-option" data-theme-value="dark-viridian">
+                <div class="theme-swatch-canvas theme-canvas-viridian">
+                  <div class="theme-swatch-top">
+                    <span class="theme-swatch-chip"></span>
+                    <span class="theme-swatch-accent emerald"></span>
+                  </div>
+                  <div class="theme-swatch-columns">
+                    <div class="theme-swatch-bar"></div>
+                    <div class="theme-swatch-content">
+                      <div class="theme-swatch-line line-1"></div>
+                      <div class="theme-swatch-line line-2"></div>
+                      <div class="theme-swatch-pill emerald"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="ag-theme-caption">
+                  <div class="ag-theme-info">
+                    <span class="ag-theme-title">Viridian Cyber</span>
+                    <span class="ag-theme-tag">Emerald Night • Cyber Mint</span>
+                  </div>
+                  <span class="ag-theme-check-badge">✓</span>
+                </div>
+              </button>
+
+              <!-- 4. Porcelain Mono -->
+              <button type="button" class="settings-theme-card ag-theme-card theme-option" data-theme-value="light-mono">
+                <div class="theme-swatch-canvas theme-canvas-porcelain">
+                  <div class="theme-swatch-top">
+                    <span class="theme-swatch-chip"></span>
+                    <span class="theme-swatch-accent dark"></span>
+                  </div>
+                  <div class="theme-swatch-columns">
+                    <div class="theme-swatch-bar"></div>
+                    <div class="theme-swatch-content">
+                      <div class="theme-swatch-line line-1"></div>
+                      <div class="theme-swatch-line line-2"></div>
+                      <div class="theme-swatch-pill dark"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="ag-theme-caption">
+                  <div class="ag-theme-info">
+                    <span class="ag-theme-title">Porcelain Mono</span>
+                    <span class="ag-theme-tag">Clean White • High Contrast</span>
+                  </div>
+                  <span class="ag-theme-check-badge">✓</span>
+                </div>
+              </button>
+            </div>
+
+            <!-- Grouped Setting Container: Display & Canvas -->
+            <div class="ag-group-label" style="margin-top: 24px;">CANVAS & WORKSPACE DISPLAY</div>
+            <div class="ag-settings-group">
+              
+              <div class="ag-setting-row">
+                <div class="ag-setting-info">
+                  <div class="ag-setting-title">Follow Operating System Theme</div>
+                  <div class="ag-setting-desc">Automatically switch between dark and light modes based on your OS schedule.</div>
+                </div>
+                <div class="ag-setting-control">
+                  <button type="button" class="ag-system-pill theme-option" data-theme-value="system">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                    <span>System Auto</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="ag-setting-row">
+                <div class="ag-setting-info">
+                  <div class="ag-setting-title">Storefront Customer Widget Palette</div>
+                  <div class="ag-setting-desc">Theme mode applied to the customer-facing chat launcher on Wrennon storefront.</div>
+                </div>
+                <div class="ag-setting-control">
+                  <div class="ag-segmented-pills">
+                    <button type="button" class="ag-seg-pill active widget-theme-btn" data-widget-theme="adaptive">Adaptive</button>
+                    <button type="button" class="ag-seg-pill widget-theme-btn" data-widget-theme="dark">Obsidian Dark</button>
+                    <button type="button" class="ag-seg-pill widget-theme-btn" data-widget-theme="crisp">Crisp Light</button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ============================================== -->
+          <!-- PANEL 2: Model & AI Engine (ai-copilot)        -->
+          <!-- ============================================== -->
+          <div class="settings-panel" data-settings-panel="ai-copilot">
+            <div class="ag-panel-heading">
+              <h3 class="ag-panel-title">Model Selection & AI Engine</h3>
+              <p class="ag-panel-desc">Configure the active Gemini LLM reasoning model, inference parameters, and copilot autocomplete.</p>
+            </div>
+
+            <div class="ag-group-label">INFERENCE ENGINE & REASONING</div>
+            <div class="ag-settings-group">
+              
+              <div class="ag-setting-row">
+                <div class="ag-setting-info">
+                  <div class="ag-setting-title">Active AI Model</div>
+                  <div class="ag-setting-desc">Primary Gemini intelligence model powering real-time conversation triage and tool calls.</div>
+                </div>
+                <div class="ag-setting-control">
+                  <select id="settings-model-select" class="ag-select-field">
+                    <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash Tiered (Default • Fast)</option>
+                    <option value="gemini-2.5-pro">Gemini 2.5 Pro (Deep Reasoning • Complex)</option>
+                    <option value="gemini-next-preview">Gemini Next-Gen Preview (Experimental)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="ag-setting-row">
+                <div class="ag-setting-info">
+                  <div class="ag-setting-title">Native Context Window</div>
+                  <div class="ag-setting-desc">Multi-turn context allocated for ticket transcript history, customer metadata, and order items.</div>
+                </div>
+                <div class="ag-setting-control">
+                  <span class="ag-pill-tag cyan">1,000,000 Tokens (1M Native)</span>
+                </div>
+              </div>
+
+              <div class="ag-setting-row">
+                <div class="ag-setting-info">
+                  <div class="ag-setting-title">AI Copilot Response Drafts</div>
+                  <div class="ag-setting-desc">Automatically generate one-click response suggestions upon receiving customer queries.</div>
+                </div>
+                <div class="ag-setting-control">
+                  <label class="ag-toggle-switch">
+                    <input type="checkbox" id="settings-suggestions-switch" checked>
+                    <span class="ag-toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="ag-setting-row">
+                <div class="ag-setting-info">
+                  <div class="ag-setting-title">Smart Macro Autocomplete (Tab)</div>
+                  <div class="ag-setting-desc">Press Tab in the composer to accept action macro suggestions and fast replies.</div>
+                </div>
+                <div class="ag-setting-control">
+                  <label class="ag-toggle-switch">
+                    <input type="checkbox" id="settings-macro-autocomplete" checked>
+                    <span class="ag-toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ============================================== -->
+          <!-- PANEL 3: Tool Policies & Sandbox (execution)   -->
+          <!-- ============================================== -->
+          <div class="settings-panel" data-settings-panel="execution">
+            <div class="ag-panel-heading">
+              <h3 class="ag-panel-title">Tool Execution & Sandbox Policies</h3>
+              <p class="ag-panel-desc">Define autonomous permission boundaries, execution sandboxing, and live viewport streaming.</p>
+            </div>
+
+            <div class="ag-group-label">TOOL EXECUTION & SECURITY POLICIES</div>
+            <div class="ag-settings-group">
+              
+              <div class="ag-setting-row">
+                <div class="ag-setting-info">
+                  <div class="ag-setting-title">Tool Execution Policy</div>
+                  <div class="ag-setting-desc">Controls whether agent actions (database lookups, order refunds, status updates) execute autonomously.</div>
+                </div>
+                <div class="ag-setting-control">
+                  <div class="ag-segmented-pills">
+                    <button type="button" class="ag-seg-pill active" data-policy="always">Always Proceed</button>
+                    <button type="button" class="ag-seg-pill" data-policy="review">Request Review</button>
+                    <button type="button" class="ag-seg-pill" data-policy="strict">Strict Sandbox</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="ag-setting-row">
+                <div class="ag-setting-info">
+                  <div class="ag-setting-title">Auto-Scroll on Live Agent Output</div>
+                  <div class="ag-setting-desc">Keep chat viewport continuously anchored to live WebSocket message arrivals.</div>
+                </div>
+                <div class="ag-setting-control">
+                  <label class="ag-toggle-switch">
+                    <input type="checkbox" id="settings-autoscroll-toggle" checked>
+                    <span class="ag-toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="ag-setting-row">
+                <div class="ag-setting-info">
+                  <div class="ag-setting-title">Terminal & Script Sandbox Mode</div>
+                  <div class="ag-setting-desc">Run backend scripts inside a restricted container environment to isolate workspace storage.</div>
+                </div>
+                <div class="ag-setting-control">
+                  <span class="ag-pill-tag green">Sandbox Active</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ============================================== -->
+          <!-- PANEL 4: Notifications & Audio (notifications) -->
+          <!-- ============================================== -->
+          <div class="settings-panel" data-settings-panel="notifications">
+            <div class="ag-panel-heading">
+              <h3 class="ag-panel-title">Notifications & Audio Alerts</h3>
+              <p class="ag-panel-desc">Configure sound chimes for incoming customer chats and urgent triage alerts.</p>
+            </div>
+
+            <div class="ag-group-label">AUDIO CHIMES</div>
+            <div class="ag-settings-group">
+              
+              <div class="ag-setting-row">
+                <div class="ag-setting-info">
+                  <div class="ag-setting-title">Customer Message Inbound Sound</div>
+                  <div class="ag-setting-desc">Play a gentle auditory chime whenever a customer submits a new message.</div>
+                </div>
+                <div class="ag-setting-control" style="display: flex; align-items: center; gap: 10px;">
+                  <button type="button" id="settings-test-chime-btn" class="ag-secondary-btn">Test Sound</button>
+                  <label class="ag-toggle-switch">
+                    <input type="checkbox" id="settings-sound-toggle" checked>
+                    <span class="ag-toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="ag-setting-row">
+                <div class="ag-setting-info">
+                  <div class="ag-setting-title">Urgent Escalation Chime</div>
+                  <div class="ag-setting-desc">Play high-priority alert chime when a ticket receives an urgent priority escalation.</div>
+                </div>
+                <div class="ag-setting-control" style="display: flex; align-items: center; gap: 10px;">
+                  <button type="button" id="settings-test-urgent-chime-btn" class="ag-secondary-btn">Test Alert</button>
+                  <label class="ag-toggle-switch">
+                    <input type="checkbox" id="settings-urgent-sound-toggle" checked>
+                    <span class="ag-toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+            </div>
+
+            <div class="ag-group-label" style="margin-top: 24px;">SYSTEM DESKTOP NOTIFICATIONS</div>
+            <div class="ag-settings-group">
+              
+              <div class="ag-setting-row">
+                <div class="ag-setting-info">
+                  <div class="ag-setting-title">Browser Desktop Alerts</div>
+                  <div class="ag-setting-desc">Display OS-level notifications when customer messages arrive while the window is in the background.</div>
+                </div>
+                <div class="ag-setting-control">
+                  <button type="button" id="settings-req-desktop-notif-btn" class="ag-secondary-btn">Request OS Permission</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ============================================== -->
+          <!-- PANEL 5: Keyboard Shortcuts (shortcuts)        -->
+          <!-- ============================================== -->
+          <div class="settings-panel" data-settings-panel="shortcuts">
+            <div class="ag-panel-heading">
+              <h3 class="ag-panel-title">Keyboard Shortcuts</h3>
+              <p class="ag-panel-desc">Ergonomic keybindings designed for high-velocity triage and agent pair-programming.</p>
+            </div>
+
+            <div class="ag-shortcuts-grid">
+              
+              <div class="ag-shortcut-card">
+                <div class="ag-shortcut-category">GENERAL & WORKSPACE</div>
+                <div class="ag-shortcut-line">
+                  <span class="ag-shortcut-action">Open Settings & Preferences</span>
+                  <span class="ag-shortcut-keys"><kbd>Ctrl</kbd> + <kbd>,</kbd></span>
+                </div>
+                <div class="ag-shortcut-line">
+                  <span class="ag-shortcut-action">Close Active Modal / Popover</span>
+                  <span class="ag-shortcut-keys"><kbd>ESC</kbd></span>
+                </div>
+                <div class="ag-shortcut-line">
+                  <span class="ag-shortcut-action">Global Search & Command Palette</span>
+                  <span class="ag-shortcut-keys"><kbd>Ctrl</kbd> + <kbd>K</kbd></span>
+                </div>
+                <div class="ag-shortcut-line">
+                  <span class="ag-shortcut-action">Toggle Bulk Multi-Select</span>
+                  <span class="ag-shortcut-keys"><kbd>Ctrl</kbd> + <kbd>B</kbd></span>
+                </div>
+              </div>
+
+              <div class="ag-shortcut-card">
+                <div class="ag-shortcut-category">COMPOSER & CHAT</div>
+                <div class="ag-shortcut-line">
+                  <span class="ag-shortcut-action">Send Message</span>
+                  <span class="ag-shortcut-keys"><kbd>Enter</kbd></span>
+                </div>
+                <div class="ag-shortcut-line">
+                  <span class="ag-shortcut-action">Insert Line Break</span>
+                  <span class="ag-shortcut-keys"><kbd>Shift</kbd> + <kbd>Enter</kbd></span>
+                </div>
+                <div class="ag-shortcut-line">
+                  <span class="ag-shortcut-action">Action Macros Menu</span>
+                  <span class="ag-shortcut-keys"><kbd>/</kbd></span>
+                </div>
+                <div class="ag-shortcut-line">
+                  <span class="ag-shortcut-action">Accept AI Copilot Suggestion</span>
+                  <span class="ag-shortcut-keys"><kbd>Tab</kbd></span>
+                </div>
+              </div>
+
+              <div class="ag-shortcut-card" style="grid-column: span 2;">
+                <div class="ag-shortcut-category">TICKET TRIAGE & QUEUE</div>
+                <div class="ag-shortcut-line">
+                  <span class="ag-shortcut-action">Next Conversation in Queue</span>
+                  <span class="ag-shortcut-keys"><kbd>Alt</kbd> + <kbd>↓</kbd></span>
+                </div>
+                <div class="ag-shortcut-line">
+                  <span class="ag-shortcut-action">Previous Conversation in Queue</span>
+                  <span class="ag-shortcut-keys"><kbd>Alt</kbd> + <kbd>↑</kbd></span>
+                </div>
+                <div class="ag-shortcut-line">
+                  <span class="ag-shortcut-action">Mark Conversation as Resolved</span>
+                  <span class="ag-shortcut-keys"><kbd>Alt</kbd> + <kbd>R</kbd></span>
+                </div>
+                <div class="ag-shortcut-line">
+                  <span class="ag-shortcut-action">Escalate Ticket Priority</span>
+                  <span class="ag-shortcut-keys"><kbd>Alt</kbd> + <kbd>E</kbd></span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ============================================== -->
+          <!-- PANEL 6: Developer & API Keys (api-keys)       -->
+          <!-- ============================================== -->
+          <div class="settings-panel" data-settings-panel="api-keys">
+            <div class="ag-panel-heading">
+              <h3 class="ag-panel-title">Developer & Public API Keys</h3>
+              <p class="ag-panel-desc">Generate secure API keys to integrate external CRM webhooks, Python automation pipelines, or BI dashboards.</p>
+            </div>
+
+            <div class="ag-group-label">GENERATE API CREDENTIALS</div>
+            <div class="ag-settings-group" style="padding: 16px;">
+              <div style="font-size: 13px; font-weight: 600; color: #f1f5f9; margin-bottom: 4px;">Create New Scoped Key</div>
+              <p style="font-size: 12px; color: #64748b; margin-bottom: 14px;">Keys are scoped for programmatic access to conversation history and customer analytics.</p>
+              
+              <div class="ag-keygen-row">
+                <input type="text" id="new-api-key-name" placeholder="Key Description (e.g. Production Webhook Node)" class="ag-input-field">
+                <button type="button" id="create-api-key-btn" class="ag-primary-btn">Generate Key</button>
+              </div>
+
+              <div id="new-api-key-result" class="ag-key-banner" style="display: none;">
+                <div class="ag-key-banner-warning">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                  <span>Copy this secret API key immediately. You will not be able to view it again!</span>
+                </div>
+                <div class="ag-key-banner-row">
+                  <code id="new-api-key-value"></code>
+                  <button type="button" id="copy-api-key-btn" class="ag-secondary-btn" title="Copy to clipboard">
+                    <span id="copy-api-key-text">Copy</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="ag-group-label" style="margin-top: 24px; display: flex; align-items: center; justify-content: space-between;">
+              <span>ACTIVE API KEYS</span>
+              <button type="button" id="settings-refresh-keys-btn" class="ag-refresh-btn" title="Refresh API Keys">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              </button>
+            </div>
+            <div class="ag-settings-group" style="padding: 12px;">
+              <div id="api-keys-list" class="ag-keys-list-container">
+                <div class="ag-empty-state">Loading API keys...</div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- ============================================== -->
+          <!-- PANEL 7: Account & Workspace (account)         -->
+          <!-- ============================================== -->
+          <div class="settings-panel" data-settings-panel="account">
+            <div class="ag-panel-heading">
+              <h3 class="ag-panel-title">Account & Workspace Profile</h3>
+              <p class="ag-panel-desc">Manage active workstation identity, queue availability presence, and session tokens.</p>
+            </div>
+
+            <div class="ag-group-label">ACTIVE AGENT IDENTITY</div>
+            <div class="ag-settings-group" style="padding: 16px;">
+              <div class="ag-profile-card">
+                <img id="settings-agent-avatar" src="images/default-avatar.png" alt="Agent Avatar" class="ag-profile-avatar">
+                <div class="ag-profile-meta">
+                  <div id="settings-agent-name" class="ag-profile-name">Agent User</div>
+                  <div id="settings-agent-role" class="ag-profile-role">Customer Success Specialist</div>
+                  <div class="ag-profile-node">Wrennon Workspace • Production Node 01</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="ag-group-label" style="margin-top: 24px;">QUEUE PRESENCE STATUS</div>
+            <div class="ag-settings-group" style="padding: 16px;">
+              <div class="ag-presence-row">
+                <button type="button" class="ag-presence-pill active status-option" data-status="online">
+                  <span class="ag-pres-dot online"></span>
+                  <span>Online (Available)</span>
+                </button>
+                <button type="button" class="ag-presence-pill status-option" data-status="away">
+                  <span class="ag-pres-dot away"></span>
+                  <span>Away (Break)</span>
+                </button>
+                <button type="button" class="ag-presence-pill status-option" data-status="offline">
+                  <span class="ag-pres-dot offline"></span>
+                  <span>Offline (Hidden)</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="ag-group-label" style="margin-top: 24px;">SESSION SECURITY</div>
+            <div class="ag-settings-group" style="padding: 16px; border-color: rgba(239, 68, 68, 0.25);">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <div style="font-size: 13px; font-weight: 600; color: #ef4444;">Terminate Workstation Session</div>
+                  <div style="font-size: 12px; color: #64748b;">Sign out and clear local cached authorization tokens.</div>
+                </div>
+                <button type="button" id="settings-logout-btn" class="ag-danger-btn">Log Out</button>
+              </div>
+            </div>
+          </div>
+
+        </main>
+      </div>
+
+      <!-- Antigravity Studio Status Bar Footer -->
+      <footer class="ag-modal-footer">
+        <div class="ag-footer-status">
+          <span class="ag-live-pulse-dot"></span>
+          <span>Wrennon Operations Suite • All changes saved</span>
+        </div>
+        <div class="ag-footer-actions">
+          <button type="button" class="ag-link-btn" onclick="window.closeSettingsModal()">Reset to Defaults</button>
+          <button type="button" class="ag-primary-btn ag-done-btn" onclick="window.closeSettingsModal()">Done</button>
+        </div>
+      </footer>
+
+    </div>
+  </div>
+
 
   <!-- Developer Settings Modal -->
   <div id="dev-settings-modal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 1000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(4px);">

@@ -620,25 +620,47 @@
 .bubble-agent::before { border-radius: 50%; background-image: var(--w-agent-avatar); background-color: #E4E8EE; }
 .bubble-bot:has(+ .bubble-bot)::before,
 .bubble-agent:has(+ .bubble-agent)::before,
-.bubble-bot:has(+ .bubble-agent)::before,
-.bubble-agent:has(+ .bubble-bot)::before,
 .bubble-agent.bubble-grouped-prev::before,
 .bubble-bot.bubble-grouped-prev::before { visibility: hidden; }
 
-/* Consecutive messages from the same side read as one clean run (3px gap). */
-.bubble-user.bubble-grouped-prev {
-  border-bottom-right-radius: 5px;
+/* Consecutive messages from the same side read as one clean run (3px gap, straight border line, curve at ending only). */
+.bubble-user:has(+ .bubble-user),
+.bubble-user.bubble-grouped-prev:not(.bubble-grouped-next) {
+  border-bottom-right-radius: 0 !important;
+}
+.bubble-user + .bubble-user:has(+ .bubble-user),
+.bubble-user.bubble-grouped-prev.bubble-grouped-next {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+.bubble-user + .bubble-user:not(:has(+ .bubble-user)),
+.bubble-user.bubble-grouped-next:not(.bubble-grouped-prev) {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 4px !important;
 }
 .bubble-user + .bubble-user,
 .bubble-user.bubble-grouped-next {
   margin-top: -5px !important;
   margin-bottom: 0 !important;
-  border-top-right-radius: 5px;
 }
 
-.bubble-agent.bubble-grouped-prev,
-.bubble-bot.bubble-grouped-prev {
-  border-bottom-left-radius: 5px;
+.bubble-agent:has(+ :is(.bubble-agent, .bubble-bot)),
+.bubble-bot:has(+ :is(.bubble-agent, .bubble-bot)),
+.bubble-agent.bubble-grouped-prev:not(.bubble-grouped-next),
+.bubble-bot.bubble-grouped-prev:not(.bubble-grouped-next) {
+  border-bottom-left-radius: 0 !important;
+}
+:is(.bubble-agent, .bubble-bot) + :is(.bubble-agent, .bubble-bot):has(+ :is(.bubble-agent, .bubble-bot)),
+.bubble-agent.bubble-grouped-prev.bubble-grouped-next,
+.bubble-bot.bubble-grouped-prev.bubble-grouped-next {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+}
+:is(.bubble-agent, .bubble-bot) + :is(.bubble-agent, .bubble-bot):not(:has(+ :is(.bubble-agent, .bubble-bot))),
+.bubble-agent.bubble-grouped-next:not(.bubble-grouped-prev),
+.bubble-bot.bubble-grouped-next:not(.bubble-grouped-prev) {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 4px !important;
 }
 .bubble-agent + .bubble-agent,
 .bubble-bot + .bubble-bot,
@@ -648,7 +670,6 @@
 .bubble-bot.bubble-grouped-next {
   margin-top: -5px !important;
   margin-bottom: 0 !important;
-  border-top-left-radius: 5px;
 }
 
 .bubble-system {
@@ -878,28 +899,44 @@
    Typing indicator + jump button (widget.js builds both by id)
    ========================================================================== */
 #typing-indicator-bar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  align-self: flex-start;
-  width: fit-content;
-  flex-shrink: 0;
-  margin: 0 16px 10px 52px;   /* 16px gutter + 36px avatar column, so it lines up with the bubbles */
-  padding: 12px 14px;
-  background: var(--w-agent-bg);
-  border: 1px solid var(--w-agent-line);
-  border-radius: 18px 18px 18px 6px;
-  box-shadow: 0 1px 2px rgba(20, 32, 28, 0.05);
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  align-self: flex-start !important;
+  width: fit-content !important;
+  flex-shrink: 0 !important;
+  margin-left: 36px !important;
+  margin-top: 6px !important;
+  margin-bottom: 6px !important;
+  padding: 10px 14px !important;
+  background: var(--w-agent-bg) !important;
+  color: var(--w-agent-ink) !important;
+  border: 1px solid var(--w-agent-line) !important;
+  border-left: 2px solid var(--w-brand) !important;
+  border-radius: 18px 18px 18px 4px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03), 0 2px 6px rgba(0, 0, 0, 0.02) !important;
+  clear: both !important;
 }
-#typing-indicator-bar .dot {
+#typing-indicator-bar.hidden {
+  display: none !important;
+}
+.bubble-bot + #typing-indicator-bar,
+.bubble-agent + #typing-indicator-bar,
+.bubble-user + #typing-indicator-bar {
+  margin-top: 6px !important;
+}
+#typing-indicator-bar .dot,
+#typing-indicator-bar .typing-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--w-ink-dim);
+  background: var(--w-brand, var(--w-ink-dim));
   animation: typingBounce 1.3s infinite ease-in-out both;
 }
-#typing-indicator-bar .dot:nth-child(1) { animation-delay: -0.3s; }
-#typing-indicator-bar .dot:nth-child(2) { animation-delay: -0.15s; }
+#typing-indicator-bar .dot:nth-child(1),
+#typing-indicator-bar .typing-dot:nth-child(1) { animation-delay: -0.3s; }
+#typing-indicator-bar .dot:nth-child(2),
+#typing-indicator-bar .typing-dot:nth-child(2) { animation-delay: -0.15s; }
 @keyframes typingBounce {
   0%, 70%, 100% { transform: translateY(0); opacity: 0.4; }
   35%           { transform: translateY(-4px); opacity: 1; }
@@ -957,12 +994,13 @@
   max-height: 120px;
   padding: 10px 14px;
   background: var(--w-field);
-  border: 1px solid transparent;
+  border: 1px solid var(--w-line, #E0DACB);
   border-radius: 16px;
   outline: none;
   resize: none;
   font: 400 14px/20px var(--w-font);
   color: var(--w-ink);
+  box-shadow: 0 1px 3px rgba(20, 32, 28, 0.06);
   transition: background 0.18s, border-color 0.18s, box-shadow 0.18s;
   box-sizing: border-box;
 }
@@ -971,7 +1009,7 @@
 .chat-input-placeholder:focus-visible {
   background: var(--w-white);
   border-color: var(--w-brand);
-  box-shadow: 0 0 0 3px var(--w-ring);
+  box-shadow: 0 0 0 3px var(--w-ring), 0 2px 8px rgba(20, 32, 28, 0.08);
   outline: none;
 }
 
@@ -1079,7 +1117,12 @@
   background: var(--w-white);
   border: 1px solid var(--w-line);
   border-radius: 16px;
-  box-shadow: 0 1px 2px rgba(20, 32, 28, 0.05);
+  box-shadow: 0 4px 12px rgba(20, 32, 28, 0.08);
+  animation: csatEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes csatEnter {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .csat-card__question { margin-bottom: 8px; font-size: 14px; font-weight: 600; letter-spacing: -0.005em; color: var(--w-ink); }
 .csat-card__stars { display: flex; justify-content: center; gap: 4px; }
@@ -1737,7 +1780,8 @@
   }
   #wrennon-widget:not(.theme-light):not([data-theme="light"]) .chat-input-placeholder {
     background: #161E1A;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
     color: #F0F4F2;
   }
   #wrennon-widget:not(.theme-light):not([data-theme="light"]) .chat-input-placeholder::placeholder {
@@ -1747,7 +1791,7 @@
   #wrennon-widget:not(.theme-light):not([data-theme="light"]) .chat-input-placeholder:focus-visible {
     background: #1B2420;
     border-color: #10B981;
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.22);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.22), 0 2px 8px rgba(0, 0, 0, 0.45);
   }
   #wrennon-widget:not(.theme-light):not([data-theme="light"]) .chat-icon-btn {
     color: #889790;
@@ -2129,7 +2173,8 @@
 [data-theme="dark"] #wrennon-widget .chat-input-placeholder,
 [data-widget-theme="dark"] #wrennon-widget .chat-input-placeholder {
   background: #161E1A;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   color: #F0F4F2;
 }
 
@@ -2150,7 +2195,7 @@
 [data-widget-theme="dark"] #wrennon-widget .chat-input-placeholder:focus-visible {
   background: #1B2420;
   border-color: #10B981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.22);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.22), 0 2px 8px rgba(0, 0, 0, 0.45);
 }
 
 #wrennon-widget.theme-dark .chat-icon-btn,
@@ -2226,9 +2271,13 @@
   color: #889790;
 }
 
+#wrennon-widget.theme-dark #typing-indicator-bar .dot,
 #wrennon-widget.theme-dark #typing-indicator-bar .typing-dot,
+#wrennon-widget[data-theme="dark"] #typing-indicator-bar .dot,
 #wrennon-widget[data-theme="dark"] #typing-indicator-bar .typing-dot,
+[data-theme="dark"] #wrennon-widget #typing-indicator-bar .dot,
 [data-theme="dark"] #wrennon-widget #typing-indicator-bar .typing-dot,
+[data-widget-theme="dark"] #wrennon-widget #typing-indicator-bar .dot,
 [data-widget-theme="dark"] #wrennon-widget #typing-indicator-bar .typing-dot {
   background: #10B981;
 }

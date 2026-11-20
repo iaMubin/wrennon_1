@@ -121,6 +121,7 @@ def order_to_dict(o: StoreOrder, include_email: bool = False, include_address: b
         "carrier": o.carrier,
         "tracking_number": o.tracking_number,
         "tracking_url": o.tracking_url,
+        "invoice_url": f"https://wrennon.com/invoice/{o.order_id}",
         "eta": o.eta.isoformat() if o.eta else None,
         "items_count": sum(i.quantity for i in o.items),
         "items": [

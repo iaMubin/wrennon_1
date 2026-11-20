@@ -1,11 +1,22 @@
 // ── Backend URL detection ──────────────────────────────────────────
 const _RENDER_HOST = "wrennon-1.onrender.com";
-const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const BACKEND_URL = IS_LOCAL ? `${window.location.protocol}//${window.location.host}` : `https://${_RENDER_HOST}`;
+const isLocalHost = window.location.hostname === 'localhost' || 
+                    window.location.hostname === '127.0.0.1' || 
+                    window.location.hostname === '0.0.0.0' || 
+                    window.location.protocol === 'file:' || 
+                    !window.location.hostname;
+
+const localBackendHost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? (window.location.host || '127.0.0.1:8000')
+  : '127.0.0.1:8000';
+
+const BACKEND_URL = isLocalHost 
+  ? `${window.location.protocol === 'https:' ? 'https:' : 'http:'}//${localBackendHost}`
+  : `https://${_RENDER_HOST}`;
 
 const API_BASE = `${BACKEND_URL}/api`;
-const WS_URL = IS_LOCAL 
-  ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws/agent`
+const WS_URL = isLocalHost 
+  ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${localBackendHost}/ws/agent`
   : `wss://${_RENDER_HOST}/ws/agent`;
 
 window.showToast = function(msg, type = 'info') {
@@ -134,6 +145,14 @@ function updateSuggestionsUI() {
   if (pill) {
     pill.textContent = agentSuggestionsEnabled ? "On" : "Off";
   }
+  const switchEl = document.getElementById("settings-suggestions-switch");
+  if (switchEl) {
+    switchEl.checked = !!agentSuggestionsEnabled;
+  }
+  const statusEl = document.getElementById("settings-suggestions-status-pill");
+  if (statusEl) {
+    statusEl.textContent = agentSuggestionsEnabled ? "Active (Synced to server)" : "Disabled";
+  }
 }
 
 async function setSuggestionsEnabled(enabled, saveToBackend = true) {
@@ -162,6 +181,385 @@ if (initialSavedUsername) {
   agentSuggestionsEnabled = localPref !== "false";
 } else {
   agentSuggestionsEnabled = true;
+}
+
+// ── Audio & Notification Chimes ──────────────────────────────────
+function playChime(type = "message") {
+  const soundEnabled = localStorage.getItem("wrennon_sound_notifications") !== "false";
+  if (!soundEnabled) return;
+  if (type === "urgent" && localStorage.getItem("wrennon_urgent_sound") === "false") return;
+
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    if (ctx.state === "suspended") {
+      ctx.resume();
+    }
+    const now = ctx.currentTime;
+
+    if (type === "urgent") {
+      // 2-tone alert chime (F5 to A5)
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(698.46, now); // F5
+      osc.frequency.exponentialRampToValueAtTime(880.00, now + 0.14); // A5
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.42);
+    } else {
+      // Soft executive 3-tone arpeggio (E5, G#5, B5)
+      const notes = [659.25, 830.61, 987.77];
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        const startTime = now + (i * 0.07);
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0.12, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.38);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + 0.38);
+      });
+    }
+  } catch (err) {
+    console.debug("Web Audio chime notice:", err);
+  }
+}
+
+function updateSettingsLiveClock() {
+  const clockEl = document.getElementById("settings-live-clock");
+  const tzEl = document.getElementById("settings-live-timezone");
+  if (!clockEl) return;
+  
+  const now = new Date();
+  const format = localStorage.getItem("wrennon_time_format") || "12h";
+  let timeStr = "";
+  if (format === "24h") {
+    timeStr = now.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  } else {
+    timeStr = now.toLocaleTimeString([], { hour12: true, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+  
+  const dateStr = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  clockEl.textContent = `${dateStr} · ${timeStr}`;
+  
+  if (tzEl) {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local Time";
+      const offsetMinutes = -now.getTimezoneOffset();
+      const offsetHours = Math.floor(Math.abs(offsetMinutes) / 60);
+      const offsetMins = Math.abs(offsetMinutes) % 60;
+      const gmtSign = offsetMinutes >= 0 ? "+" : "-";
+      const gmtStr = `GMT${gmtSign}${offsetHours.toString().padStart(2, '0')}:${offsetMins.toString().padStart(2, '0')}`;
+      tzEl.textContent = `${tz} (${gmtStr})`;
+    } catch (e) {
+      tzEl.textContent = "Local System Timezone";
+    }
+  }
+}
+
+function syncSettingsAccountInfo() {
+  const avatar = document.getElementById("settings-agent-avatar");
+  const nameEl = document.getElementById("settings-agent-name");
+  const roleEl = document.getElementById("settings-agent-role");
+  const profileDp = document.getElementById("agent-profile-dp");
+  const profileName = document.getElementById("profile-dropdown-name");
+  const profileRole = document.getElementById("profile-dropdown-role");
+
+  if (avatar) {
+    const dp = localStorage.getItem("agent_dp_url") || (profileDp && profileDp.src);
+    if (dp) avatar.src = dp;
+  }
+  if (nameEl) {
+    const fullName = localStorage.getItem("agent_full_name");
+    const username = localStorage.getItem("agent_username");
+    nameEl.textContent = fullName || username || (profileName && profileName.textContent) || "Active Agent";
+  }
+  if (roleEl) {
+    const role = localStorage.getItem("agent_role");
+    roleEl.textContent = role || (profileRole && profileRole.textContent) || "Customer Support Specialist";
+  }
+}
+
+function updateDesktopNotifUI() {
+  const badge = document.getElementById("settings-desktop-notif-badge");
+  const text = document.getElementById("settings-desktop-notif-text");
+  const btn = document.getElementById("settings-req-desktop-notif-btn");
+  if (!badge || !text) return;
+  if (!window.Notification) {
+    badge.className = "settings-notif-status-badge";
+    text.textContent = "Unsupported";
+    if (btn) btn.disabled = true;
+    return;
+  }
+  const perm = Notification.permission;
+  if (perm === "granted") {
+    badge.className = "settings-notif-status-badge granted";
+    text.textContent = "Enabled & Allowed";
+    if (btn) {
+      btn.textContent = "Permission Granted";
+      btn.disabled = true;
+    }
+  } else if (perm === "denied") {
+    badge.className = "settings-notif-status-badge";
+    text.textContent = "Blocked in Browser";
+    if (btn) {
+      btn.textContent = "Blocked in Browser Settings";
+      btn.disabled = true;
+    }
+  } else {
+    badge.className = "settings-notif-status-badge";
+    text.textContent = "Not Enabled";
+    if (btn) {
+      btn.textContent = "Request Browser Permission";
+      btn.disabled = false;
+    }
+  }
+}
+
+function setupSettingsModal() {
+  const modal = document.getElementById("settings-modal");
+  if (!modal) return;
+
+  window.openSettingsModal = function(tabName = "appearance") {
+    modal.classList.remove("hidden");
+    modal.style.display = "flex";
+    
+    // Activate tab
+    if (tabName) {
+      const navItems = modal.querySelectorAll(".settings-nav-item");
+      const panels = modal.querySelectorAll(".settings-panel");
+      navItems.forEach(item => {
+        item.classList.toggle("active", item.dataset.settingsTab === tabName);
+      });
+      panels.forEach(panel => {
+        panel.classList.toggle("active", panel.dataset.settingsPanel === tabName);
+      });
+      if (tabName === "api-keys" && typeof window.loadApiKeys === "function") {
+        window.loadApiKeys();
+      }
+    }
+    syncSettingsAccountInfo();
+    updateDesktopNotifUI();
+    updateSettingsLiveClock();
+    updateSuggestionsUI();
+  };
+
+  window.closeSettingsModal = function() {
+    modal.classList.add("hidden");
+    modal.style.display = "none";
+  };
+
+  // Close button
+  const closeBtn = document.getElementById("settings-modal-close-btn");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      window.closeSettingsModal();
+    });
+  }
+
+  // Backdrop click to close
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      window.closeSettingsModal();
+    }
+  });
+
+  // Instant, lag-free Tab switching
+  const navItems = modal.querySelectorAll(".settings-nav-item[data-settings-tab]");
+  navItems.forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const targetTab = btn.getAttribute("data-settings-tab");
+      if (targetTab) {
+        window.openSettingsModal(targetTab);
+      }
+    });
+  });
+
+  // Keyboard shortcut: Ctrl+, or Cmd+,
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+      e.preventDefault();
+      if (!modal.classList.contains("hidden") && modal.style.display !== "none") {
+        window.closeSettingsModal();
+      } else {
+        window.openSettingsModal("appearance");
+      }
+    } else if (e.key === "Escape") {
+      if (!modal.classList.contains("hidden") && modal.style.display !== "none") {
+        window.closeSettingsModal();
+      }
+    }
+  });
+
+  // Clock interval
+  setInterval(updateSettingsLiveClock, 1000);
+  updateSettingsLiveClock();
+
+  // Notification audio controls
+  const soundToggle = document.getElementById("settings-sound-toggle");
+  if (soundToggle) {
+    soundToggle.checked = localStorage.getItem("wrennon_sound_notifications") !== "false";
+    soundToggle.addEventListener("change", () => {
+      localStorage.setItem("wrennon_sound_notifications", soundToggle.checked ? "true" : "false");
+    });
+  }
+
+  const urgentSoundToggle = document.getElementById("settings-urgent-sound-toggle");
+  if (urgentSoundToggle) {
+    urgentSoundToggle.checked = localStorage.getItem("wrennon_urgent_sound") !== "false";
+    urgentSoundToggle.addEventListener("change", () => {
+      localStorage.setItem("wrennon_urgent_sound", urgentSoundToggle.checked ? "true" : "false");
+    });
+  }
+
+  const testChimeBtn = document.getElementById("settings-test-chime-btn");
+  if (testChimeBtn) {
+    testChimeBtn.addEventListener("click", () => playChime("message"));
+  }
+
+  const testUrgentBtn = document.getElementById("settings-test-urgent-chime-btn");
+  if (testUrgentBtn) {
+    testUrgentBtn.addEventListener("click", () => playChime("urgent"));
+  }
+
+  // Desktop notification permission
+  const reqNotifBtn = document.getElementById("settings-req-desktop-notif-btn");
+  if (reqNotifBtn) {
+    reqNotifBtn.addEventListener("click", async () => {
+      if (window.Notification) {
+        await Notification.requestPermission();
+        updateDesktopNotifUI();
+      }
+    });
+  }
+
+  // AI suggestions switch
+  const suggestionsSwitch = document.getElementById("settings-suggestions-switch");
+  if (suggestionsSwitch) {
+    suggestionsSwitch.addEventListener("change", () => {
+      setSuggestionsEnabled(suggestionsSwitch.checked, true);
+    });
+  }
+
+  // Auto-scroll toggle
+  const autoscrollToggle = document.getElementById("settings-autoscroll-toggle");
+  if (autoscrollToggle) {
+    autoscrollToggle.checked = localStorage.getItem("wrennon_autoscroll") !== "false";
+    autoscrollToggle.addEventListener("change", () => {
+      localStorage.setItem("wrennon_autoscroll", autoscrollToggle.checked ? "true" : "false");
+    });
+  }
+
+  // Refresh API keys button
+  const refreshKeysBtn = document.getElementById("settings-refresh-keys-btn");
+  if (refreshKeysBtn) {
+    refreshKeysBtn.addEventListener("click", () => {
+      if (typeof window.loadApiKeys === "function") {
+        window.loadApiKeys();
+      }
+    });
+  }
+
+  // Settings logout button
+  const settingsLogoutBtn = document.getElementById("settings-logout-btn");
+  if (settingsLogoutBtn) {
+    settingsLogoutBtn.addEventListener("click", () => {
+      const logoutBtn = document.getElementById("profile-logout-btn") || document.getElementById("logout-btn");
+      if (logoutBtn) logoutBtn.click();
+    });
+  }
+
+  // Presence status buttons in Settings Modal
+  const presenceBtns = modal.querySelectorAll(".settings-presence-btn");
+  presenceBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const status = btn.dataset.status;
+      presenceBtns.forEach(b => b.classList.toggle("active", b === btn));
+      // Trigger corresponding status-option in profile dropdown if available
+      const match = document.querySelector(`#profile-dropdown .status-option[data-status="${status}"]`);
+      if (match) {
+        match.click();
+      } else {
+        const connectionDot = document.getElementById("connection-dot");
+        if (connectionDot) {
+          connectionDot.className = "dot";
+          connectionDot.style.backgroundColor = "";
+          if (status === "online") connectionDot.classList.add("dot--online");
+          else if (status === "offline") connectionDot.classList.add("dot--offline");
+          else if (status === "away") connectionDot.style.backgroundColor = "var(--warning)";
+        }
+      }
+    });
+  });
+
+  // Scope switcher: Global vs Workspace
+  const scopeBtns = modal.querySelectorAll(".ag-scope-btn");
+  scopeBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      scopeBtns.forEach(b => {
+        b.classList.toggle("active", b === btn);
+        b.setAttribute("aria-selected", b === btn ? "true" : "false");
+      });
+    });
+  });
+
+  // Tool policy segmented pills
+  const policyBtns = modal.querySelectorAll("[data-policy]");
+  policyBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      policyBtns.forEach(b => b.classList.toggle("active", b === btn));
+      localStorage.setItem("wrennon_tool_policy", btn.dataset.policy);
+    });
+  });
+
+  // Antigravity Studio Live Search Filter
+  const searchInput = document.getElementById("settings-search-input");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      const activePanel = modal.querySelector(".settings-panel.active");
+      if (!activePanel) return;
+
+      const items = activePanel.querySelectorAll(".ag-setting-row, .ag-theme-card, .ag-shortcut-line, .ag-shortcut-card, .settings-card, .settings-theme-card, .shortcut-item");
+      items.forEach(item => {
+        if (!q) {
+          item.style.display = "";
+        } else {
+          const text = (item.textContent || "").toLowerCase();
+          item.style.display = text.includes(q) ? "" : "none";
+        }
+      });
+    });
+
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && searchInput.value) {
+        e.stopPropagation();
+        searchInput.value = "";
+        searchInput.dispatchEvent(new Event("input"));
+      }
+    });
+  }
+
+  // Ctrl+F / Cmd+K to focus search input inside modal
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "k" || e.key.toLowerCase() === "f")) {
+      if (!modal.classList.contains("hidden") && modal.style.display !== "none") {
+        e.preventDefault();
+        if (searchInput) searchInput.focus();
+      }
+    }
+  });
 }
 
 // ── Theme Management ───────────────────────────────────────────────
@@ -215,20 +613,18 @@ function setupThemeDropdown() {
     });
   }
 
+  setupSettingsModal();
+
   menuBtn.addEventListener("click", (e) => {
+    e.preventDefault();
     e.stopPropagation();
-    const isExpanded = menuBtn.getAttribute("aria-expanded") === "true";
-    menuBtn.setAttribute("aria-expanded", !isExpanded);
-    dropdown.classList.toggle("hidden");
-
-    if (!dropdown.classList.contains("hidden") && menuMainView) {
-      menuMainView.classList.remove("hidden");
-      if (menuAppearanceView) menuAppearanceView.classList.add("hidden");
-      if (menuTimeFormatView) menuTimeFormatView.classList.add("hidden");
-    }
-
-    if (!isExpanded && options.length > 0) {
-      options[0].focus();
+    if (dropdown) dropdown.classList.add("hidden");
+    const profileDropdown = document.getElementById("profile-dropdown");
+    if (profileDropdown) profileDropdown.classList.add("hidden");
+    if (typeof window.openSettingsModal === "function") {
+      window.openSettingsModal("appearance");
+    } else {
+      dropdown.classList.toggle("hidden");
     }
   });
 
@@ -309,11 +705,14 @@ function setupThemeDropdown() {
   });
 
   options.forEach(opt => {
-    opt.addEventListener("click", () => {
-      if (!opt.dataset.themeValue) return; // Don't trigger theme change for submenu navigation buttons
+    opt.addEventListener("click", (e) => {
+      if (!opt.dataset.themeValue) return;
       applyTheme(opt.dataset.themeValue);
-      dropdown.classList.add("hidden");
-      menuBtn.setAttribute("aria-expanded", "false");
+      // Only close dropdown if clicked inside the legacy popover, NOT inside settings-modal
+      if (opt.closest("#theme-dropdown")) {
+        dropdown.classList.add("hidden");
+        menuBtn.setAttribute("aria-expanded", "false");
+      }
     });
   });
 
@@ -433,6 +832,12 @@ agentInput.addEventListener("input", (e) => {
   agentInput.style.height = newHeight + 'px';
   agentInput.style.overflowY = agentInput.scrollHeight > 120 ? 'auto' : 'hidden';
 
+  if (agentInput.value.length > 0) {
+    stopRotatingPlaceholder();
+  } else {
+    resumeRotatingPlaceholderIfNeeded();
+  }
+
   if (!activeSessionId || !socket || socket.readyState !== WebSocket.OPEN) return;
   const isInternal = noteTypeSelect && noteTypeSelect.value === "internal";
   if (isInternal) return; // Don't broadcast typing for internal notes
@@ -477,7 +882,7 @@ loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   loginError.classList.add("hidden");
 
-  const username = document.getElementById("username").value;
+  const username = (document.getElementById("username").value || "").trim();
   const password = document.getElementById("password").value;
   const body = new URLSearchParams({ username, password });
 
@@ -490,6 +895,8 @@ loginForm.addEventListener("submit", async (e) => {
     });
 
     if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      loginError.textContent = errData.detail || "Incorrect username or password.";
       loginError.classList.remove("hidden");
       return;
     }
@@ -631,6 +1038,20 @@ function connectSocket() {
         fetchOrderContext(data.session_id);
         updateResolveUI(!!data.is_resolved, data.updated_at);
       }
+      // Audio notification chime & desktop push for incoming customer replies
+      if (data.sender === "human" || data.sender === "user") {
+        playChime("message");
+        if (document.hidden && window.Notification && Notification.permission === "granted") {
+          try {
+            new Notification("New Customer Message", {
+              body: data.content ? (data.content.length > 80 ? data.content.slice(0, 77) + "..." : data.content) : "Customer sent a message",
+              icon: "images/default-avatar.png"
+            });
+          } catch (e) {
+            console.debug("Notification display error:", e);
+          }
+        }
+      }
       loadConversations();
     } else if (data.type === "typing" || data.type === "stopped_typing") {
       // Customer -> agent typing indicator (mirrors the agent -> customer
@@ -647,9 +1068,38 @@ function connectSocket() {
       if (data.session_id === activeSessionId) {
         renderCollisionBadge(data.viewers || []);
       }
+    } else if (data.type === "csat_submitted") {
+      if (data.session_id === activeSessionId) {
+        renderCsatBadge(data.rating, data.comment);
+      }
+      const conv = conversations.find(c => c.session_id === data.session_id);
+      if (conv) {
+        conv.csat_rating = data.rating;
+        conv.csat_comment = data.comment;
+      }
+      loadConversations();
+      if (window.showToast) {
+        const starStr = "★".repeat(data.rating) + "☆".repeat(5 - data.rating);
+        window.showToast(`⭐ Customer rating received for session ${data.session_id.substring(0,8)}: ${starStr} (${data.rating}/5)`, "success");
+      }
+    } else if (data.type === "conversation_resolved") {
+      if (data.session_id === activeSessionId) {
+        updateResolveUI(true, data.resolved_at || new Date().toISOString());
+      }
+      const conv = conversations.find(c => c.session_id === data.session_id);
+      if (conv) {
+        conv.resolved = true;
+        conv.resolved_at = data.resolved_at;
+        conv.handled_by = data.handled_by;
+      }
+      loadConversations();
     } else if (data.type === "low_csat_alert") {
       if (window.showToast) {
         window.showToast(`🚨 Low CSAT Alert! Session ${data.session_id.substring(0,8)} received a ${data.rating}-star rating: "${data.comment || 'No comment'}"`, 'error');
+      }
+    } else if (data.type === "customer_presence") {
+      if (window.CustomerPanel && typeof window.CustomerPanel.setCustomerPresence === "function") {
+        window.CustomerPanel.setCustomerPresence(data.session_id, data.is_online, data.email);
       }
     } else if (data.type === "presence") {
       const badge = document.getElementById("team-online-badge");
@@ -1312,11 +1762,7 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
     (currentRole !== "agent" || currentAuthor === prevAuthor || !prevAuthor || !currentAuthor)
   );
 
-  const isGrouped = Boolean(
-    isSameSender &&
-    prevTimestamp &&
-    Math.abs(timestamp - prevTimestamp) < 600000 // 10 minutes cluster threshold (standard)
-  );
+  const isGrouped = Boolean(isSameSender);
 
   if (isGrouped && prevWrapper) {
     // Hide previous bubble's timestamp so only the latest in the burst shows the time
@@ -1383,6 +1829,11 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
   
   // Format message content
   let displayContent = content || "";
+
+  // Never render raw internal system events (e.g. [SYSTEM_EVENT: page_stall]) in the chat thread
+  if (displayContent && displayContent.includes("[SYSTEM_EVENT:")) {
+    return;
+  }
     
   // Feature: Hide internal image descriptions from agent UI
   displayContent = displayContent.replace(/\[INTERNAL_IMAGE_DESC\][\s\S]*?\[\/INTERNAL_IMAGE_DESC\]/g, '');
@@ -1426,7 +1877,29 @@ function appendMessage(sender, content, isoString = new Date().toISOString(), is
     div.classList.add("msg--voice-only");
   }
 
-  if (isInternal) {
+  if (actualSender === "system" && (displayContent.includes("📋") || /^summary\s*:/i.test(displayContent.trim()))) {
+    const rawSummary = displayContent.replace(/^[📋\s]+/, '').replace(/^summary\s*:\s*/i, '').trim();
+    contentWrapper.className = "msg-content msg-content--ai-summary";
+    div.className = "msg msg--ai-summary";
+    div.innerHTML = `
+      <div class="modern-ai-summary-content">
+        <div class="modern-ai-summary-header">
+          <span class="modern-ai-summary-icon" title="Summary" aria-label="Summary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+          </span>
+        </div>
+        <div class="modern-ai-summary-body">
+          ${renderMarkdown(rawSummary)}
+        </div>
+      </div>
+    ` + transcriptHtml;
+  } else if (isInternal) {
     displayContent = displayContent.replace(/^\*Internal Note:\* /, "");
     div.innerHTML = nameHtml + replyHtml + renderMarkdown(displayContent) + transcriptHtml;
   } else {
@@ -1964,6 +2437,113 @@ if (sendToggleBtn && sendTypeMenu) {
   });
 }
 
+// ── Dynamic Rotating Typing Placeholders for Agent Composer ──
+const COMPOSER_PLACEHOLDERS = {
+  public: [
+    "Type a message...",
+    "Type / for actions & macros...",
+    "Press Shift + Enter for a new line...",
+    "Type @ to mention team members...",
+    "Paste or drag & drop images to attach..."
+  ],
+  internal: [
+    "Add an internal note...",
+    "Type @ to mention teammates...",
+    "Type / for internal note macros...",
+    "Internal notes are visible to agents only..."
+  ]
+};
+
+let placeholderTimer = null;
+let currentPlaceholderMode = "public";
+let placeholderMsgIndex = 0;
+let placeholderCharIndex = 0;
+let isPlaceholderDeleting = false;
+
+function tickRotatingPlaceholder() {
+  if (!agentInput) return;
+
+  // Don't animate if user is typing, input has value, element is disabled, or tab is hidden
+  if (agentInput.value.length > 0 || agentInput.disabled || document.hidden) {
+    placeholderTimer = null;
+    return;
+  }
+
+  const list = COMPOSER_PLACEHOLDERS[currentPlaceholderMode] || COMPOSER_PLACEHOLDERS.public;
+  const currentText = list[placeholderMsgIndex % list.length];
+
+  if (isPlaceholderDeleting) {
+    placeholderCharIndex--;
+    agentInput.placeholder = currentText.substring(0, placeholderCharIndex);
+
+    if (placeholderCharIndex <= 0) {
+      isPlaceholderDeleting = false;
+      placeholderMsgIndex = (placeholderMsgIndex + 1) % list.length;
+      placeholderTimer = setTimeout(tickRotatingPlaceholder, 300);
+      return;
+    }
+
+    placeholderTimer = setTimeout(tickRotatingPlaceholder, 20);
+  } else {
+    placeholderCharIndex++;
+    agentInput.placeholder = currentText.substring(0, placeholderCharIndex);
+
+    if (placeholderCharIndex >= currentText.length) {
+      isPlaceholderDeleting = true;
+      placeholderTimer = setTimeout(tickRotatingPlaceholder, 2800);
+      return;
+    }
+
+    placeholderTimer = setTimeout(tickRotatingPlaceholder, 38);
+  }
+}
+
+function startRotatingPlaceholder(mode = "public") {
+  if (placeholderTimer) {
+    clearTimeout(placeholderTimer);
+    placeholderTimer = null;
+  }
+  currentPlaceholderMode = mode;
+  isPlaceholderDeleting = false;
+  
+  if (!agentInput) return;
+  if (agentInput.value.length > 0) return;
+
+  const list = COMPOSER_PLACEHOLDERS[currentPlaceholderMode] || COMPOSER_PLACEHOLDERS.public;
+  const currentText = list[placeholderMsgIndex % list.length];
+  agentInput.placeholder = currentText;
+  placeholderCharIndex = currentText.length;
+  isPlaceholderDeleting = true;
+  placeholderTimer = setTimeout(tickRotatingPlaceholder, 2800);
+}
+
+function stopRotatingPlaceholder() {
+  if (placeholderTimer) {
+    clearTimeout(placeholderTimer);
+    placeholderTimer = null;
+  }
+}
+
+function resumeRotatingPlaceholderIfNeeded() {
+  if (!agentInput) return;
+  if (agentInput.value.length === 0 && !placeholderTimer && !agentInput.disabled) {
+    const list = COMPOSER_PLACEHOLDERS[currentPlaceholderMode] || COMPOSER_PLACEHOLDERS.public;
+    const currentText = list[placeholderMsgIndex % list.length];
+    agentInput.placeholder = currentText;
+    placeholderCharIndex = currentText.length;
+    isPlaceholderDeleting = true;
+    placeholderTimer = setTimeout(tickRotatingPlaceholder, 2800);
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    stopRotatingPlaceholder();
+  } else {
+    resumeRotatingPlaceholderIfNeeded();
+  }
+});
+
 if (noteTypeSelect && chatInputWrapper) {
   const chatFooterWrapper = document.getElementById("chat-footer-wrapper");
   const internalNoteBanner = document.getElementById("internal-note-banner");
@@ -1984,16 +2564,16 @@ if (noteTypeSelect && chatInputWrapper) {
       chatInputWrapper.classList.add("internal-mode");
       chatFooterWrapper?.classList.add("internal-mode");
       internalNoteBanner?.classList.remove("hidden");
-      agentInput.placeholder = "Add an internal note...";
       if (modeBadge) modeBadge.textContent = "Note";
       if (sendBtn) sendBtn.title = "Add internal note (Enter)";
+      startRotatingPlaceholder("internal");
     } else {
       chatInputWrapper.classList.remove("internal-mode");
       chatFooterWrapper?.classList.remove("internal-mode");
       internalNoteBanner?.classList.add("hidden");
-      agentInput.placeholder = "Type a message...";
       if (modeBadge) modeBadge.textContent = "Reply";
       if (sendBtn) sendBtn.title = "Send public reply (Enter)";
+      startRotatingPlaceholder("public");
     }
   }
 
@@ -2010,6 +2590,11 @@ if (noteTypeSelect && chatInputWrapper) {
     updatePlaceholder();
     agentInput.focus();
   });
+
+  // Start rotating placeholder on load
+  updatePlaceholder();
+} else if (agentInput) {
+  startRotatingPlaceholder("public");
 }
 
 document.addEventListener("keydown", (e) => {
@@ -2142,6 +2727,7 @@ function sendAgentReply() {
   agentInput.style.height = "26px";
   agentInput.style.overflowY = "hidden";
   document.getElementById("slash-command-popup")?.classList.remove("active");
+  resumeRotatingPlaceholderIfNeeded();
 }
 
 // --- Order Context Popup ---
@@ -2156,7 +2742,7 @@ async function fetchOrderContext(sessionId) {
     
     if (result.customer) {
       window.WRENNON_DEMO = result.demo === true;
-      showCustomerSidebar(result.customer, result.demo === true);
+      showCustomerSidebar(result.customer, result.demo === true, result.order);
       if (sessionId === activeSessionId && result.customer.name) {
         conversationEmail.textContent = result.customer.name;
         // Re-render pinned banner with the resolved customer name
@@ -2280,12 +2866,13 @@ function showOrderPopup(order, customer) {
       availableFields.push({ label: 'ETA', value: escapeHtml(order.eta) });
   }
   
-  if (order.payment_method) {
-      let paymentBadge = `<span style="padding: 1px 4px; background: color-mix(in srgb, var(--ink) 8%, transparent); border-radius: 4px; font-family: var(--font-sans); font-size: 10px; font-weight: 600; color: var(--ink); text-transform: none; letter-spacing: normal;">${escapeHtml(order.payment_method)}</span>`;
-      let labelHtml = `<span style="display:flex; align-items:center; gap: 4px;">Payment ${paymentBadge}</span>`;
+  const invoiceUrl = order.invoice_url || (order.order_id ? `https://wrennon.com/invoice/${order.order_id}` : null);
+  if (order.payment_method || invoiceUrl) {
+      let paymentBadge = order.payment_method ? `<span style="padding: 1px 4px; background: color-mix(in srgb, var(--ink) 8%, transparent); border-radius: 4px; font-family: var(--font-sans); font-size: 10px; font-weight: 600; color: var(--ink); text-transform: none; letter-spacing: normal;">${escapeHtml(order.payment_method)}</span>` : '';
+      let labelHtml = `<span style="display:flex; align-items:center; gap: 4px;">${order.payment_method ? 'Payment ' : 'Invoice'}${paymentBadge}</span>`;
       let valueHtml = '';
-      if (order.invoice_url) {
-          valueHtml = `<div style="display: flex; align-items: center; gap: 4px; line-height: 1.2; min-width: 0;"><a href="${escapeAttr(safeHttpUrl(order.invoice_url))}" target="_blank" rel="noopener noreferrer" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; display: inline-block;">View Invoice</a><button class="icon-action-btn" style="padding: 2px; height: 18px; width: 18px; margin: 0; min-height: 0; min-width: 0; flex-shrink: 0;" data-copy="${escapeAttr(safeHttpUrl(order.invoice_url))}" onclick="navigator.clipboard.writeText(this.dataset.copy)" title="Copy invoice URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>`;
+      if (invoiceUrl) {
+          valueHtml = `<div style="display: flex; align-items: center; gap: 4px; line-height: 1.2; min-width: 0;"><a href="${escapeAttr(safeHttpUrl(invoiceUrl))}" target="_blank" rel="noopener noreferrer" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; display: inline-block; color: var(--accent); font-weight: 600; text-decoration: underline;" title="${escapeAttr(safeHttpUrl(invoiceUrl))}">View Invoice</a><button class="icon-action-btn" style="padding: 2px; height: 18px; width: 18px; margin: 0; min-height: 0; min-width: 0; flex-shrink: 0;" data-copy="${escapeAttr(safeHttpUrl(invoiceUrl))}" onclick="navigator.clipboard.writeText(this.dataset.copy); if (window.showToast) window.showToast('Invoice link copied', 'info');" title="Copy invoice URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>`;
       } else {
           valueHtml = `<span style="color: var(--text-muted);">No invoice link</span>`;
       }
@@ -3406,7 +3993,7 @@ function extractAndShowCustomerDetails(text) {
 }
 
 // The panel itself lives in customer-panel.js; these keep the older call sites working.
-function showCustomerSidebar(customer, isDemo = false) { if (window.CustomerPanel) window.CustomerPanel.setOrderContext(customer, isDemo); }
+function showCustomerSidebar(customer, isDemo = false, order = null) { if (window.CustomerPanel) window.CustomerPanel.setOrderContext(customer, isDemo, order); }
 function hideCustomerSidebar() { if (window.CustomerPanel) window.CustomerPanel.hide(); }
 function clearCustomerSidebar() { if (window.CustomerPanel) window.CustomerPanel.reset(); }
 
@@ -3570,6 +4157,8 @@ async function saveTicketProperty(fields) {
   renderTagChips(currentTicketProperties.tags);
   loadConversations(); // list rows show priority/tags too, keep them in sync
 }
+window.saveTicketProperty = saveTicketProperty;
+window.getCurrentTicketProperties = () => currentTicketProperties;
 
 function updateViaMediaPosition() {
   const session = document.getElementById("conversation-session");
@@ -5414,10 +6003,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 orders.forEach(o => {
                     const card = document.createElement('div');
                     card.className = 'drawer-record-card';
+                    const invUrl = o.invoice_url || (o.order_id ? `https://wrennon.com/invoice/${o.order_id}` : null);
                     card.innerHTML = `
                         <div>
                             <div style="font-weight: 600; color: var(--ink); font-size: 13px;">Order #${o.order_id}</div>
-                            <div style="font-size: 11.5px; color: var(--ink-soft);">${o.order_date || 'Recent'} • ${o.carrier || 'FedEx'}</div>
+                            <div style="font-size: 11.5px; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+                                <span>${o.order_date || 'Recent'} • ${o.carrier || 'FedEx'}</span>
+                                ${invUrl ? `• <a href="${escapeAttr(safeHttpUrl(invUrl))}" target="_blank" rel="noopener noreferrer" style="color: var(--accent); font-weight: 500; text-decoration: underline;">Invoice</a>` : ''}
+                            </div>
                         </div>
                         <div style="text-align: right;">
                             <div style="font-weight: 700; color: var(--ink);">${o.total_amount || '$0.00'}</div>
@@ -5627,17 +6220,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!devSettingsBtn || !devSettingsModal) return;
 
-    devSettingsBtn.addEventListener('click', () => {
+    window.loadApiKeys = loadApiKeys;
+
+    devSettingsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
         // Hide theme dropdown if open
         const themeDropdown = document.getElementById('theme-dropdown');
         if (themeDropdown) themeDropdown.classList.add('hidden');
         
-        devSettingsModal.style.display = 'flex';
-        loadApiKeys();
+        if (typeof window.openSettingsModal === 'function') {
+            window.openSettingsModal('api-keys');
+        } else {
+            devSettingsModal.style.display = 'flex';
+            loadApiKeys();
+        }
         
         // Reset new key result state
-        newApiKeyName.value = '';
-        newApiKeyResult.style.display = 'none';
+        if (newApiKeyName) newApiKeyName.value = '';
+        if (newApiKeyResult) newApiKeyResult.style.display = 'none';
     });
 
     devSettingsCloseBtn.addEventListener('click', () => {
@@ -5655,7 +6255,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             apiKeysList.innerHTML = '<div style="padding: 12px; text-align: center; color: var(--ink-soft); font-size: 0.9rem;">Loading API keys...</div>';
             
-            const response = await fetch(`${API_BASE}/agent/api-keys`, {
+            const response = await fetch(`${API_BASE}/api-keys`, {
                 headers: getAuthHeaders(),
                 credentials: 'include'
             });
@@ -5705,7 +6305,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     const id = e.target.getAttribute('data-id');
                     try {
-                        const res = await fetch(`${API_BASE}/agent/api-keys/${id}`, {
+                        const res = await fetch(`${API_BASE}/api-keys/${id}`, {
                             method: 'DELETE',
                             headers: getAuthHeaders(),
                             credentials: 'include'
@@ -5739,7 +6339,7 @@ document.addEventListener('DOMContentLoaded', () => {
             createApiKeyBtn.disabled = true;
             createApiKeyBtn.textContent = 'Generating...';
             
-            const response = await fetch(`${API_BASE}/agent/api-keys`, {
+            const response = await fetch(`${API_BASE}/api-keys`, {
                 method: 'POST',
                 headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
                 credentials: 'include',

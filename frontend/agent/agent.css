@@ -858,6 +858,15 @@ body {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 2px 6px -1px var(--accent-glow);
 }
 
+.msg-content--human + .msg-content--human,
+.msg-content--user + .msg-content--user,
+.msg-content--human + .msg-content--user,
+.msg-content--user + .msg-content--human,
+.msg-content--agent + .msg-content--agent,
+.msg-content--ai + .msg-content--ai,
+.msg-content--bot + .msg-content--bot,
+.msg-content--agent + .msg-content--ai,
+.msg-content--ai + .msg-content--agent,
 .msg-content--grouped,
 .msg-content--grouped-next {
   margin-top: -5px; /* 8px - 5px = 3px gap */
@@ -866,37 +875,64 @@ body {
   display: none !important;
 }
 
-/* Consecutive messages grouped corners (WhatsApp / Messenger style) */
-.msg-content--grouped-prev.msg-content--human .msg,
-.msg-content--grouped-prev.msg-content--user .msg,
-.msg-content--grouped-prev.msg-content--bot .msg,
-.msg-content--grouped-prev.msg-content--ai .msg,
-.msg--grouped-prev.msg--human,
-.msg--grouped-prev.msg--user,
-.msg--grouped-prev.msg--bot,
-.msg--grouped-prev.msg--ai {
-  border-bottom-left-radius: 5px;
+/* Consecutive messages grouped corners (Straight accent border line, curve at ending only) */
+.msg-content--human:has(+ :is(.msg-content--human, .msg-content--user)) .msg,
+.msg-content--user:has(+ :is(.msg-content--human, .msg-content--user)) .msg,
+.msg-content--grouped-prev:not(.msg-content--grouped-next).msg-content--human .msg,
+.msg-content--grouped-prev:not(.msg-content--grouped-next).msg-content--user .msg,
+.msg--grouped-prev:not(.msg--grouped-next).msg--human,
+.msg--grouped-prev:not(.msg--grouped-next).msg--user {
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 0;
+}
+:is(.msg-content--human, .msg-content--user) + :is(.msg-content--human, .msg-content--user):has(+ :is(.msg-content--human, .msg-content--user)) .msg,
+.msg-content--grouped-next.msg-content--grouped-prev.msg-content--human .msg,
+.msg-content--grouped-next.msg-content--grouped-prev.msg-content--user .msg,
+.msg--grouped-next.msg--grouped-prev.msg--human,
+.msg--grouped-next.msg--grouped-prev.msg--user {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+:is(.msg-content--human, .msg-content--user) + :is(.msg-content--human, .msg-content--user):not(:has(+ :is(.msg-content--human, .msg-content--user))) .msg,
+.msg-content--grouped-next:not(.msg-content--grouped-prev).msg-content--human .msg,
+.msg-content--grouped-next:not(.msg-content--grouped-prev).msg-content--user .msg,
+.msg--grouped-next:not(.msg--grouped-prev).msg--human,
+.msg--grouped-next:not(.msg--grouped-prev).msg--user {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 4px;
 }
 
-.msg-content--grouped.msg-content--human .msg,
-.msg-content--grouped.msg-content--user .msg,
-.msg-content--grouped.msg-content--bot .msg,
-.msg-content--grouped.msg-content--ai .msg,
-.msg--grouped-next.msg--human,
-.msg--grouped-next.msg--user,
-.msg--grouped-next.msg--bot,
-.msg--grouped-next.msg--ai {
-  border-top-left-radius: 5px;
+.msg-content--agent:has(+ :is(.msg-content--agent, .msg-content--ai, .msg-content--bot)) .msg,
+.msg-content--ai:has(+ :is(.msg-content--agent, .msg-content--ai, .msg-content--bot)) .msg,
+.msg-content--bot:has(+ :is(.msg-content--agent, .msg-content--ai, .msg-content--bot)) .msg,
+.msg-content--grouped-prev:not(.msg-content--grouped-next).msg-content--agent .msg,
+.msg-content--grouped-prev:not(.msg-content--grouped-next).msg-content--ai .msg,
+.msg-content--grouped-prev:not(.msg-content--grouped-next).msg-content--bot .msg,
+.msg--grouped-prev:not(.msg--grouped-next).msg--agent,
+.msg--grouped-prev:not(.msg--grouped-next).msg--ai,
+.msg--grouped-prev:not(.msg--grouped-next).msg--bot {
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 0;
 }
-
-.msg-content--grouped-prev.msg-content--agent .msg,
-.msg--grouped-prev.msg--agent {
-  border-bottom-right-radius: 5px;
+:is(.msg-content--agent, .msg-content--ai, .msg-content--bot) + :is(.msg-content--agent, .msg-content--ai, .msg-content--bot):has(+ :is(.msg-content--agent, .msg-content--ai, .msg-content--bot)) .msg,
+.msg-content--grouped-next.msg-content--grouped-prev.msg-content--agent .msg,
+.msg-content--grouped-next.msg-content--grouped-prev.msg-content--ai .msg,
+.msg-content--grouped-next.msg-content--grouped-prev.msg-content--bot .msg,
+.msg--grouped-next.msg--grouped-prev.msg--agent,
+.msg--grouped-next.msg--grouped-prev.msg--ai,
+.msg--grouped-next.msg--grouped-prev.msg--bot {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
-
-.msg-content--grouped.msg-content--agent .msg,
-.msg--grouped-next.msg--agent {
-  border-top-right-radius: 5px;
+:is(.msg-content--agent, .msg-content--ai, .msg-content--bot) + :is(.msg-content--agent, .msg-content--ai, .msg-content--bot):not(:has(+ :is(.msg-content--agent, .msg-content--ai, .msg-content--bot))) .msg,
+.msg-content--grouped-next:not(.msg-content--grouped-prev).msg-content--agent .msg,
+.msg-content--grouped-next:not(.msg-content--grouped-prev).msg-content--ai .msg,
+.msg-content--grouped-next:not(.msg-content--grouped-prev).msg-content--bot .msg,
+.msg--grouped-next:not(.msg--grouped-prev).msg--agent,
+.msg--grouped-next:not(.msg--grouped-prev).msg--ai,
+.msg--grouped-next:not(.msg--grouped-prev).msg--bot {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 4px;
 }
 
 .msg--internal {
@@ -907,7 +943,7 @@ body {
   color: var(--ink) !important;
 }
 
-.msg--system {
+.msg--system:not(.msg--ai-summary) {
   align-self: stretch;
   background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
   color: var(--ink);
@@ -934,10 +970,17 @@ body {
 .msg-content--user .msg-meta { justify-content: flex-start; }
 .msg-content--agent .msg-meta, .msg-content--ai .msg-meta, .msg-content--bot .msg-meta { justify-content: flex-end; }
 
-.msg-content--user:has(+ .msg-content--user.msg-content--grouped) .msg-meta,
-.msg-content--human:has(+ .msg-content--human.msg-content--grouped) .msg-meta,
-.msg-content--agent:has(+ .msg-content--agent.msg-content--grouped) .msg-meta,
-.msg-content--ai:has(+ .msg-content--ai.msg-content--grouped) .msg-meta { display: none; }
+.msg-content--user:has(+ :is(.msg-content--user, .msg-content--human)) .msg-meta,
+.msg-content--human:has(+ :is(.msg-content--user, .msg-content--human)) .msg-meta,
+.msg-content--agent:has(+ :is(.msg-content--agent, .msg-content--ai, .msg-content--bot)) .msg-meta,
+.msg-content--ai:has(+ :is(.msg-content--agent, .msg-content--ai, .msg-content--bot)) .msg-meta,
+.msg-content--grouped-prev .msg-meta {
+  display: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
 
 .msg-ticks {
   margin-left: 4px;
@@ -1302,10 +1345,7 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   background: var(--bg-surface, #ffffff); opacity: 1 !important;
   display: flex;
   gap: 8px;
-  border-top: none !important;
-  border: none !important;
   align-items: flex-start;
-  box-shadow: none !important;
 }
 
 .icon-action-btn {
@@ -1896,28 +1936,32 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   transform: translateX(-50%) translateY(0);
 }
 
-/* ── Customer Details Sidebar ── */
+/* ── Customer Details Sidebar (Slim Separate Panel) ── */
 .customer-sidebar {
-  width: 320px;
-  min-width: 320px;
-  background: transparent !important;
-  border-left: none;
+  width: 290px;
+  min-width: 285px;
+  max-width: 295px;
+  height: calc(100% - 16px);
+  margin: 8px 10px 8px 6px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface) !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
-  transition: margin-right 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease-out, filter 0.5s ease;
-  transform-origin: calc(100% - 20px) -40px;
-  margin-right: 0;
-  transform: scale(1) translate(0, 0);
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: margin-right 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+  margin-right: 10px;
   opacity: 1;
-  filter: blur(0px);
 }
 
 .customer-sidebar.hidden {
-  margin-right: -320px;
-  transform: scale(0.4) translate(60px, -60px);
+  margin-right: -306px;
+  transform: translateX(16px);
   opacity: 0;
-  filter: blur(4px);
   pointer-events: none;
+  box-shadow: none;
 }
 
 @media (max-width: 820px) {
@@ -2812,9 +2856,6 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   position: relative;
   display: flex;
   flex-direction: column;
-  background: transparent;
-  box-shadow: none;
-  border-top: none;
 }
 
 #agent-message-input {
@@ -3623,7 +3664,7 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   flex-direction: column !important;
   overflow: visible !important;
   position: relative !important;
-  padding: 10px 16px 14px 16px !important;
+  padding: 12px 24px 20px 24px !important;
   box-sizing: border-box !important;
   transition: background 0.2s ease !important;
 }
@@ -3665,7 +3706,7 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   width: 100% !important;
   margin: 0 auto !important;
   padding: 0 !important;
-  border-radius: 12px !important;
+  border-radius: 16px !important;
   background: transparent !important;
   background-color: transparent !important;
   box-shadow: none !important;
@@ -3701,10 +3742,10 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   flex-direction: column !important;
   gap: 0 !important;
   width: 100% !important;
-  border-radius: 12px !important;
+  border-radius: 16px !important;
   background-color: var(--onyx-raised, var(--bg-surface, #FFFFFF)) !important;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
-  padding: 8px 10px 8px 12px !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06) !important;
+  padding: 10px 14px !important;
   box-sizing: border-box !important;
   border: 1px solid var(--border) !important;
   margin: 0 !important;
@@ -3713,24 +3754,24 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
 
 .surface-composer:focus-within > .surface-composer-card,
 .surface-composer-card:focus-within {
-  border-color: var(--border-focus) !important;
-  box-shadow: 0 0 0 1px var(--border-focus), 0 2px 8px rgba(0, 0, 0, 0.10) !important;
+  border-color: var(--accent, var(--border-focus)) !important;
+  box-shadow: 0 0 0 1px var(--accent, var(--border-focus)), 0 6px 28px rgba(0, 0, 0, 0.16) !important;
 }
 
 /* ALL Dark Themes Inner Card */
 [data-theme^="dark"] .surface-composer-card,
 [data-theme^="dark"] .chat-composer-card,
 [data-theme^="dark"] #agent-input-row {
-  background-color: var(--onyx-raised, #15151A) !important;
-  border: 1px solid var(--border) !important;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+  background-color: var(--onyx-raised, #1E2028) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
 }
 
 [data-theme^="dark"] .surface-composer:focus-within > .surface-composer-card,
 [data-theme^="dark"] .chat-composer-card:focus-within,
 [data-theme^="dark"] #agent-input-row:focus-within {
-  border-color: var(--border-focus) !important;
-  box-shadow: 0 0 0 1px var(--border-focus), 0 2px 8px rgba(0, 0, 0, 0.10) !important;
+  border-color: var(--accent, var(--border-focus)) !important;
+  box-shadow: 0 0 0 1px var(--accent, var(--border-focus)), 0 10px 36px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.12) !important;
 }
 
 /* Internal Note Active State on Inner Card (Clean border, no extra gradient halo) */

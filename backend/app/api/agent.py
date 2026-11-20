@@ -16,7 +16,7 @@ import pyotp
 from app.services.qa import process_resolved_conversation_tasks
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 from app.auth.dependencies import get_current_agent
 from app.auth.access import get_conversation_or_404, require_permission, scope_conversations, can_access_conversation
@@ -131,10 +131,6 @@ async def login(
         ip_attempts = await r.get(ip_key)
         locked = locked or (bool(ip_attempts) and int(ip_attempts) >= 40)
     except Exception as e:
-        # If Redis is down, brute-force lockout silently fails OPEN — an
-        # attacker can hammer this endpoint unthrottled until Redis comes
-        # back. That's an operationally important signal, not routine
-        # noise, so it's logged at WARNING (visible in production/Sentry).
         logger.warning(f"Redis unavailable during login rate-limit check for {form_data.username}: {e}")
     # Raised OUTSIDE the try block: previously this 429 was raised inside
     # `except Exception`'s scope and got swallowed, so lockout never fired.
@@ -156,8 +152,14 @@ async def login(
             logger.warning(f"Redis unavailable while recording a failed login attempt for {form_data.username}: {e}")
         audit_now(db, username_key, "login_failed", details=reason, ip=client_ip)
 
+    username_val = (form_data.username or "").strip()
     agent = db.query(Agent).filter(
-        or_(Agent.username == form_data.username, Agent.employee_id == form_data.username)
+        or_(
+            func.lower(Agent.username) == username_val.lower(),
+            func.lower(Agent.employee_id) == username_val.lower(),
+            Agent.username == form_data.username,
+            Agent.employee_id == form_data.username,
+        )
     ).first()
 
     # Always run one bcrypt comparison so "no such user" and "wrong password"
@@ -598,9 +600,30 @@ def get_customers(
     
     return results
 
+
+CUSTOMER_TAGS_OVERRIDE: dict[str, list[str]] = {}
+
+
+class CustomerTagsUpdate(BaseModel):
+    email: str
+    tags: list[str]
+
+
+@router.patch("/agent/customers/tags")
+def update_customer_tags(
+    payload: CustomerTagsUpdate,
+    agent: Agent = Depends(get_current_agent),
+):
+    em = payload.email.strip().lower()
+    cleaned = [t.strip() for t in payload.tags if t.strip()]
+    CUSTOMER_TAGS_OVERRIDE[em] = cleaned
+    return {"status": "ok", "email": em, "tags": cleaned}
+
+
 @router.get("/agent/customers/profile")
 def get_customer_profile(
     email: str = Query(..., min_length=3, max_length=254),
+    session_id: str | None = Query(None),
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
 ):
@@ -624,19 +647,92 @@ def get_customer_profile(
     health_score, health_label = _customer_health(avg_csat, resolved_ratio)
 
     demo_mode = bool(USE_MOCK and not _STORE_DB)
-    mock_c = next((c for c in (MOCK_CUSTOMERS if demo_mode else []) if (c.get("email") or "").strip().lower() == em), {})
-    orders = [o for o in MOCK_ORDERS.values() if o.get("email", "").lower() == em] if demo_mode else []
+    mock_c = {}
+    orders = []
+    location = None
+    address = None
+
+    if _STORE_DB:
+        from app.services import store_service as svc
+        sc = svc.customer_by_email(db, em)
+        if sc:
+            mock_c = svc.customer_profile(db, sc)
+            store_orders = svc.orders_for_email(db, em)
+            orders = [svc.order_to_dict(o, include_email=True, include_address=True) for o in store_orders]
+            if orders and orders[0].get("ship_to"):
+                address = orders[0].get("ship_to")
+    elif demo_mode:
+        mock_c = next((c for c in MOCK_CUSTOMERS if (c.get("email") or "").strip().lower() == em), {})
+        orders = [o for o in MOCK_ORDERS.values() if o.get("email", "").lower() == em]
+
+    from app.services.store_seed import person_for
+    person = person_for(em)
+    if person:
+        if not mock_c.get("name"):
+            mock_c["name"] = person.name
+        if not mock_c.get("phone"):
+            mock_c["phone"] = person.phone
+        location = person.city
+        if not address:
+            address = f"{person.street}, {person.city} {person.zip}"
+    elif address:
+        parts = address.split(",")
+        if len(parts) >= 2:
+            location = parts[-2].strip()
+
+    import re
+    aov = None
+    ltv_val = mock_c.get("lifetime_value")
+    tot_ord = mock_c.get("total_orders", len(orders) if orders else None)
+    if ltv_val and tot_ord:
+        try:
+            val_clean = float(re.sub(r"[^\d.]", "", str(ltv_val)))
+            if int(tot_ord) > 0:
+                aov = f"${val_clean / int(tot_ord):.2f}"
+        except Exception:
+            pass
 
     recent = base.order_by(Conversation.created_at.desc()).limit(8).all()
+
+    # Check real-time websocket connection for this customer
+    is_online = False
+    try:
+        from app.realtime.connection_manager import manager
+        if session_id and manager.get_customer_websocket(session_id) is not None:
+            is_online = True
+        if not is_online and hasattr(manager, "is_customer_online"):
+            is_online = manager.is_customer_online(email=em)
+        if not is_online:
+            all_sids = [c.session_id for c in base.all()]
+            for sid in all_sids:
+                if manager.get_customer_websocket(sid) is not None:
+                    is_online = True
+                    break
+        if not is_online and hasattr(manager, "_customer_emails"):
+            for sid, c_email in manager._customer_emails.items():
+                if c_email and c_email.strip().lower() == em:
+                    if manager.get_customer_websocket(sid) is not None:
+                        is_online = True
+                        break
+    except Exception:
+        pass
+
     return {
         "email": email.strip(),
         "name": mock_c.get("name"),
         "phone": mock_c.get("phone") or None,
+        "location": location,
+        "address": address,
+        "member_since": mock_c.get("member_since"),
         "tier": mock_c.get("loyalty_tier") or None,
-        "lifetime_value": mock_c.get("lifetime_value") or None,
-        "total_orders": mock_c.get("total_orders", len(orders) if orders else None),
-        "tags": list(mock_c.get("tags", [])),
+        "lifetime_value": ltv_val or None,
+        "total_orders": tot_ord,
+        "aov": aov,
+        "tags": CUSTOMER_TAGS_OVERRIDE.get(em, list(mock_c.get("tags", []))),
         "orders": orders,
+        "preferred_payment": orders[0].get("payment_method") if orders else None,
+        "preferred_shipping": orders[0].get("shipping_method") if orders else None,
+        "has_account": mock_c.get("has_account", False),
         "total_tickets": total,
         "resolved_ratio": resolved_ratio,
         "avg_csat": avg_csat,
@@ -646,6 +742,7 @@ def get_customer_profile(
         "sentiment": _customer_sentiment(avg_csat),
         "first_seen": first_seen.isoformat() if first_seen else None,
         "last_active": last_active.isoformat() if last_active else None,
+        "is_online": is_online,
         "demo": demo_mode and bool(mock_c or orders),
         "recent_conversations": [{
             "session_id": c.session_id, "short_id": c.short_id, "resolved": bool(c.resolved), "priority": c.priority or "normal",
@@ -870,6 +967,7 @@ def conversation_messages(
                 "is_pinned": getattr(m, 'is_pinned', False)
             }
             for m in conversation.messages
+            if not (m.content and m.content.startswith("[SYSTEM_EVENT:"))
         ]
     }
 
@@ -1067,6 +1165,8 @@ def get_order_context(
     def build_response(order, source):
         resp = {"source": source, "demo": USE_MOCK and not _STORE_DB}
         if order:
+            if not order.get("invoice_url") and order.get("order_id"):
+                order["invoice_url"] = f"https://wrennon.com/invoice/{order['order_id']}"
             resp["order"] = order
             # Always ensure the customer info matches the order's email if possible
             cust = None
@@ -1149,8 +1249,18 @@ def _do_resolve_conversation(conversation: Conversation, agent_username: str, db
             target_username=conversation.session_id
         )
         db.add(audit)
+        
+        async def notify_resolved_immediate():
+            await manager.send_to_customer(conversation.session_id, {"type": "resolved"})
+            await manager.broadcast_to_agents({
+                "type": "conversation_resolved",
+                "session_id": conversation.session_id,
+                "resolved_at": conversation.resolved_at.isoformat() if conversation.resolved_at else None,
+                "handled_by": agent_username,
+            })
+
+        background_tasks.add_task(notify_resolved_immediate)
         background_tasks.add_task(process_resolved_conversation_tasks, conversation.id)
-        background_tasks.add_task(manager.send_to_customer, conversation.session_id, {"type": "resolved"})
 
 def _do_update_ticket_properties(conversation: Conversation, agent_username: str, db: Session, priority: str | None = None, tags: list[str] | None = None, assigned_agent: str | None = None) -> list[str]:
     changes = []
@@ -1373,7 +1483,8 @@ def get_sla_status(c: Conversation, sla_policy: dict) -> str:
     return "ok"
 
 def _conversation_summary(c: Conversation, sla_policy: dict = None) -> dict:
-    last_msg_obj = c.messages[-1] if c.messages else None
+    visible_msgs = [m for m in c.messages if not (m.content and m.content.startswith("[SYSTEM_EVENT:"))] if c.messages else []
+    last_msg_obj = visible_msgs[-1] if visible_msgs else None
     last_message = last_msg_obj.content if last_msg_obj else None
     last_message_is_internal = (last_msg_obj.sender == 'agent_internal') if last_msg_obj else False
     
