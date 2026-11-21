@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Wrennon Agent Workspace</title>
+<link rel="icon" type="image/svg+xml" href="images/wren-mark.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="alternate icon" type="image/x-icon" href="/favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Big+Shoulders+Display:wght@700;800&display=swap" rel="stylesheet">
@@ -59,6 +64,9 @@
   <!-- Login screen -->
   <div id="login-screen">
     <form id="login-form">
+      <div class="login-brand" style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 8px;">
+        <img src="images/wren-mark.svg" alt="Wrennon Logo" style="width: 48px; height: 48px; margin-bottom: 8px; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.18));" class="login-logo-mark" onerror="this.onerror=null; this.src='/images/wren-mark.svg';">
+      </div>
       <h1>Agent Console</h1>
       <div class="input-group">
         <label for="username">Username or Employee ID</label>
@@ -408,9 +416,6 @@
              </button>
           </div>
         </div>
-        <div class="global-nav-logo bottom">
-           <img src="images/wren-mark.svg" alt="Wrennon" style="width: 28px; height: 28px; opacity: 1;">
-        </div>
       </div>
     </nav>
     <div id="view-conversations" class="view-panel active">
@@ -418,7 +423,7 @@
       <div id="sidebar-header">
         <div>
           <span id="brand" class="logo-text">
-            <img src="images/wren-mark.svg" alt="Wrennon Logo" class="logo-img">
+            <img src="images/wren-mark.svg" alt="Wrennon Logo" class="logo-img" onerror="this.onerror=null; this.src='/images/wren-mark.svg';">
             <span class="brand-name">Wrennon</span>
           </span>
         </div>
@@ -510,6 +515,7 @@
             <div class="conv-header-title-row">
               <h2 id="conversation-email">Unknown Customer</h2>
               <span id="ticket-id-badge"></span>
+              <span id="conv-header-wait-badge" class="badge wait-badge hidden" title="Customer wait time"></span>
               <span id="collision-badge" class="collision-badge hidden"></span>
             </div>
             <div class="conv-header-meta-row">
@@ -541,18 +547,15 @@
 
               <div class="tp-divider"></div>
 
-              <div class="tp-item tp-item--tags">
-                <span class="tp-tag-header-label" title="Conversation / Chat Issue Tags">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 3px;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>Chat Tags:
-                </span>
+              <div class="tp-item--tags" id="conversation-tags-group">
                 <div id="tag-chips" class="tag-chips"></div>
                 <div class="chat-tag-popover-anchor" style="position: relative; display: inline-flex;">
-                  <button id="add-tag-btn" class="tag-add-btn" type="button" title="Add chat tag" aria-haspopup="true" aria-expanded="false">
+                  <button id="add-tag-btn" class="tag-add-btn" type="button" title="Add tag" aria-haspopup="true" aria-expanded="false">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    + Tag
+                    Tag
                   </button>
                   <div id="chat-tag-popover" class="chat-tag-popover hidden">
-                    <div class="chat-tag-popover-title">Suggested Chat Tags</div>
+                    <div class="chat-tag-popover-title">Suggested Tags</div>
                     <div class="chat-tag-suggestions">
                       <button type="button" class="chat-tag-sug-chip" data-tag="Order Status">Order Status</button>
                       <button type="button" class="chat-tag-sug-chip" data-tag="Refund">Refund</button>
@@ -566,7 +569,7 @@
                       <button type="button" class="chat-tag-sug-chip" data-tag="Urgent">Urgent</button>
                     </div>
                     <div class="chat-tag-input-row">
-                      <input id="tag-input" class="tag-input" placeholder="Type custom chat tag..." maxlength="40" />
+                      <input id="tag-input" class="tag-input" placeholder="Type custom tag..." maxlength="40" />
                       <button id="tag-submit-btn" class="tag-submit-btn" type="button">Add</button>
                     </div>
                   </div>

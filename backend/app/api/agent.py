@@ -1536,6 +1536,67 @@ def get_sla_status(c: Conversation, sla_policy: dict) -> str:
         return "warning"
     return "ok"
 
+def _calculate_customer_wait(c: Conversation) -> tuple[bool, str | None, int]:
+    """Calculate if the customer is waiting for a response, since when, and how many minutes."""
+    if c.resolved or not getattr(c, "messages", None):
+        return False, None, 0
+
+    visible_msgs = [m for m in c.messages if not (m.content and m.content.startswith("[SYSTEM_EVENT:"))]
+    if not visible_msgs:
+        return False, None, 0
+
+    handoff = getattr(c, "handoff_active", False)
+    handled_by = getattr(c, "handled_by", None)
+
+    last_human_idx = -1
+    last_agent_idx = -1
+    last_ai_idx = -1
+
+    for idx in range(len(visible_msgs) - 1, -1, -1):
+        s = visible_msgs[idx].sender
+        if s in ("human", "user") and last_human_idx == -1:
+            last_human_idx = idx
+        elif s == "agent" and last_agent_idx == -1:
+            last_agent_idx = idx
+        elif s in ("ai", "bot") and last_ai_idx == -1:
+            last_ai_idx = idx
+
+    # If customer never sent a message, not waiting
+    if last_human_idx == -1:
+        return False, None, 0
+
+    # If handed off or assigned to agent: waiting until a human agent replies
+    if handoff or handled_by:
+        if last_agent_idx != -1 and last_agent_idx > last_human_idx:
+            return False, None, 0
+    else:
+        # Handled by bot: waiting only if neither AI nor agent has replied
+        last_reply_idx = max(last_agent_idx, last_ai_idx)
+        if last_reply_idx != -1 and last_reply_idx > last_human_idx:
+            return False, None, 0
+
+    # Find earliest unanswered human message after last reply
+    boundary_idx = last_agent_idx if (handoff or handled_by) else max(last_agent_idx, last_ai_idx)
+    start_search = boundary_idx + 1 if boundary_idx != -1 else 0
+
+    earliest_msg = visible_msgs[last_human_idx]
+    for idx in range(start_search, len(visible_msgs)):
+        if visible_msgs[idx].sender in ("human", "user"):
+            earliest_msg = visible_msgs[idx]
+            break
+
+    target_time = earliest_msg.created_at
+    if target_time.tzinfo is None:
+        target_utc = target_time.replace(tzinfo=datetime.timezone.utc)
+    else:
+        target_utc = target_time.astimezone(datetime.timezone.utc)
+
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    diff_sec = max(0.0, (now_utc - target_utc).total_seconds())
+    wait_mins = int(diff_sec // 60)
+
+    return True, target_utc.isoformat(), wait_mins
+
 def _conversation_summary(c: Conversation, sla_policy: dict = None) -> dict:
     visible_msgs = [m for m in c.messages if not (m.content and m.content.startswith("[SYSTEM_EVENT:"))] if c.messages else []
     last_msg_obj = visible_msgs[-1] if visible_msgs else None
@@ -1582,6 +1643,8 @@ def _conversation_summary(c: Conversation, sla_policy: dict = None) -> dict:
         if cust:
             customer_name = cust.get("name")
 
+    cust_waiting, waiting_since, wait_mins = _calculate_customer_wait(c)
+
     return {
         "session_id": c.session_id,
         "short_id": getattr(c, "short_id", "CUST-XXXX"),
@@ -1604,6 +1667,9 @@ def _conversation_summary(c: Conversation, sla_policy: dict = None) -> dict:
         "assigned_agent": getattr(c, "assigned_agent", None),
         "csat_rating": c.csat_response.rating if c.csat_response else None,
         "csat_comment": c.csat_response.comment if c.csat_response else None,
+        "customer_waiting": cust_waiting,
+        "waiting_since": waiting_since,
+        "wait_time_minutes": wait_mins,
     }
 
 

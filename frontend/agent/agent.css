@@ -1968,9 +1968,10 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   .customer-sidebar {
     position: absolute !important;
     right: 0;
-    top: 0;
+    top: 60px !important;
     bottom: 0;
-    z-index: 99;
+    height: calc(100% - 60px) !important;
+    z-index: 1100;
     background: var(--bg-surface) !important;
     border-left: 1px solid var(--border) !important;
     box-shadow: -5px 0 20px rgba(0,0,0,0.1);
@@ -2486,15 +2487,21 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
 .tp-item--tags {
   display: inline-flex;
   align-items: center;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 6px;
   min-width: auto;
   max-width: none;
   flex-shrink: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
 }
 
 .tag-chips {
-  display: contents;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
 }
 
 .tp-tag-chip {
@@ -2503,12 +2510,12 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   gap: 4px;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   color: var(--accent);
-  padding: 3px 6px 3px 8px;
+  padding: 3px 8px;
   border-radius: var(--radius-pill);
   font-size: var(--fs-2xs);
-  font-weight: 700;
-  font-family: var(--font-mono);
-  text-transform: uppercase;
+  font-weight: 600;
+  font-family: inherit;
+  text-transform: none;
 }
 
 .tp-tag-chip__remove {
@@ -2531,15 +2538,15 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 8px;
+  padding: 3px 9px;
   border-radius: var(--radius-pill);
   border: 1px dashed var(--line);
   background: transparent;
   color: var(--ink-soft, var(--ink));
   font-size: var(--fs-2xs);
-  font-weight: 700;
-  font-family: var(--font-mono);
-  text-transform: uppercase;
+  font-weight: 500;
+  font-family: inherit;
+  text-transform: none;
   cursor: pointer;
 }
 .tag-add-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -3744,18 +3751,28 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   width: 100% !important;
   border-radius: 16px !important;
   background-color: var(--onyx-raised, var(--bg-surface, #FFFFFF)) !important;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 
+    0 2px 6px -1px rgba(0, 0, 0, 0.04),
+    0 6px 18px -2px rgba(0, 0, 0, 0.05),
+    0 12px 30px -4px rgba(0, 0, 0, 0.04) !important;
   padding: 10px 14px !important;
   box-sizing: border-box !important;
-  border: 1px solid var(--border) !important;
+  border: 1px solid rgba(0, 0, 0, 0.09) !important;
+  outline: 1px solid rgba(0, 0, 0, 0.075) !important;
+  outline-offset: 3px !important;
   margin: 0 !important;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .surface-composer:focus-within > .surface-composer-card,
 .surface-composer-card:focus-within {
-  border-color: var(--accent, var(--border-focus)) !important;
-  box-shadow: 0 0 0 1px var(--accent, var(--border-focus)), 0 6px 28px rgba(0, 0, 0, 0.16) !important;
+  border: 1px solid rgba(0, 0, 0, 0.18) !important;
+  outline: 1px solid rgba(0, 0, 0, 0.13) !important;
+  outline-offset: 3px !important;
+  box-shadow: 
+    0 0 0 1px rgba(0, 0, 0, 0.04),
+    0 4px 18px -1px rgba(0, 0, 0, 0.07),
+    0 12px 28px -4px rgba(0, 0, 0, 0.08) !important;
 }
 
 /* ALL Dark Themes Inner Card */
@@ -3763,15 +3780,25 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
 [data-theme^="dark"] .chat-composer-card,
 [data-theme^="dark"] #agent-input-row {
   background-color: var(--onyx-raised, #1E2028) !important;
-  border: 1px solid rgba(255, 255, 255, 0.14) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  outline: 1px solid rgba(255, 255, 255, 0.08) !important;
+  outline-offset: 3px !important;
+  box-shadow: 
+    0 2px 8px -2px rgba(0, 0, 0, 0.4),
+    0 8px 24px -2px rgba(0, 0, 0, 0.55),
+    0 16px 36px -4px rgba(0, 0, 0, 0.72) !important;
 }
 
 [data-theme^="dark"] .surface-composer:focus-within > .surface-composer-card,
 [data-theme^="dark"] .chat-composer-card:focus-within,
 [data-theme^="dark"] #agent-input-row:focus-within {
-  border-color: var(--accent, var(--border-focus)) !important;
-  box-shadow: 0 0 0 1px var(--accent, var(--border-focus)), 0 10px 36px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.20) !important;
+  outline: 1px solid rgba(255, 255, 255, 0.14) !important;
+  outline-offset: 3px !important;
+  box-shadow: 
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 6px 24px -2px rgba(0, 0, 0, 0.6),
+    0 16px 40px -4px rgba(0, 0, 0, 0.8) !important;
 }
 
 /* Internal Note Active State on Inner Card (Clean border, no extra gradient halo) */
@@ -3809,9 +3836,8 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   outline: none !important;
   background: transparent !important;
   padding: 4px 2px 8px 2px !important;
-  min-height: 24px !important;
-  height: 24px !important;
-  max-height: 140px !important;
+  min-height: 26px !important;
+  max-height: 120px !important;
   font-family: inherit !important;
   font-size: 13.5px !important;
   line-height: 20px !important;
@@ -4957,10 +4983,13 @@ th.sort-desc .sort-icon::after {
     margin-top: 0 !important;
     display: inline-flex !important;
     align-items: center !important;
-    flex-wrap: nowrap !important;
+    flex-wrap: wrap !important;
     gap: 6px !important;
     max-width: 100% !important;
     flex-shrink: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
   }
   #conversation-header .tp-divider:nth-of-type(2) {
     display: inline-block !important;
@@ -4968,12 +4997,9 @@ th.sort-desc .sort-icon::after {
   #conversation-header .tag-chips {
     display: inline-flex !important;
     align-items: center !important;
-    flex-wrap: nowrap !important;
+    flex-wrap: wrap !important;
     gap: 4px !important;
     min-width: 0 !important;
-    max-width: calc(100vw - 180px) !important;
-    overflow-x: auto !important;
-    scrollbar-width: none !important;
   }
   #conversation-header .tag-chips::-webkit-scrollbar {
     display: none !important;
@@ -5058,10 +5084,13 @@ th.sort-desc .sort-icon::after {
     margin-top: 0 !important;
     display: inline-flex !important;
     align-items: center !important;
-    flex-wrap: nowrap !important;
+    flex-wrap: wrap !important;
     gap: 4px !important;
     max-width: 100% !important;
     flex-shrink: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
   }
 
   #conversation-header .tp-divider {
@@ -5071,12 +5100,9 @@ th.sort-desc .sort-icon::after {
   #conversation-header .tag-chips {
     display: inline-flex !important;
     align-items: center !important;
-    flex-wrap: nowrap !important;
+    flex-wrap: wrap !important;
     gap: 4px !important;
     min-width: 0 !important;
-    max-width: calc(100vw - 140px) !important;
-    overflow-x: auto !important;
-    scrollbar-width: none !important;
   }
   #conversation-header .tag-chips::-webkit-scrollbar {
     display: none !important;
@@ -5347,3 +5373,98 @@ th.sort-desc .sort-icon::after {
 .view-content {
   border-top: 1px solid var(--line);
 }
+
+/* ============================================================
+   Customer Wait Time Badge & Warning Levels
+   ============================================================ */
+.wait-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-family: var(--font-mono, monospace) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 2px 7px !important;
+  border-radius: var(--radius-pill, 9999px) !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  transition: all 0.25s ease !important;
+}
+
+.wait-badge.hidden {
+  display: none !important;
+}
+
+.wait-badge .wait-icon {
+  flex-shrink: 0;
+}
+
+/* 1. Normal / Safe (< 5 mins): Green */
+:root[data-theme] .wait-badge--normal,
+:root[data-theme] .badge--sla-ok,
+.wait-badge--normal,
+.badge--sla-ok {
+  background: var(--success-bg, #E2F7E6) !important;
+  color: var(--success-ink, #034E21) !important;
+  border: 1px solid var(--success-border, #B8E3C0) !important;
+}
+
+/* 2. Warning (5 - 15 mins): Amber / Yellow */
+:root[data-theme] .wait-badge--warning,
+:root[data-theme] .badge--sla-warning,
+.wait-badge--warning,
+.badge--sla-warning {
+  background: var(--warning-bg, #FFEEDA) !important;
+  color: var(--warning-ink, #593800) !important;
+  border: 1px solid var(--warning-border, #F1D0A7) !important;
+}
+
+/* 3. Urgent / Critical (>= 15 mins): Danger Red with pulse */
+:root[data-theme] .wait-badge--urgent,
+:root[data-theme] .badge--sla-breached,
+.wait-badge--urgent,
+.badge--sla-breached {
+  background: var(--danger-bg, #FFECE9) !important;
+  color: var(--danger-ink, #6B2621) !important;
+  border: 1px solid var(--danger-border, #FEC6BF) !important;
+  animation: waitBadgePulse 2s infinite ease-in-out !important;
+}
+
+@keyframes waitBadgePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger, #C8433C) 40%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger, #C8433C) 15%, transparent);
+  }
+}
+
+/* In Active Message Window Header */
+#conv-header-wait-badge {
+  font-size: 11px !important;
+  padding: 3px 8px !important;
+  height: 22px !important;
+  box-sizing: border-box !important;
+}
+
+/* In Sidebar Message List next to Customer Name */
+.conv-wait-badge-holder {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.conv-wait-badge-holder:empty {
+  display: none !important;
+}
+
+.conv-wait-badge-holder .wait-badge {
+  font-size: 9.5px !important;
+  padding: 1.5px 5.5px !important;
+  line-height: 1.15 !important;
+  letter-spacing: 0.02em !important;
+}
+

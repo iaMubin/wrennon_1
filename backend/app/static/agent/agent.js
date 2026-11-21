@@ -840,11 +840,19 @@ function stopAgentTypingImmediately(sessionId = activeSessionId) {
   }
 }
 
+function autoResizeAgentInput() {
+  if (!agentInput) return;
+  agentInput.style.setProperty('height', 'auto', 'important');
+  const scrollH = agentInput.scrollHeight;
+  const standardMaxHeight = 120; // Standard comfortable multi-line height (max 120px)
+  const newHeight = Math.min(Math.max(scrollH, 26), standardMaxHeight);
+  agentInput.style.setProperty('height', newHeight + 'px', 'important');
+  agentInput.style.setProperty('overflow-y', scrollH > standardMaxHeight ? 'auto' : 'hidden', 'important');
+}
+window.autoResizeAgentInput = autoResizeAgentInput;
+
 agentInput.addEventListener("input", (e) => {
-  agentInput.style.height = '26px';
-  const newHeight = Math.min(Math.max(agentInput.scrollHeight, 26), 120);
-  agentInput.style.height = newHeight + 'px';
-  agentInput.style.overflowY = agentInput.scrollHeight > 120 ? 'auto' : 'hidden';
+  autoResizeAgentInput();
 
   if (agentInput.value.length > 0) {
     stopRotatingPlaceholder();
@@ -875,6 +883,10 @@ agentInput.addEventListener("input", (e) => {
   typingTimeout = setTimeout(() => {
     stopAgentTypingImmediately(activeSessionId);
   }, 1500);
+});
+
+agentInput.addEventListener("paste", () => {
+  setTimeout(autoResizeAgentInput, 0);
 });
 
 agentInput.addEventListener("blur", () => {
@@ -1084,6 +1096,14 @@ function connectSocket() {
         // Refresh order context whenever a new message arrives (human or bot/ai may trigger order fetching)
         fetchOrderContext(data.session_id);
         updateResolveUI(!!data.is_resolved, data.updated_at);
+        if (data.sender === "human" || data.sender === "user") {
+          const activeSla = currentTicketProperties?.sla_status || (window.__wrennonConversations?.find(c => c.session_id === data.session_id)?.sla_status) || null;
+          updateConversationHeaderWaitBadge(new Date().toISOString(), true, activeSla);
+          updateWaitBadgeInList(data.session_id, new Date().toISOString(), true, activeSla);
+        } else if (data.sender === "agent") {
+          updateConversationHeaderWaitBadge(null, false);
+          updateWaitBadgeInList(data.session_id, null, false);
+        }
       }
       // Audio notification chime & desktop push for incoming customer replies
       if (data.sender === "human" || data.sender === "user") {
@@ -1287,6 +1307,96 @@ async function loadConversations() {
   renderConversationList(conversations);
 }
 
+// --- Merged SLA & Customer Wait Time Formatter and Badge Helpers ---
+function formatWaitTime(mins) {
+  if (mins < 1) return "< 1m";
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+function getMergedSlaWaitState(waitingSince, initialMins = null, slaStatus = null) {
+  const mins = (initialMins !== null && initialMins !== undefined)
+    ? Math.max(0, initialMins)
+    : (waitingSince ? Math.max(0, Math.floor((Date.now() - new Date(waitingSince).getTime()) / 60000)) : 0);
+
+  const isBreached = slaStatus === "breached" || mins >= 15;
+  const isWarning = !isBreached && (slaStatus === "warning" || mins >= 5);
+
+  let levelClass, slaClass, labelText, titleText;
+  const timeStr = formatWaitTime(mins);
+
+  if (isBreached) {
+    levelClass = "wait-badge--urgent";
+    slaClass = "badge--sla-breached";
+    labelText = `${timeStr} · SLA`;
+    titleText = `Customer waiting ${mins} min${mins === 1 ? '' : 's'} (SLA Breached)`;
+  } else if (isWarning) {
+    levelClass = "wait-badge--warning";
+    slaClass = "badge--sla-warning";
+    labelText = `${timeStr} · SLA`;
+    titleText = `Customer waiting ${mins} min${mins === 1 ? '' : 's'} (SLA At Risk)`;
+  } else {
+    levelClass = "wait-badge--normal";
+    slaClass = "badge--sla-ok";
+    labelText = `${timeStr} · SLA`;
+    titleText = `Customer waiting ${mins} min${mins === 1 ? '' : 's'} (SLA On Track)`;
+  }
+
+  return { mins, isBreached, isWarning, levelClass, slaClass, labelText, titleText };
+}
+
+function createMergedSlaWaitBadge(waitingSince, initialMins = null, slaStatus = null) {
+  if (!waitingSince) return "";
+  const state = getMergedSlaWaitState(waitingSince, initialMins, slaStatus);
+  const rawSlaStatus = escapeHtml(slaStatus || (state.isBreached ? 'breached' : (state.isWarning ? 'warning' : 'ok')));
+
+  return `<span class="badge ${state.slaClass} wait-badge ${state.levelClass}" data-waiting-since="${escapeHtml(waitingSince)}" data-sla-status="${rawSlaStatus}" title="${escapeHtml(state.titleText)}"><svg class="wait-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg><span class="wait-text">${state.labelText}</span></span>`;
+}
+
+function updateConversationHeaderWaitBadge(waitingSince, isWaiting, slaStatus = null) {
+  const badgeEl = document.getElementById("conv-header-wait-badge");
+  if (!badgeEl) return;
+  if (!isWaiting || !waitingSince) {
+    badgeEl.classList.add("hidden");
+    badgeEl.removeAttribute("data-waiting-since");
+    badgeEl.removeAttribute("data-sla-status");
+    badgeEl.innerHTML = "";
+    return;
+  }
+  const state = getMergedSlaWaitState(waitingSince, null, slaStatus);
+  badgeEl.className = `badge ${state.slaClass} wait-badge ${state.levelClass}`;
+  badgeEl.dataset.waitingSince = waitingSince;
+  badgeEl.dataset.slaStatus = slaStatus || (state.isBreached ? 'breached' : (state.isWarning ? 'warning' : 'ok'));
+  badgeEl.title = state.titleText;
+  badgeEl.innerHTML = `<svg class="wait-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg><span class="wait-text">${state.labelText}</span>`;
+  badgeEl.classList.remove("hidden");
+}
+
+function updateWaitBadgeInList(sessionId, waitingSince, isWaiting, slaStatus = null) {
+  const item = document.querySelector(`.conv-checkbox[data-session-id="${sessionId}"]`)?.closest(".conv-item");
+  if (!item) return;
+  const holder = item.querySelector(".conv-wait-badge-holder");
+  if (!isWaiting || !waitingSince) {
+    if (holder) holder.innerHTML = "";
+    else {
+      const existingWaitBadge = item.querySelector(".wait-badge");
+      if (existingWaitBadge) existingWaitBadge.remove();
+    }
+    return;
+  }
+  const badgeHtml = createMergedSlaWaitBadge(waitingSince, null, slaStatus);
+  if (holder) {
+    holder.innerHTML = badgeHtml;
+  } else {
+    const nameEl = item.querySelector(".conv-item-name-text");
+    if (nameEl) {
+      nameEl.insertAdjacentHTML("afterend", `<span class="conv-wait-badge-holder" style="flex: 0 1 auto; min-width: 0; overflow: hidden; display: inline-flex; align-items: center;">${badgeHtml}</span>`);
+    }
+  }
+}
+
 function renderConversationList(conversations) {
   window.__wrennonConversations = conversations;   // read by the command palette
   conversationList.innerHTML = "";
@@ -1342,12 +1452,23 @@ function renderConversationList(conversations) {
       sentimentBadge = `<span class="badge ${cls}">${escapeHtml(conv.sentiment)}</span>`;
     }
 
-    // SLA warning
+    // Merged SLA & Customer Wait Badge
     let slaBadge = "";
-    if (conv.sla_status === "breached") {
-      slaBadge = `<span class="badge badge--sla-breached">SLA breached</span>`;
+    let slaLabel = "SLA on track";
+    let slaRank = 0;
+    if (conv.customer_waiting && conv.waiting_since && !conv.resolved) {
+      const waitState = getMergedSlaWaitState(conv.waiting_since, conv.wait_time_minutes, conv.sla_status);
+      slaBadge = createMergedSlaWaitBadge(conv.waiting_since, conv.wait_time_minutes, conv.sla_status);
+      slaLabel = waitState.labelText;
+      slaRank = waitState.isBreached ? 100 : (waitState.isWarning ? 90 : 85);
+    } else if (conv.sla_status === "breached") {
+      slaBadge = `<span class="badge badge--sla-breached wait-badge wait-badge--urgent" title="SLA Breached">SLA</span>`;
+      slaLabel = "SLA breached";
+      slaRank = 100;
     } else if (conv.sla_status === "warning") {
-      slaBadge = `<span class="badge badge--sla-warning">SLA at risk</span>`;
+      slaBadge = `<span class="badge badge--sla-warning wait-badge wait-badge--warning" title="SLA At Risk">SLA</span>`;
+      slaLabel = "SLA at risk";
+      slaRank = 90;
     }
 
     let languageBadge = '';
@@ -1356,23 +1477,22 @@ function renderConversationList(conversations) {
     }
 
     const customerDisplayName = conv.customer_name || conv.customer_email || "Customer";
-    const avatarHtml = initialsAvatar(customerDisplayName, conv.customer_email || conv.customer_id || conv.session_id, 28);
+    const avatarHtml = initialsAvatar(customerDisplayName, conv.customer_email || conv.customer_id || conv.session_id, 22);
 
     // One badge at a time, the most urgent first; the rest are summarised as "+N" with a tooltip.
     const stageBadge = `<span class="badge ${badgeClass}">${escapeHtml(stageText)}</span>`;
     const needsHuman = !conv.resolved && conv.handoff_active && !conv.handled_by;
     const sentRank = /badge--sent-neg|badge--sent-warn/.test(sentimentBadge) ? 60 : (/badge--sent-pos/.test(sentimentBadge) ? 20 : 30);
     const ranked = [
-      conv.sla_status === 'breached' && [100, slaBadge, 'SLA breached'],
-      conv.sla_status === 'warning' && [90, slaBadge, 'SLA at risk'],
       [needsHuman ? 80 : 40, stageBadge, stageText],
       conv.is_mentioned && [75, mentionedBadge, 'Mentioned'],
       sentimentBadge && [sentRank, sentimentBadge, conv.sentiment],
       conv.reopen_count > 0 && [50, reopenBadge, 'Reopened'],
       languageBadge && [30, languageBadge, conv.language],
     ].filter(Boolean).sort((x, y) => y[0] - x[0]);
-    const restBadges = ranked.slice(1);
-    const badgeRowHtml = ranked[0][1] + (restBadges.length
+    const visibleBadges = ranked.slice(0, 2);
+    const restBadges = ranked.slice(2);
+    const badgeRowHtml = visibleBadges.map(b => b[1]).join(' ') + (restBadges.length
       ? `<span class="badge badge-more" title="${escapeHtml(restBadges.map(r => r[2]).join(' · '))}">+${restBadges.length}</span>` : '');
 
     const unreadCount = conv.unread_count || (conv.handoff_active && !conv.resolved ? 1 : 0);
@@ -1385,17 +1505,18 @@ function renderConversationList(conversations) {
         ${avatarHtml}
       </div>
       <div class="conv-item-body">
-        <div class="conv-item-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <div style="display: flex; gap: 8px; align-items: center; overflow: hidden; min-width: 0;">
+        <div class="conv-item-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; gap: 6px; min-width: 0;">
+          <div style="display: flex; gap: 6px; align-items: center; overflow: hidden; min-width: 0; flex: 1 1 auto;">
               <input type="checkbox" class="conv-checkbox" data-session-id="${conv.session_id}" onclick="event.stopPropagation(); toggleBulkSelection(this, '${conv.session_id}')" style="cursor: pointer; flex-shrink: 0;">
-              <span class="conv-item-email" style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                  <span class="desktop-only-avatar">${avatarHtml}</span>
-                  <span class="conv-item-name-text" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(customerDisplayName)}</span>
+              <span class="conv-item-email" style="display: flex; align-items: center; gap: 6px; overflow: hidden; min-width: 0; flex: 1 1 auto;">
+                  <span class="desktop-only-avatar" style="flex-shrink: 0;">${avatarHtml}</span>
+                  <span class="conv-item-name-text" style="flex-shrink: 0; white-space: nowrap; font-weight: 600;">${escapeHtml(customerDisplayName)}</span>
+                  <span class="conv-wait-badge-holder" style="flex: 0 1 auto; min-width: 0; overflow: hidden; display: inline-flex; align-items: center;">${slaBadge || ""}</span>
               </span>
           </div>
-          <span class="conv-item-time" style="flex-shrink: 0;">${formatSidebarTime(conv.updated_at)}</span>
+          <span class="conv-item-time" style="flex-shrink: 0; margin-left: auto;">${formatSidebarTime(conv.updated_at)}</span>
         </div>
-        <div class="conv-item-preview" style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+        <div class="conv-item-preview" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 2px;">
           <span class="conv-item-snippet" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${formatPreview(conv)}</span>
           ${unreadBadgeHtml}
         </div>
@@ -1460,6 +1581,39 @@ async function fetchAndRenderMessages(sessionId) {
     }
 
     updatePinnedMessageUI(pinnedMessages);
+
+    // Update message window wait badge
+    let custWaiting = false;
+    let waitingSince = null;
+    const isConvResolved = document.getElementById("resolve-btn")?.classList.contains("is-resolved");
+    if (!isConvResolved) {
+      const visibleMsgs = messages.filter(m => !m.content?.startsWith("[SYSTEM_EVENT:"));
+      let lastHumanIdx = -1;
+      let lastAgentIdx = -1;
+      let lastAiIdx = -1;
+      for (let i = visibleMsgs.length - 1; i >= 0; i--) {
+        const s = visibleMsgs[i].sender;
+        if ((s === "human" || s === "user") && lastHumanIdx === -1) lastHumanIdx = i;
+        if (s === "agent" && lastAgentIdx === -1) lastAgentIdx = i;
+        if ((s === "ai" || s === "bot") && lastAiIdx === -1) lastAiIdx = i;
+      }
+      if (lastHumanIdx !== -1 && (lastAgentIdx === -1 || lastHumanIdx > lastAgentIdx)) {
+        custWaiting = true;
+        const boundaryIdx = Math.max(lastAgentIdx, lastAiIdx);
+        let start = boundaryIdx !== -1 ? boundaryIdx + 1 : 0;
+        if (start > lastHumanIdx) start = lastHumanIdx;
+        let earliest = visibleMsgs[lastHumanIdx];
+        for (let i = start; i < visibleMsgs.length; i++) {
+          if (visibleMsgs[i].sender === "human" || visibleMsgs[i].sender === "user") {
+            earliest = visibleMsgs[i];
+            break;
+          }
+        }
+        waitingSince = earliest.created_at;
+      }
+    }
+    const activeSla = currentTicketProperties?.sla_status || (window.__wrennonConversations?.find(c => c.session_id === activeSessionId)?.sla_status) || null;
+    updateConversationHeaderWaitBadge(waitingSince, custWaiting, activeSla);
   } else {
     console.log("[DEBUG] responseData is null/falsy - auth failed or network error");
   }
@@ -2052,12 +2206,33 @@ document.addEventListener("click", async (e) => {
       const content = menu.closest('.msg-content');
       if (content) content.style.zIndex = "999999";
       
+      menu.style.left = '';
+      menu.style.right = '';
       const rect = menu.getBoundingClientRect();
       
-      // Prevent going off right edge
-      if (rect.right > window.innerWidth) {
+      const sidebarEl = document.getElementById('customer-sidebar');
+      const isSidebarOpen = sidebarEl && !sidebarEl.classList.contains('hidden');
+      const messagesContainer = document.getElementById('agent-messages');
+      const containerRect = messagesContainer ? messagesContainer.getBoundingClientRect() : null;
+      
+      let maxRight = window.innerWidth;
+      if (isSidebarOpen && sidebarEl) {
+        const sbRect = sidebarEl.getBoundingClientRect();
+        if (sbRect.left > 120) {
+          maxRight = Math.min(maxRight, sbRect.left);
+        }
+      }
+      if (containerRect && containerRect.right > 120) {
+        maxRight = Math.min(maxRight, containerRect.right);
+      }
+      
+      // Prevent going off right edge or getting hidden under customer sidebar
+      if (rect.right > maxRight - 12) {
         menu.style.right = '0';
         menu.style.left = 'auto';
+      } else if (rect.left < 10) {
+        menu.style.left = '0';
+        menu.style.right = 'auto';
       }
       
       // Prevent going off bottom edge
@@ -2771,10 +2946,15 @@ function sendAgentReply() {
   
   socket.send(JSON.stringify({ type: "new_message", session_id: activeSessionId, message: text.trim(), is_internal: isInternal }));
   
+  if (!isInternal) {
+    updateConversationHeaderWaitBadge(null, false);
+    updateWaitBadgeInList(activeSessionId, null, false);
+  }
+
   agentInput.value = "";
   drafts[activeSessionId] = ""; 
-  agentInput.style.height = "26px";
-  agentInput.style.overflowY = "hidden";
+  agentInput.style.setProperty('height', '26px', 'important');
+  agentInput.style.setProperty('overflow-y', 'hidden', 'important');
   document.getElementById("slash-command-popup")?.classList.remove("active");
   resumeRotatingPlaceholderIfNeeded();
 }
@@ -3527,6 +3707,8 @@ function updateResolveUI(isResolved, updatedAt) {
   if (!resolveBtn) return;
 
   if (isResolved) {
+    updateConversationHeaderWaitBadge(null, false);
+    if (activeSessionId) updateWaitBadgeInList(activeSessionId, null, false);
     resolveBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><polyline points="20 6 9 17 4 12"></polyline></svg><span>Resolved</span>`;
     resolveBtn.disabled = true;
     resolveBtn.classList.remove("btn-primary");
@@ -4112,7 +4294,7 @@ function renderTagChips(tags) {
   const container = document.getElementById("tag-chips");
   if (!container) return;
   container.innerHTML = (tags || []).map(tag => `
-    <span class="tp-tag-chip tp-tag-chip--chat" title="Chat Tag: ${escapeHtml(tag)}">
+    <span class="tp-tag-chip tp-tag-chip--chat" title="Tag: ${escapeHtml(tag)}">
       ${escapeHtml(tag)}
       <button class="tp-tag-chip__remove" data-tag="${escapeHtml(tag)}" aria-label="Remove tag ${escapeHtml(tag)}">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -4131,6 +4313,7 @@ function resetTicketPropertiesBar() {
   document.getElementById("priority-dropdown")?.classList.add("hidden");
   document.getElementById("assignee-dropdown")?.classList.add("hidden");
   renderCsatBadge(null, null);
+  updateConversationHeaderWaitBadge(null, false);
 }
 
 async function loadTicketProperties(sessionId) {
@@ -4140,12 +4323,16 @@ async function loadTicketProperties(sessionId) {
     priority: result.priority || "normal",
     tags: result.tags || [],
     assigned_agent: result.assigned_agent || null,
+    sla_status: result.sla_status || null,
   };
   renderPriorityBadge(currentTicketProperties.priority);
   renderAssigneeDropdown();
   renderAssigneeBadge(currentTicketProperties.assigned_agent);
   renderTagChips(currentTicketProperties.tags);
   renderCsatBadge(result.csat_rating, result.csat_comment);
+  if (result.customer_waiting !== undefined) {
+    updateConversationHeaderWaitBadge(result.waiting_since, result.customer_waiting && !result.resolved, result.sla_status);
+  }
   updateViaMediaPosition();
   if (result.resolved !== undefined) {
     updateResolveUI(!!result.resolved, result.resolved_at || result.updated_at);
@@ -4344,9 +4531,18 @@ window.renderTagChips = renderTagChips;
       e.stopPropagation();
       const isHidden = chatTagPopover.classList.toggle("hidden");
       addTagBtn.setAttribute("aria-expanded", String(!isHidden));
-      if (!isHidden && tagInput) {
-        tagInput.value = "";
-        tagInput.focus();
+      if (!isHidden) {
+        chatTagPopover.style.left = "0";
+        chatTagPopover.style.right = "auto";
+        const popRect = chatTagPopover.getBoundingClientRect();
+        if (popRect.right > window.innerWidth - 12) {
+          chatTagPopover.style.left = "auto";
+          chatTagPopover.style.right = "0";
+        }
+        if (tagInput) {
+          tagInput.value = "";
+          tagInput.focus();
+        }
       }
     });
 
@@ -4435,6 +4631,23 @@ window.renderTagChips = renderTagChips;
 
 // Periodic SLA Check
 setInterval(loadConversations, 30000);
+
+// Live Customer Wait Time & SLA Recalculation
+setInterval(() => {
+  document.querySelectorAll(".wait-badge[data-waiting-since]").forEach(badge => {
+    const since = badge.getAttribute("data-waiting-since");
+    if (!since) return;
+    const slaStatus = badge.getAttribute("data-sla-status") || null;
+    const state = getMergedSlaWaitState(since, null, slaStatus);
+    badge.classList.remove("wait-badge--normal", "wait-badge--warning", "wait-badge--urgent", "badge--sla-breached", "badge--sla-warning", "badge--sla-ok");
+    badge.classList.add(state.levelClass, state.slaClass);
+    badge.title = state.titleText;
+    const textEl = badge.querySelector(".wait-text");
+    if (textEl) {
+      textEl.textContent = state.labelText;
+    }
+  });
+}, 15000);
 
 // Mobile Sidebar Toggle
 document.addEventListener("DOMContentLoaded", () => {

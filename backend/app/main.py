@@ -12,6 +12,7 @@ import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic")
 warnings.filterwarnings("ignore", category=PendingDeprecationWarning, module="sentry_sdk")
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, Response
 
 from contextlib import asynccontextmanager
 
@@ -423,6 +424,40 @@ app.include_router(uploads_router)  # signed-link file serving (see app/api/uplo
 # so they are guaranteed to be in the Docker image.
 static_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 frontend_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "frontend")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+@app.get("/agent/favicon.ico", include_in_schema=False)
+async def favicon_ico():
+    for base in [frontend_path, static_path]:
+        path = os.path.join(base, "favicon.ico")
+        if os.path.exists(path):
+            return FileResponse(path, media_type="image/x-icon")
+    return Response(status_code=404)
+
+
+@app.get("/favicon.svg", include_in_schema=False)
+@app.get("/agent/favicon.svg", include_in_schema=False)
+async def favicon_svg():
+    for base in [frontend_path, static_path]:
+        path = os.path.join(base, "favicon.svg")
+        if os.path.exists(path):
+            return FileResponse(path, media_type="image/svg+xml")
+    return Response(status_code=404)
+
+
+@app.get("/images/wren-mark.svg", include_in_schema=False)
+@app.get("/agent/images/wren-mark.svg", include_in_schema=False)
+async def wren_mark_logo():
+    for base in [frontend_path, static_path]:
+        for sub in [
+            os.path.join("agent", "images", "wren-mark.svg"),
+            os.path.join("images", "wren-mark.svg"),
+        ]:
+            path = os.path.join(base, sub)
+            if os.path.exists(path):
+                return FileResponse(path, media_type="image/svg+xml")
+    return Response(status_code=404)
 
 if os.path.exists(frontend_path):
     # In development, serve directly from the frontend folder so changes reflect immediately
