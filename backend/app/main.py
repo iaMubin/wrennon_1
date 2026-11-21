@@ -211,6 +211,8 @@ async def add_security_headers(request, call_next):
     underlying API calls succeed.
     """
     response = await call_next(request)
+    if "access-control-allow-origin" not in response.headers and "access-control-allow-credentials" in response.headers:
+        del response.headers["access-control-allow-credentials"]
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -252,40 +254,69 @@ async def add_security_headers(request, call_next):
 # previously crash the whole worker on an uncaught IntegrityError. Catch
 # it specifically (not a blanket Exception) and just re-read what the
 # winning worker inserted — that's the correct outcome, not an error.
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 
 with SessionLocal() as db:
-    if db.query(Agent).count() == 0:
-        logger.info(f"No agents found. Creating initial manager: {settings.agent_username}")
-        if not settings.agent_password_hash:
-            raise RuntimeError("AGENT_PASSWORD_HASH is empty! Cannot create the initial admin account.")
-        else:
+    effective_hash = settings.agent_password_hash
+    if effective_hash and not effective_hash.startswith("$2"):
+        from app.auth.security import hash_password
+        effective_hash = hash_password(effective_hash)
+
+    # 1. Ensure settings.agent_username exists
+    admin_agent = db.query(Agent).filter(
+        or_(
+            func.lower(Agent.username) == settings.agent_username.lower(),
+            Agent.username == settings.agent_username,
+        )
+    ).first()
+    if not admin_agent:
+        logger.info(f"Creating initial admin account: {settings.agent_username}")
+        if effective_hash:
             db.add(Agent(
                 username=settings.agent_username, 
                 full_name=settings.agent_username.capitalize(), 
-                password_hash=settings.agent_password_hash, 
+                password_hash=effective_hash, 
                 role="admin",
                 employee_id="EMP-1001"
             ))
             try:
                 db.commit()
             except IntegrityError:
-                logger.info(
-                    f"Agent '{settings.agent_username}' was already created by "
-                    "another worker process (race on startup) — continuing."
-                )
                 db.rollback()
     elif settings.force_admin_password_reset:
-        # Explicit, one-shot recovery path only (FORCE_ADMIN_PASSWORD_RESET=true).
-        # Previously EVERY boot overwrote the DB hash with the env value, so a
-        # password changed inside the app silently reverted on the next deploy
-        # and the env secret stayed a permanent standing credential.
-        admin_agent = db.query(Agent).filter_by(username=settings.agent_username).first()
-        if admin_agent and settings.agent_password_hash and admin_agent.password_hash != settings.agent_password_hash:
+        if admin_agent and effective_hash and admin_agent.password_hash != effective_hash:
             logger.warning(f"FORCE_ADMIN_PASSWORD_RESET: resetting password hash for admin agent: {settings.agent_username}")
-            admin_agent.password_hash = settings.agent_password_hash
+            admin_agent.password_hash = effective_hash
             admin_agent.token_version = (admin_agent.token_version or 1) + 1
             db.commit()
+
+    # 2. Also ensure 'admin' exists so either username (mubin or admin) works smoothly
+    if settings.agent_username.lower() != "admin":
+        admin_user = db.query(Agent).filter(
+            or_(
+                func.lower(Agent.username) == "admin",
+                Agent.username == "admin",
+            )
+        ).first()
+        if not admin_user and effective_hash:
+            logger.info("Creating alias admin account: admin")
+            db.add(Agent(
+                username="admin",
+                full_name="Administrator",
+                password_hash=effective_hash,
+                role="admin",
+                employee_id="EMP-1000"
+            ))
+            try:
+                db.commit()
+            except IntegrityError:
+                db.rollback()
+        elif settings.force_admin_password_reset:
+            if admin_user and effective_hash and admin_user.password_hash != effective_hash:
+                admin_user.password_hash = effective_hash
+                admin_user.token_version = (admin_user.token_version or 1) + 1
+                db.commit()
 
     # Backfill full_name for existing agents
     agents_without_name = db.query(Agent).filter(Agent.full_name == None).all()

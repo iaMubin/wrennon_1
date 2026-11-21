@@ -10,14 +10,17 @@ Public storefront API (mounted at /api/store).
 from __future__ import annotations
 
 from typing import List, Optional
+import hashlib
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.db.session import get_db
 from app.limiter import limiter
 from app.services import customer_auth as auth
+from app.services import ratelimit
 from app.services import store_actions as actions_svc
 from app.services import store_context as ctx_svc
 from app.services import store_demo as demo
@@ -75,13 +78,32 @@ def create_order(request: Request, payload: OrderIn, db: Session = Depends(get_d
     return svc.order_to_dict(order, include_email=True)
 
 
+# Order ids are sequential (1001, 1002, ...), so "order id + email" is the only secret. Without
+# a failure budget anyone who knows a victim's email can walk the id space and read their name,
+# address and phone. Only FAILED lookups are counted; the same generic 404 is returned either way.
+_TRACK_WINDOW = 3600
+_TRACK_LIMITS = {"ip": 20, "email": 6, "order": 15}
+
+
+def _h(v: str) -> str:
+    return hashlib.sha256(v.strip().lower().encode()).hexdigest()[:24]
+
+
 @router.get("/orders/{order_id}")
 @limiter.limit("30/minute")
-def track_order(request: Request, order_id: str, email: str = Query(min_length=3, max_length=254),
-                db: Session = Depends(get_db)):
-    order = svc.get_order(db, order_id, email=email)
+async def track_order(request: Request, response: Response, order_id: str, email: str = Query(min_length=3, max_length=254),
+                      db: Session = Depends(get_db)):
+    ip = request.client.host if request.client else "unknown"
+    keys = {"ip": f"trk_fail:i:{ip}", "email": f"trk_fail:e:{_h(email)}", "order": f"trk_fail:o:{_h(order_id)}"}
+    for name, key in keys.items():
+        if await ratelimit.peek(key) >= _TRACK_LIMITS[name]:
+            raise HTTPException(status_code=429, detail="Too many attempts. Please try again later.")
+    order = await run_in_threadpool(svc.get_order, db, order_id, email)
     if not order:  # same answer for "no such order" and "wrong email"
+        for key in keys.values():
+            await ratelimit.hit(key, _TRACK_WINDOW)
         raise HTTPException(status_code=404, detail="Order not found")
+    response.headers["Cache-Control"] = "no-store"   # the body contains name/address/phone
     return svc.order_to_dict(order, include_email=True)
 
 
@@ -111,13 +133,29 @@ def register(request: Request, payload: RegisterIn, db: Session = Depends(get_db
     return _session_payload(c)
 
 
+# Credential-stuffing / brute-force budget. The 10/min per-IP slowapi limit alone lets a botnet (or a
+# patient attacker) guess one account's password indefinitely; failures are therefore also counted per
+# account and per IP over a longer window. Only FAILED logins consume budget.
+_LOGIN_WINDOW = 900
+_LOGIN_LIMITS = {"email": 8, "ip": 30}
+
+
 @router.post("/auth/login")
 @limiter.limit("10/minute")
-def login(request: Request, payload: LoginIn, db: Session = Depends(get_db)):
-    c = svc.customer_by_email(db, payload.email)
-    if not auth.check_pw(payload.password, c.password_hash if c else None):  # same answer for "no account" and "wrong password"
+async def login(request: Request, payload: LoginIn, db: Session = Depends(get_db)):
+    ip = request.client.host if request.client else "unknown"
+    keys = {"email": f"cust_login_fail:e:{_h(payload.email)}", "ip": f"cust_login_fail:i:{ip}"}
+    for name, key in keys.items():
+        if await ratelimit.peek(key) >= _LOGIN_LIMITS[name]:
+            raise HTTPException(status_code=429, detail={"code": "too_many_attempts", "message": "Too many attempts. Please try again later."})
+    c = await run_in_threadpool(svc.customer_by_email, db, payload.email)
+    ok = await run_in_threadpool(auth.check_pw, payload.password, c.password_hash if c else None)
+    if not ok:  # same answer for "no account" and "wrong password"
+        for key in keys.values():
+            await ratelimit.hit(key, _LOGIN_WINDOW)
         raise HTTPException(status_code=401, detail={"code": "bad_credentials", "message": "Incorrect email or password."})
-    svc.mark_login(db, c)
+    await ratelimit.clear(keys["email"])
+    await run_in_threadpool(svc.mark_login, db, c)
     return _session_payload(c)
 
 
@@ -170,7 +208,7 @@ async def pending_actions(request: Request, session_id: str = Query(min_length=8
         raise HTTPException(status_code=401, detail="Invalid chat session")
     try:
         await proactive.deliver_pending(session_id)   # order updates the assistant wants to tell this customer
-    except Exception:  # a failed courtesy message must never break the page's polling
+    except Exception:  # a failed courtesy message must never break the page's polling  # nosec B110
         pass
     return {"actions": actions_svc.pop_actions(db, session_id)}
 
@@ -205,7 +243,7 @@ async def cancel_my_order(request: Request, order_id: str, db: Session = Depends
     result = svc.order_to_dict(order, include_email=True)
     try:   # an open chat (and the agent looking at it) hears about it straight away
         await proactive.announce_to_customer(email, f"I can see you just cancelled order #{order.order_id} from your account. It's done: the payment is voided and the items are back in stock. Anything else I can help with?")
-    except Exception:
+    except Exception:  # nosec B110
         pass
     return result
 

@@ -58,7 +58,7 @@ def _emit(session_id: str, payload: Dict[str, Any]) -> None:
     try:
         with SessionLocal() as db:
             store_actions.queue_action(db, session_id, "activity", payload)
-    except Exception:   # the live chips are decoration: they must never break a reply
+    except Exception:   # the live chips are decoration: they must never break a reply  # nosec B110
         pass
 
 

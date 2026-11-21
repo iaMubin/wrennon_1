@@ -826,6 +826,20 @@ if (logoutBtn) {
 
 let typingTimeout;
 let isTyping = false;
+
+function stopAgentTypingImmediately(sessionId = activeSessionId) {
+  if (isTyping && sessionId && socket && socket.readyState === WebSocket.OPEN) {
+    clearTimeout(typingTimeout);
+    isTyping = false;
+    try {
+      socket.send(JSON.stringify({ type: "stopped_typing", session_id: sessionId }));
+    } catch (_) {}
+  } else {
+    clearTimeout(typingTimeout);
+    isTyping = false;
+  }
+}
+
 agentInput.addEventListener("input", (e) => {
   agentInput.style.height = '26px';
   const newHeight = Math.min(Math.max(agentInput.scrollHeight, 26), 120);
@@ -840,7 +854,16 @@ agentInput.addEventListener("input", (e) => {
 
   if (!activeSessionId || !socket || socket.readyState !== WebSocket.OPEN) return;
   const isInternal = noteTypeSelect && noteTypeSelect.value === "internal";
-  if (isInternal) return; // Don't broadcast typing for internal notes
+  if (isInternal) {
+    stopAgentTypingImmediately(activeSessionId);
+    return;
+  }
+
+  // If agent emptied or deleted all text, cancel typing immediately
+  if (agentInput.value.trim().length === 0) {
+    stopAgentTypingImmediately(activeSessionId);
+    return;
+  }
   
   if (!isTyping) {
     socket.send(JSON.stringify({ type: "typing", session_id: activeSessionId }));
@@ -849,9 +872,30 @@ agentInput.addEventListener("input", (e) => {
   
   clearTimeout(typingTimeout);
   typingTimeout = setTimeout(() => {
-    socket.send(JSON.stringify({ type: "stopped_typing", session_id: activeSessionId }));
-    isTyping = false;
+    stopAgentTypingImmediately(activeSessionId);
   }, 1500);
+});
+
+agentInput.addEventListener("blur", () => {
+  stopAgentTypingImmediately();
+});
+
+if (noteTypeSelect) {
+  noteTypeSelect.addEventListener("change", () => {
+    if (noteTypeSelect.value === "internal") {
+      stopAgentTypingImmediately();
+    }
+  });
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    stopAgentTypingImmediately();
+  }
+});
+
+window.addEventListener("beforeunload", () => {
+  stopAgentTypingImmediately();
 });
 
 const agentSendBtn = document.getElementById("agent-send-btn");
@@ -1421,6 +1465,7 @@ async function fetchAndRenderMessages(sessionId) {
 
 async function openConversation(sessionId, customerEmail, shortId, isResolved, updatedAt) {
   if (activeSessionId && activeSessionId !== sessionId) {
+    stopAgentTypingImmediately(activeSessionId);
     drafts[activeSessionId] = agentInput.value;
   }
   hideCustomerTypingIndicator(); // clear any stale indicator from the previously-open conversation
@@ -2704,6 +2749,7 @@ function renderCopilotActions(actions) {
 }
 
 function sendAgentReply() {
+  stopAgentTypingImmediately(activeSessionId);
   let text = agentInput.value.trim();
   const previewContainer = document.getElementById("reply-preview-container");
   const isReplying = previewContainer && !previewContainer.classList.contains("hidden") && previewContainer.dataset.replyContent;
@@ -4063,7 +4109,7 @@ function renderTagChips(tags) {
   const container = document.getElementById("tag-chips");
   if (!container) return;
   container.innerHTML = (tags || []).map(tag => `
-    <span class="tp-tag-chip">
+    <span class="tp-tag-chip tp-tag-chip--chat" title="Chat Tag: ${escapeHtml(tag)}">
       ${escapeHtml(tag)}
       <button class="tp-tag-chip__remove" data-tag="${escapeHtml(tag)}" aria-label="Remove tag ${escapeHtml(tag)}">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -4287,34 +4333,101 @@ window.renderTagChips = renderTagChips;
 
   document.addEventListener("click", () => closeAllDropdowns());
 
-  addTagBtn.addEventListener("click", () => {
-    addTagBtn.classList.add("hidden");
-    tagInput.classList.remove("hidden");
-    tagInput.value = "";
-    tagInput.focus();
-  });
+  const chatTagPopover = document.getElementById("chat-tag-popover");
+  const tagSubmitBtn = document.getElementById("tag-submit-btn");
 
-  function commitTagInput() {
-    const value = tagInput.value.trim();
-    tagInput.classList.add("hidden");
-    addTagBtn.classList.remove("hidden");
-    if (!value) return;
-    if (currentTicketProperties.tags.includes(value)) return;
-    saveTicketProperty({ tags: [...currentTicketProperties.tags, value] });
+  if (addTagBtn && chatTagPopover) {
+    addTagBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isHidden = chatTagPopover.classList.toggle("hidden");
+      addTagBtn.setAttribute("aria-expanded", String(!isHidden));
+      if (!isHidden && tagInput) {
+        tagInput.value = "";
+        tagInput.focus();
+      }
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!chatTagPopover.contains(e.target) && !addTagBtn.contains(e.target)) {
+        chatTagPopover.classList.add("hidden");
+        addTagBtn.setAttribute("aria-expanded", "false");
+      }
+    });
+
+    chatTagPopover.addEventListener("click", (e) => {
+      const chip = e.target.closest(".chat-tag-sug-chip");
+      if (chip) {
+        const val = chip.getAttribute("data-tag");
+        if (val && !currentTicketProperties.tags.includes(val)) {
+          saveTicketProperty({ tags: [...currentTicketProperties.tags, val] });
+        }
+        chatTagPopover.classList.add("hidden");
+        addTagBtn.setAttribute("aria-expanded", "false");
+      }
+    });
+
+    function commitChatTag() {
+      if (!tagInput) return;
+      const val = tagInput.value.trim();
+      tagInput.value = "";
+      if (!val) return;
+      if (!currentTicketProperties.tags.includes(val)) {
+        saveTicketProperty({ tags: [...currentTicketProperties.tags, val] });
+      }
+      chatTagPopover.classList.add("hidden");
+      addTagBtn.setAttribute("aria-expanded", "false");
+    }
+
+    if (tagSubmitBtn) {
+      tagSubmitBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        commitChatTag();
+      });
+    }
+
+    if (tagInput) {
+      tagInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commitChatTag();
+        } else if (e.key === "Escape") {
+          chatTagPopover.classList.add("hidden");
+          addTagBtn.setAttribute("aria-expanded", "false");
+        }
+      });
+    }
+  } else if (addTagBtn && tagInput) {
+    addTagBtn.addEventListener("click", () => {
+      addTagBtn.classList.add("hidden");
+      tagInput.classList.remove("hidden");
+      tagInput.value = "";
+      tagInput.focus();
+    });
+
+    function commitTagInput() {
+      const value = tagInput.value.trim();
+      tagInput.classList.add("hidden");
+      addTagBtn.classList.remove("hidden");
+      if (!value) return;
+      if (currentTicketProperties.tags.includes(value)) return;
+      saveTicketProperty({ tags: [...currentTicketProperties.tags, value] });
+    }
+
+    tagInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); commitTagInput(); }
+      if (e.key === "Escape") { tagInput.classList.add("hidden"); addTagBtn.classList.remove("hidden"); }
+    });
+    tagInput.addEventListener("blur", commitTagInput);
   }
 
-  tagInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); commitTagInput(); }
-    if (e.key === "Escape") { tagInput.classList.add("hidden"); addTagBtn.classList.remove("hidden"); }
-  });
-  tagInput.addEventListener("blur", commitTagInput);
-
-  tagChips.addEventListener("click", (e) => {
-    const removeBtn = e.target.closest(".tp-tag-chip__remove");
-    if (!removeBtn) return;
-    const tagToRemove = removeBtn.dataset.tag;
-    saveTicketProperty({ tags: currentTicketProperties.tags.filter(t => t !== tagToRemove) });
-  });
+  if (tagChips) {
+    tagChips.addEventListener("click", (e) => {
+      const removeBtn = e.target.closest(".tp-tag-chip__remove");
+      if (!removeBtn) return;
+      const tagToRemove = removeBtn.dataset.tag;
+      saveTicketProperty({ tags: currentTicketProperties.tags.filter(t => t !== tagToRemove) });
+    });
+  }
 })();
 
 // Periodic SLA Check

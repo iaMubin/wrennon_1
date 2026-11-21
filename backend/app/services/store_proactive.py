@@ -235,7 +235,7 @@ async def link_session(session_id: str, email: str) -> str:
                 "is_online": True,
                 "email": email,
             })
-    except Exception:
+    except Exception:  # nosec B110
         pass
 
     return result

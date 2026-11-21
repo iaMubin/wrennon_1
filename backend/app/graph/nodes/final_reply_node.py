@@ -97,29 +97,32 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
     if state.get("page_context"):
         context_parts.append(state["page_context"])
     context_parts.append(
-        "Honesty rule: only say you did something (cancelled, refunded, added to the bag, opened a page, changed an order) if the tool results "
+        "Honesty rule: only say you did something (performed a cancellation, refunded, added to the bag, opened a page, changed an order) if the tool results "
         "show it was done. A tool result that starts with NOT (or NOT DONE) means nothing changed: say exactly that and why. If it says it needs the customer's confirmation, ask for it. Never claim an action you did not perform."
     )
     if state.get("gathered_context"):
         context_parts.append("Tool/policy results:\n" + "\n".join(state["gathered_context"]))
 
+    in_business_hours = True
     if state.get("handoff_requested"):
         reason = state.get("handoff_reason") or "this needs a closer look from the team"
         from app.services.business_hours import is_within_business_hours
         
-        if is_within_business_hours(db):
+        in_business_hours = is_within_business_hours(db)
+        if in_business_hours:
             context_parts.append(
                 f"IMPORTANT: This conversation is being handed to a human teammate because: "
-                f"{reason}. Let the customer know, naturally and briefly, that you're bringing "
-                "in someone from the team to take care of this. Do not say 'ticket created' or "
-                "use internal jargon, and do not pretend to be that teammate yourself."
+                f"{reason}. You must let the customer know warmly, clearly and directly that you're connecting "
+                "them with someone from our human support team to take care of this. Let them know someone "
+                "will be with them shortly and that their chat details are already shared. "
+                "Do not say 'ticket created' or use internal jargon, and do not pretend to be that teammate yourself."
             )
         else:
             context_parts.append(
                 f"IMPORTANT: This conversation is being escalated because: {reason}. "
-                "However, our human team is currently offline. You must let the customer know "
-                "that the team is currently offline and we will respond within our next business hours. "
-                "Do not imply someone is about to jump in right now."
+                "However, our human team is currently offline. You must clearly inform the customer "
+                "that our team is currently offline and we will follow up as soon as our business hours resume. "
+                "Do not leave them waiting expecting an immediate human response right now."
             )
 
     if state.get("conversation_summary"):
@@ -158,7 +161,30 @@ async def final_reply_node(state: ConversationState) -> ConversationState:
 
     reply = await _safe_llm_call(llm_messages, temperature=0.3, max_tokens=1000, prefer_openrouter=prefer_openrouter)
     if not reply:
-        reply = "I'm sorry, I couldn't process that right now. Could you please try again?"
+        if state.get("handoff_requested"):
+            if in_business_hours:
+                reply = (
+                    "I'm connecting you with a human support specialist from our team right now. "
+                    "They will have full access to our conversation so you won't need to repeat yourself, "
+                    "and someone will be with you shortly."
+                )
+            else:
+                reply = (
+                    "I've escalated this to our human support team. Our team is currently offline, "
+                    "but your message and conversation history have been recorded and a specialist "
+                    "will follow up with you as soon as business hours begin."
+                )
+        else:
+            reply = "I'm sorry, I couldn't process that right now. Could you please try again?"
+    elif state.get("handoff_requested"):
+        # Ensure handoff was mentioned in the reply so the customer is never left waiting in silence
+        handoff_keywords = ["team", "agent", "specialist", "human", "colleague", "support", "offline", "hours"]
+        if not any(k in reply.lower() for k in handoff_keywords):
+            if in_business_hours:
+                handoff_notice = "I've connected this chat with our human support team, and a specialist will be with you shortly."
+            else:
+                handoff_notice = "I've escalated your request to our support team. We're currently outside business hours, but an agent will follow up as soon as we open."
+            reply = f"{reply.strip()}\n\n{handoff_notice}"
 
     state["messages"].append(AIMessage(content=reply))
     logger.info(f"[TIMING] Final Reply Node took {time.time() - start_time:.3f}s")

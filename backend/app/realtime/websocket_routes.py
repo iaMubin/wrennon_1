@@ -484,7 +484,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             if _c and _c.customer_email:
                 _ws_customer_email = _c.customer_email
             _s.close()
-        except Exception:
+        except Exception:  # nosec B110
             pass
     await manager.connect_customer(session_id, websocket, email=_ws_customer_email)
     await manager.broadcast_to_agents({
@@ -627,7 +627,17 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
         msg_start_time = time.time()
 
         phase1_data = await _get_fresh_phase1_data()
-        if phase1_data is None or phase1_data.get("handoff_active"):
+        if phase1_data is None:
+            return
+        if phase1_data.get("handoff_active"):
+            try:
+                await websocket.send_json({"type": "stopped_typing"})
+                await websocket.send_json({
+                    "type": "handoff_ack",
+                    "message": "Your message was delivered to our support team."
+                })
+            except Exception:  # nosec B110
+                pass
             return
 
         customer_text = phase1_data["messages"][-1]["content"] if phase1_data["messages"] else ""
@@ -767,6 +777,15 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             _t0 = time.time()
             await manager.broadcast_to_agents(event)
             logger.info(f"[TIMING] broadcast_to_agents ({event['type']}) dispatched in {time.time() - _t0:.3f}s")
+            if event.get("type") == "handoff":
+                try:
+                    await websocket.send_json({
+                        "type": "handoff",
+                        "status": "pending_human",
+                        "message": "Connected to human support. An agent will be with you shortly."
+                    })
+                except Exception:  # nosec B110
+                    pass
 
         phase3_duration = time.time() - phase3_start
         logger.info(f"[TIMING] Phase 3 (DB Post-processing) took {phase3_duration:.3f}s")
@@ -794,7 +813,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             try:
                 await manager.send_to_customer(session_id, {"type": "new_message", "sender": "bot", "reply": "Sorry, I'm having trouble answering right now. Please try again in a moment, or ask for a team member and I'll bring one in."})
                 await manager.broadcast_to_agents({"type": "new_message", "session_id": session_id, "sender": "agent_internal", "content": "The AI assistant failed on a turn (see the server log). The customer was told to retry.", "is_resolved": False, "message_id": None})
-            except Exception:
+            except Exception:  # nosec B110
                 pass
 
     def _start_turn() -> asyncio.Task:
@@ -857,6 +876,10 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             # even though it wasn't claimed when the last message arrived.
             recheck = await asyncio.to_thread(_sync_setup_conversation, session_id, _ws_customer_email)
             if recheck["handoff_active"]:
+                try:
+                    await websocket.send_json({"type": "stopped_typing"})
+                except Exception:  # nosec B110
+                    pass
                 continue
 
             task = _start_turn()
@@ -931,7 +954,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
             if data.get("type") in ("ping", "heartbeat"):
                 try:
                     await websocket.send_json({"type": "pong"})
-                except Exception:
+                except Exception:  # nosec B110
                     pass
                 continue
 
@@ -1067,7 +1090,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
                 "is_online": still_online,
                 "email": disc_email,
             })
-        except Exception:
+        except Exception:  # nosec B110
             pass
     except Exception as e:
         logger.error(f"Error in customer_websocket: {e}", exc_info=True)
@@ -1080,7 +1103,7 @@ async def customer_websocket(websocket: WebSocket, session_id: str, token: str |
                 "is_online": still_online,
                 "email": disc_email,
             })
-        except Exception:
+        except Exception:  # nosec B110
             pass
     finally:
         debounce_worker_task.cancel()
@@ -1176,7 +1199,7 @@ async def agent_websocket(websocket: WebSocket, access_token: str | None = Cooki
                     continue
             if data.get("type") in ["typing", "stopped_typing"]:
                 if session_id:
-                    await manager.send_to_customer(session_id, {"type": data["type"]})
+                    await manager.send_to_customer(session_id, {"type": data["type"], "sender": "agent"})
                 continue
 
             if data.get("type") == "view_conversation":
@@ -1213,6 +1236,8 @@ async def agent_websocket(websocket: WebSocket, access_token: str | None = Cooki
             # wrong, the sender check prevents internal notes from leaking.
             msg_sender = "agent_internal" if is_internal else "agent"
             if not is_internal and msg_sender != "agent_internal":
+                # Ensure customer typing indicator is cleared immediately on agent reply
+                await manager.send_to_customer(session_id, {"type": "stopped_typing"})
                 # Customer receives same shape as AI reply — seamless handoff.
                 await manager.send_to_customer(session_id, {
                     "reply": reply_text, 

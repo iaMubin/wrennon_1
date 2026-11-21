@@ -255,6 +255,8 @@ class ConnectionManager:
                 if not viewers:
                     self._viewers_by_session.pop(old_session_id, None)
                 changed_sessions.add(old_session_id)
+            # Guarantee customer typing indicator is cleared if agent navigated away
+            await self.send_to_customer(old_session_id, {"type": "stopped_typing"})
 
         if session_id is not None:
             self._viewing[websocket] = session_id

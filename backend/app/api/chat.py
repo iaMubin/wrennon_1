@@ -119,18 +119,18 @@ def session_status(
     csat_rating = csat.rating if csat else None
 
     if not conversation.resolved:
-        return {"status": "active", "resolved": False, "csat_rating": csat_rating}
+        return {"status": "active", "resolved": False, "csat_rating": csat_rating, "handoff_active": bool(conversation.handoff_active)}
 
     # Conversation was resolved — check if within 72-hour window
     if conversation.resolved_at:
         elapsed = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - conversation.resolved_at
         if elapsed.total_seconds() < REOPEN_WINDOW_HOURS * 3600:
-            return {"status": "resolved_recent", "resolved": True, "csat_rating": csat_rating}
+            return {"status": "resolved_recent", "resolved": True, "csat_rating": csat_rating, "handoff_active": bool(conversation.handoff_active)}
         else:
-            return {"status": "expired", "resolved": True, "csat_rating": csat_rating}
+            return {"status": "expired", "resolved": True, "csat_rating": csat_rating, "handoff_active": False}
 
     # resolved=True but no resolved_at (legacy data) — treat as expired
-    return {"status": "expired", "resolved": True, "csat_rating": csat_rating}
+    return {"status": "expired", "resolved": True, "csat_rating": csat_rating, "handoff_active": False}
 
 
 @router.get("/chat/{session_id}/history")

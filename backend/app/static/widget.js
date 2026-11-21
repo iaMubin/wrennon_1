@@ -285,7 +285,7 @@ const PRIVACY_URL = "";
 // Live typing indicator bubble placed inside #messages
 const typingIndicatorBar = document.createElement("div");
 typingIndicatorBar.id = "typing-indicator-bar";
-typingIndicatorBar.className = "bubble bubble-bot bubble-typing hidden";
+typingIndicatorBar.className = "bubble bubble-agent bubble-typing hidden";
 typingIndicatorBar.setAttribute("role", "status");
 typingIndicatorBar.setAttribute("aria-live", "polite");
 typingIndicatorBar.innerHTML = `<span class="dot"></span><span class="dot"></span><span class="dot"></span>`;
@@ -340,6 +340,9 @@ async function resolveSessionId() {
           if (data.status === "resolved_recent" || data.resolved) {
             window.__wrennon_session_resolved = true;
             window.__wrennon_csat_rating = data.csat_rating || null;
+          }
+          if (data.handoff_active) {
+            window.__wrennon_handoff_active = true;
           }
           return;
         }
@@ -724,17 +727,33 @@ function connectSocket() {
       }
       
       if (data.type === "typing") {
-        showTypingIndicator();
+        if (data.sender !== "bot") {
+          showTypingIndicator();
+        }
         return;
       } else if (data.type === "stopped_typing") {
         hideTypingIndicator();
         return;
+      } else if (data.type === "handoff" || data.type === "handoff_status") {
+        hideTypingIndicator();
+        window.__wrennon_handoff_active = true;
+        appendHandoffNotice(data.message || "Connected to human support. An agent will be with you shortly.");
+        return;
+      } else if (data.type === "handoff_ack") {
+        hideTypingIndicator();
+        window.__wrennon_handoff_active = true;
+        return;
       } else if (data.type === "resolved") {
+        hideTypingIndicator();
+        window.__wrennon_session_resolved = true;
         showCsatPrompt();
         return;
       } else if (data.type === "new_message" || data.reply || data.message || data.content) {
         hideTypingIndicator();
         const sender = data.sender || "bot";
+        if (sender === "agent") {
+          window.__wrennon_handoff_active = true;
+        }
         const name = data.name || (sender === "agent" ? "Support Agent" : "AI Assistant");
         const text = data.reply || data.content || data.message;
         
@@ -742,7 +761,12 @@ function connectSocket() {
           appendMessage(sender, text, true, Date.now(), name);
         }
         if (data.is_resolved || data.resolved) {
+          window.__wrennon_session_resolved = true;
           showCsatPrompt();
+        } else if (window.__wrennon_session_resolved) {
+          window.__wrennon_session_resolved = false;
+          const oldCsat = document.getElementById("wrennon-csat-card");
+          if (oldCsat) oldCsat.remove();
         }
         return;
       } else {
@@ -755,6 +779,7 @@ function connectSocket() {
   };
 
   socket.onclose = (event) => {
+    hideTypingIndicator();
     // 4409: this specific connection was superseded by a newer one for
     // the same session (see connection_manager.py's connect_customer) —
     // that newer connection already exists, so reconnecting here again
@@ -779,6 +804,7 @@ function connectSocket() {
   };
 
   socket.onerror = (err) => {
+    hideTypingIndicator();
     console.error("WebSocket error:", err);
   };
 }
@@ -786,10 +812,14 @@ function connectSocket() {
 // ── Rendering ──────────────────────────────────────────────────────
 
 function renderMarkdown(text) {
+  if (!text) return "";
   const lines = text.split("\n");
   let html = "";
   let inList = false;
   let listTag = "ul";
+  let inCodeBlock = false;
+  let codeBlockLang = "";
+  let codeBlockLines = [];
 
   const closeList = () => {
     if (inList) {
@@ -799,15 +829,53 @@ function renderMarkdown(text) {
   };
 
   for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) {
+    const trimmed = rawLine.trim();
+
+    // Fenced code blocks ```
+    if (trimmed.startsWith("```")) {
+      closeList();
+      if (!inCodeBlock) {
+        inCodeBlock = true;
+        codeBlockLang = trimmed.slice(3).trim();
+        codeBlockLines = [];
+      } else {
+        inCodeBlock = false;
+        const codeContent = codeBlockLines.join("\n");
+        html += `<pre class="chat-code-block"><code class="${codeBlockLang ? 'language-' + escapeAttr(codeBlockLang) : ''}">${escapeHtml(codeContent)}</code></pre>`;
+        codeBlockLines = [];
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeBlockLines.push(rawLine);
+      continue;
+    }
+
+    if (!trimmed) {
       closeList();
       continue;
     }
 
-    const numbered = line.match(/^(\d+)[.)]\s+(.*)/);
-    const bulleted = line.match(/^[-*•]\s+(.*)/);
-    const blockquoted = line.match(/^>\s*(.*)/);
+    // Horizontal dividers
+    if (/^(\*{3,}|-{3,}|_{3,})$/.test(trimmed)) {
+      closeList();
+      html += `<hr class="chat-divider" />`;
+      continue;
+    }
+
+    // Headings (e.g. ### Title)
+    const headingMatch = trimmed.match(/^(#{1,4})\s+(.+)/);
+    if (headingMatch) {
+      closeList();
+      const level = Math.min(headingMatch[1].length + 1, 4);
+      html += `<h${level} class="chat-heading">${inlineMarkdown(headingMatch[2])}</h${level}>`;
+      continue;
+    }
+
+    const numbered = trimmed.match(/^(\d+)[.)]\s+(.*)/);
+    const bulleted = trimmed.match(/^[-*•]\s+(.*)/);
+    const blockquoted = trimmed.match(/^>\s*(.*)/);
 
     if (numbered || bulleted) {
       const tag = numbered ? "ol" : "ul";
@@ -824,10 +892,14 @@ function renderMarkdown(text) {
       html += `<blockquote>${inlineMarkdown(blockquoted[1])}</blockquote>`;
     } else {
       closeList();
-      html += `<p>${inlineMarkdown(line)}</p>`;
+      html += `<p>${inlineMarkdown(trimmed)}</p>`;
     }
   }
   closeList();
+  if (inCodeBlock && codeBlockLines.length > 0) {
+    const codeContent = codeBlockLines.join("\n");
+    html += `<pre class="chat-code-block"><code>${escapeHtml(codeContent)}</code></pre>`;
+  }
   return html;
 }
 
@@ -1012,7 +1084,15 @@ function inlineMarkdown(text) {
     return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer nofollow" title="${escapeAttr(url)}" style="color: var(--accent); text-decoration: underline;">${escapeHtml(maskedTitle)}</a>`;
   });
   escaped = linkifyRawUrls(escaped);
+  // Inline code tags (e.g. `order_id` or `track-123`)
+  escaped = escaped.replace(/`([^`\n]+)`/g, '<code class="chat-code-inline">$1</code>');
+  // Bold
   escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  // Italics (single asterisk or underscore, avoiding HTML attribute quotes)
+  escaped = escaped.replace(/(^|[^\w*])\*([^*\n]+)\*([^\w*]|$)/g, "$1<em>$2</em>$3");
+  escaped = escaped.replace(/(^|[^\w_])_([^_\n]+)_([^\w_]|$)/g, "$1<em>$2</em>$3");
+  // Strikethrough
+  escaped = escaped.replace(/~~(.+?)~~/g, "<del>$1</del>");
   return escaped;
 }
 
@@ -1227,38 +1307,29 @@ function showCsatPrompt(initialRating = null) {
   const csatKey = `wrennon_csat_submitted_${SESSION_ID}`;
   const storedRating = initialRating || localStorage.getItem(csatKey);
   const alreadySubmitted = Boolean(storedRating);
+  const ratingNum = Number(storedRating) || 0;
 
-  let card = document.getElementById("wrennon-csat-card");
-  if (card) {
-    if (alreadySubmitted) {
-      const ratingNum = Number(storedRating);
-      const stars = card.querySelectorAll(".csat-star");
-      stars.forEach(s => {
-        s.disabled = true;
-        s.classList.toggle("csat-star--selected", Number(s.dataset.rating) <= ratingNum);
-      });
-      const question = card.querySelector(".csat-card__question");
-      if (question) question.textContent = "Thanks for your feedback!";
-    }
-    return;
+  // Always remove any previously rendered CSAT card so the prompt re-appears fresh at the bottom of the chat
+  const existingCard = document.getElementById("wrennon-csat-card");
+  if (existingCard) {
+    existingCard.remove();
   }
 
-  card = document.createElement("div");
+  const card = document.createElement("div");
   card.id = "wrennon-csat-card";
   card.className = "csat-card";
-  const ratingNum = Number(storedRating) || 0;
   card.innerHTML = `
     <div class="csat-card__question">${alreadySubmitted ? "Thanks for your feedback!" : "How was your support experience?"}</div>
     <div class="csat-card__stars" role="radiogroup" aria-label="Rate your experience">
-      ${[1, 2, 3, 4, 5].map(n => `<button type="button" class="csat-star${alreadySubmitted && n <= ratingNum ? ' csat-star--selected' : ''}" data-rating="${n}" ${alreadySubmitted ? 'disabled' : ''} aria-label="${n} star${n > 1 ? 's' : ''}">★</button>`).join("")}
+      ${[1, 2, 3, 4, 5].map(n => `<button type="button" class="csat-star${alreadySubmitted && n <= ratingNum ? ' csat-star--selected' : ''}" data-rating="${n}" aria-label="${n} star${n > 1 ? 's' : ''}">★</button>`).join("")}
     </div>
   `;
   messagesEl.appendChild(card);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
-  if (alreadySubmitted) return;
-
   const stars = card.querySelectorAll(".csat-star");
+  const questionEl = card.querySelector(".csat-card__question");
+
   stars.forEach(star => {
     star.addEventListener("mouseenter", () => {
       const n = Number(star.dataset.rating);
@@ -1269,12 +1340,16 @@ function showCsatPrompt(initialRating = null) {
     });
     star.addEventListener("click", () => {
       const rating = Number(star.dataset.rating);
-      // Instant optimistic UI update
-      stars.forEach(s => { s.disabled = true; });
-      stars.forEach(s => s.classList.toggle("csat-star--selected", Number(s.dataset.rating) <= rating));
+      // Instant optimistic UI update — stars remain interactive so feedback can be changed anytime
+      stars.forEach(s => {
+        s.disabled = false;
+        s.classList.toggle("csat-star--selected", Number(s.dataset.rating) <= rating);
+      });
       localStorage.setItem(csatKey, String(rating));
-      const question = card.querySelector(".csat-card__question");
-      if (question) question.textContent = "Thanks for your feedback!";
+      window.__wrennon_csat_rating = rating;
+      if (questionEl) {
+        questionEl.textContent = "Thanks for your feedback!";
+      }
 
       fetch(`${API_BASE}/chat/${SESSION_ID}/csat`, {
         method: "POST",
@@ -1385,7 +1460,11 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   const wrapper = document.createElement("div");
   wrapper.className = `bubble bubble-${uiRole} bubble-enter${isImageOnly ? ' bubble-image-only' : ''}${isVoiceOnly ? ' bubble-voice-only' : ''}${isGrouped ? ' bubble-grouped-next' : ''}`;
   wrapper.setAttribute("role", "listitem");
-  wrapper.innerHTML = nameHtml + replyHtml + renderMarkdown(displayText) + metaHtml;
+  if (uiRole === "agent" || uiRole === "bot") {
+    wrapper.innerHTML = `<div class="bubble-box">${nameHtml}${replyHtml}${renderMarkdown(displayText)}</div>${metaHtml}`;
+  } else {
+    wrapper.innerHTML = nameHtml + replyHtml + renderMarkdown(displayText) + metaHtml;
+  }
 
   if (wrapper.querySelector('.voice-player')) {
     const clone = wrapper.cloneNode(true);
@@ -1420,6 +1499,16 @@ function appendMessage(role, text, save = true, timestamp = Date.now(), name = n
   }
 }
 
+function appendHandoffNotice(text) {
+  const existing = messagesEl.querySelector(".bubble-handoff");
+  if (existing) return;
+  const notice = document.createElement("div");
+  notice.className = "bubble bubble-system bubble-handoff";
+  notice.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px; vertical-align:-2px; flex-shrink:0;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg><span>${escapeHtml(text)}</span>`;
+  messagesEl.appendChild(notice);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
 let typingIndicatorTimeout = null;
 function showTypingIndicator() {
   clearTimeout(typingIndicatorTimeout);
@@ -1439,10 +1528,10 @@ function showTypingIndicator() {
     } catch (_) {}
   });
 
-  // Auto-hide after 20s if no response arrives to avoid stuck indicator
+  // Auto-hide after 5s if no response arrives to avoid stuck indicator
   typingIndicatorTimeout = setTimeout(() => {
     hideTypingIndicator();
-  }, 20000);
+  }, 5000);
 }
 
 function hideTypingIndicator() {
@@ -1457,8 +1546,15 @@ function sendMessage() {
   const text = inputEl.value.trim();
   if (!text) return;
 
+  if (window.__wrennon_session_resolved) {
+    window.__wrennon_session_resolved = false;
+    const oldCsat = document.getElementById("wrennon-csat-card");
+    if (oldCsat) oldCsat.remove();
+    localStorage.removeItem(`wrennon_csat_submitted_${SESSION_ID}`);
+    window.__wrennon_csat_rating = null;
+  }
+
   appendMessage("user", text);
-  showTypingIndicator(); // Show live indicator at the bottom while awaiting reply
   inputEl.value = "";
   inputEl.style.height = '44px';
   inputEl.style.overflowY = 'hidden';

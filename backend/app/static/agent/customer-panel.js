@@ -31,8 +31,22 @@
     demo: false,
     activeTab: 'overview',
     isTagInputOpen: false,
+    isNoteInputOpen: false,
     isOnline: false
   };
+
+  const SUGGESTED_CUSTOMER_TAGS = [
+    'VIP',
+    'Wholesale',
+    'Repeat Buyer',
+    'High LTV',
+    'Loyal Customer',
+    'Influencer',
+    'New Customer',
+    'Frequent Returner',
+    'High Priority',
+    'Corporate'
+  ];
 
   // ── SVGs ────────────────────────────────────────────────────────────────
   const ICONS = {
@@ -100,11 +114,52 @@
   const isOpen = () => { const s = sidebar(); return !!s && !s.classList.contains('hidden'); };
 
   const shouldDefaultOpen = () => {
-    const p = getPref();
-    if (p === 'closed') return false;
-    if (p === 'open') return true;
-    return typeof window !== 'undefined' && window.innerWidth > 980;
+    return hasCustomerInfo();
   };
+
+  function hasCustomerInfo() {
+    if (!state.sessionId) return false;
+    const meta = (typeof convMeta === 'function') ? (convMeta(state.sessionId) || {}) : {};
+    const email = (state.email || meta.customer_email || (state.order && state.order.email) || (state.profile && state.profile.email) || '').trim();
+    const name = (state.profile && state.profile.name) || (state.order && state.order.name) || meta.customer_name || '';
+    const isNamed = Boolean(name && name.trim() && !/^(customer|guest|anonymous|user)$/i.test(name.trim()));
+    const hasOrders = Boolean(
+      (state.profile && Array.isArray(state.profile.orders) && state.profile.orders.length > 0) ||
+      (state.order && Array.isArray(state.order.orders) && state.order.orders.length > 0) ||
+      state.activeOrder
+    );
+    const hasPhone = Boolean((state.profile && state.profile.phone) || (state.order && state.order.phone));
+    const hasLtvOrTier = Boolean(
+      (state.profile && (state.profile.tier || (state.profile.lifetime_value && state.profile.lifetime_value !== '—' && state.profile.lifetime_value !== '$0.00'))) ||
+      (state.order && (state.order.loyalty_tier || state.order.tier))
+    );
+    const hasNotes = Boolean(state.profile && Array.isArray(state.profile.notes) && state.profile.notes.length > 0);
+
+    return Boolean(
+      (email && email.includes('@')) ||
+      isNamed ||
+      hasOrders ||
+      hasPhone ||
+      hasLtvOrTier ||
+      hasNotes
+    );
+  }
+
+  function syncPanelVisibility() {
+    const hasInfo = hasCustomerInfo();
+    applyVisibility(hasInfo);
+    const b = toggleBtn();
+    if (b) {
+      if (hasInfo) {
+        b.style.opacity = '1';
+        b.style.pointerEvents = 'auto';
+        b.setAttribute('title', `Customer Details: ${state.email || 'Customer'} (Press I)`);
+      } else {
+        b.style.opacity = '0.35';
+        b.setAttribute('title', 'No customer info for this conversation');
+      }
+    }
+  }
 
   function applyVisibility(open) {
     const s = sidebar(); if (!s) return;
@@ -148,6 +203,40 @@
     authedFetch('/agent/customers/tags', 'PATCH', { email: email.trim(), tags }).catch(() => {});
   }
 
+  // ── Customer Note Storage & Sync (Separated from Chat Internal Notes) ───
+  function getCustomerNotes(email) {
+    if (!email) return null;
+    try {
+      const stored = localStorage.getItem(`wrennon_cust_notes_${email.toLowerCase().trim()}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function setCustomerNotes(email, notes) {
+    if (!email) return;
+    try {
+      localStorage.setItem(`wrennon_cust_notes_${email.toLowerCase().trim()}`, JSON.stringify(notes));
+    } catch (e) {}
+  }
+
+  function syncCustomerNoteToBackend(email, note) {
+    if (!email || typeof authedFetch !== 'function') return Promise.resolve(null);
+    return authedFetch('/agent/customers/notes', 'POST', {
+      email: email.trim(),
+      text: note.text,
+      author: note.author || 'Agent'
+    }).catch(() => null);
+  }
+
+  function deleteCustomerNoteFromBackend(email, noteId) {
+    if (!email || !noteId || typeof authedFetch !== 'function') return Promise.resolve(null);
+    return authedFetch(`/agent/customers/notes?email=${encodeURIComponent(email.trim())}&note_id=${encodeURIComponent(noteId)}`, 'DELETE').catch(() => null);
+  }
+
   // ── Data Fetching ───────────────────────────────────────────────────────
   function convMeta(sessionId) {
     return (window.__wrennonConversations || []).find((c) => c.session_id === sessionId) || null;
@@ -178,6 +267,12 @@
           data.tags = localTags;
         } else if (Array.isArray(data.tags)) {
           setCustomerTags(key, data.tags);
+        }
+        const localNotes = getCustomerNotes(key);
+        if (localNotes !== null) {
+          data.notes = localNotes;
+        } else if (Array.isArray(data.notes)) {
+          setCustomerNotes(key, data.notes);
         }
         cache.set(key, { t: Date.now(), data });
         if (cache.size > MAX_CACHE) cache.delete(cache.keys().next().value);
@@ -419,6 +514,11 @@
     const customerTags = (p && Array.isArray(p.tags))
       ? p.tags
       : ((email && getCustomerTags(email)) || []);
+
+    // Dedicated Customer Notes (Strictly isolated from conversation internal notes)
+    const customerNotes = (p && Array.isArray(p.notes))
+      ? p.notes
+      : ((email && getCustomerNotes(email)) || []);
 
     // Active Order (Gorgias Premier Feature)
     const activeOrderObj = ao || (p && p.orders && p.orders[0]) || (o.recent_order ? { order_id: o.recent_order, status: 'recent' } : null);
@@ -855,7 +955,7 @@
 
             <!-- Quick Action Toolbar -->
             <div class="cp-action-bar">
-              <button type="button" class="cp-action-btn cp-action-btn--note" data-cp="switch-note" title="Switch composer to internal note (Ctrl+L)">
+              <button type="button" class="cp-action-btn cp-action-btn--note ${state.isNoteInputOpen ? 'is-active' : ''}" data-cp="toggle-customer-note" title="Add customer profile note">
                 ${ICONS.pen} <span>+ Note</span>
               </button>
               <button type="button" class="cp-action-btn cp-action-btn--tag ${state.isTagInputOpen ? 'is-active' : ''}" data-cp="toggle-tag-input" title="Add customer tag">
@@ -870,6 +970,7 @@
             <div class="cp-hero-tags">
               <div class="cp-hero-tags-head">
                 <span class="cp-hero-tags-title">${ICONS.tag} <span>Customer Tags</span></span>
+                ${customerTags.length ? `<span class="cp-tag-badge-count">${customerTags.length}</span>` : ''}
               </div>
               <div class="cp-tag-cloud">
                 ${customerTags.length ? customerTags.map((t) => `
@@ -881,10 +982,57 @@
                   <span class="cp-tag-empty">No customer tags</span>
                 `}
               </div>
-              <form class="cp-inline-tag-form ${state.isTagInputOpen ? '' : 'hidden'}" data-cp-form="add-customer-tag">
-                <input type="text" class="cp-tag-input" placeholder="Type customer tag..." maxlength="30" />
-                <button type="submit" class="cp-tag-submit-btn" title="Add customer tag">${ICONS.check}</button>
-              </form>
+              ${state.isTagInputOpen ? `
+                <div class="cp-tag-suggestions">
+                  <span class="cp-sug-label">Suggested:</span>
+                  <div class="cp-sug-chips">
+                    ${SUGGESTED_CUSTOMER_TAGS.filter(st => !customerTags.some(ct => ct.toLowerCase() === st.toLowerCase())).map(st => `
+                      <button type="button" class="cp-tag-sug-chip" data-cp="add-suggested-customer-tag" data-tag="${esc(st)}">
+                        + ${esc(st)}
+                      </button>
+                    `).join('')}
+                  </div>
+                </div>
+                <form class="cp-inline-tag-form" data-cp-form="add-customer-tag">
+                  <input type="text" class="cp-tag-input" placeholder="Type custom tag & hit Enter..." maxlength="30" />
+                  <button type="submit" class="cp-tag-submit-btn" title="Add customer tag">${ICONS.check}</button>
+                </form>
+              ` : ''}
+            </div>
+
+            <!-- Upper Section: Customer Notes (Dedicated to Customer Profile) -->
+            <div class="cp-hero-notes">
+              <div class="cp-hero-notes-head">
+                <span class="cp-hero-notes-title">${ICONS.clipboard} <span>Customer Notes</span></span>
+                ${customerNotes.length ? `<span class="cp-notes-count">${customerNotes.length}</span>` : ''}
+                <button type="button" class="cp-card-action-btn ${state.isNoteInputOpen ? 'is-active' : ''}" data-cp="toggle-customer-note" title="Add customer note">
+                  ${ICONS.plus} Note
+                </button>
+              </div>
+              ${customerNotes.length ? `
+                <div class="cp-notes-list">
+                  ${customerNotes.map(n => `
+                    <div class="cp-note-item" data-note-id="${esc(n.id)}">
+                      <div class="cp-note-item-head">
+                        <span class="cp-note-author">${esc(n.author || 'Agent')}</span>
+                        <span class="cp-note-time">${esc(n.created_at ? ago(n.created_at) : 'recently')}</span>
+                        <button type="button" class="cp-note-del" data-cp="remove-customer-note" data-note-id="${esc(n.id)}" title="Delete note" aria-label="Delete note">&times;</button>
+                      </div>
+                      <div class="cp-note-text">${esc(n.text)}</div>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : (!state.isNoteInputOpen ? `<span class="cp-notes-empty">No customer notes yet</span>` : '')}
+
+              ${state.isNoteInputOpen ? `
+                <form class="cp-customer-note-form" data-cp-form="add-customer-note">
+                  <textarea class="cp-note-textarea" placeholder="Add a persistent note about this customer (e.g. VIP handling, preferences)..." rows="3" maxlength="500"></textarea>
+                  <div class="cp-note-form-actions">
+                    <button type="button" class="cp-btn-ghost cp-btn-sm" data-cp="toggle-customer-note">Cancel</button>
+                    <button type="submit" class="cp-btn-primary cp-btn-sm">Save Note</button>
+                  </div>
+                </form>
+              ` : ''}
             </div>
           </div>
 
@@ -1007,6 +1155,7 @@
       demo: false,
       activeTab: state.activeTab || 'overview',
       isTagInputOpen: false,
+      isNoteInputOpen: false,
       isOnline: false
     };
 
@@ -1014,8 +1163,8 @@
       updatePresenceFromProfile(state.profile);
     }
 
-    applyVisibility(shouldDefaultOpen());
     render();
+    syncPanelVisibility();
 
     if (email) {
       loadProfile(email, sessionId, true).then((data) => {
@@ -1024,9 +1173,11 @@
         state.loading = false;
         updatePresenceFromProfile(data);
         render();
+        syncPanelVisibility();
       });
     } else {
       state.loading = false;
+      syncPanelVisibility();
     }
   }
 
@@ -1039,6 +1190,7 @@
       state.email = customer.email;
     }
     render();
+    syncPanelVisibility();
 
     if (state.email && (!state.profile || state.email !== oldEmail)) {
       loadProfile(state.email).then((data) => {
@@ -1046,6 +1198,7 @@
         state.profile = data;
         state.loading = false;
         render();
+        syncPanelVisibility();
       });
     }
   }
@@ -1053,6 +1206,12 @@
   function reset() {
     state.token++;
     state.sessionId = null;
+    state.email = null;
+    state.profile = null;
+    state.order = null;
+    state.activeOrder = null;
+    state.isTagInputOpen = false;
+    state.isNoteInputOpen = false;
     applyVisibility(false);
     const el = content();
     if (el) el.innerHTML = '';
@@ -1126,6 +1285,20 @@
         copyText(summary, act, 'Copied Snapshot!');
         return;
       }
+      if (action === 'toggle-customer-note') {
+        state.isNoteInputOpen = !state.isNoteInputOpen;
+        render();
+        if (state.isNoteInputOpen) {
+          const ta = sb.querySelector('.cp-note-textarea');
+          if (ta) ta.focus();
+        }
+        return;
+      }
+      if (action === 'remove-customer-note') {
+        const noteId = act.dataset.noteId;
+        if (noteId) handleRemoveCustomerNote(noteId);
+        return;
+      }
       if (action === 'switch-note') {
         const noteSelect = document.getElementById('note-type-select');
         if (noteSelect) {
@@ -1141,6 +1314,11 @@
         render();
         const tagInputEl = sb.querySelector('.cp-tag-input');
         if (tagInputEl) tagInputEl.focus();
+        return;
+      }
+      if (action === 'add-suggested-customer-tag') {
+        const tag = act.dataset.tag;
+        if (tag) handleAddCustomerTag(tag);
         return;
       }
       if (action === 'remove-customer-tag') {
@@ -1224,14 +1402,92 @@
     render();
   }
 
+  function handleAddCustomerNote(text) {
+    const clean = String(text || '').trim();
+    if (!clean) return;
+    const meta = convMeta(state.sessionId) || {};
+    const email = state.email || (state.profile && state.profile.email) || meta.customer_email || '';
+    if (!state.profile) {
+      state.profile = { email, notes: [] };
+    }
+    const existing = Array.isArray(state.profile.notes)
+      ? [...state.profile.notes]
+      : (getCustomerNotes(email) || []);
+
+    const newNote = {
+      id: 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      text: clean,
+      author: (window.currentUser && window.currentUser.name) || 'Agent',
+      created_at: new Date().toISOString()
+    };
+
+    const updated = [newNote, ...existing];
+    state.profile.notes = updated;
+    if (email) {
+      setCustomerNotes(email, updated);
+      syncCustomerNoteToBackend(email, newNote).then(saved => {
+        if (saved && saved.id) {
+          newNote.id = saved.id;
+          setCustomerNotes(email, updated);
+        }
+      });
+      const c = cache.get(email.toLowerCase());
+      if (c && c.data) c.data.notes = updated;
+    }
+    state.isNoteInputOpen = false;
+    render();
+  }
+
+  function handleRemoveCustomerNote(noteId) {
+    if (!noteId) return;
+    const meta = convMeta(state.sessionId) || {};
+    const email = state.email || (state.profile && state.profile.email) || meta.customer_email || '';
+    if (!state.profile) return;
+    const existing = Array.isArray(state.profile.notes)
+      ? [...state.profile.notes]
+      : (getCustomerNotes(email) || []);
+    const updated = existing.filter(n => String(n.id) !== String(noteId));
+    state.profile.notes = updated;
+    if (email) {
+      setCustomerNotes(email, updated);
+      deleteCustomerNoteFromBackend(email, noteId);
+      const c = cache.get(email.toLowerCase());
+      if (c && c.data) c.data.notes = updated;
+    }
+    render();
+  }
+
   document.addEventListener('submit', (e) => {
     const tagForm = e.target.closest('[data-cp-form="add-customer-tag"]');
-    if (!tagForm) return;
-    e.preventDefault();
-    const inputEl = tagForm.querySelector('.cp-tag-input');
-    const val = inputEl ? inputEl.value.trim() : '';
-    if (val) {
-      handleAddCustomerTag(val);
+    if (tagForm) {
+      e.preventDefault();
+      const inputEl = tagForm.querySelector('.cp-tag-input');
+      const val = inputEl ? inputEl.value.trim() : '';
+      if (val) {
+        handleAddCustomerTag(val);
+      }
+      return;
+    }
+
+    const noteForm = e.target.closest('[data-cp-form="add-customer-note"]');
+    if (noteForm) {
+      e.preventDefault();
+      const ta = noteForm.querySelector('.cp-note-textarea');
+      const val = ta ? ta.value.trim() : '';
+      if (val) {
+        handleAddCustomerNote(val);
+      }
+      return;
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.matches && e.target.matches('.cp-note-textarea')) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        const val = e.target.value.trim();
+        if (val) handleAddCustomerNote(val);
+      }
     }
   });
 

@@ -602,11 +602,22 @@ def get_customers(
 
 
 CUSTOMER_TAGS_OVERRIDE: dict[str, list[str]] = {}
+CUSTOMER_NOTES_OVERRIDE: dict[str, list[dict]] = {}
 
 
 class CustomerTagsUpdate(BaseModel):
     email: str
     tags: list[str]
+
+
+class CustomerNoteCreate(BaseModel):
+    email: str
+    text: str
+
+
+class CustomerNoteDelete(BaseModel):
+    email: str
+    id: str
 
 
 @router.patch("/agent/customers/tags")
@@ -618,6 +629,48 @@ def update_customer_tags(
     cleaned = [t.strip() for t in payload.tags if t.strip()]
     CUSTOMER_TAGS_OVERRIDE[em] = cleaned
     return {"status": "ok", "email": em, "tags": cleaned}
+
+
+@router.get("/agent/customers/notes")
+def get_customer_notes(
+    email: str = Query(..., min_length=3, max_length=254),
+    agent: Agent = Depends(get_current_agent),
+):
+    em = email.strip().lower()
+    return {"status": "ok", "email": em, "notes": CUSTOMER_NOTES_OVERRIDE.get(em, [])}
+
+
+@router.post("/agent/customers/notes")
+def add_customer_note(
+    payload: CustomerNoteCreate,
+    agent: Agent = Depends(get_current_agent),
+):
+    em = payload.email.strip().lower()
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Note text cannot be empty")
+    import uuid
+    note = {
+        "id": f"cn_{uuid.uuid4().hex[:8]}",
+        "text": text,
+        "author": getattr(agent, "full_name", None) or agent.username,
+        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+    if em not in CUSTOMER_NOTES_OVERRIDE:
+        CUSTOMER_NOTES_OVERRIDE[em] = []
+    CUSTOMER_NOTES_OVERRIDE[em].insert(0, note)
+    return {"status": "ok", "email": em, "note": note, "notes": CUSTOMER_NOTES_OVERRIDE[em]}
+
+
+@router.delete("/agent/customers/notes")
+def delete_customer_note(
+    payload: CustomerNoteDelete,
+    agent: Agent = Depends(get_current_agent),
+):
+    em = payload.email.strip().lower()
+    existing = CUSTOMER_NOTES_OVERRIDE.get(em, [])
+    CUSTOMER_NOTES_OVERRIDE[em] = [n for n in existing if n.get("id") != payload.id]
+    return {"status": "ok", "email": em, "notes": CUSTOMER_NOTES_OVERRIDE[em]}
 
 
 @router.get("/agent/customers/profile")
@@ -689,7 +742,7 @@ def get_customer_profile(
             val_clean = float(re.sub(r"[^\d.]", "", str(ltv_val)))
             if int(tot_ord) > 0:
                 aov = f"${val_clean / int(tot_ord):.2f}"
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
     recent = base.order_by(Conversation.created_at.desc()).limit(8).all()
@@ -714,7 +767,7 @@ def get_customer_profile(
                     if manager.get_customer_websocket(sid) is not None:
                         is_online = True
                         break
-    except Exception:
+    except Exception:  # nosec B110
         pass
 
     return {
@@ -729,6 +782,7 @@ def get_customer_profile(
         "total_orders": tot_ord,
         "aov": aov,
         "tags": CUSTOMER_TAGS_OVERRIDE.get(em, list(mock_c.get("tags", []))),
+        "notes": CUSTOMER_NOTES_OVERRIDE.get(em, []),
         "orders": orders,
         "preferred_payment": orders[0].get("payment_method") if orders else None,
         "preferred_shipping": orders[0].get("shipping_method") if orders else None,

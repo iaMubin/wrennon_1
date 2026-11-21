@@ -542,12 +542,35 @@
               <div class="tp-divider"></div>
 
               <div class="tp-item tp-item--tags">
+                <span class="tp-tag-header-label" title="Conversation / Chat Issue Tags">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 3px;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>Chat Tags:
+                </span>
                 <div id="tag-chips" class="tag-chips"></div>
-                <button id="add-tag-btn" class="tag-add-btn" type="button" title="Add tag">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                  Tag
-                </button>
-                <input id="tag-input" class="tag-input hidden" placeholder="Add tag..." maxlength="40" />
+                <div class="chat-tag-popover-anchor" style="position: relative; display: inline-flex;">
+                  <button id="add-tag-btn" class="tag-add-btn" type="button" title="Add chat tag" aria-haspopup="true" aria-expanded="false">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    + Tag
+                  </button>
+                  <div id="chat-tag-popover" class="chat-tag-popover hidden">
+                    <div class="chat-tag-popover-title">Suggested Chat Tags</div>
+                    <div class="chat-tag-suggestions">
+                      <button type="button" class="chat-tag-sug-chip" data-tag="Order Status">Order Status</button>
+                      <button type="button" class="chat-tag-sug-chip" data-tag="Refund">Refund</button>
+                      <button type="button" class="chat-tag-sug-chip" data-tag="Exchange">Exchange</button>
+                      <button type="button" class="chat-tag-sug-chip" data-tag="Product Inquiry">Product Inquiry</button>
+                      <button type="button" class="chat-tag-sug-chip" data-tag="Shipping Delay">Shipping Delay</button>
+                      <button type="button" class="chat-tag-sug-chip" data-tag="Payment Issue">Payment Issue</button>
+                      <button type="button" class="chat-tag-sug-chip" data-tag="Discount Code">Discount Code</button>
+                      <button type="button" class="chat-tag-sug-chip" data-tag="Complaint">Complaint</button>
+                      <button type="button" class="chat-tag-sug-chip" data-tag="Damaged Item">Damaged Item</button>
+                      <button type="button" class="chat-tag-sug-chip" data-tag="Urgent">Urgent</button>
+                    </div>
+                    <div class="chat-tag-input-row">
+                      <input id="tag-input" class="tag-input" placeholder="Type custom chat tag..." maxlength="40" />
+                      <button id="tag-submit-btn" class="tag-submit-btn" type="button">Add</button>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <span id="csat-badge" class="csat-badge hidden"></span>

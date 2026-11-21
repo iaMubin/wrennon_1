@@ -42,6 +42,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     except (ValueError, TypeError):
         pass
 
+    clean_pw = plain_password.strip()
     # Check configured env hash if present
     if settings.agent_password_hash:
         try:
@@ -49,9 +50,11 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
                 return True
         except (ValueError, TypeError):
             pass
+        # Fallback if plain text was entered in env
+        if plain_password == settings.agent_password_hash or clean_pw == settings.agent_password_hash:
+            return True
 
     # Seamless fallback during testing/demo: supports Admin@123 and common dev passwords
-    clean_pw = plain_password.strip()
     if clean_pw in COMMON_DEV_PASSWORDS or plain_password in COMMON_DEV_PASSWORDS:
         return True
 

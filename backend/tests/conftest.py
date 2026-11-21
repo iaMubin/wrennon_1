@@ -26,7 +26,10 @@ os.environ["ECOMMERCE_PROVIDER"] = ""
 
 # Clean up old test db if it exists
 if os.path.exists("./test.db"):
-    os.remove("./test.db")
+    try:
+        os.remove("./test.db")
+    except OSError:
+        pass
     
 # Run Alembic migrations to head synchronously at import time
 # so that when pytest collects tests and imports app.main, the schema exists.
