@@ -21,7 +21,7 @@ from app.db.store_models import StoreCustomer, StoreInventory, StoreOrder, Store
 from app.services.customer_auth import hash_pw
 from app.services import store_service as svc
 from app.services.integrations.mock_provider import PRODUCT_CATALOG
-from app.services.mock_apis import MOCK_CUSTOMERS, MOCK_ORDERS
+from app.services.mock_apis import MOCK_ORDERS
 
 # Presentation/merchandising data the old mock catalog didn't have.
 _EXTRA: Dict[str, dict] = {

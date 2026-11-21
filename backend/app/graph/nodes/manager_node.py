@@ -29,7 +29,7 @@ import json
 import time
 
 from app.graph.state import ConversationState
-from app.services.llm import _safe_llm_call, mask_pii, LIGHT_MODEL
+from app.services.llm import _safe_llm_call, mask_pii
 from app.logger import logger
 from app.security.sanitize import render_brand_voice
 

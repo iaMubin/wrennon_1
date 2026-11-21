@@ -7,7 +7,6 @@ import pytest
 from app.services import bot_eval as ev
 from app.services import store_actions as sa
 from app.services.bot_eval import Turn
-from test_store_db import full, db, full_world  # noqa: F401  (shared fixtures)
 
 
 class GoodBot:

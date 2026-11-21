@@ -10,14 +10,13 @@ to the chatbot, with real stock levels and real prices.
 from __future__ import annotations
 
 import datetime
-import os
 from typing import Any, Callable, Dict, List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.db.store_models import StoreCustomer, StoreOrder, StoreProduct
+from app.db.store_models import StoreCustomer, StoreProduct
 from app.services import store_service as svc
 
 from .base import EcommerceProvider

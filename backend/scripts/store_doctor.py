@@ -4,7 +4,6 @@
 """
 import inspect
 
-from sqlalchemy import func
 
 from app.db.models import Conversation
 from app.db.session import SessionLocal

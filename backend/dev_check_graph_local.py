@@ -9,7 +9,7 @@ so it needs real API keys configured. Run directly:
 import asyncio
 from app.graph.builder import build_graph
 from app.graph.state import initial_state
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage
 
 async def test_graph():
     graph = build_graph()

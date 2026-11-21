@@ -2,11 +2,9 @@
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import delete
 
 from app.api.store import router as store_router
 from app.db import store_models as m
-from app.db.session import SessionLocal
 from app.limiter import limiter
 from app.services import store_service as svc
 from app.services.integrations.store_db import StoreDBProvider
@@ -14,14 +12,9 @@ from app.services import customer_auth as auth
 from app.services.store_seed import DEMO_PASSWORD, seed_store
 
 
-@pytest.fixture()
-def db():
-    with SessionLocal() as s:
-        for model in (m.StorePendingMessage, m.StoreNudgeLog, m.StoreSessionContext, m.StoreUiAction, m.StoreRefund, m.StoreOrderEvent, m.StoreOrderItem, m.StoreOrder, m.StoreCustomer, m.StoreInventory, m.StoreProduct):
-            s.execute(delete(model))
-        s.commit()
-        seed_store(s, with_history=False)
-        yield s
+@pytest.fixture(autouse=True)
+def _enable_store_db(monkeypatch):
+    monkeypatch.setenv("ECOMMERCE_PROVIDER", "store_db")
 
 
 @pytest.fixture()
@@ -141,13 +134,6 @@ def test_factory_selects_store_db(monkeypatch):
 
 
 # ------------------------------------------------------------ customers & login
-@pytest.fixture()
-def full(db):
-    from app.services.store_seed import seed_history
-    seed_history(db)
-    return db
-
-
 def test_fifteen_customers_with_history_and_passwords(full):
     customers = full.query(m.StoreCustomer).all()
     assert len(customers) == 15 and all(c.password_hash for c in customers)
@@ -731,13 +717,6 @@ def test_reorder_refills_the_bag_from_a_past_order(full):
     assert "No matching order" in sa._reorder({"_session_id": sid, "_customer_email": "emma.richardson@gmail.com", "order_id": "1002"})[0]   # someone else's order
 
 
-@pytest.fixture()
-def full_world(full):
-    """The fully seeded demo world (used by the bot-eval tests)."""
-    return full
-
-
-
 # ------------------------------------------------------------------- complete the look
 def test_complete_the_look_pairs_in_stock_pieces_and_shows_a_card(full):
     from app.services import store_actions as sa, store_context as sc
@@ -785,7 +764,7 @@ def test_every_tool_call_shows_up_as_live_chips(full):
 # ------------------------------------------------------------------ presenter controls
 def test_demo_endpoints_are_invisible_unless_demo_mode_is_on(full, monkeypatch):
     c = _client()
-    monkeypatch.delenv("STORE_DEMO_MODE", raising=False)
+    monkeypatch.setenv("STORE_DEMO_MODE", "0")
     assert c.get("/api/store/demo/status").json() == {"enabled": False}
     for path, body in (("login", {"email": "emma.richardson@gmail.com"}), ("order", {"action": "ship"}), ("stock", {"preset": "restock"}), ("reset", None)):
         assert c.post(f"/api/store/demo/{path}", json=body).status_code == 404, path

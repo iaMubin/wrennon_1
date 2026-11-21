@@ -7,7 +7,6 @@ Sends a tiny test message to each provider the app can use and says plainly what
 import asyncio
 import time
 
-from app.config import settings
 from app.services import llm
 
 

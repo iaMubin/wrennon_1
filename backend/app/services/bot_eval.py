@@ -15,13 +15,12 @@ It creates its own test customer and orders and removes them afterwards (stock i
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import re
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Awaitable, Callable, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from app.db.models import Conversation, Message
 from app.db.session import SessionLocal

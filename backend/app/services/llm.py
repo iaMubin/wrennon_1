@@ -165,7 +165,6 @@ async def _safe_groq_json_call(messages: list, temperature: float = 0.2, max_tok
         raise e
 
 
-from tenacity import retry_if_not_exception_type
 
 @retry(
     stop=stop_after_attempt(3),

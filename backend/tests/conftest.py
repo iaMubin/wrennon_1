@@ -49,3 +49,34 @@ def setup_test_database():
             os.remove("./test.db")
         except PermissionError:
             pass # Windows file lock issue, ignore
+
+
+@pytest.fixture()
+def db():
+    from sqlalchemy import delete
+    from app.db.session import SessionLocal
+    from app.db import store_models as m
+    from app.db.models import SystemSetting
+    from app.services.store_seed import seed_store
+
+    with SessionLocal() as s:
+        s.execute(delete(SystemSetting).where(SystemSetting.key.in_(["store_history_seeded", "store_mock_dates_shifted"])))
+        for model in (m.StorePendingMessage, m.StoreNudgeLog, m.StoreSessionContext, m.StoreUiAction, m.StoreRefund, m.StoreOrderEvent, m.StoreOrderItem, m.StoreOrder, m.StoreCustomer, m.StoreInventory, m.StoreProduct):
+            s.execute(delete(model))
+        s.commit()
+        seed_store(s, with_history=False)
+        yield s
+
+
+@pytest.fixture()
+def full(db):
+    from app.services.store_seed import seed_history
+    seed_history(db)
+    return db
+
+
+@pytest.fixture()
+def full_world(full):
+    """The fully seeded demo world (used by the bot-eval tests)."""
+    return full
+
