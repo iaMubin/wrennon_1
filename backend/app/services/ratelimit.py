@@ -35,9 +35,10 @@ async def hit(key: str, window: int, amount: int = 1) -> int:
     """Add *amount* to the counter for *key* (fixed *window* seconds); return the new total."""
     from app.api.agent import DummyRedis, get_redis
 
+    mem_total = _mem_hit(key, window, amount)
     r = get_redis()
     if isinstance(r, DummyRedis):
-        return _mem_hit(key, window, amount)
+        return mem_total
     try:
         total = await r.incrby(key, amount)
         if total == amount:
@@ -45,21 +46,23 @@ async def hit(key: str, window: int, amount: int = 1) -> int:
         return int(total)
     except Exception as e:  # noqa: BLE001
         logger.warning(f"Redis unavailable for counter {key.split(':')[0]}; using in-process fallback: {type(e).__name__}")
-        return _mem_hit(key, window, amount)
+        return mem_total
 
 
 async def peek(key: str) -> int:
     from app.api.agent import DummyRedis, get_redis
 
+    r_val = 0
     r = get_redis()
     if not isinstance(r, DummyRedis):
         try:
             v = await r.get(key)
-            return int(v) if v else 0
+            r_val = int(v) if v else 0
         except Exception as e:  # noqa: BLE001
             logger.debug(f"Redis peek failed, using in-process counter: {type(e).__name__}")
     count, exp = _memory.get(key, (0, 0.0))
-    return count if exp > time.monotonic() else 0
+    mem_val = count if exp > time.monotonic() else 0
+    return max(r_val, mem_val)
 
 
 async def clear(key: str) -> None:

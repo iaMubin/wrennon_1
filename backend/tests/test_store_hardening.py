@@ -61,10 +61,13 @@ def test_login_is_locked_after_repeated_failures_per_account():
     email = f"lock{uuid.uuid4().hex[:6]}@example.com"
     assert _register(email).status_code == 201
     asyncio.run(ratelimit.clear("cust_login_fail:i:testclient"))
-    codes = [client.post("/api/store/auth/login", json={"email": email, "password": f"wrong-{i}"}).status_code for i in range(9)]
-    assert codes[:8] == [401] * 8 and codes[8] == 429
-    # even the right password is refused while locked (attacker cannot keep guessing between lockouts)
-    assert client.post("/api/store/auth/login", json={"email": email, "password": "Sup3rSecret!"}).status_code == 429
+    try:
+        codes = [client.post("/api/store/auth/login", json={"email": email, "password": f"wrong-{i}"}).status_code for i in range(9)]
+        assert codes[:8] == [401] * 8 and codes[8] == 429
+        # even the right password is refused while locked (attacker cannot keep guessing between lockouts)
+        assert client.post("/api/store/auth/login", json={"email": email, "password": "Sup3rSecret!"}).status_code == 429
+    finally:
+        asyncio.run(ratelimit.clear("cust_login_fail:i:testclient"))
 
 
 def test_successful_login_resets_the_account_budget():

@@ -64,7 +64,7 @@ jobs:
         PINECONE_HOST: "dummy"
         DATABASE_URL: "sqlite:///./test.db"
         REDIS_URL: "redis://localhost:6379"
-        JWT_SECRET_KEY: "test-secret"
+        JWT_SECRET_KEY: "test-secret-at-least-32-bytes-long-for-tests"
         AGENT_PASSWORD_HASH: "test-hash"
         AGENT_USERNAME: "test_admin"
         PYTHONPATH: "."

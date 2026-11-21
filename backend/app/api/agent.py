@@ -7,6 +7,7 @@ these REST routes are for the initial page load only.
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import json
 
@@ -75,11 +76,29 @@ class DummyRedis:
 
 def get_redis():
     global _redis_client
-    if _redis_client is None:
-        if settings.redis_url.startswith("memory://"):
+    if settings.redis_url.startswith("memory://"):
+        if not isinstance(_redis_client, DummyRedis):
             _redis_client = DummyRedis()
-        else:
-            _redis_client = redis.from_url(settings.redis_url, decode_responses=True, socket_connect_timeout=1.0, socket_timeout=1.0)
+        return _redis_client
+
+    try:
+        current_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        current_loop = None
+
+    client_loop = getattr(_redis_client, "_created_loop", None) if _redis_client is not None else None
+    if (
+        _redis_client is None
+        or isinstance(_redis_client, DummyRedis)
+        or (current_loop is not None and client_loop is not None and (client_loop.is_closed() or client_loop is not current_loop))
+    ):
+        _redis_client = redis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_connect_timeout=1.0,
+            socket_timeout=1.0,
+        )
+        _redis_client._created_loop = current_loop
     return _redis_client
 
 router = APIRouter()

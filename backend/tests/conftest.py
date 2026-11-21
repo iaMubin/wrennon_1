@@ -38,6 +38,21 @@ alembic_cfg = Config("alembic.ini")
 alembic_cfg.set_main_option("sqlalchemy.url", db_path)
 command.upgrade(alembic_cfg, "head")
 
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    import asyncio
+    from app.limiter import limiter
+    from app.services import ratelimit
+    limiter.reset()
+    yield
+    limiter.reset()
+    try:
+        asyncio.run(ratelimit.clear("apikey_fail:testclient"))
+        asyncio.run(ratelimit.clear("cust_login_fail:i:testclient"))
+    except Exception:
+        pass
+
+
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_database():
     """

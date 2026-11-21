@@ -88,9 +88,11 @@ def test_assigned_agent_filter_works_and_pagination_bounded(env):
 def test_bad_key_attempts_are_throttled():
     import asyncio
     asyncio.run(ratelimit.clear("apikey_fail:testclient"))
-    codes = [client.get("/api/v1/conversations", headers={"Authorization": "Bearer wk_live_" + "a" * 30}).status_code for _ in range(25)]
-    assert 429 in codes and codes[0] == 401
-    asyncio.run(ratelimit.clear("apikey_fail:testclient"))
+    try:
+        codes = [client.get("/api/v1/conversations", headers={"Authorization": "Bearer wk_live_" + "a" * 30}).status_code for _ in range(25)]
+        assert 429 in codes and codes[0] == 401
+    finally:
+        asyncio.run(ratelimit.clear("apikey_fail:testclient"))
 
 
 def test_admin_creates_scoped_expiring_key(env):
