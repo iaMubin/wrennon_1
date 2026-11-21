@@ -1,6 +1,4 @@
 import datetime
-import pytest
-from unittest.mock import MagicMock
 from app.api.agent import _calculate_customer_wait, _conversation_summary
 from app.db.models import Conversation, Message
 

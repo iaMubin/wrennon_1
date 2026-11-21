@@ -1477,7 +1477,7 @@ function renderConversationList(conversations) {
     }
 
     const customerDisplayName = conv.customer_name || conv.customer_email || "Customer";
-    const avatarHtml = initialsAvatar(customerDisplayName, conv.customer_email || conv.customer_id || conv.session_id, 28);
+    const avatarHtml = initialsAvatar(customerDisplayName, conv.customer_email || conv.customer_id || conv.session_id, 22);
 
     // One badge at a time, the most urgent first; the rest are summarised as "+N" with a tooltip.
     const stageBadge = `<span class="badge ${badgeClass}">${escapeHtml(stageText)}</span>`;
@@ -1505,8 +1505,8 @@ function renderConversationList(conversations) {
         ${avatarHtml}
       </div>
       <div class="conv-item-body">
-        <div class="conv-item-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 6px; min-width: 0;">
-          <div style="display: flex; gap: 8px; align-items: center; overflow: hidden; min-width: 0; flex: 1 1 auto;">
+        <div class="conv-item-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; gap: 6px; min-width: 0;">
+          <div style="display: flex; gap: 6px; align-items: center; overflow: hidden; min-width: 0; flex: 1 1 auto;">
               <input type="checkbox" class="conv-checkbox" data-session-id="${conv.session_id}" onclick="event.stopPropagation(); toggleBulkSelection(this, '${conv.session_id}')" style="cursor: pointer; flex-shrink: 0;">
               <span class="conv-item-email" style="display: flex; align-items: center; gap: 6px; overflow: hidden; min-width: 0; flex: 1 1 auto;">
                   <span class="desktop-only-avatar" style="flex-shrink: 0;">${avatarHtml}</span>
@@ -1516,7 +1516,7 @@ function renderConversationList(conversations) {
           </div>
           <span class="conv-item-time" style="flex-shrink: 0; margin-left: auto;">${formatSidebarTime(conv.updated_at)}</span>
         </div>
-        <div class="conv-item-preview" style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+        <div class="conv-item-preview" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 2px;">
           <span class="conv-item-snippet" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${formatPreview(conv)}</span>
           ${unreadBadgeHtml}
         </div>
@@ -1590,14 +1590,18 @@ async function fetchAndRenderMessages(sessionId) {
       const visibleMsgs = messages.filter(m => !m.content?.startsWith("[SYSTEM_EVENT:"));
       let lastHumanIdx = -1;
       let lastAgentIdx = -1;
+      let lastAiIdx = -1;
       for (let i = visibleMsgs.length - 1; i >= 0; i--) {
         const s = visibleMsgs[i].sender;
         if ((s === "human" || s === "user") && lastHumanIdx === -1) lastHumanIdx = i;
         if (s === "agent" && lastAgentIdx === -1) lastAgentIdx = i;
+        if ((s === "ai" || s === "bot") && lastAiIdx === -1) lastAiIdx = i;
       }
       if (lastHumanIdx !== -1 && (lastAgentIdx === -1 || lastHumanIdx > lastAgentIdx)) {
         custWaiting = true;
-        const start = lastAgentIdx !== -1 ? lastAgentIdx + 1 : 0;
+        const boundaryIdx = Math.max(lastAgentIdx, lastAiIdx);
+        let start = boundaryIdx !== -1 ? boundaryIdx + 1 : 0;
+        if (start > lastHumanIdx) start = lastHumanIdx;
         let earliest = visibleMsgs[lastHumanIdx];
         for (let i = start; i < visibleMsgs.length; i++) {
           if (visibleMsgs[i].sender === "human" || visibleMsgs[i].sender === "user") {

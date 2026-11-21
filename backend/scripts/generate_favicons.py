@@ -6,7 +6,6 @@ and root directories.
 """
 
 import os
-import shutil
 import struct
 import fitz  # PyMuPDF
 
