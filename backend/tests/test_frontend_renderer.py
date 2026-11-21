@@ -13,7 +13,8 @@ SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "js", "rendere
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
 @pytest.mark.parametrize("rel", ["frontend/widget.js", "frontend/agent/agent.js"])
 def test_renderer_blocks_remote_media_and_spoofed_links(rel):
-    r = subprocess.run(["node", SCRIPT, os.path.join(ROOT, rel)], capture_output=True, text=True)
+    node_bin = shutil.which("node") or "node"
+    r = subprocess.run([node_bin, SCRIPT, os.path.join(ROOT, rel)], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "FAIL" not in r.stdout
 
