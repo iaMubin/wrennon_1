@@ -853,7 +853,8 @@ agentInput.addEventListener("input", (e) => {
   }
 
   if (!activeSessionId || !socket || socket.readyState !== WebSocket.OPEN) return;
-  const isInternal = noteTypeSelect && noteTypeSelect.value === "internal";
+  const noteTypeSelectEl = document.getElementById("note-type-select");
+  const isInternal = noteTypeSelectEl && noteTypeSelectEl.value === "internal";
   if (isInternal) {
     stopAgentTypingImmediately(activeSessionId);
     return;
@@ -880,9 +881,10 @@ agentInput.addEventListener("blur", () => {
   stopAgentTypingImmediately();
 });
 
-if (noteTypeSelect) {
-  noteTypeSelect.addEventListener("change", () => {
-    if (noteTypeSelect.value === "internal") {
+const noteTypeSelectEl = document.getElementById("note-type-select");
+if (noteTypeSelectEl) {
+  noteTypeSelectEl.addEventListener("change", () => {
+    if (noteTypeSelectEl.value === "internal") {
       stopAgentTypingImmediately();
     }
   });
