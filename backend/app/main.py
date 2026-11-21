@@ -160,19 +160,31 @@ app.add_middleware(SlowAPIMiddleware)
 _origins = settings.cors_origins_list
 _allow_all = _origins == ["*"]
 
+_WRENNON_ORIGIN_REGEX = (
+    r"^https?://(localhost|127\.0\.0\.1|"
+    r"([a-zA-Z0-9-]+\.)*wrennon\.com|"
+    r"([a-zA-Z0-9-]+\.)*onrender\.com|"
+    r"([a-zA-Z0-9-]+\.)*vercel\.app)(:\d+)?$"
+)
+
 if _allow_all:
-    # In development, dynamically reflect localhost/127.0.0.1 origins so credentials work
+    # Allow localhost/127.0.0.1 and deployed wrennon/render/vercel domains with credentials
     app.add_middleware(
         CORSMiddleware,
-        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+        allow_origin_regex=_WRENNON_ORIGIN_REGEX,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 else:
+    _merged_origins = list(_origins)
+    for _known in ["https://app.wrennon.com", "https://wrennon.com", "https://wrennon-1.onrender.com"]:
+        if _known not in _merged_origins:
+            _merged_origins.append(_known)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=_origins,
+        allow_origins=_merged_origins,
+        allow_origin_regex=_WRENNON_ORIGIN_REGEX,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

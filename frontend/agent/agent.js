@@ -990,6 +990,7 @@ loginForm.addEventListener("submit", async (e) => {
                    // retried, so @mentions and the assignee dropdown silently had
                    // an empty agent list. Refresh it now that we have a session.
   } catch (err) {
+    loginError.textContent = "Unable to connect to server. Please try again.";
     loginError.classList.remove("hidden");
     console.error(err);
   }

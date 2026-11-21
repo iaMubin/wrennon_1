@@ -1134,12 +1134,16 @@ def _origin_allowed(websocket: WebSocket) -> bool:
     allowed = settings.cors_origins_list
     if allowed == ["*"]:
         # Wildcard is rejected in production by config.py; dev/staging only.
-        return settings.app_env != "production"
+        if settings.app_env != "production":
+            return True
     if origin in allowed:
         return True
     from urllib.parse import urlparse
+    netloc = urlparse(origin).netloc.lower()
+    if netloc == "wrennon.com" or netloc.endswith(".wrennon.com") or netloc.endswith(".onrender.com"):
+        return True
     host = websocket.headers.get("host", "")
-    return bool(host) and urlparse(origin).netloc == host
+    return bool(host) and netloc == host
 
 
 @router.websocket("/ws/agent")
