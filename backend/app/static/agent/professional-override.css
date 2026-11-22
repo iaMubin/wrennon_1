@@ -188,6 +188,12 @@
   #sidebar,
   [data-theme] #sidebar,
   [data-theme^="dark"] #sidebar {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    bottom: auto !important;
+    right: auto !important;
+    transform: none !important;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
@@ -197,9 +203,42 @@
     flex-direction: column !important;
     gap: 6px !important;
     height: 100% !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     flex-shrink: 0 !important;
     z-index: 10 !important;
+  }
+
+  /* Closed / Hidden Sidebar State */
+  #sidebar.sidebar-hidden,
+  [data-theme] #sidebar.sidebar-hidden,
+  [data-theme^="dark"] #sidebar.sidebar-hidden {
+    display: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: none !important;
+  }
+
+  /* Hide resizer when sidebar is hidden */
+  #sidebar.sidebar-hidden ~ #resizer,
+  [data-theme] #sidebar.sidebar-hidden ~ #resizer {
+    display: none !important;
+  }
+
+  /* Expand conversation view to full width when sidebar is hidden */
+  #sidebar.sidebar-hidden ~ #conversation-view,
+  [data-theme] #sidebar.sidebar-hidden ~ #conversation-view {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    min-width: 0 !important;
   }
 
   /* 1. Wrennon Branding Panel */

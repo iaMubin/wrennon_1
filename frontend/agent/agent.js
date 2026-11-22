@@ -4649,20 +4649,15 @@ setInterval(() => {
   });
 }, 15000);
 
-// Mobile Sidebar Toggle
+// Mobile / Desktop Sidebar Toggle
 document.addEventListener("DOMContentLoaded", () => {
   const mobileToggle = document.getElementById("mobile-sidebar-toggle");
   const sidebar = document.getElementById("sidebar");
   if (mobileToggle && sidebar) {
     function updateSidebarToggleIcon() {
-      let isOpen = false;
-      if (window.innerWidth <= 1200) {
-        isOpen = sidebar.classList.contains("sidebar-open");
-      } else {
-        isOpen = !sidebar.classList.contains("sidebar-hidden");
-      }
+      const isClosed = sidebar.classList.contains("sidebar-hidden");
       
-      if (isOpen) {
+      if (!isClosed) {
         mobileToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="M9 3v18"></path><rect x="3" y="3" width="6" height="18" rx="4" fill="currentColor" fill-opacity="0.22" stroke="none"></rect><path d="m15.5 15-3-3 3-3"></path></svg>';
         mobileToggle.setAttribute("title", "Close Sidebar");
         mobileToggle.setAttribute("aria-label", "Close Sidebar");
@@ -4678,18 +4673,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     mobileToggle.addEventListener("click", () => {
-      if (window.innerWidth <= 1200) {
-        sidebar.classList.toggle("sidebar-open");
-      } else {
-        sidebar.classList.toggle("sidebar-hidden");
-      }
+      sidebar.classList.toggle("sidebar-hidden");
+      sidebar.classList.remove("sidebar-open");
       updateSidebarToggleIcon();
     });
     
-    // Auto-close sidebar on tablet (769px-1200px) when a conversation is selected
+    // Auto-close sidebar on small tablet (< 1024px) when a conversation is selected
     const originalOpenConv = openConversation;
     window.openConversation = async function(...args) {
-      if (window.innerWidth <= 1200 && window.innerWidth > 768) {
+      if (window.innerWidth <= 1024 && window.innerWidth > 768) {
+        sidebar.classList.add("sidebar-hidden");
         sidebar.classList.remove("sidebar-open");
         updateSidebarToggleIcon();
       }
