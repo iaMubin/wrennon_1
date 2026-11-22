@@ -282,7 +282,13 @@ body {
   width: 340px;
   min-width: 280px;
   max-width: 900px;
+  height: calc(100% - 12px);
+  margin: 6px 0 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
   background: var(--bg-surface, #ffffff); opacity: 1 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   z-index: 2;
@@ -618,7 +624,13 @@ body {
   min-width: 500px;
   display: flex;
   flex-direction: column;
+  height: calc(100% - 12px);
+  margin: 6px 8px 6px 0;
+  border-radius: 8px;
+  border: 1px solid var(--border);
   background: var(--bg-base);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
   position: relative;
 }
 
@@ -653,10 +665,9 @@ body {
 }
 
 #conversation-header {
-  padding-left: 12px;
-  padding-right: 16px;
-  min-height: 60px;
-  height: 60px;
+  padding: 12px 20px 12px;
+  min-height: 68px;
+  height: auto;
 }
 .conv-header-actions {
   display: flex;
@@ -2728,9 +2739,10 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
 }
 
 .conv-item {
-  padding: 14px;
-  margin-bottom: 7px;
-  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  min-height: 100px;
+  border-radius: 8px;
   background: transparent;
   border-color: transparent;
 }
@@ -4918,9 +4930,9 @@ th.sort-desc .sort-icon::after {
   }
 
   #conversation-header {
-    min-height: 60px !important;
+    min-height: 70px !important;
     height: auto !important;
-    padding: 8px 12px !important;
+    padding: 14px 12px 12px !important;
     gap: 8px !important;
     flex-wrap: nowrap !important;
     display: flex !important;
@@ -5035,9 +5047,9 @@ th.sort-desc .sort-icon::after {
 @media (max-width: 580px) {
   #conversation-header {
     height: auto !important;
-    min-height: 60px !important;
+    min-height: 68px !important;
     max-height: none !important;
-    padding: 8px 10px !important;
+    padding: 12px 10px 10px !important;
     gap: 6px !important;
     align-items: flex-start !important;
     overflow: visible !important;
