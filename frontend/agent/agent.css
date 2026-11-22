@@ -4203,7 +4203,11 @@ body:has(.msg-dropdown-menu.show) #agent-input-row {
   background: var(--bg-surface);
 }
 
-.view-panel.hidden {
+.view-panel.hidden,
+#view-conversations.hidden,
+#view-dashboard.hidden,
+#view-customers.hidden,
+#view-analytics.hidden {
   display: none !important;
 }
 

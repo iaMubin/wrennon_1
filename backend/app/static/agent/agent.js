@@ -5057,13 +5057,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // Hide all views and remove active class from all buttons
     Object.keys(views).forEach(key => {
-      if(views[key]) views[key].classList.add('hidden');
+      if(views[key]) {
+        views[key].classList.add('hidden');
+        views[key].classList.remove('active');
+      }
       if(btns[key]) btns[key].classList.remove('active');
     });
 
     // Show selected view and set button to active
     if(views[viewName]) {
       views[viewName].classList.remove('hidden');
+      views[viewName].classList.add('active');
     }
     if(btns[viewName]) {
       btns[viewName].classList.add('active');
